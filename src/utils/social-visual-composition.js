@@ -1,14 +1,15 @@
-import { footerChromeReservePct } from './card-chrome.js';
+import { footerChromeReservePct, STORIES_FOOTER_LIFT } from './card-chrome.js';
 import { FORMATS } from './formats.js';
 import { resolvePresetChrome } from './preset-tokens.js';
 import { visibleSocialText } from './social-generation.js';
 import {
-  SOCIAL_FAMILIES, SOCIAL_LIBRARY_VERSION, socialCardLayout, socialFamilyFor, formatFrame, socialDevices,
+  SOCIAL_FAMILIES, SOCIAL_COMPOSERS, SOCIAL_LIBRARY_VERSION, socialCardLayout, socialFamilyFor, formatFrame, socialDevices,
   toTitleSize, toSubSize, toBodySize,
 } from './social-families.js';
 import { assignSocialFunctions, rhythmVariants } from './social-sequence.js';
-import { socialGround } from './social-chrome.js';
+import { socialGround, luminance } from './social-chrome.js';
 import { normalizePresentationBlocks } from './presentation-quality.js';
+import { VIRAL_STYLES, PILL_ROLE_VISIBLE, pillRoleFor } from './social-viral-styles.js';
 
 const box = (x, y, w, h) => ({ x, y, w, h });
 const PHOTO_ESSAY = new Set(['editorial_magazine', 'mood_sepia', 'reflexivo_cream', 'cinematic_hybrid']);
@@ -130,6 +131,16 @@ function supportChars(slide) {
 export function applySocialVisualComposition(slides, { preset, photoRegion = 'full', brand = null, formato = 'carrossel', narrative = 'editorial' } = {}) {
   if (!preset || preset.productKind === 'apresentacao' || photoRegion !== 'full') return slides;
   if (usesSocialLibrary(preset)) return composeSocialLibrary(slides, { preset, brand, formato, narrative });
+  return applySocialVisualCompositionV3(slides, { preset, photoRegion, brand, formato });
+}
+
+/**
+ * Composição v3 (18/11/2026), a que os projetos salvos antes da v4 carregam.
+ * O app não gera mais com ela; continua exportada para documentar e testar o
+ * formato que esses projetos têm gravado.
+ */
+export function applySocialVisualCompositionV3(slides, { preset, photoRegion = 'full', brand = null, formato = 'carrossel' } = {}) {
+  if (!preset || preset.productKind === 'apresentacao' || photoRegion !== 'full') return slides;
   if (preset.isCustom) return slides;
   const editorial = PHOTO_ESSAY.has(preset.id);
   const chrome = resolvePresetChrome(brand || preset.brand || {});
@@ -196,7 +207,7 @@ export function applySocialVisualComposition(slides, { preset, photoRegion = 'fu
 }
 
 /** Marcas que a composição grava no card; sem as caixas elas não significam nada. */
-const SOCIAL_COMPOSITION_FIELDS = ['socialComposition', 'socialCompositionVersion', 'socialVisualPresetId', 'socialZoneAnchors', 'overlayMode', 'socialArt', 'socialFunction', 'socialFamily', 'socialPhotoTreatment', 'titleItalic', 'subtitleWeight'];
+const SOCIAL_COMPOSITION_FIELDS = ['socialComposition', 'socialCompositionVersion', 'socialVisualPresetId', 'socialZoneAnchors', 'overlayMode', 'socialArt', 'socialFunction', 'socialFamily', 'socialPhotoTreatment', 'titleItalic', 'subtitleWeight', 'hideFooterPill', 'subtitleCase', 'subtitleItalic'];
 
 /**
  * Troca de padrão num projeto já gerado.
@@ -230,13 +241,15 @@ export function restyleSocialSlides(slides, { preset, brand = null, formato = 'c
 /* ================================================================== */
 
 /**
- * Quem passa pela biblioteca v4: as nove famílias e qualquer identidade
- * própria (padrão personalizado). Os doze estilos antigos continuam na v3 para
- * que projetos salvos abram como foram feitos.
+ * Quem passa pela composição v4: as nove famílias, os 12 estilos virais
+ * (social-viral-styles.js) e qualquer identidade própria (padrão
+ * personalizado). Projeto salvo com a v3 não é recomposto ao abrir: a v4 só
+ * entra em geração nova e quando a pessoa reaplica o estilo.
  */
 export function usesSocialLibrary(preset) {
   if (!preset || preset.productKind === 'apresentacao') return false;
   if (preset.socialFamily && SOCIAL_FAMILIES[preset.socialFamily]) return true;
+  if (!preset.isCustom && VIRAL_STYLES[preset.id]) return true;
   // Padrão personalizado com layout próprio salvo pela pessoa continua dela.
   return preset.isCustom === true && !preset.slideDefaults?.layout && !preset.slideDefaults?.canvas;
 }
@@ -250,6 +263,7 @@ const FOOTER_FORMATS = ['carrossel', 'quadrado', 'stories'];
  * frase de ensaio em português (espaços incluídos). Fonte desconhecida: 0,52.
  */
 const CHAR_WIDTH = [
+  [/archivo black/, 0.69], [/big shoulders/, 0.41], [/yeseva/, 0.54], [/playfair/, 0.48],
   [/syne/, 0.6], [/archivo/, 0.53], [/space grotesk|plus jakarta/, 0.52], [/inter tight/, 0.47],
   [/inter\b/, 0.5], [/ibm plex sans/, 0.49], [/fraunces/, 0.49], [/bodoni/, 0.48], [/figtree/, 0.47],
   [/oswald/, 0.48], [/anton/, 0.43], [/jost|dm sans/, 0.45], [/instrument serif/, 0.36], [/mono/, 0.6],
@@ -258,8 +272,8 @@ function charWidthEm(font = '', upper = false) {
   const f = String(font).toLowerCase();
   const hit = CHAR_WIDTH.find(([re]) => re.test(f));
   const w = hit ? hit[1] : 0.52;
-  // Medidas de Anton e Oswald já são em caixa alta.
-  return upper && !/anton|oswald/.test(f) ? w * 1.15 : w;
+  // Medidas de Anton, Oswald, Archivo Black e Big Shoulders já são em caixa alta.
+  return upper && !/anton|oswald|archivo black|big shoulders/.test(f) ? w * 1.15 : w;
 }
 
 function linesFor(text, px, widthPx, cw) {
@@ -276,7 +290,8 @@ function linesFor(text, px, widthPx, cw) {
  * (`socialArt.density = 'over'`) em vez de virar letra miúda.
  */
 function fitDensity(L, slide, F, typo) {
-  const W = (z) => (z.w / 100) * F.w * 0.94;
+  // Largura útil: a caixa menos o respiro lateral que o renderer aplica (~32 px por lado).
+  const W = (z) => (z.w / 100) * F.w - 64;
   const H = (z) => (z.h / 100) * F.h;
   const T = { ...L.title }; const S = { ...L.subtitle };
   let titlePx = L.titlePx; let bodyPx = L.bodyPx; let supportPx = L.supportPx;
@@ -302,7 +317,7 @@ function fitDensity(L, slide, F, typo) {
   // Texto além do previsto num card com foto acima do texto: a foto cede
   // altura (até 28% do card) antes de o apoio encolher no render.
   let P = L.photo ? { ...L.photo } : null;
-  if (P && !L.onPhoto && P.y + P.h <= T.y + 0.5 && P.x <= S.x + 0.5 && needBody() > H(S)) {
+  if (P && !L.onPhoto && P.y + P.h <= T.y + 0.5 && P.x < S.x + S.w && S.x < P.x + P.w && needBody() > H(S)) {
     const deficit = Math.min(toPct(needBody() - H(S)) + 1, P.h - 28);
     if (deficit > 0) { P.h -= deficit; T.y -= deficit; S.y -= deficit; S.h += deficit; }
   }
@@ -310,9 +325,43 @@ function fitDensity(L, slide, F, typo) {
   // caixa (sem isso o navegador parte a palavra no meio).
   const longest = (txt) => String(txt || '').split(/\s+/).reduce((m, w) => Math.max(m, chars(w)), 0);
   // Letras de uma palavra são mais largas que a média com espaços: +18%.
-  const wordFit = (txt, cw) => (longest(txt) ? W(T) / (longest(txt) * cw * 1.18) : Infinity);
+  // Letras de uma palavra são mais largas que a média com espaços; nas
+  // display pesadas em caixa alta (Archivo Black), bem mais.
+  const wordWide = /archivo black/i.test(typo.titleFont || '') ? 1.16 : 1.08;
+  const wordFit = (txt, cw) => (longest(txt) ? W(T) / (longest(txt) * cw * wordWide) : Infinity);
   titlePx = Math.min(titlePx, Math.max(Math.round(L.titlePx * 0.45), Math.floor(wordFit(slide.title, tCw))));
-  for (let i = 0; i < 12 && needTitle() > H(T) && titlePx > L.titlePx * 0.65; i += 1) titlePx = Math.round(titlePx * 0.95);
+  const wordCap = titlePx;
+  // Título longo sobre foto em sangria ou sem foto acima: a caixa sobe até o
+  // topo útil antes de o corpo diminuir (composição alternativa, não letra miúda).
+  if (needTitle() > H(T) && (L.anchors?.title === 'end' || L.anchors?.title === 'center') && (L.onPhoto || !P || P.y >= T.y + T.h)) {
+    // Sobre foto, a manchete não sobe além de 30% do card (o assunto da foto
+    // fica no terço de cima); sem foto, até o topo útil.
+    const room = T.y - (L.onPhoto ? Math.max(F.t + 1, 30) : F.t + 1);
+    const add = Math.min(room, toPct(needTitle() - H(T)) + 1);
+    if (add > 0) { T.y -= add; T.h += add; }
+  }
+  // Piso do título: 65% do planejado e nunca menos de 1,7× o apoio (o título
+  // é o card). Abaixo disso o título ganha espaço em vez de diminuir.
+  const titleFloor = () => Math.max(L.titlePx * 0.65, Math.min(L.titlePx, bodyPx * 1.7), 56);
+  for (let i = 0; i < 12 && needTitle() > H(T) && titlePx * 0.95 >= titleFloor(); i += 1) titlePx = Math.round(titlePx * 0.95);
+  // Título longo no piso: a foto acima cede (até 26% do card), depois o
+  // card só de texto sobe a caixa até o topo útil (o numeral sai).
+  if (needTitle() > H(T) && P && !L.onPhoto && P.y + P.h <= T.y + 0.5 && P.x < T.x + T.w && T.x < P.x + P.w) {
+    const d = Math.min(toPct(needTitle() - H(T)) + 0.5, P.h - 26);
+    if (d > 0) { P.h -= d; T.y -= d; T.h += d; }
+  }
+  if (needTitle() > H(T) && !P && T.y > F.t + 0.5 && (L.anchors?.title || 'start') === 'start') {
+    const d = Math.min(T.y - F.t, toPct(needTitle() - H(T)) + 0.5);
+    T.y -= d; T.h += d;
+  }
+  if (needTitle() > H(T) && stacked && S.h - toPct(needBody()) > 1) {
+    const d = Math.min(S.h - toPct(needBody()) - 1, toPct(needTitle() - H(T)) + 0.5);
+    T.h += d; S.y += d; S.h -= d;
+  }
+  // O apoio nunca encosta no corpo do título: no máximo título ÷ 1,6.
+  bodyPx = Math.max(30, Math.min(bodyPx, Math.floor(titlePx / 1.6)));
+  supportPx = Math.max(28, Math.min(supportPx, bodyPx - 6));
+  const wordLimited = titlePx < Math.max(56, bodyPx * 1.6);
   for (let i = 0; i < 12 && needBody() > H(S) && bodyPx > 30; i += 1) { bodyPx = Math.max(30, bodyPx - 2); supportPx = Math.max(28, supportPx - 2); }
   // Bloco agrupado: com título ancorado em cima, o apoio sobe para logo
   // abaixo das linhas reais do título (sem o vão fixo entre caixas).
@@ -342,7 +391,7 @@ function fitDensity(L, slide, F, typo) {
   }
   const over = needBody() > H(S) * 1.02 || needTitle() > H(T) * 1.15;
   const r = (z) => ({ x: round2(z.x), y: round2(z.y), w: round2(z.w), h: round2(z.h) });
-  return { title: r(T), subtitle: r(S), photo: P ? r(P) : null, titlePx, bodyPx, supportPx, over, subUsed: round2(Math.min(S.h, toPct(needBody()))) };
+  return { title: r(T), subtitle: r(S), photo: P ? r(P) : null, titlePx, bodyPx, supportPx, over, wordLimited, titleUsed: round2(Math.min(T.h, toPct(needTitle()))), subUsed: round2(Math.min(S.h, toPct(needBody()))) };
 }
 const round2 = (v) => Math.round(v * 100) / 100;
 
@@ -350,10 +399,20 @@ const round2 = (v) => Math.round(v * 100) / 100;
 function guardChrome(L, F, { footerPct = 0, logoCorner = null }) {
   const base = 100 - footerPct;
   const T = { ...L.title }; const S = { ...L.subtitle };
+  let photo = L.photo || null;
   const over = Math.max(0, S.y + S.h - base);
   if (over > 0) {
     if (S.h - over >= 10) S.h -= over;
-    else { const up = over - Math.max(0, S.h - 10); S.h = Math.max(10, S.h - over); S.y -= up; T.y -= up; }
+    else {
+      const up = over - Math.max(0, S.h - 10); S.h = Math.max(10, S.h - over); S.y -= up;
+      // O título sobe junto, mas nunca acima do topo útil nem para dentro da
+      // foto acima: a foto cede até 24% e, no limite, a caixa do título encurta.
+      const P = L.photo && !L.onPhoto && L.photo.y + L.photo.h <= T.y + 0.5 ? L.photo : null;
+      const floorY = P ? Math.max(F.t, P.y + 24 + 0.5) : F.t;
+      const ty = Math.max(floorY, T.y - up);
+      if (P && P.y + P.h > ty - 0.5) photo = { ...P, h: Math.max(24, ty - 0.5 - P.y) };
+      T.h = Math.max(6, Math.min(T.h, S.y - 0.5 - ty)); T.y = ty;
+    }
   }
   let chrome = L.chrome;
   if (logoCorner && logoCorner.startsWith('t')) {
@@ -370,7 +429,7 @@ function guardChrome(L, F, { footerPct = 0, logoCorner = null }) {
     });
   }
   if (footerPct > 0) chrome = chrome.filter((d) => !(d.t === 'text' && d.y > base - 3));
-  return { title: T, subtitle: S, chrome };
+  return { title: T, subtitle: S, chrome, photo };
 }
 
 /**
@@ -379,14 +438,21 @@ function guardChrome(L, F, { footerPct = 0, logoCorner = null }) {
  */
 export function socialFormatPatch(slide, formato = 'carrossel') {
   const art = slide?.socialArt;
-  if (!art || !SOCIAL_FAMILIES[art.family]) return {};
+  if (!art || !SOCIAL_COMPOSERS[art.family]) return {};
   const F = { ...formatFrame(formato) };
   const photo = hasPhoto(slide);
-  const L = socialCardLayout(art.family, art.fn, { formato, photo, structured: art.structured, variant: art.variant, topReserve: logoTopReserve(art.logo, F) });
+  let L = socialCardLayout(art.family, art.fn, { formato, photo, structured: art.structured, variant: art.variant, topReserve: logoTopReserve(art.logo, F) });
   const typo = art.typo || {};
   const zoned = guardChrome(L, F, { footerPct: art.footer?.[F.key] || 0, logoCorner: null });
   const center = !L.photo && ['opener', 'development', 'list'].includes(art.fn);
-  const fit = fitDensity({ ...L, center, title: zoned.title, subtitle: zoned.subtitle }, slide, F, typo);
+  let fit = fitDensity({ ...L, center, photo: zoned.photo, title: zoned.title, subtitle: zoned.subtitle }, slide, F, typo);
+  // Título que só caberia com letra pequena numa coluna estreita: a página
+  // troca para foto em faixa e texto na largura toda.
+  if (fit.wordLimited && L.photo && !L.onPhoto && L.title.w < 60) {
+    L = socialCardLayout(art.family, art.fn, { formato, photo, structured: art.structured, variant: art.variant, topReserve: logoTopReserve(art.logo, F), wide: true });
+    const z2 = guardChrome(L, F, { footerPct: art.footer?.[F.key] || 0, logoCorner: null });
+    fit = fitDensity({ ...L, center, photo: z2.photo, title: z2.title, subtitle: z2.subtitle }, slide, F, typo);
+  }
   const hasSub = !!String(slide.subtitle || slide.bodyAfterImage || '').trim();
   // Trava final do rodapé (selo/barra): depois do ajuste de densidade nada
   // termina abaixo da faixa; se o apoio ficaria curto demais, o bloco sobe.
@@ -397,11 +463,20 @@ export function socialFormatPatch(slide, formato = 'carrossel') {
     if (fit.subtitle.h < minH) {
       const up = minH - fit.subtitle.h;
       fit.subtitle.y = round2(fit.subtitle.y - up); fit.subtitle.h = round2(minH);
-      if (fit.title.y + fit.title.h > fit.subtitle.y) fit.title.h = round2(Math.max(6, fit.subtitle.y - fit.title.y - 0.5));
-      if (fit.title.y + fit.title.h > fit.subtitle.y) fit.title.y = round2(fit.subtitle.y - fit.title.h - 0.5);
+      if (fit.title.y + fit.title.h > fit.subtitle.y - 0.5) {
+        // Título sobe até o topo útil; a foto acima cede o que faltar; no
+        // limite, a caixa do título encurta (nunca invade foto nem cabeçalho).
+        const need = fit.title.y + fit.title.h - (fit.subtitle.y - 0.5);
+        const P = fit.photo || L.photo;
+        const floorY = P && !L.onPhoto && P.y + P.h <= fit.title.y + 0.5 ? Math.max(F.t, P.y + 26) : F.t;
+        const move = Math.max(0, Math.min(need, fit.title.y - floorY));
+        if (move > 0 && P && !L.onPhoto && P.y + P.h > fit.title.y - move) fit.photo = { ...P, h: round2(Math.max(26 - P.y, fit.title.y - move - P.y)) };
+        fit.title.y = round2(fit.title.y - move);
+        fit.title.h = round2(Math.max(6, fit.subtitle.y - 0.5 - fit.title.y));
+      }
     }
   }
-  const finalL = { ...L, photo: fit.photo || L.photo, title: fit.title, subtitle: fit.subtitle, hasSub, subUsed: fit.subUsed };
+  const finalL = { ...L, photo: fit.photo || L.photo, title: fit.title, subtitle: fit.subtitle, hasSub, subUsed: fit.subUsed, titleUsed: fit.titleUsed };
   const guarded = guardChrome({ ...finalL, chrome: socialDevices(art.family, art.fn, finalL, formato, { photo: !!L.photo, topReserve: logoTopReserve(art.logo, F) }) }, F,
     { footerPct: art.footer?.[F.key] || 0, logoCorner: art.logoCorner });
   const zones = {
@@ -411,11 +486,14 @@ export function socialFormatPatch(slide, formato = 'carrossel') {
     ...(L.evidence ? { evidence: L.evidence } : {}),
   };
   const titleLeading = typo.titleLeading ?? 102;
+  // Cor-assinatura (não branca) sobre foto: proteção localizada mais densa
+  // atrás do texto, em vez de trocar a cor do título.
+  const scrimAmount = L.scrim ? Math.min(80, L.scrim.amount + (art.signatureOnPhoto ? 14 : 0)) : 0;
   return {
     layout: L.align === 'center' ? 'tc' : 'tl',
     align: L.align,
     bgFit: L.photoFit === 'contain' ? 'contain' : 'cover',
-    overlay: L.scrim ? L.scrim.amount : 0,
+    overlay: scrimAmount,
     overlayMode: L.scrim ? 'scrim' : null,
     titleSize: toTitleSize(fit.titlePx),
     subSize: toSubSize(fit.bodyPx),
@@ -425,7 +503,7 @@ export function socialFormatPatch(slide, formato = 'carrossel') {
     titleItalic: L.titleItalic && art.ownType === true,
     socialZoneAnchors: L.anchors,
     socialComposition: `v4:${L.archetype}`,
-    socialArt: { ...art, ground: L.ground, chrome: guarded.chrome, archetype: L.archetype, density: fit.over ? 'over' : 'ok', formato: F.key },
+    socialArt: { ...art, ground: L.ground, chrome: guarded.chrome, archetype: L.archetype, density: fit.over ? 'over' : 'ok', formato: F.key, titleUsed: fit.titleUsed },
     canvas: { enabled: false, applied: true, variant: 'classic', source: 'social-preset', preserveZones: true, zones },
   };
 }
@@ -449,23 +527,47 @@ function logoCornerFor(brand) {
   return pos === 'c' ? null : pos;
 }
 
+/**
+ * Campos por card dos estilos virais: papel do selo na sequência e ajustes do
+ * apoio (caixa alta só em linha curta; sem itálico onde a fonte não tem
+ * itálico real). Não toca em texto, foto nem logo.
+ */
+function pillFields(style, fn, pillText) {
+  const role = pillRoleFor(pillText, style.pillRole || null);
+  return { hideFooterPill: role ? !PILL_ROLE_VISIBLE[role](fn) : undefined };
+}
+
+function viralCardFields(style, fn, slide) {
+  const out = {};
+  const o = style.subtitleOverrides;
+  if (o?.longCase) out.subtitleCase = chars(slide.subtitle) > (o.longFrom || 48) ? o.longCase : undefined;
+  if (o && typeof o.italic === 'boolean') out.subtitleItalic = o.italic;
+  return out;
+}
+
 function composeSocialLibrary(slides, { preset, brand, formato, narrative }) {
   if (!Array.isArray(slides) || !slides.length) return slides;
   const base = brand || preset.brand || {};
   const familyKey = socialFamilyFor(preset, base);
-  const family = SOCIAL_FAMILIES[familyKey];
+  const family = SOCIAL_COMPOSERS[familyKey];
+  const viral = family.kind === 'viral';
   // Família com as próprias fontes (padrão da biblioteca) ou identidade do
   // usuário (fontes e pesos da marca, geometria e ritmo da família).
   const sameFont = (a, b) => String(a || '').split(',')[0].replace(/["']/g, '').trim().toLowerCase()
     === String(b || '').split(',')[0].replace(/["']/g, '').trim().toLowerCase();
-  const ownType = !preset.isCustom && preset.socialFamily === familyKey && sameFont(base.titleFont || family.type.title, family.type.title);
+  const ownType = !viral && !preset.isCustom && preset.socialFamily === familyKey && sameFont(base.titleFont || family.type.title, family.type.title);
   const chrome = resolvePresetChrome(base);
-  const footer = Object.fromEntries(FOOTER_FORMATS.map((k) => [k, footerChromeReservePct(chrome, k)]));
+  // Stories: o rodapé sobe para fora da faixa da interface (STORIES_FOOTER_LIFT),
+  // então a reserva do texto cresce na mesma medida.
+  const footer = Object.fromEntries(FOOTER_FORMATS.map((k) => {
+    const r = footerChromeReservePct(chrome, k);
+    return [k, k === 'stories' && r > 0 ? r + STORIES_FOOTER_LIFT * 100 : r];
+  }));
   const functions = assignSocialFunctions(slides, { narrative });
   const variants = rhythmVariants(functions);
   const typo = {
-    titleFont: base.titleFont || family.type.title,
-    bodyFont: base.bodyFont || family.type.body,
+    titleFont: base.titleFont || family.type?.title,
+    bodyFont: base.bodyFont || family.type?.body,
     titleCase: ownType ? family.type.titleCase : (base.textTitleCase || 'normal'),
     titleLeading: ownType ? family.type.titleLeading : (base.textTitleLeading || 104),
   };
@@ -476,7 +578,8 @@ function composeSocialLibrary(slides, { preset, brand, formato, narrative }) {
     const structured = normalizePresentationBlocks(slide.presentationBlocks).length > 0;
     const art = {
       family: familyKey, fn, variant: variants[index], structured, typo, footer,
-      logoCorner: logoCornerFor(base), logo: logoCornerFor(base) ? { pos: logoCornerFor(base), size: base.logoSize ?? 260 } : null, labelFont: ownType ? (family.type.label || null) : null, ownType,
+      logoCorner: logoCornerFor(base), logo: logoCornerFor(base) ? { pos: logoCornerFor(base), size: base.logoSize ?? 260 } : null, labelFont: ownType ? (family.type.label || null) : null, ownType, viral,
+      signatureOnPhoto: viral && luminance(base.titleColor) != null && luminance(base.titleColor) < 0.6,
     };
     const patch = socialFormatPatch({ ...slide, socialArt: art }, formato);
     const inks = socialGround(base, patch.socialArt.ground);
@@ -495,10 +598,18 @@ function composeSocialLibrary(slides, { preset, brand, formato, narrative }) {
       photoRegion: 'full',
       photoFraming: slide.photoFraming === 'manual' ? 'manual' : 'auto',
       textInset: 0,
-      textShadow: false,
-      // A seta de arraste só existe na capa em sangria da Manchete; nas
-      // demais famílias ela cortava a moldura da foto da capa.
-      showSwipeCue: index === 0 && familyKey === 'manchete' && patch.socialArt.archetype === 'coverBleed',
+      // Cor-assinatura escura sobre foto: além do degradê, sombra suave atrás
+      // das letras (proteção localizada; a cor do título não muda).
+      textShadow: !!(patch.socialArt.signatureOnPhoto && /Bleed/.test(patch.socialArt.archetype)),
+      // Seta de arraste: capa em sangria da Manchete e capa dos estilos virais
+      // que não têm selo de arrastar (o selo já faz esse papel).
+      showSwipeCue: index === 0 && (viral
+        ? pillRoleFor(chrome.footerPillText, family.pillRole) !== 'swipe' && /Bleed|Type/.test(patch.socialArt.archetype)
+        : familyKey === 'manchete' && patch.socialArt.archetype === 'coverBleed'),
+      subtitleCase: undefined, subtitleItalic: undefined,
+      // Selo com papel na sequência em toda composição v4 (estilos e famílias).
+      ...pillFields(family, fn, chrome.footerPillText),
+      ...(viral ? viralCardFields(family, fn, slide) : {}),
       ...(ownType ? {
         titleWeight: family.type.titleWeight,
         titleCase: family.type.titleCase,

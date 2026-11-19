@@ -21,7 +21,7 @@ import { pctBox, CanvasZonesOverlay } from './CanvasZonesOverlay.jsx';
 import { VcBgPatternLayer, CultureInlineRich, CultureRichParagraphs, OverflowScaler } from './render-primitives.jsx';
 import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks, inkIfReadable, accentInkOnSurface } from '../../utils/brand-visuals.js';
 import { resolvePresetChrome, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
-import { footerChromeReservePx, footerGuardApplies, footerPillBottomPx, footerPillColors, textZonesAboveFooter } from '../../utils/card-chrome.js';
+import { footerChromeReservePx, footerGuardApplies, footerPillBottomPx, footerPillColors, textZonesAboveFooter, STORIES_FOOTER_LIFT } from '../../utils/card-chrome.js';
 import { titleLetterSpacingEm } from '../../utils/title-tracking.js';
 import { photoPlaceholderRect } from '../../utils/photo-placeholder.js';
 import { cultureAccentRenderablePieces } from '../../utils/text-spans.js';
@@ -803,15 +803,22 @@ const ClassicCanvasInner = React.forwardRef(({
     titleTypography?.case,
     slide.titleCase === 'upper' ? 'uppercase' : slide.titleCase === 'lower' ? 'lowercase' : 'none',
   );
+  // Composição de carrossel v4 pode fixar a caixa do apoio por card (ex.:
+  // parágrafo longo deixa de ser MAIÚSCULAS mesmo em estilo de apoio em caixa alta).
+  const slideSubtitleCase = slide.socialCompositionVersion >= 4 && slide.subtitleCase
+    ? (slide.subtitleCase === 'upper' ? 'uppercase' : slide.subtitleCase === 'lower' ? 'lowercase' : 'none')
+    : null;
   const resolvedSubtitleTransform = presentationCaseTransform(
     subtitleTypography?.case,
-    subtitleTextTransform(brand),
+    slideSubtitleCase || subtitleTextTransform(brand),
   );
   // Afirmação tipográfica das famílias de carrossel com itálico verdadeiro.
   const resolvedTitleItalic = titleTypography ? titleTypography.italic === true : slide.titleItalic === true;
   const resolvedSubtitleItalic = subtitleTypography
     ? subtitleTypography.italic === true
-    : brand.subtitleItalic === true;
+    : (slide.socialCompositionVersion >= 4 && typeof slide.subtitleItalic === 'boolean'
+      ? slide.subtitleItalic
+      : brand.subtitleItalic === true);
   const pr = clampRect(zcv.photo || DEFAULT_CANVAS_ZONES_CLASSIC.photo);
   let tr = clampRect(zcv.title || DEFAULT_CANVAS_ZONES_CLASSIC.title);
   let sr = clampRect(zcv.subtitle || DEFAULT_CANVAS_ZONES_CLASSIC.subtitle);
@@ -1857,7 +1864,9 @@ const SlideCardInner = React.forwardRef(({
   // Biblioteca 2.0: a família define a tinta do título em todas as páginas.
   // A regra legada (cards do meio com a cor do apoio) deixava títulos de
   // conteúdo e evidência na cor secundária, diferente da referência.
-  const carouselTitleInk = carouselEdgeSlide || slide.presentationArtDirectionVersion === 2
+  // Carrossel composto (v4: famílias e os 12 estilos) também mantém a cor de
+  // título em todos os cards: é a cor-assinatura do estilo.
+  const carouselTitleInk = carouselEdgeSlide || slide.presentationArtDirectionVersion === 2 || slide.socialCompositionVersion >= 4
     ? brandPal.titleColor : brandPal.subtitleColor;
   const carouselBodyInk = brandPal.textColor;
   zonePatchRef.current = onCanvasZonePatch;
@@ -2130,7 +2139,11 @@ const SlideCardInner = React.forwardRef(({
   }
 
   if (photoInk) {
-    displayTitleInk = '#ffffff';
+    // Sobre foto com proteção localizada (degradê atrás do texto) a cor-assinatura
+    // do título fica quando lê contra o escuro da proteção; senão, branco.
+    displayTitleInk = slide.socialCompositionVersion >= 4
+      ? inkIfReadable(carouselTitleInk, '#111111', '#ffffff', 3)
+      : '#ffffff';
     displayBodyInk = '#f5f5f7';
   }
 
@@ -2252,7 +2265,12 @@ const SlideCardInner = React.forwardRef(({
           const fCenter = brand.footerBarCenter;
           const fRight = brand.footerBarRight;
           const hasFooter = !!(fLeft || fCenter || fRight);
-          const hasPill = !!brand.footerPillText;
+          // Stories composto na v4: selo e barra sobem para fora da faixa da
+          // interface do app (18% de baixo). Projeto v3 fica onde estava.
+          const liftStories = slide.socialCompositionVersion >= 4 && fmt === 'stories' ? f.h * STORIES_FOOTER_LIFT : 0;
+          // O selo tem papel na sequência (arrastar, CTA, etiqueta): a composição
+          // pode desligá-lo por card. A reserva do rodapé continua a mesma.
+          const hasPill = !!brand.footerPillText && slide.hideFooterPill !== true;
           if (!hasFooter && !hasPill) return null;
           // Com a foto em coluna lateral, o meio do card é a divisa entre foto e
           // painel: selo e barra ficam na coluna de texto.
@@ -2294,7 +2312,7 @@ const SlideCardInner = React.forwardRef(({
               <div data-vc-chrome="footerBar" {...mov('footerBar', {
                 ...(empilhado
                   ? { position:'relative', alignSelf:'stretch' }
-                  : { position:'absolute', bottom: f.h*0.038, left: barLeft, right: barRight, zIndex: 25 }),
+                  : { position:'absolute', bottom: f.h*0.038 + liftStories, left: barLeft, right: barRight, zIndex: 25 }),
                 display:'flex', justifyContent:'space-between', alignItems:'flex-start',
                 gap: f.w*0.02, pointerEvents: movableElements ? 'auto' : 'none',
               })}>
@@ -2320,7 +2338,7 @@ const SlideCardInner = React.forwardRef(({
               <div data-vc-chrome="pill" {...mov('pill', {
                 ...(empilhado
                   ? { position:'relative' }
-                  : { position:'absolute', bottom: footerPillBottomPx(brand, f, escFooterBar),
+                  : { position:'absolute', bottom: footerPillBottomPx(brand, f, escFooterBar) + liftStories,
                       left:`${pillCenterPct}%`, transform:'translateX(-50%)', zIndex:25 }),
                 pointerEvents: movableElements ? 'auto' : 'none',
               })}>
@@ -2351,7 +2369,7 @@ const SlideCardInner = React.forwardRef(({
           if (!empilhado) return <>{barra}{selo}</>;
           return (
             <div data-vc-chrome-stack="footer" style={{
-              position:'absolute', bottom: f.h*0.038, left: barLeft, right: barRight, zIndex: 25,
+              position:'absolute', bottom: f.h*0.038 + liftStories, left: barLeft, right: barRight, zIndex: 25,
               display:'flex', flexDirection:'column', alignItems:'center', gap: f.h*0.022,
               pointerEvents:'none',
             }}>
@@ -3968,16 +3986,20 @@ const SlideCardInner = React.forwardRef(({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: f.w * 0.032,
-              fontWeight: 600,
-              fontFamily: 'var(--font-ui), system-ui, sans-serif',
               pointerEvents: 'none',
               zIndex: 41,
               backdropFilter: 'blur(4px)',
               WebkitBackdropFilter: 'blur(4px)',
             }}
           >
-            →
+            {/* Seta desenhada (duas bordas), não um glifo: a fonte de UI não
+                existe na exportação e o "→" caía em Times. */}
+            <span style={{
+              display: 'block', width: f.w * 0.014, height: f.w * 0.014,
+              borderTop: `${Math.max(1, f.w * 0.0035)}px solid currentColor`,
+              borderRight: `${Math.max(1, f.w * 0.0035)}px solid currentColor`,
+              transform: 'translateX(-18%) rotate(45deg)',
+            }}/>
           </div>
         )}
       </div>

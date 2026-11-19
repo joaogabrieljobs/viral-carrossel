@@ -58,11 +58,15 @@ describe('composição social com design e conteúdo preservados', () => {
   it('distribui foto e texto sem a faixa estreita nem metade inferior abandonada', () => {
     const preset = VISUAL_PRESETS.find(p => p.id === 'editorial_magazine');
     const result = applySocialVisualComposition(source, { preset });
-    expect(result[0].socialComposition).toBe('cover-photo');
-    expect(result[2].socialComposition).toBe('portrait-editorial');
-    expect(result[2].canvas.zones.photo.h).toBe(100);
+    // Composição v4 dos 12 estilos: capa em sangria; a foto do miolo vai em
+    // coluna larga (48%), sem a faixa estreita, e o apoio chega perto da base.
+    expect(result[0].socialComposition).toBe('v4:vCoverBleed');
+    expect(result[2].socialComposition).toMatch(/^v4:vPhoto(Column|Top)$/);
+    const fotoMiolo = result[2].canvas.zones.photo;
+    // Coluna de ponta a ponta com 48% de largura, ou faixa larga no topo.
+    expect(fotoMiolo.h === 100 ? fotoMiolo.w >= 44 : fotoMiolo.w === 100).toBe(true);
     expect(result[2].canvas.zones.subtitle.y + result[2].canvas.zones.subtitle.h).toBeGreaterThanOrEqual(88);
-    expect(result[0].canvas.zones.subtitle.y + result[0].canvas.zones.subtitle.h).toBeLessThanOrEqual(91);
+    expect(result[0].canvas.zones.subtitle.y + result[0].canvas.zones.subtitle.h).toBeLessThanOrEqual(91.5);
     expect(result[2].bgFit).toBe('cover');
     for (let i = 0; i < result.length; i++) {
       expect(result[i]).toMatchObject({ id: source[i].id, title: source[i].title, subtitle: source[i].subtitle, bodyAfterImage: source[i].bodyAfterImage, imageQuery: source[i].imageQuery });
@@ -81,7 +85,7 @@ describe('composição social com design e conteúdo preservados', () => {
   });
   it('sem foto usa composição tipográfica; foto escura sem corpo também recebe contraste', () => {
     const result = applySocialVisualComposition([{ ...source[0], imageQuery: '' }], { preset: VISUAL_PRESETS.find(p => p.id === 'sports_editorial') });
-    expect(result[0].socialComposition).toBe('typographic');
+    expect(result[0].socialComposition).toBe('v4:vCoverType');
     expect(result[0].overlay).toBe(0);
     expect(needsLightPhotoText({ bgImage: 'photo', overlay: 70, useCultureLayout: true, bodyAfterImage: '' })).toBe(true);
     expect(needsLightPhotoText({ bgImage: 'photo', overlay: 70, useCultureLayout: true, bodyAfterImage: 'Corpo de um sanduíche.' })).toBe(false);

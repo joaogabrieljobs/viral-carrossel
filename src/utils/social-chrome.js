@@ -100,6 +100,8 @@ export function socialChromeElements(art, { frame, brand, tokens = {}, fonts = {
   const out = [];
   art.chrome.forEach((d, i) => {
     const key = `${d.t}-${i}`;
+    // Dispositivo que só existe com conteúdo da pessoa (oferta, chapéu).
+    if (d.requires && !String(tokens[d.requires] || '').trim()) return;
     const zIndex = d.z === 'over' ? 3 : 1;
     const color = colorFor(d.color, inks);
     const opacity = d.color === 'rule' && d.opacity == null ? 0.28 : (d.opacity ?? 1);
@@ -110,6 +112,13 @@ export function socialChromeElements(art, { frame, brand, tokens = {}, fonts = {
         background: color, opacity, borderRadius: d.radius ? d.radius * scale : 0,
         transform: d.rotate ? `rotate(${d.rotate}deg)` : undefined,
       } });
+    } else if (d.t === 'star' || d.t === 'diamond') {
+      // Estrela de 8 pontas = dois quadrados, um girado 45°; losango = um só.
+      // Só transformações simples (o html2canvas desenha rotate).
+      const size = (d.d / 100) * frame.w;
+      const base = { left: `calc(${pct(d.x)} - ${size / 2}px)`, top: `calc(${pct(d.y)} - ${size / 2}px)`, width: size, height: size, background: color, opacity };
+      out.push({ key: `${key}-a`, z: zIndex, style: { ...base, transform: d.t === 'diamond' ? 'rotate(45deg) scale(0.72)' : 'rotate(0deg) scale(0.62)' } });
+      if (d.t === 'star') out.push({ key: `${key}-b`, z: zIndex, style: { ...base, transform: 'rotate(45deg) scale(0.62)' } });
     } else if (d.t === 'circle') {
       const size = (d.d / 100) * frame.w;
       out.push({ key, z: zIndex, style: { left: pct(d.x), top: pct(d.y), width: size, height: size, borderRadius: '50%', background: color, opacity } });
@@ -127,7 +136,9 @@ export function socialChromeElements(art, { frame, brand, tokens = {}, fonts = {
       const family = d.role === 'title' ? fonts.title : d.role === 'label' ? (fonts.label || fonts.body) : fonts.body;
       out.push({ key, z: zIndex, text: t, style: {
         left: pct(d.x), top: pct(d.y), width: d.w != null ? pct(d.w) : undefined, textAlign: d.align || 'left',
-        fontFamily: family, fontSize: d.size * scale, fontWeight: d.weight || (d.role === 'title' ? undefined : 500),
+        fontFamily: family, fontSize: d.size * scale,
+        fontWeight: d.weight === 'title' ? (fonts.titleWeight || undefined) : (d.weight || (d.role === 'title' ? undefined : 500)),
+        transform: d.rotate ? `rotate(${d.rotate}deg)` : undefined, transformOrigin: 'left top',
         fontStyle: d.italic ? 'italic' : 'normal', lineHeight: d.leading || 1.15,
         letterSpacing: d.tracking ? `${d.tracking / 100}em` : undefined, textTransform: d.case === 'upper' ? 'uppercase' : undefined,
         color, opacity, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', fontSynthesis: 'none',
@@ -137,8 +148,12 @@ export function socialChromeElements(art, { frame, brand, tokens = {}, fonts = {
   return out;
 }
 
-export function socialChromeTokens(brand = {}, { index = 0, total = 1 } = {}) {
+export function socialChromeTokens(brand = {}, { index = 0, total = 1, slide = null } = {}) {
   const pad = (n) => String(n).padStart(2, '0');
   const name = String(brand.name || '').trim();
-  return { n: pad(index + 1), total: pad(total), marca: name };
+  // Conteúdo escrito pela pessoa no card; texto de amostra do preset não conta.
+  const real = (v) => { const t = String(v || '').trim(); return t && !SAMPLE.test(t) ? t : ''; };
+  const oferta = [real(slide?.strikethroughText), real(slide?.afterTitleText)].filter(Boolean).join('  ');
+  return { n: pad(index + 1), total: pad(total), marca: name, eyebrow: real(slide?.eyebrowText), oferta };
 }
+const SAMPLE = /^(O RESULTADO EM UMA LINHA|DE R\$\s*0+|POR R\$\s*0+.*|.*SUA OFERTA.*)$/i;

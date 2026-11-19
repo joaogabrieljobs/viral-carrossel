@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { VISUAL_PRESETS, applyVisualPreset, getSlideOverridesForPreset } from '../../src/styles/visual-presets.jsx';
 import {
-  applySocialVisualComposition,
+  // Esta suíte descreve a composição v3, a que os projetos salvos carregam. Os
+  // 12 estilos geram agora com a v4 (social-library-v4.test.js, com as mesmas
+  // garantias de rodapé, sobreposição e piso de leitura).
+  applySocialVisualCompositionV3 as applySocialVisualComposition,
   restyleSocialSlides,
   PORTRAIT_CENTER_MAX_SUPPORT_CHARS,
   SOCIAL_COMPOSITION_TYPOGRAPHY,
@@ -10,10 +13,9 @@ import {
 import { footerChromeReservePct } from '../../src/utils/card-chrome.js';
 import { resolvePresetChrome } from '../../src/utils/preset-tokens.js';
 
-// Composição v3: os doze estilos que projetos salvos continuam usando. As nove
-// famílias da biblioteca v4 têm a própria suíte (social-library-v4.test.js),
-// com as mesmas garantias de rodapé, sobreposição e piso de leitura.
-const SOCIAIS = VISUAL_PRESETS.filter((p) => p.productKind !== 'apresentacao' && p.legacySocialStyle);
+// Composição v3 dos doze estilos (projetos salvos). As 9 famílias editoriais
+// nunca tiveram v3.
+const SOCIAIS = VISUAL_PRESETS.filter((p) => p.productKind !== 'apresentacao' && !p.socialFamily);
 const FORMATOS = ['carrossel', 'quadrado', 'stories'];
 const MARCAS = {
   vazia: { name: 'Padrão', handle: '' },
@@ -288,14 +290,16 @@ describe('trocar o padrão num projeto já gerado', () => {
     const brand = applyVisualPreset(MARCAS.completa, novo.id);
     const result = restyleSocialSlides(gerados, { preset: novo, brand, formato: 'stories', overrides: getSlideOverridesForPreset(novo.id) });
     expect(result).toHaveLength(gerados.length);
+    // Reaplicar um dos 12 estilos recompõe com a composição v4 do estilo novo
+    // (projeto gerado antes continua v3 até a pessoa reaplicar).
     for (const slide of result) {
       expect(slide.canvas?.source).toBe('social-preset');
       expect(slide.socialVisualPresetId).toBe('mood_sepia');
-      expect(slide.socialCompositionVersion).toBe(SOCIAL_COMPOSITION_VERSION);
-      expect(slide.titleSize).toBe(SOCIAL_COMPOSITION_TYPOGRAPHY[slide.socialComposition].titleSize);
+      expect(slide.socialCompositionVersion).toBe(4);
+      expect(slide.socialFamily).toBe('mood_sepia');
     }
-    // Mood Sépia põe a foto em coluna no miolo: a composição é a do padrão novo.
-    expect(result[1].socialComposition).toBe('portrait-editorial');
+    // Mood Sépia põe a foto em coluna larga no miolo (Stories: foto no topo).
+    expect(result[1].socialComposition).toMatch(/^v4:vPhoto/);
   });
 
   it('padrão sem composição própria volta ao clássico com véu e sombra sobre a foto', () => {

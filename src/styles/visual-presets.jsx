@@ -804,12 +804,13 @@ function socialFamilyPreset(key) {
 export const SOCIAL_FAMILY_PRESETS = SOCIAL_FAMILY_KEYS.map(socialFamilyPreset);
 
 /**
- * Os doze estilos anteriores continuam abrindo projetos salvos sem mudança
- * (composição v3). Saem do seletor e indicam a família que os substitui.
+ * Os 12 estilos de carrossel viral continuam no seletor, primeiro, e agora
+ * compõem com a linguagem própria (social-viral-styles.js). As 9 famílias
+ * editoriais da biblioteca v4 entram depois, como grupo próprio.
  */
 export const VISUAL_PRESETS = [
-  ...SOCIAL_FAMILY_PRESETS,
-  ...LEGACY_SOCIAL_PRESETS.map((p) => ({ ...p, hidden: true, legacySocialStyle: true, successorFamily: LEGACY_SOCIAL_STYLE_FAMILY[p.id] })),
+  ...LEGACY_SOCIAL_PRESETS,
+  ...SOCIAL_FAMILY_PRESETS.map((p) => ({ ...p, presetGroup: 'familias-editoriais' })),
 ];
 
 export const VISUAL_PRESET_BY_ID = Object.fromEntries(VISUAL_PRESETS.map(p => [p.id, p]));

@@ -6,7 +6,7 @@
  */
 import { visibleSocialText } from './social-generation.js';
 import { normalizePresentationBlocks } from './presentation-quality.js';
-import { SOCIAL_FAMILIES } from './social-families.js';
+import { SOCIAL_COMPOSERS } from './social-families.js';
 
 /**
  * Matriz modo narrativo × função visual (documentada para revisão).
@@ -81,10 +81,10 @@ export function rhythmVariants(functions) {
  * um bloco de texto repetido em todos os cards.
  */
 export function buildSocialSequencePrompt({ family = null, narrative = 'editorial' } = {}) {
-  const f = SOCIAL_FAMILIES[family];
+  const f = SOCIAL_COMPOSERS[family];
   if (!f) return '';
   const m = NARRATIVE_VISUAL_MATRIX[narrative] || NARRATIVE_VISUAL_MATRIX.editorial;
-  return `SEQUÊNCIA VISUAL (família ${f.label}; o texto continua seu, o layout é escolhido pelo app):
+  return `SEQUÊNCIA VISUAL (${f.kind === 'viral' ? 'estilo' : 'família'} ${f.label}; o texto continua seu, o layout é escolhido pelo app):
 - Ritmo do modo: ${m.rhythm}
 - Capa: title forte e curto (até 8 palavras); subtitle de uma frase ou vazio.
 - Card de afirmação: quando a ideia cabe numa frase, escreva só o title (até 12 palavras) e deixe subtitle vazio. Use em no máximo um card a cada três.

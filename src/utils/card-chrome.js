@@ -13,6 +13,13 @@ import { wcagContrast } from './wcag.js';
 
 const temTexto = (valor) => !!String(valor || '').trim();
 
+/**
+ * Stories da composição v4: selo e barra sobem 13% da altura para ficar acima
+ * da faixa da interface do app (respostas, barra de mensagem). A composição
+ * reserva a mesma altura a mais para o texto.
+ */
+export const STORIES_FOOTER_LIFT = 0.13;
+
 /** Altura em px da barra de três colunas; 0 quando nenhuma coluna tem texto. */
 export function footerBarHeightPx(brand, f, escala = 1) {
   const colunas = [brand?.footerBarLeft, brand?.footerBarCenter, brand?.footerBarRight];

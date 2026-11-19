@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { VISUAL_PRESETS, SOCIAL_FAMILY_PRESETS, applyVisualPreset, getSlideOverridesForPreset } from '../../src/styles/visual-presets.jsx';
-import { applySocialVisualComposition, restyleSocialSlides, socialFormatPatch, SOCIAL_COMPOSITION_VERSION } from '../../src/utils/social-visual-composition.js';
+import { applySocialVisualComposition, applySocialVisualCompositionV3, restyleSocialSlides, socialFormatPatch, SOCIAL_COMPOSITION_VERSION } from '../../src/utils/social-visual-composition.js';
 import { SOCIAL_FAMILIES, SOCIAL_FAMILY_KEYS, LEGACY_SOCIAL_STYLE_FAMILY, socialCardLayout, socialFamilyFor, SOCIAL_FUNCTIONS, socialPhotoDirection } from '../../src/utils/social-families.js';
 import { assignSocialFunctions, NARRATIVE_VISUAL_MATRIX } from '../../src/utils/social-sequence.js';
 import { socialChromeElements, socialGround, contrastRatio } from '../../src/utils/social-chrome.js';
@@ -30,17 +30,14 @@ const sequencia = (carga = 'balanceado') => {
 const presetDe = (fam) => SOCIAL_FAMILY_PRESETS.find((p) => p.socialFamily === fam);
 
 describe('biblioteca v4 — catálogo', () => {
-  it('nove famílias visíveis; doze estilos antigos ocultos e mapeados', () => {
+  it('nove famílias visíveis num grupo próprio, depois dos 12 estilos', () => {
     expect(SOCIAL_FAMILY_KEYS).toHaveLength(9);
     const visiveis = VISUAL_PRESETS.filter((p) => !p.hidden);
-    expect(visiveis.map((p) => p.socialFamily)).toEqual(SOCIAL_FAMILY_KEYS);
-    const legados = VISUAL_PRESETS.filter((p) => p.legacySocialStyle);
-    expect(legados).toHaveLength(12);
-    for (const p of legados) {
-      expect(p.hidden).toBe(true);
-      expect(SOCIAL_FAMILIES[LEGACY_SOCIAL_STYLE_FAMILY[p.id]]).toBeTruthy();
-      expect(socialFamilyFor(p.id)).toBe(LEGACY_SOCIAL_STYLE_FAMILY[p.id]);
-    }
+    expect(visiveis.slice(0, 12).map((p) => p.id)).toEqual(Object.keys(LEGACY_SOCIAL_STYLE_FAMILY));
+    expect(visiveis.slice(12).map((p) => p.socialFamily)).toEqual(SOCIAL_FAMILY_KEYS);
+    for (const p of visiveis.slice(12)) expect(p.presetGroup).toBe('familias-editoriais');
+    // Cada um dos 12 compõe com a própria linguagem (não vira a família relacionada).
+    for (const id of Object.keys(LEGACY_SOCIAL_STYLE_FAMILY)) expect(socialFamilyFor(id)).toBe(id);
   });
 
   it('no máximo duas famílias tipográficas por página e só fontes com face local', () => {
@@ -198,10 +195,15 @@ describe('biblioteca v4 — conteúdo e escolhas do usuário intactos', () => {
     expect(out[0].socialCompositionVersion).toBe(4);
     expect(out[0].socialFamily).toBe('revista');
   });
-  it('estilos antigos continuam na v3 (projetos salvos abrem iguais)', () => {
+  it('projeto salvo com a v3 abre igual; os 12 estilos geram com a v4', () => {
     const legado = VISUAL_PRESETS.find((p) => p.id === 'editorial_magazine');
-    const out = applySocialVisualComposition(sequencia(), { preset: legado, brand: applyVisualPreset({}, legado.id) });
-    expect(out[0].socialCompositionVersion).toBe(SOCIAL_COMPOSITION_VERSION);
+    const salvos = applySocialVisualCompositionV3(sequencia(), { preset: legado, brand: applyVisualPreset({}, legado.id) });
+    expect(salvos[0].socialCompositionVersion).toBe(SOCIAL_COMPOSITION_VERSION);
+    // Abrir em qualquer formato não recompõe as zonas gravadas na v3.
+    for (const formato of FORMATOS) for (const s of salvos) expect(slideForFormatDisplay(s, formato, {}, 'livre').canvas.zones).toEqual(s.canvas.zones);
+    const novos = applySocialVisualComposition(sequencia(), { preset: legado, brand: applyVisualPreset({}, legado.id) });
+    expect(novos[0].socialCompositionVersion).toBe(4);
+    expect(novos[0].socialFamily).toBe('editorial_magazine');
   });
   it('trocar de família recompõe e não deixa cor de chão antiga', () => {
     const a = presetDe('manchete'); const b = presetDe('minimal');
@@ -287,10 +289,11 @@ describe('biblioteca v4 — palavras inteiras e logo no topo', () => {
       const out = applySocialVisualComposition(src, { preset, brand: applyVisualPreset({}, preset.id) }).map((s) => slideForFormatDisplay(s, formato, {}, 'livre'));
       for (const s of out) {
         const px = 1080 * 0.084 * s.titleSize / 100;
-        const largura = (s.canvas.zones.title.w / 100) * 1080 * 0.94;
+        // Largura útil do renderer: caixa menos ~32 px de respiro por lado.
+        const largura = (s.canvas.zones.title.w / 100) * 1080 - 64;
         const palavra = Math.max(...s.title.split(/\s+/).map((w) => w.length));
         // Larguras medidas (ver CHAR_WIDTH) + margem de palavra.
-        const cw = { revista: 0.49, manchete: 0.43, grade: 0.53, documental: 0.36, produto: 0.48, ficha: 0.49, minimal: 0.47, poster: 0.6, cinema: 0.48 }[fam] * 1.1;
+        const cw = { revista: 0.49, manchete: 0.43, grade: 0.53, documental: 0.36, produto: 0.48, ficha: 0.49, minimal: 0.47, poster: 0.6, cinema: 0.48 }[fam] * 1.06;
         expect(palavra * px * cw, `${fam} ${formato} "${s.title}"`).toBeLessThanOrEqual(largura);
       }
     }

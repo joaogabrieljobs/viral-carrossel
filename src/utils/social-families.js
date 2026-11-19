@@ -15,6 +15,7 @@
  * tocar a linha de cima; tracking final ≥ −0,025 em).
  */
 import { FORMATS } from './formats.js';
+import { VIRAL_STYLES } from './social-viral-styles.js';
 
 export const SOCIAL_LIBRARY_VERSION = 4;
 
@@ -168,6 +169,15 @@ export const SOCIAL_FAMILIES = Object.freeze({
 
 export const SOCIAL_FAMILY_KEYS = Object.freeze(Object.keys(SOCIAL_FAMILIES));
 
+/**
+ * Tudo o que a composição v4 sabe montar: as 9 famílias editoriais e os 12
+ * estilos virais (social-viral-styles.js). Chave = id da família ou do preset.
+ */
+export const SOCIAL_COMPOSERS = Object.freeze({ ...SOCIAL_FAMILIES, ...VIRAL_STYLES });
+export function socialComposer(key) {
+  return SOCIAL_COMPOSERS[key] || null;
+}
+
 /** IDs salvos dos 12 estilos anteriores → família + paleta preservada. */
 export const LEGACY_SOCIAL_STYLE_FAMILY = Object.freeze({
   sports_editorial: 'manchete', case_study_neon: 'ficha', mood_sepia: 'documental', bold_promo_rosa: 'poster',
@@ -190,6 +200,8 @@ export function socialFamilyFor(presetOrId, brand) {
   const id = typeof presetOrId === 'string' ? presetOrId : presetOrId?.id;
   const declared = typeof presetOrId === 'object' ? presetOrId?.socialFamily : null;
   if (declared && SOCIAL_FAMILIES[declared]) return declared;
+  // Os 12 estilos virais compõem com a própria linguagem.
+  if (VIRAL_STYLES[id]) return id;
   if (SOCIAL_FAMILIES[id]) return id;
   const byPreset = SOCIAL_FAMILY_KEYS.find((k) => SOCIAL_FAMILIES[k].presetId === id);
   if (byPreset) return byPreset;
@@ -237,7 +249,7 @@ const A = {
     anchors: { title: 'end', subtitle: 'start' }, onPhoto: true,
   }),
   coverSplit: (F) => F.kind === 'square'
-    ? { photo: z(50, 0, 50, 100), title: z(F.e, 22, 50 - F.e - 4, 44), subtitle: z(F.e, 68, 50 - F.e - 4, 100 - F.b - 68), anchors: { title: 'end', subtitle: 'start' } }
+    ? { photo: z(56, 0, 44, 100), title: z(F.e, F.t + 6, 56 - F.e - 4, 50), subtitle: z(F.e, F.t + 58, 56 - F.e - 4, 100 - F.b - F.t - 58), anchors: { title: 'end', subtitle: 'start' } }
     : { photo: z(0, 0, 100, F.kind === 'tall' ? 52 : 54), title: z(F.e, (F.kind === 'tall' ? 52 : 54) + 4, 100 - 2 * F.e, F.kind === 'tall' ? 18 : 22), subtitle: z(F.e, (F.kind === 'tall' ? 52 : 54) + (F.kind === 'tall' ? 23 : 27), 100 - 2 * F.e, 100 - F.b - ((F.kind === 'tall' ? 52 : 54) + (F.kind === 'tall' ? 23 : 27))) },
   coverFramed: (F) => F.kind === 'square'
     ? { photo: z(F.e, F.t, 44, 100 - F.t - F.b), title: z(F.e + 48, F.t + 4, 100 - 2 * F.e - 48, 50), subtitle: z(F.e + 48, F.t + 56, 100 - 2 * F.e - 48, 100 - F.b - F.t - 56) }
@@ -324,6 +336,65 @@ const A = {
   closingPoster: (F) => A.coverPoster(F),
 };
 
+/* ------------------------------------------------------------------ */
+/* Arquétipos dos 12 estilos virais                                    */
+/* ------------------------------------------------------------------ */
+/*
+ * Linguagem de carrossel viral: capa em sangria com o título enorme
+ * embaixo (ou título gigante sozinho no chão de cor), afirmação como pôster
+ * que ocupa o card, numeral grande no miolo, foto em faixa ou em sangria.
+ * O alinhamento horizontal vem do estilo (esquerda ou centro).
+ */
+Object.assign(A, {
+  // Alternativa larga para título longo em coluna estreita: foto em faixa no
+  // topo e o texto na largura toda (qualquer família ou estilo).
+  wideStack: (F) => {
+    const ph = F.kind === 'square' ? 38 : F.kind === 'tall' ? 40 : 44;
+    return { photo: z(0, 0, 100, ph), title: z(F.e, ph + 3, 100 - 2 * F.e, F.kind === 'tall' ? 22 : 24),
+      subtitle: z(F.e, ph + (F.kind === 'tall' ? 26 : 28), 100 - 2 * F.e, 100 - F.b - ph - (F.kind === 'tall' ? 26 : 28)) };
+  },
+  vCoverBleed: (F) => {
+    const ty = F.kind === 'tall' ? 34 : F.kind === 'square' ? 28 : 32;
+    const th = F.kind === 'square' ? 42 : 40;
+    const sy = ty + th + 1.5;
+    return { photo: z(0, 0, 100, 100), scrim: { mode: 'scrim', amount: 60 }, onPhoto: true,
+      title: z(F.e, ty, 100 - 2 * F.e, th), subtitle: z(F.e, sy, 100 - 2 * F.e - 4, 100 - F.b - sy),
+      anchors: { title: 'end', subtitle: 'start' } };
+  },
+  vClosingBleed: (F) => ({ ...A.vCoverBleed(F), scrim: { mode: 'scrim', amount: 64 } }),
+  vCoverType: (F) => {
+    const th = F.kind === 'square' ? 50 : F.kind === 'tall' ? 44 : 50;
+    return { title: z(F.e, F.t + 6, 100 - 2 * F.e, th), subtitle: z(F.e, F.t + 6 + th + 2, 100 - 2 * F.e - 6, 100 - F.b - F.t - 8 - th),
+      anchors: { title: 'end', subtitle: 'start' } };
+  },
+  // Pôster tipográfico: a frase ocupa o miolo do card, centrada na vertical.
+  vStatement: (F) => ({ title: z(F.e, F.t + 2, 100 - 2 * F.e, 100 - F.t - F.b - 16), subtitle: z(F.e, 100 - F.b - 12, 100 - 2 * F.e, 12),
+    anchors: { title: 'center', subtitle: 'end' } }),
+  vStatementCenter: (F) => ({ ...A.vStatement(F), align: 'center' }),
+  // Miolo com numeral: o número do card ocupa o topo, o bloco vem logo abaixo.
+  vDevNumeral: (F) => ({ title: z(F.e, F.t + (F.kind === 'square' ? 20 : 22), 100 - 2 * F.e, F.kind === 'square' ? 30 : 30),
+    subtitle: z(F.e, F.t + (F.kind === 'square' ? 52 : 54), 100 - 2 * F.e, 100 - F.b - F.t - (F.kind === 'square' ? 52 : 54)) }),
+  // Miolo com bloco: título grande e apoio como um bloco só no centro óptico.
+  vDevBlock: (F) => ({ title: z(F.e, F.t + 8, 100 - 2 * F.e, 34), subtitle: z(F.e, F.t + 44, 100 - 2 * F.e, 100 - F.b - F.t - 44) }),
+  vDevCenter: (F) => ({ ...A.vDevBlock(F), align: 'center' }),
+  vList: (F) => ({ title: z(F.e, F.t + 8, 100 - 2 * F.e, 22), subtitle: z(F.e, F.t + 32, 100 - 2 * F.e, 100 - F.b - F.t - 32) }),
+  vPhotoTop: (F) => (F.kind === 'square'
+    ? { photo: z(0, 0, 50, 100), title: z(54, F.t + 4, 100 - 54 - F.e, 46), subtitle: z(54, F.t + 52, 100 - 54 - F.e, 100 - F.t - F.b - 52), anchors: { title: 'end', subtitle: 'start' } }
+    : { photo: z(0, 0, 100, F.kind === 'tall' ? 46 : 52), title: z(F.e, (F.kind === 'tall' ? 46 : 52) + 3, 100 - 2 * F.e, F.kind === 'tall' ? 18 : 20),
+      subtitle: z(F.e, (F.kind === 'tall' ? 46 : 52) + (F.kind === 'tall' ? 23 : 25), 100 - 2 * F.e, 100 - F.b - ((F.kind === 'tall' ? 46 : 52) + (F.kind === 'tall' ? 23 : 25))) }),
+  // Coluna de foto ao lado do texto: só onde a coluna de texto é larga o
+  // bastante (Feed e Quadrado, 44% de texto); no Stories vira foto no topo.
+  vPhotoColumn: (F) => (F.kind === 'tall' ? A.vPhotoTop(F)
+    : { photo: z(0, 0, 48, 100), title: z(52, F.t + 8, 100 - 52 - F.e + 2, 42), subtitle: z(52, F.t + 52, 100 - 52 - F.e + 2, 100 - F.t - F.b - 52),
+      anchors: { title: 'end', subtitle: 'start' } }),
+  vPhotoBleed: (F) => {
+    const ty = F.kind === 'tall' ? 44 : 44;
+    return { photo: z(0, 0, 100, 100), scrim: { mode: 'scrim', amount: 56 }, onPhoto: true,
+      title: z(F.e, ty, 100 - 2 * F.e, 28), subtitle: z(F.e, ty + 29.5, 100 - 2 * F.e - 4, 100 - F.b - ty - 29.5),
+      anchors: { title: 'end', subtitle: 'start' } };
+  },
+});
+
 export const SOCIAL_ARCHETYPES = Object.freeze(Object.keys(A));
 
 /**
@@ -369,7 +440,7 @@ function devicesFor(familyKey, fn, L, F, { photo, index }) {
   const T = L.title; const S = L.subtitle; const P = L.photo;
   const top = Math.max(2.5, F.t - 4.5);
   const out = [];
-  switch (SOCIAL_FAMILIES[familyKey].devices) {
+  switch (SOCIAL_COMPOSERS[familyKey].devices) {
     case 'revista':
       if (fn === 'statement') out.push(text(F.e, T.y - F.py(150), 20, '“', { size: 220, color: 'accent', role: 'title', leading: 1 }));
       else if (!L.onPhoto) {
@@ -424,6 +495,108 @@ function devicesFor(familyKey, fn, L, F, { photo, index }) {
       } else out.push(text(L.align === 'center' ? F.e : F.e, T.y - 3.6, L.align === 'center' ? 100 - 2 * F.e : 40, 'CENA {n}', { size: 22, color: 'accent', tracking: 14, role: 'title', align: L.align === 'center' ? 'center' : 'left' }));
       break;
     default:
+      out.push(...viralDevices(SOCIAL_COMPOSERS[familyKey].devices, fn, L, F, { photo }));
+  }
+  return out;
+}
+
+/**
+ * Caixa real do texto do título (em %), pela âncora da zona e pela altura
+ * estimada no ajuste de densidade (`L.titleUsed`).
+ */
+function titleBox(L) {
+  const T = L.title;
+  const used = Math.min(T.h, L.titleUsed ?? T.h);
+  const anchor = L.anchors?.title || 'start';
+  const y = anchor === 'end' ? T.y + T.h - used : anchor === 'center' ? T.y + (T.h - used) / 2 : T.y;
+  return { x: T.x, y, w: T.w, h: used };
+}
+
+/** Linguagem gráfica dos 12 estilos virais. Cores são tokens da marca. */
+function viralDevices(kind, fn, L, F, { photo }) {
+  const out = [];
+  const B = titleBox(L);
+  const center = L.align === 'center';
+  const under = (w, h, color, extra) => block(center ? 50 - w / 2 : B.x, B.y + B.h + 0.6, w, h, color, extra);
+  const over = (w, h, color, gap = 1.6, extra) => block(center ? 50 - w / 2 : B.x, B.y - gap - h, w, h, color, extra);
+  const numeral = (color, size = 230) => {
+    const h = F.py(size * 0.92);
+    if (!['opener', 'development'].includes(fn) || L.onPhoto || B.y - h - 1 < F.t - 1) return;
+    out.push(text(center ? F.e : B.x, B.y - h - 1, center ? 100 - 2 * F.e : 40, '{n}', { size, color, role: 'title', weight: 'title', leading: 0.92, align: center ? 'center' : 'left' }));
+  };
+  // Moldura fina abaixo da faixa do cabeçalho/contador (que fica até ~6,5%).
+  const frame = (color) => {
+    if (L.onPhoto || L.photo) return;
+    const y = F.kind === 'tall' ? F.t - 4 : 7;
+    const bottom = F.kind === 'tall' ? 100 - F.b + 4 : 97.4;
+    out.push({ t: 'frame', x: 3.2, y, w: 93.6, h: bottom - y, color, opacity: 0.55 });
+  };
+  switch (kind) {
+    case 'sports':
+      out.push(under(16, F.kind === 'tall' ? 0.5 : 0.75, 'accent'));
+      numeral('accent');
+      break;
+    case 'case':
+      out.push(under(34, F.kind === 'tall' ? 0.75 : 1.1, 'accent'));
+      // Estrela neon acima do título; sem espaço até o cabeçalho, ela vai
+      // para a ponta do sublinhado.
+      if (['cover', 'statement', 'closing'].includes(fn)) {
+        const above = B.y - (F.kind === 'tall' ? 3.2 : 4.2);
+        if (above - 2.6 >= F.t - 0.5) out.push({ t: 'star', x: center ? 50 : B.x + 2.6, y: above, d: 5.2, color: 'accent' });
+        else out.push({ t: 'star', x: (center ? 50 + 17 : B.x + 34) + 3.6, y: B.y + B.h + 0.6 + (F.kind === 'tall' ? 0.4 : 0.55), d: 5.2, color: 'accent' });
+      }
+      if (fn === 'cover') out.push(text(B.x, B.y - (F.kind === 'tall' ? 7.4 : 9.6), 100 - 2 * F.e, '{eyebrow?}', { size: 28, color: 'accent', weight: 700, tracking: 6, case: 'upper', requires: 'eyebrow' }));
+      numeral('accent');
+      break;
+    case 'mood':
+      out.push(over(10, 0.3, 'accent', 2.2));
+      break;
+    case 'promo':
+      out.push(under(22, F.kind === 'tall' ? 0.55 : 0.8, 'accent'));
+      if (fn === 'cover' || fn === 'closing') {
+        const y = B.y - (F.kind === 'tall' ? 6.4 : 8.2);
+        out.push(block(B.x, y, 52, F.kind === 'tall' ? 3.6 : 5, 'accent', { rotate: -3, requires: 'oferta' }));
+        out.push(text(B.x + 2, y + (F.kind === 'tall' ? 0.7 : 1), 50, '{oferta?}', { size: 30, color: 'ground', weight: 800, case: 'upper', rotate: -3, requires: 'oferta' }));
+      }
+      numeral('accent');
+      break;
+    case 'reflexivo':
+      if (fn === 'statement') out.push(text(F.e, B.y - F.py(190), 100 - 2 * F.e, '“', { size: 240, color: 'accent', role: 'title', leading: 1, align: 'center' }));
+      else { out.push({ t: 'diamond', x: 50, y: B.y - 2.4, d: 1.6, color: 'accent' }); out.push(block(50 - 11, B.y - 2.4, 8, 0.12, 'accent')); out.push(block(50 + 3, B.y - 2.4, 8, 0.12, 'accent')); }
+      break;
+    case 'tabloid':
+      if (!L.onPhoto) out.push(block(0, Math.max(1.5, F.t - 2.4), 100, F.kind === 'tall' ? 0.6 : 0.9, 'accent'));
+      out.push(under(24, F.kind === 'tall' ? 0.7 : 1.05, 'accent'));
+      numeral('accent');
+      break;
+    case 'magazine':
+      frame('accent');
+      out.push(over(9, 0.2, 'accent', 2));
+      break;
+    case 'luxury':
+      frame('accent');
+      out.push(under(12, 0.22, 'accent'));
+      numeral('accent', 210);
+      break;
+    case 'hype':
+      out.push(block(Math.max(1.5, B.x - 3), B.y + 0.6, F.kind === 'tall' ? 0.9 : 1.1, Math.max(3, B.h - 1.2), 'accent'));
+      numeral('accent');
+      break;
+    case 'cinematic':
+      if (L.onPhoto) {
+        out.push(block(0, 0, 100, F.kind === 'tall' ? 6 : 7.5, 'ground', { z: 'over' }));
+        out.push(block(0, F.kind === 'tall' ? 94 : 92.5, 100, F.kind === 'tall' ? 6 : 7.5, 'ground', { z: 'over' }));
+      }
+      out.push(under(10, 0.3, 'accent'));
+      break;
+    case 'authority':
+      out.push(over(10, 0.45, 'accent', 2.2));
+      numeral('accent', 200);
+      break;
+    case 'minimal':
+      out.push(over(6, 0.16, 'ink', 2.2));
+      break;
+    default:
   }
   return out;
 }
@@ -436,7 +609,7 @@ const FICHA_LABEL = { opener: 'CONTEXTO', development: 'PONTO', photo: 'FIGURA',
 
 /** Px de título por função (largura 1080). */
 export function socialTitlePx(familyKey, fn) {
-  const s = SOCIAL_FAMILIES[familyKey].scale;
+  const s = SOCIAL_COMPOSERS[familyKey].scale;
   return s[fn] ?? s.development;
 }
 
@@ -446,8 +619,8 @@ export function socialTitlePx(familyKey, fn) {
  * @param {string} fn função do card
  * @param {{ formato?: string, photo?: boolean, structured?: boolean, variant?: number, index?: number }} opts
  */
-export function socialCardLayout(familyKey, fn, { formato = 'carrossel', photo = false, structured = false, variant = 0, index = 0, topReserve = 0 } = {}) {
-  const family = SOCIAL_FAMILIES[familyKey] || SOCIAL_FAMILIES.minimal;
+export function socialCardLayout(familyKey, fn, { formato = 'carrossel', photo = false, structured = false, variant = 0, index = 0, topReserve = 0, wide = false } = {}) {
+  const family = SOCIAL_COMPOSERS[familyKey] || SOCIAL_FAMILIES.minimal;
   const F = formatFrame(formato);
   // Logo no topo: o conteúdo começa abaixo da faixa dela.
   if (topReserve > F.t) F.t = Math.min(topReserve, F.t + 8);
@@ -467,11 +640,13 @@ export function socialCardLayout(familyKey, fn, { formato = 'carrossel', photo =
     name = Array.isArray(alt) ? alt[0] : alt;
     raw = A[name](F, photo);
   }
+  // Título longo que não cabe em coluna estreita ao lado da foto.
+  if (wide && photo && raw.photo && !raw.onPhoto && raw.title.w < 60) { name = 'wideStack'; raw = { ...A.wideStack(F), align: raw.align }; }
   const usePhoto = photo && !!raw.photo;
   raw = reserveSupport(raw, usePhoto);
   const L = {
     family: family.id, fn, formato: F.key, archetype: name,
-    align: raw.align || 'left',
+    align: raw.align || family.align || 'left',
     anchors: raw.anchors || { title: 'start', subtitle: 'start' },
     title: raw.title, subtitle: raw.subtitle,
     photo: usePhoto ? raw.photo : null,
@@ -479,9 +654,12 @@ export function socialCardLayout(familyKey, fn, { formato = 'carrossel', photo =
     photoFit: raw.photoFit || 'cover',
     scrim: usePhoto && raw.scrim ? raw.scrim : null,
     onPhoto: usePhoto && !!raw.onPhoto,
-    titleItalic: !!raw.titleItalic && !!family.type.italicStatements,
+    titleItalic: !!raw.titleItalic && !!family.type?.italicStatements,
     ground: usePhoto && raw.onPhoto ? 'bg' : (family.grounds[fn] || 'bg'),
-    titlePx: Math.round(socialTitlePx(family.id, fn) * (F.kind === 'square' ? 0.92 : 1)),
+    // Capa e fechamento sem foto são o próprio pôster: escala perto da afirmação.
+    titlePx: Math.round((['cover', 'closing'].includes(fn) && !usePhoto && family.kind === 'viral'
+      ? Math.max(socialTitlePx(family.id, fn), family.scale.statement * 0.85)
+      : socialTitlePx(family.id, fn)) * (F.kind === 'square' ? 0.92 : 1)),
     // Lista/etapas: os itens são o conteúdo da página, em corpo de leitura maior.
     bodyPx: fn === 'list' ? Math.round(family.scale.body * 1.18) : family.scale.body, supportPx: family.scale.support,
   };
@@ -492,7 +670,8 @@ export function socialCardLayout(familyKey, fn, { formato = 'carrossel', photo =
   }
   // Sem foto, uma área prevista para a foto nunca fica vazia.
   if (!usePhoto && raw.photo && !['coverGrid', 'coverModule', 'closingGrid', 'closingModule'].includes(name)) {
-    const alt = fn === 'cover' || fn === 'closing' ? (fn === 'cover' ? 'coverType' : 'closingType') : 'devRule';
+    const own = (k) => { const c = family.pick[k]; return Array.isArray(c) ? c[c.length - 1] : c; };
+    const alt = fn === 'cover' || fn === 'closing' ? own(fn) : own('development');
     return { ...socialCardLayout(familyKey, fn === 'cover' || fn === 'closing' ? fn : 'development', { formato, photo: false, structured, variant: 0, index, topReserve }), archetype: alt };
   }
   L.chrome = devicesFor(family.id, fn, L, F, { photo: usePhoto, index });
@@ -506,7 +685,7 @@ export const toBodySize = (px) => Math.round((px / (1080 * 0.018)) * 1000) / 10;
 
 /** Direção fotográfica da família (pt para revisão/UI; en para o gerador de imagem). */
 export function socialPhotoDirection(familyKey, lang = 'pt') {
-  const f = SOCIAL_FAMILIES[familyKey];
+  const f = SOCIAL_COMPOSERS[familyKey];
   if (!f) return '';
   return lang === 'en' ? f.photo.directionEn : f.photo.direction;
 }

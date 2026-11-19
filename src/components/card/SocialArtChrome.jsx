@@ -11,8 +11,8 @@ export default function SocialArtChrome({ slide, brand, frame, titleFont, bodyFo
   if (!art || slide.socialCompositionVersion < 4) return null;
   const elements = socialChromeElements(art, {
     frame, brand,
-    tokens: socialChromeTokens(brand, { index, total }),
-    fonts: { title: titleFont, body: bodyFont, label: art.labelFont || bodyFont },
+    tokens: socialChromeTokens(brand, { index, total, slide }),
+    fonts: { title: titleFont, body: bodyFont, label: art.labelFont || bodyFont, titleWeight: slide.titleWeight },
   });
   if (!elements.length) return null;
   return <div aria-hidden="true" data-vc-social-art={art.family} data-vc-social-function={art.fn}>

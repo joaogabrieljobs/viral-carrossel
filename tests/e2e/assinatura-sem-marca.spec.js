@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 import { enterEditorFromHome } from './helpers/project-entry.js';
 import { applyVisualPreset, VISUAL_PRESETS } from '../../src/styles/visual-presets.jsx';
-import { applySocialVisualComposition } from '../../src/utils/social-visual-composition.js';
+import { applySocialVisualComposition, applySocialVisualCompositionV3 } from '../../src/utils/social-visual-composition.js';
 
 // Rodada R2 (15–16/11/2026): carrosséis gerados sem marca cadastrada saíram com
 // "SUA MARCA", "@seuperfil", "#SUAHASHTAG" impressos, e o selo do rodapé cobria
@@ -135,12 +135,17 @@ for (const preset of SOCIAIS) test(`com assinatura: ${preset.id} mantém selo e 
   const fotografar = await fontesDoPadraoProntas(page, brand, testInfo);
   for (let i = 0; i < slides.length; i++) {
     const card = superficie.nth(i);
-    await expect(card).toContainText('ARRASTA PRO LADO');
+    // O selo tem papel na sequência: "arrasta pro lado" aparece enquanto há
+    // card seguinte e sai do fechamento (composição v4). A barra fica em todos.
+    const comSelo = slides[i].hideFooterPill !== true;
+    expect(comSelo).toBe(i < slides.length - 1);
+    if (comSelo) await expect(card).toContainText('ARRASTA PRO LADO');
+    else await expect(card).not.toContainText('ARRASTA PRO LADO');
     await expect(card).toContainText('Retratos');
     const r = await colisoes(card);
-    expect(r.ornamentos).toBeGreaterThanOrEqual(2);
+    expect(r.ornamentos).toBeGreaterThanOrEqual(comSelo ? 2 : 1);
     expect(r.achados, `card ${i + 1} de ${preset.id}`).toEqual([]);
-    expect(await contrasteDoSelo(card), `texto do selo no card ${i + 1} de ${preset.id}`).toBeGreaterThanOrEqual(4.5);
+    if (comSelo) expect(await contrasteDoSelo(card), `texto do selo no card ${i + 1} de ${preset.id}`).toBeGreaterThanOrEqual(4.5);
     if (i < 2 && fotografar) await card.screenshot({ path: testInfo.outputPath(`${preset.id}-com-assinatura-${i + 1}.png`) });
   }
 });
@@ -155,7 +160,9 @@ for (const id of ['editorial_magazine', 'reflexivo_cream', 'cinematic_hybrid', '
   const brand = { ...applyVisualPreset({ name: 'Ateliê Traço', handle: 'atelietraco', showHandle: false, logo: null }, preset.id),
     footerPillText: 'ARRASTA PRO LADO', footerPillArrow: true,
     footerBarLeft: 'Tema|Retratos de estúdio', footerBarCenter: 'Conteúdo por|Ateliê Traço Fotografia', footerBarRight: 'Não esqueça|de salvar para depois' };
-  const slides = applySocialVisualComposition(cards(), { preset, brand, formato: 'carrossel' });
+  // Projeto salvo com a composição v3 (coluna estreita ao lado da foto): o
+  // renderer continua precisando empilhar selo e barra nela.
+  const slides = applySocialVisualCompositionV3(cards(), { preset, brand, formato: 'carrossel' });
   expect(slides.some(s => s.socialComposition === 'portrait-editorial')).toBe(true);
   const superficie = await abrir(page, { preset, brand, slides });
   for (let i = 0; i < slides.length; i++) {
@@ -170,7 +177,7 @@ test('projeto antigo: zonas gravadas sob o selo sobem no render', async ({ page 
   const preset = VISUAL_PRESETS.find(p => p.id === 'viral_hype_dark');
   const brand = applyVisualPreset({ name: 'Padrão', handle: '', showHandle: false, logo: null }, preset.id);
   // Geometria anterior à reserva: capa com apoio até 91% e selo por cima.
-  const antigos = applySocialVisualComposition(cards(), { preset, brand: { ...brand, footerPillText: '' }, formato: 'carrossel' })
+  const antigos = applySocialVisualCompositionV3(cards(), { preset, brand: { ...brand, footerPillText: '' }, formato: 'carrossel' })
     .map(({ socialCompositionVersion, ...slide }) => slide);
   // Sem selo, o apoio da capa termina em 91%: por baixo de onde o selo vai entrar.
   expect(antigos[0].canvas.zones.subtitle.y + antigos[0].canvas.zones.subtitle.h).toBe(91);
