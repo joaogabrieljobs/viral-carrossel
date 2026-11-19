@@ -55,6 +55,7 @@ function TextSizeChoice({ label, value, onChange, disabled }) {
 }
 
 export function QuickAdjustmentsPanel({
+  onOpenTemplateGallery = null,
   slide = {}, brand = {}, activeIdx = 0, cardCount = 0, isPresentation = false,
   projectId = null, visualPreset = '', presets = [], applyVisualPreset,
   updateSlide, onImportPhotoAt, onOpenPhotoPosition, onSaveBrandLogo,
@@ -209,6 +210,10 @@ export function QuickAdjustmentsPanel({
         </div>
         {catalogCount > quickVisiblePresets(presets, false, selectedPresetId).length && <button type="button" className="vc-quick-adjustments-link" aria-expanded={stylesExpanded} onClick={() => setStylesExpanded((value) => !value)}>{stylesExpanded ? 'Mostrar menos estilos' : `Ver todos os estilos (${catalogCount})`}<ChevronDown size={15} aria-hidden="true" /></button>}
         <p className="vc-quick-adjustments-hint">Cores, fontes e composição em um clique.</p>
+        {onOpenTemplateGallery && <div style={{ display: 'flex', gap: 8, marginTop: 10 }} data-vc-template-gallery-entry>
+          <button type="button" className="vc-quick-adjustments-button" style={{ flex: 1, minHeight: 44 }} onClick={() => onOpenTemplateGallery('gallery')}>Galeria de modelos</button>
+          <button type="button" className="vc-quick-adjustments-button" style={{ flex: 1, minHeight: 44 }} onClick={() => onOpenTemplateGallery('publish')}>Publicar como modelo</button>
+        </div>}
       </section>
 
       <details className="vc-quick-adjustments-disclosure" data-vc-editor-section="texto-caixa">

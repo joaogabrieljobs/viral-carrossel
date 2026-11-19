@@ -229,8 +229,21 @@ function UnlockGroupedElementsNotice({ onUnlock, itemLabel = 'card' }) {
   );
 }
 
+/** Entrada da galeria de modelos publicados (Visual e Ajustes rápidos). */
+function TemplateGalleryEntry({ onOpen }) {
+  return (
+    <div data-vc-template-gallery-entry style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--hairline)', display: 'grid', gap: 8 }}>
+      <span className="vc-label-sm">Modelos da comunidade</span>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="button" className="vc-btn vc-btn-ghost" style={{ flex: 1, minHeight: 44 }} onClick={() => onOpen('gallery')}>Galeria de modelos</button>
+        <button type="button" className="vc-btn vc-btn-ghost" style={{ flex: 1, minHeight: 44 }} onClick={() => onOpen('publish')}>Publicar como modelo</button>
+      </div>
+    </div>
+  );
+}
+
 function SidebarContent({
-  freePlan = false, onUpgrade = null,
+  freePlan = false, onUpgrade = null, onOpenTemplateGallery = null,
   setHookLibrary,
   niche,
   slide, slides, activeIdx, brand, setBrand, updateSlide,
@@ -763,6 +776,7 @@ function SidebarContent({
 
         {tab === 'ajustes' && appMode === 'criador' && (
           <QuickAdjustmentsPanel
+            onOpenTemplateGallery={onOpenTemplateGallery}
             slide={slide} brand={brand} activeIdx={activeIdx} cardCount={slides.length}
             isPresentation={isPresentationProject} projectId={activeDocId || activeEntry?.id}
             visualPreset={visualPreset} presets={productVisualPresets}
@@ -2290,6 +2304,7 @@ function SidebarContent({
                   </p>
                 </div>
               ) : null}
+              {onOpenTemplateGallery && <TemplateGalleryEntry onOpen={onOpenTemplateGallery} />}
             </S>
             <S sectionId="visual-elementos" title="Elementos" hint="CTAs e traços premium — clique para inserir; edite texto e cores do item selecionado.">
               <ElementsPanel

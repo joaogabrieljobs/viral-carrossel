@@ -11,7 +11,8 @@ Studio de narrativas visuais com IA para comunicação e apresentações. Vite +
 - Landing: **docs/LANDING-COPY.md**; preços/quotas vêm de `shared/plans.js`, texto incluso e chave própria opcional.
 - Auditorias históricas: docs/audit.md (2026-08-07) · docs/audit-produto.md (2026-08-07) · docs/audit-ia-2026-09-15.md. Achados e linhas retratam a versão auditada; consultar revisões posteriores e o código atual antes de reutilizá-los.
 - Plano grátis (conta sem assinatura, sem IA, projetos no aparelho): **docs/product/plano-gratis.md**
-- Em especificação, ainda sem código: docs/product/publicar-modelo.md · docs/product/navegacao-mobile.md
+- Publicar modelo (galeria pública de estrutura visual): **docs/product/publicar-modelo.md**
+- Navegação no celular: docs/product/navegacao-mobile.md
 - PRD: docs/product/PRD-suite-testes-confianca.md
 - TDD: docs/engineering/TDD-suite-testes-confianca.md
 - Épicos e specs: docs/epics/

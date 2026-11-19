@@ -1,6 +1,6 @@
 # Publicar modelo — diagramação e visual para outros usuários
 
-**Status:** especificação com decisões respondidas pelo João em 2026-11-19 (seção 4). Nada implementado.
+**Status:** implementado em 2026-11-19 (seção 7), aguardando a migração 015 no banco de produção e a autorização de envio.
 **Data:** 2026-11-18 · **Base:** `main` em `4257738`
 **Pedido:** "um usuário pode criar um modelo de diagramação, visual e publicar para outro usuário usar."
 
@@ -82,3 +82,28 @@ Consequências no desenho:
 ## 6. Pronto quando
 
 Publicar, listar, aplicar e despublicar funcionam de ponta a ponta entre duas contas; nenhum dado do autor nem conteúdo de cliente está no modelo guardado; ninguém edita ou apaga modelo alheio, com teste de servidor; portão completo verde.
+
+## 7. Implementação (2026-11-19)
+
+| Peça | Arquivo |
+|---|---|
+| Modelo: montar, limpar por lista permitida, aplicar, prévia | `src/utils/published-template.js` (o servidor usa o mesmo módulo) |
+| Banco | `db/migrations/015_published_templates.sql` (`published_templates`, `published_template_reports`) |
+| Loja (dono conferido no SQL) | `api/lib/published-templates-store.js` |
+| Rota | `api/templates.js` (exige conta; não exige assinatura) |
+| Interface | `src/components/TemplateGalleryModal.jsx` (Galeria · Meus modelos · Publicar), entrada em Ajustes (Criar rápido) e em Visual |
+
+Regras implementadas:
+- O servidor reconstrói o modelo por lista permitida antes de gravar; texto livre de ornamento só passa se for marcador. Limite de 48 KB.
+- Escrita compara o dono no SQL; modelo alheio responde 404. `owner_id` e contagem de denúncias nunca saem na resposta.
+- Limites por conta: 10 modelos publicados e 5 publicações a cada 24 h; 10 publicações por minuto.
+- Denúncia: uma por conta e modelo; ninguém denuncia o próprio; com 3 contas o modelo sai da galeria (`status = 'hidden'`) e a autora vê "em revisão". Revisão do João: pela tabela `moont.published_template_reports` no Supabase.
+- Despublicar apaga o modelo. Projetos que já o usaram não mudam (aplicar é uma cópia).
+- Aplicar mantém textos, fotos, logo, nome, @ e o formato do projeto; capa no primeiro card, fechamento no último, conteúdo se repete no meio. Dá para desfazer.
+
+Testes:
+- `tests/integration/published-templates.test.js`: rota e loja reais sobre Postgres embutido (PGlite, devDependency) com a migração 015 — conteúdo do cliente fora, permissão entre contas, dono vindo da sessão, limites, denúncia, paginação. Teste de mutação: tirar `owner_id` do `DELETE` faz o teste falhar.
+- `tests/unit/published-template.test.js`: montar, limpar e aplicar.
+- `tests/e2e/publicar-modelo.spec.js`: conta paga publica, conta grátis encontra e aplica mantendo os próprios textos, não consegue apagar o modelo alheio, autora despublica e o modelo some; galeria em 390 px.
+
+Para ativar em produção: aplicar `015_published_templates.sql` no Supabase "Moont Production" antes do envio. Sem a tabela, a rota responde 503 "A galeria de modelos ainda não foi ativada" e o resto do app segue normal.

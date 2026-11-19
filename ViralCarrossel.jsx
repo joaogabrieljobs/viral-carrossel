@@ -253,6 +253,8 @@ import {
   planFreePlanDraftRecovery, rememberUpgradeReturn, takeUpgradeReturn,
 } from './src/utils/free-plan.js';
 import { useLibrary } from './src/hooks/useLibrary.js';
+import { applyTemplateToDoc } from './src/utils/published-template.js';
+import { recordTemplateUse } from './src/lib/templates-client.js';
 import { useToasts } from './src/hooks/useToasts.js';
 import { useAiSettings } from './src/hooks/useAiSettings.js';
 import {
@@ -604,6 +606,7 @@ const ImageCropModal = lazy(() => import('./src/components/ImageCropModal.jsx'))
 const PhotoPositionModal = lazy(() => import('./src/components/PhotoPositionModal.jsx'));
 const KeysModal = lazy(() => import('./src/components/KeysModal.jsx'));
 const TemplatesModal = lazy(() => import('./src/components/TemplatesModal.jsx'));
+const TemplateGalleryModal = lazy(() => import('./src/components/TemplateGalleryModal.jsx'));
 
 
 // ─── VIDEO URL MAP (módulo-level, sincronizado do App.videoUrls state) ───────
@@ -2730,6 +2733,8 @@ export default function App() {
   const [resultsOpen, setResultsOpen] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  /** Galeria de modelos publicados: '' fechada, ou a aba aberta. */
+  const [templateGalleryTab, setTemplateGalleryTab] = useState('');
   const [hookVarsOpen, setHookVarsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const {
@@ -7211,7 +7216,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
       // deve bloquear atalhos que editariam o documento por trás do modal.
       const modalInDom = typeof document !== 'undefined'
         && !!document.querySelector('[role="dialog"][aria-modal="true"]');
-      const anyModalOpen = modalInDom || resultsOpen || setupOpen || researchOpen || seriesOpen || keysOpen || templatesOpen || hookVarsOpen || helpOpen || imgPrompt.open || fullscreenOpen || tourOpen || libraryOpen || brandsOpen || imageCropOpen || photoPositionOpen || modesIntroOpen || landingOpen || paywallOpen || loginOpen;
+      const anyModalOpen = modalInDom || resultsOpen || setupOpen || researchOpen || seriesOpen || keysOpen || templatesOpen || hookVarsOpen || helpOpen || imgPrompt.open || fullscreenOpen || tourOpen || libraryOpen || brandsOpen || imageCropOpen || photoPositionOpen || modesIntroOpen || landingOpen || paywallOpen || loginOpen || !!templateGalleryTab;
       const mod = e.metaKey || e.ctrlKey;
       const k = e.key;
       if (creationSession) {
@@ -7289,7 +7294,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeIdx, slides, selectedCardElement, deleteCardTarget, history, setupOpen, researchOpen, seriesOpen, resultsOpen, keysOpen, templatesOpen, hookVarsOpen, helpOpen, imgPrompt.open, fullscreenOpen, tourOpen, libraryOpen, brandsOpen, imageCropOpen, photoPositionOpen, modesIntroOpen, landingOpen, paywallOpen, loginOpen, shellView, creationSession]); // eslint-disable-line
+  }, [activeIdx, slides, selectedCardElement, deleteCardTarget, history, setupOpen, researchOpen, seriesOpen, resultsOpen, keysOpen, templatesOpen, hookVarsOpen, helpOpen, imgPrompt.open, fullscreenOpen, tourOpen, libraryOpen, brandsOpen, imageCropOpen, photoPositionOpen, modesIntroOpen, landingOpen, paywallOpen, loginOpen, templateGalleryTab, shellView, creationSession]); // eslint-disable-line
 
   const openCardElement = useCallback((slideId, key, { navigate = false } = {}) => {
     if (!slideId || !key) return;
@@ -7324,8 +7329,21 @@ Retorne APENAS JSON: ${refineAllWantsBody
   const sidebarBrand = editingCardVisual ? { ...displayBrand, ...sanitizeCustomVisualPresetBrand(panelSlide.visualBrand) } : displayBrand;
   const setSidebarBrand = editingCardVisual ? next => history.set(d => editCardVisualBrand(d, activeIdx, next)) : setBrand;
 
+  const applyPublishedTemplate = (template) => {
+    try {
+      history.set((current) => applyTemplateToDoc(current, template.content));
+      setTemplateGalleryTab('');
+      toast(`Modelo «${template.name}» aplicado. Textos e fotos foram mantidos.`, 'success', 5000);
+      trackEvent('published_template_applied', { template: template.id });
+      recordTemplateUse(template.id).catch(() => { /* contagem de uso não bloqueia */ });
+    } catch (error) {
+      toast(error?.message || 'Não foi possível aplicar este modelo.', 'error', 5000);
+    }
+  };
+
   const sidebarProps = {
     freePlan: accessFree, onUpgrade: openUpgrade,
+    onOpenTemplateGallery: (tab = 'gallery') => setTemplateGalleryTab(tab),
     saveIndicator,
     onReviewChange: review => history.set(d => ({ ...d, clientReview: review })),
     // setHookLibrary/niche: botão "salvar hook na biblioteca" (SidebarContent).
@@ -9092,6 +9110,16 @@ Retorne APENAS JSON: ${refineAllWantsBody
         onClose={()=>setTemplatesOpen(false)}
         onApply={applyTemplate}
       />
+      {templateGalleryTab && <TemplateGalleryModal
+        open={!!templateGalleryTab}
+        initialTab={templateGalleryTab}
+        onClose={() => setTemplateGalleryTab('')}
+        doc={doc}
+        projectName={activeEntry?.name || ''}
+        onApply={applyPublishedTemplate}
+        toast={toast}
+        itemsLabel={isPresentationProject ? 'slides' : 'cards'}
+      />}
       {!isApresentacaoPreset(creativePreset) && <HookVariationsModal
         open={hookVarsOpen}
         onClose={()=>setHookVarsOpen(false)}
