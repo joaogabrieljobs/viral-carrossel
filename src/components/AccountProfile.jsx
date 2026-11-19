@@ -640,7 +640,9 @@ export default function AccountProfile({
               >
                 {loggingOut ? 'Salvando e saindo…' : 'Sair da conta'}
               </button>
-              <button
+              {/* No grátis os projetos existem só neste aparelho: apagar o aparelho
+                  seria apagar tudo, sem cópia na conta. A opção só existe para quem tem nuvem. */}
+              {!freePlan && <button
                 type="button"
                 disabled={loggingOut}
                 onClick={async (e) => {
@@ -668,7 +670,10 @@ export default function AccountProfile({
                 }}
               >
                 Sair e apagar deste aparelho
-              </button>
+              </button>}
+              {freePlan && <p style={{ margin: 0, fontSize: 12, lineHeight: 1.45, color: 'var(--text-muted)' }}>
+                Ao sair, seus projetos ficam guardados neste navegador e voltam quando você entrar de novo com esta conta.
+              </p>}
             </div>
           )}
         </div>

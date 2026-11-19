@@ -751,7 +751,7 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
         if (sessionFree) trackEvent('free_plan_enter');
         enterStudio();
       }
-      if (q?.get('account_switch') === '1' && session.active) {
+      if (q?.get('account_switch') === '1' && sessionSignedIn) {
         try {
           const url = new URL(window.location.href);
           url.searchParams.delete('account_switch');

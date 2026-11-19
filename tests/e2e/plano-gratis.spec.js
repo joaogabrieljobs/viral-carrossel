@@ -169,6 +169,67 @@ test.describe('Plano grátis', () => {
     await expect(page.locator('[data-vc-tour="thumbnails"]')).toHaveCount(0);
   });
 
+  test('cadastro pelo formulário entra no editor grátis; sair e entrar de novo devolve os projetos', async ({ page }) => {
+    test.setTimeout(150_000);
+    const chamadas = [];
+    let sessao = SESSAO_ANONIMA;
+    let cadastro = null;
+    await page.route('https://api.openai.com/**', (route) => route.abort());
+    await mockApi(page, {
+      extra: {
+        '/api/auth/session': (route) => route.fulfill({ json: sessao }),
+        '/api/auth/register': (route) => {
+          cadastro = route.request().postDataJSON();
+          sessao = SESSAO_GRATIS; // o servidor emitiu o cookie da conta grátis
+          return route.fulfill({ json: { active: false, free: true, plan: 'free', email: EMAIL, customerId: SESSAO_GRATIS.customerId,
+            message: 'Conta criada. Você entrou no plano grátis.' } });
+        },
+        '/api/auth/login': (route) => {
+          sessao = SESSAO_GRATIS;
+          return route.fulfill({ json: { active: false, free: true, plan: 'free', email: EMAIL, customerId: SESSAO_GRATIS.customerId, login: 'password' } });
+        },
+        '/api/auth/logout': (route) => {
+          sessao = SESSAO_ANONIMA;
+          return route.fulfill({ json: { ok: true, localCookieCleared: true, sessionsRevoked: true } });
+        },
+        ...rotasPagas(chamadas),
+      },
+    });
+    await page.goto('/?app=1');
+    await page.getByRole('region', { name: 'Plano grátis', exact: true }).getByRole('button', { name: 'Começar grátis', exact: true }).click();
+    const modal = page.getByRole('dialog');
+    await modal.locator('input[type="email"]').fill(EMAIL);
+    await modal.locator('input[type="password"]').first().fill('SenhaDeTeste123!');
+    await modal.getByRole('button', { name: 'Criar conta', exact: true }).last().click();
+
+    // Sem parada nos planos: a conta nova cai direto na tela inicial do editor.
+    await expect(page.locator('[data-vc-tour="account-home"]')).toBeVisible({ timeout: 45_000 });
+    expect(cadastro).toMatchObject({ email: EMAIL });
+    await expect(page).not.toHaveURL(/account_switch|login=/);
+    await criarProjetoManual(page, 'Primeiro projeto grátis');
+    await tituloNoPainel(page).fill('Feito logo depois do cadastro');
+    await expect(page.locator('[data-vc-inline-editable="true"]:visible').filter({ hasText: 'Feito logo depois do cadastro' }).first()).toBeVisible();
+
+    // Sair da conta: os projetos ficam no cofre deste navegador.
+    await page.getByRole('button', { name: 'Perfil', exact: true }).first().click();
+    await expect(page.getByRole('button', { name: 'Sair e apagar deste aparelho' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Sair da conta', exact: true }).click();
+    await expect(page.getByRole('region', { name: 'Plano grátis', exact: true }).or(page.getByRole('button', { name: 'Entrar', exact: true })).first()).toBeVisible({ timeout: 45_000 });
+    expect(await page.evaluate(() => localStorage.getItem('vc_library'))).toBeNull();
+
+    // Entrar de novo com a mesma conta devolve o projeto.
+    await page.goto('/?app=1');
+    await page.getByRole('button', { name: 'Entrar com senha', exact: true }).click();
+    const login = page.getByRole('dialog');
+    await login.locator('input[type="email"]').fill(EMAIL);
+    await login.locator('input[type="password"]').first().fill('SenhaDeTeste123!');
+    await login.getByRole('button', { name: 'Entrar', exact: true }).last().click();
+    await expect(page.locator('[data-vc-tour="account-home"]')).toBeVisible({ timeout: 45_000 });
+    await expect.poll(async () => page.evaluate(() => JSON.parse(localStorage.getItem('vc_library') || '[]').map((e) => e.doc?.slides?.[0]?.title)), { timeout: 30_000 })
+      .toEqual(['Feito logo depois do cadastro']);
+    expect(chamadas.filter((rota) => rota !== '/api/library-sync')).toEqual([]);
+  });
+
   test('conta grátis cria, edita e exporta um carrossel à mão, sem chamar nenhuma rota paga', async ({ page }) => {
     test.setTimeout(120_000);
     const chamadas = [];
