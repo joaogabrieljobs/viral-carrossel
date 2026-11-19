@@ -11,7 +11,7 @@
  * conteúdo de quem publicou.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Flag, Trash2, X } from 'lucide-react';
+import { Check, EyeOff, Flag, Trash2, X } from 'lucide-react';
 import { useModalDialog } from '../hooks/useModalDialog.js';
 import { SlideCard } from './card/SlideCard.jsx';
 import { FORMATS } from '../utils/formats.js';
@@ -20,6 +20,7 @@ import {
 } from '../utils/published-template.js';
 import {
   listGalleryTemplates, listMyTemplates, publishTemplate, updateTemplate, deleteTemplate, reportTemplate,
+  listModerationQueue, moderateTemplate,
 } from '../lib/templates-client.js';
 
 const FORMAT_LABEL = { carrossel: 'Feed 4:5', quadrado: 'Quadrado', stories: 'Stories', apresentacao: 'Apresentação' };
@@ -60,24 +61,26 @@ function Field({ label, hint, children }) {
   );
 }
 
-function Gallery({ onApply, toast, slideCount, itemsLabel }) {
+function Gallery({ onApply, toast, slideCount, itemsLabel, onModerator }) {
   const [state, setState] = useState({ loading: true, templates: [], nextCursor: null, error: '' });
   const [confirming, setConfirming] = useState(null);
   const load = useCallback(async (cursor = '') => {
     setState((s) => ({ ...s, loading: true, error: '' }));
     try {
       const data = await listGalleryTemplates({ cursor });
+      if (data.moderator) onModerator?.(true);
       setState((s) => ({ loading: false, error: '', nextCursor: data.nextCursor,
         templates: cursor ? [...s.templates, ...data.templates] : data.templates }));
     } catch (error) {
       setState((s) => ({ ...s, loading: false, error: error.message }));
     }
-  }, []);
+  }, [onModerator]);
   useEffect(() => { load(); }, [load]);
   const report = async (template) => {
-    if (!window.confirm(`Denunciar o modelo «${template.name}»? Use para conteúdo ofensivo ou que copia a marca de alguém.`)) return;
+    const reason = window.prompt(`Denunciar «${template.name}»: o que há de errado? (opcional)\nUse para conteúdo ofensivo ou que copia a marca de alguém.`, '');
+    if (reason === null) return;
     try {
-      await reportTemplate(template.id);
+      await reportTemplate(template.id, reason);
       toast?.('Denúncia enviada. Obrigado por avisar.', 'success', 4000);
     } catch (error) { toast?.(error.message, 'error', 5000); }
   };
@@ -192,6 +195,74 @@ function MyTemplates({ toast, refreshKey }) {
   );
 }
 
+const DECISIONS = {
+  keep: { label: 'Manter na galeria', done: 'Modelo mantido na galeria. As denúncias foram zeradas.' },
+  hide: { label: 'Ocultar', done: 'Modelo fora da galeria. A autora vê como "em revisão".' },
+  remove: { label: 'Remover', done: 'Modelo removido.' },
+};
+const dataCurta = (iso) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+
+/** Fila de moderação: só aparece para contas moderadoras (o servidor confere). */
+function ModerationQueue({ toast }) {
+  const [state, setState] = useState({ loading: true, templates: [], error: '' });
+  const [busyId, setBusyId] = useState('');
+  const load = useCallback(async () => {
+    setState((s) => ({ ...s, loading: true, error: '' }));
+    try { setState({ loading: false, templates: (await listModerationQueue()).templates, error: '' }); }
+    catch (error) { setState({ loading: false, templates: [], error: error.message }); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const decide = async (template, decision) => {
+    if (decision === 'remove' && !window.confirm(`Remover «${template.name}» de vez? A autora perde o modelo; projetos que já o usaram não mudam.`)) return;
+    setBusyId(template.id);
+    try {
+      await moderateTemplate(template.id, decision);
+      toast?.(DECISIONS[decision].done, 'success', 4000);
+      setState((s) => ({ ...s, templates: s.templates.filter((t) => t.id !== template.id || decision === 'hide') }));
+      if (decision === 'hide') load();
+    } catch (error) { toast?.(error.message, 'error', 5000); }
+    finally { setBusyId(''); }
+  };
+  if (state.loading) return <p role="status" style={{ margin: 0, color: 'var(--text-muted)' }}>Carregando denúncias…</p>;
+  if (state.error) return <p role="alert" style={{ margin: 0 }}>{state.error}</p>;
+  if (!state.templates.length) return <p style={{ margin: 0, color: 'var(--text-muted)' }}>Nenhuma denúncia para revisar.</p>;
+  return (
+    <ul aria-label="Fila de moderação" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 12 }}>
+      {state.templates.map((template) => (
+        <li key={template.id} aria-label={`Moderar ${template.name}`} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: 12, borderRadius: 14,
+          border: `1px solid ${template.status === 'hidden' ? 'var(--danger, #d95c5c)' : 'var(--border)'}` }}>
+          <TemplatePreview content={template.content} width={96} />
+          <div style={{ flex: 1, minWidth: 0, display: 'grid', gap: 6 }}>
+            <strong style={{ fontSize: 14 }}>{template.name}</strong>
+            {template.description && <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{template.description}</span>}
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              {FORMAT_LABEL[template.format]} · publicado em {dataCurta(template.createdAt)}{template.authorName ? ` · por ${template.authorName}` : ' · sem nome'}
+              {` · ${template.authorTemplateCount} modelo${template.authorTemplateCount === 1 ? '' : 's'} da mesma conta`}
+              {template.authorStrikes ? ` · ${template.authorStrikes} já removido${template.authorStrikes === 1 ? '' : 's'}/oculto${template.authorStrikes === 1 ? '' : 's'}` : ''}
+            </span>
+            <span role="status" style={{ fontSize: 12, fontWeight: 600, color: template.status === 'hidden' ? 'var(--danger, #d95c5c)' : 'var(--text-primary)' }}>
+              {template.status === 'hidden' ? 'Fora da galeria' : 'Na galeria'} · {template.reportCount} denúncia{template.reportCount === 1 ? '' : 's'}
+            </span>
+            {template.reports.length > 0 && (
+              <ul aria-label="Denúncias" style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: 'var(--text-secondary)', display: 'grid', gap: 2 }}>
+                {template.reports.map((r, i) => <li key={i}>{dataCurta(r.createdAt)} — {r.reason || 'sem motivo escrito'}</li>)}
+              </ul>
+            )}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button type="button" className="vc-btn vc-btn-ghost" style={{ minHeight: 44 }} disabled={busyId === template.id}
+                onClick={() => decide(template, 'keep')} aria-label={`Manter ${template.name} na galeria`}><Check size={14} /> Manter</button>
+              {template.status !== 'hidden' && <button type="button" className="vc-btn vc-btn-ghost" style={{ minHeight: 44 }} disabled={busyId === template.id}
+                onClick={() => decide(template, 'hide')} aria-label={`Ocultar ${template.name}`}><EyeOff size={14} /> Ocultar</button>}
+              <button type="button" className="vc-btn vc-btn-ghost" style={{ minHeight: 44, color: 'var(--danger, #d95c5c)' }} disabled={busyId === template.id}
+                onClick={() => decide(template, 'remove')} aria-label={`Remover ${template.name}`}><Trash2 size={14} /> Remover</button>
+            </div>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function Publish({ doc, defaultName, toast, onPublished }) {
   const content = useMemo(() => buildTemplateContent(doc), [doc]);
   const [name, setName] = useState(defaultName || '');
@@ -241,6 +312,10 @@ function Publish({ doc, defaultName, toast, onPublished }) {
 export default function TemplateGalleryModal({ open, onClose, doc, projectName, onApply, toast, initialTab = 'gallery', itemsLabel = 'cards' }) {
   const [tab, setTab] = useState(initialTab);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [moderator, setModerator] = useState(false);
+  // Voltar à aba Galeria recarrega a lista (outra conta pode ter publicado ou despublicado).
+  const [galleryKey, setGalleryKey] = useState(0);
+  const selectTab = (id) => { if (id === 'gallery' && tab !== 'gallery') setGalleryKey((k) => k + 1); setTab(id); };
   const { overlayRef, dialogRef, onDialogKeyDown } = useModalDialog({ open, onClose });
   useEffect(() => { if (open) setTab(initialTab); }, [open, initialTab]);
   if (!open) return null;
@@ -254,12 +329,17 @@ export default function TemplateGalleryModal({ open, onClose, doc, projectName, 
           <button type="button" className="vc-icon-btn" onClick={onClose} aria-label="Fechar" style={{ width: 44, height: 44 }}><X size={17} /></button>
         </header>
         <div role="tablist" aria-label="Galeria de modelos" style={{ display: 'flex', padding: '0 8px', borderBottom: '1px solid var(--border)' }}>
-          <TabButton id="gallery" current={tab} onSelect={setTab}>Galeria</TabButton>
-          <TabButton id="mine" current={tab} onSelect={setTab}>Meus modelos</TabButton>
-          <TabButton id="publish" current={tab} onSelect={setTab}>Publicar</TabButton>
+          <TabButton id="gallery" current={tab} onSelect={selectTab}>Galeria</TabButton>
+          <TabButton id="mine" current={tab} onSelect={selectTab}>Meus modelos</TabButton>
+          <TabButton id="publish" current={tab} onSelect={selectTab}>Publicar</TabButton>
+          {moderator && <TabButton id="moderation" current={tab} onSelect={selectTab}>Moderação</TabButton>}
         </div>
         <div style={{ padding: 16, overflowY: 'auto' }}>
-          {tab === 'gallery' && <Gallery onApply={onApply} toast={toast} slideCount={doc?.slides?.length || 0} itemsLabel={itemsLabel} />}
+          {/* A galeria sempre carrega uma vez: é ela que descobre se a conta modera. */}
+          <div hidden={tab !== 'gallery'}>
+            <Gallery key={galleryKey} onApply={onApply} toast={toast} slideCount={doc?.slides?.length || 0} itemsLabel={itemsLabel} onModerator={setModerator} />
+          </div>
+          {tab === 'moderation' && moderator && <ModerationQueue toast={toast} />}
           {tab === 'mine' && <MyTemplates toast={toast} refreshKey={refreshKey} />}
           {tab === 'publish' && <Publish doc={doc} defaultName={projectName} toast={toast} onPublished={() => { setRefreshKey((n) => n + 1); setTab('mine'); }} />}
         </div>

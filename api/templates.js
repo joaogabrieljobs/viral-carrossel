@@ -16,6 +16,10 @@
  *   POST { action:'delete', id }
  *   POST { action:'use', id }           conta um uso (aplicar no projeto)
  *   POST { action:'report', id, reason }
+ *
+ * Moderação (só contas em `moont.template_moderators`; para as outras, 404):
+ *   GET  /api/templates?moderation=1    fila: denunciados e ocultos
+ *   POST { action:'moderate', id, decision: 'keep' | 'hide' | 'remove' }
  */
 import { applyCors } from './lib/cors.js';
 import { readCurrentAccessCookie } from './lib/access.js';
@@ -78,9 +82,14 @@ export function createTemplatesHandler({ store = defaultStore, readAccess = read
         const id = url.searchParams.get('id');
         if (id) return res.status(200).json({ ok: true, template: await store.getTemplate(id, owner) });
         if (url.searchParams.get('mine') === '1') return res.status(200).json({ ok: true, templates: await store.listMine(owner) });
+        if (url.searchParams.get('moderation') === '1') return res.status(200).json({ ok: true, templates: await store.listModerationQueue(owner) });
         const format = url.searchParams.get('format');
         if (format && !TEMPLATE_FORMATS.includes(format)) return res.status(400).json({ error: 'Formato inválido.', code: 'template_format' });
-        return res.status(200).json({ ok: true, ...await store.listGallery({ viewer: owner, cursor: url.searchParams.get('cursor'), format }) });
+        const [page, moderator] = await Promise.all([
+          store.listGallery({ viewer: owner, cursor: url.searchParams.get('cursor'), format }),
+          store.isModerator ? store.isModerator(owner).catch(() => false) : false,
+        ]);
+        return res.status(200).json({ ok: true, ...page, ...(moderator ? { moderator: true } : {}) });
       }
 
       if (bodyBytes(req) > MAX_BODY_BYTES) return res.status(413).json({ error: 'O modelo ficou grande demais.', code: 'template_too_large' });
@@ -112,6 +121,8 @@ export function createTemplatesHandler({ store = defaultStore, readAccess = read
           if (reportLimited) return rateLimitResponse(res, reportLimited.retryAfterSec);
           return res.status(200).json({ ok: true, ...await store.report(owner, body.id, body.reason) });
         }
+        case 'moderate':
+          return res.status(200).json({ ok: true, ...await store.moderate(owner, body.id, body.decision) });
         default:
           return res.status(400).json({ error: 'Ação inválida.', code: 'template_bad_action' });
       }

@@ -212,7 +212,87 @@ export function createPublishedTemplatesStore({ sql: injectedSql } = {}) {
     }));
   }
 
-  return { listGallery, listMine, getTemplate, publish, updateMine, deleteMine, recordUse, report };
+  /** Moderador é uma conta listada em `moont.template_moderators`. */
+  async function isModerator(ownerValue) {
+    if (typeof ownerValue !== 'string' || !OWNER.test(ownerValue)) return false;
+    return guard(async () => {
+      const rows = await connection().unsafe(`/* templates_is_moderator */
+        SELECT 1 FROM moont.template_moderators WHERE owner_id = $1`, [ownerValue]);
+      return rows.length > 0;
+    });
+  }
+
+  async function requireModerator(ownerValue) {
+    // Para quem não modera, a fila nem existe: 404, igual a qualquer rota desconhecida.
+    if (!await isModerator(ownerValue)) throw fail('template_not_found', 'Não encontrado.', 404);
+  }
+
+  /**
+   * Fila de moderação: modelos com denúncia ainda não revista, os ocultos
+   * primeiro, e com eles as denúncias (motivo e data; quem denunciou não sai).
+   */
+  async function listModerationQueue(ownerValue) {
+    await requireModerator(ownerValue);
+    return guard(async () => {
+      const rows = await connection().unsafe(`/* templates_moderation_queue */
+        SELECT t.*,
+          COALESCE((SELECT json_agg(json_build_object('reason', r.reason, 'createdAt', r.created_at) ORDER BY r.created_at DESC)
+            FROM moont.published_template_reports r WHERE r.template_id = t.id), '[]'::json) AS reports,
+          (SELECT count(*)::int FROM moont.published_templates o WHERE o.owner_id = t.owner_id) AS author_template_count,
+          (SELECT count(*)::int FROM moont.template_moderation_events e
+             WHERE e.template_owner_id = t.owner_id AND e.decision IN ('hide', 'remove')) AS author_strikes
+        FROM moont.published_templates t
+        WHERE t.status = 'hidden' OR t.report_count > 0
+        ORDER BY (t.status = 'hidden') DESC, t.report_count DESC, t.created_at DESC
+        LIMIT 100`, []);
+      return rows.map((row) => ({
+        ...publicRow(row, null),
+        status: row.status,
+        reportCount: Number(row.report_count || 0),
+        reports: Array.isArray(row.reports) ? row.reports.map((r) => ({ reason: r.reason || '', createdAt: new Date(r.createdAt).toISOString() })) : [],
+        // Contexto do autor sem identificá-lo: quantos modelos tem e quantos já saíram por moderação.
+        authorTemplateCount: Number(row.author_template_count || 0),
+        authorStrikes: Number(row.author_strikes || 0),
+      }));
+    });
+  }
+
+  /**
+   * Decide um modelo: `keep` devolve à galeria e zera as denúncias (novas
+   * denúncias recomeçam a contagem), `hide` tira da galeria sem apagar, e
+   * `remove` apaga. Toda decisão vai para o histórico.
+   */
+  async function moderate(ownerValue, idValue, decision) {
+    await requireModerator(ownerValue);
+    const tpl = templateId(idValue);
+    if (!['keep', 'hide', 'remove'].includes(decision)) throw fail('template_bad_decision', 'Decisão inválida.');
+    return guard(() => connection().begin(async (tx) => {
+      const found = (await tx.unsafe(`/* templates_moderate_target */
+        SELECT * FROM moont.published_templates WHERE id = $1 FOR UPDATE`, [tpl]))[0];
+      if (!found) throw fail('template_not_found', 'Modelo não encontrado.', 404);
+      await tx.unsafe(`/* templates_moderation_event */
+        INSERT INTO moont.template_moderation_events
+          (template_id, template_name, template_owner_id, moderator_id, decision, report_count)
+        VALUES ($1, $2, $3, $4, $5, $6)`, [tpl, found.name, found.owner_id, ownerValue, decision, Number(found.report_count || 0)]);
+      if (decision === 'remove') {
+        await tx.unsafe('/* templates_moderation_remove */ DELETE FROM moont.published_templates WHERE id = $1', [tpl]);
+        return { id: tpl, decision, removed: true };
+      }
+      if (decision === 'keep') {
+        await tx.unsafe('/* templates_moderation_clear */ DELETE FROM moont.published_template_reports WHERE template_id = $1', [tpl]);
+      }
+      const rows = await tx.unsafe(`/* templates_moderation_update */
+        UPDATE moont.published_templates
+        SET status = $2, report_count = CASE WHEN $2 = 'published' THEN 0 ELSE report_count END, reviewed_at = now()
+        WHERE id = $1 RETURNING status`, [tpl, decision === 'keep' ? 'published' : 'hidden']);
+      return { id: tpl, decision, status: rows[0].status };
+    }));
+  }
+
+  return {
+    listGallery, listMine, getTemplate, publish, updateMine, deleteMine, recordUse, report,
+    isModerator, listModerationQueue, moderate,
+  };
 }
 
 const defaultStore = createPublishedTemplatesStore();
