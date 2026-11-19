@@ -230,6 +230,7 @@ function UnlockGroupedElementsNotice({ onUnlock, itemLabel = 'card' }) {
 }
 
 function SidebarContent({
+  freePlan = false, onUpgrade = null,
   setHookLibrary,
   niche,
   slide, slides, activeIdx, brand, setBrand, updateSlide,
@@ -3733,7 +3734,10 @@ function SidebarContent({
               fold title="Convidar para editar"
               hint="Acesso de edição para sua equipe. Para o cliente revisar, use Aprovação."
             >
-              <TeamSharePanel
+              {freePlan ? <div data-vc-free-share style={{ display:'grid', gap:10 }}>
+                <p style={{ margin:0, fontSize:13, lineHeight:1.5, color:'var(--text-muted)' }}>Convidar a equipe para editar faz parte dos planos pagos. No grátis, envie o arquivo de backup do projeto.</p>
+                {onUpgrade && <button type="button" className="vc-btn vc-btn-ghost" style={{ minHeight:44 }} onClick={() => onUpgrade('share')}>Ver planos</button>}
+              </div> : <TeamSharePanel
                 key={activeDocId || activeEntry?.id || 'sem-projeto'}
                 doc={historyDoc}
                 projectId={activeDocId || activeEntry?.id || ''}
@@ -3744,7 +3748,7 @@ function SidebarContent({
                 onDocPulled={onTeamDocPulled}
                 onShareJoined={onTeamShareJoined}
                 toast={toast}
-              />
+              />}
             </S>
 
             {appMode === 'criador' ? (

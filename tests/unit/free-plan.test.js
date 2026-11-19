@@ -158,3 +158,35 @@ describe('voltar ao projeto depois de assinar', () => {
     expect(localStorage.getItem(UPGRADE_RETURN_KEY)).toBeNull();
   });
 });
+
+describe('rede de segurança dentro do transporte de IA', () => {
+  // Um botão esquecido na interface, ou uma chave própria gravada no navegador
+  // (que fala direto com o provedor e o servidor não vê), param aqui.
+  it('texto, imagem, leitura de imagem: nada sai para a rede no plano grátis', async () => {
+    const fetchSpy = vi.fn().mockRejectedValue(new Error('rede não pode ser chamada'));
+    vi.stubGlobal('fetch', fetchSpy);
+    const ai = await import('../../src/utils/ai-client.js');
+    const ocr = await import('../../src/utils/carousel-ocr.js');
+    const onBlocked = vi.fn();
+    setPaidFeatureGate({ blocked: true, onBlocked });
+
+    const chamadas = [
+      ['text', () => ai.callAI('escreva um carrossel', { openaiKey: 'sk-chave-propria' })],
+      ['text', () => ai.callAIwithSearch('pesquise o nicho')],
+      ['image', () => ai.generateDALLE('uma mesa', 'sk-chave-propria')],
+      ['image', () => ai.generateDALLEWithRetry('uma mesa', 'sk-chave-propria')],
+      ['image', () => ai.generateZaiImage('uma mesa', null, '', undefined)],
+      ['image', () => ai.generateDALLEEdits(new Blob(['x']), 'uma mesa', 'sk-chave-propria')],
+      ['text', () => ocr.readCarouselImageText('data:image/png;base64,AAAA')],
+    ];
+    for (const [feature, chamar] of chamadas) {
+      // eslint-disable-next-line no-await-in-loop
+      const erro = await chamar().then(() => null, (e) => e);
+      expect(isPlanRequiredError(erro), `${feature}: ${erro?.message}`).toBe(true);
+      expect(erro.feature).toBe(feature);
+    }
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(onBlocked).toHaveBeenCalledTimes(chamadas.length);
+    vi.unstubAllGlobals();
+  });
+});

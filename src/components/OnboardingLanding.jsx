@@ -8,7 +8,7 @@ import BrandLogo from './BrandLogo.jsx';
 import ProjectWorkflowShowcase from './landing/ProjectWorkflowShowcase.jsx';
 import ProductNarrativesShowcase from './landing/ProductNarrativesShowcase.jsx';
 import LandingPlans from './landing/LandingPlans.jsx';
-import { PLAN_ORDER, PLAN_TIERS } from '../../shared/plans.js';
+import { FREE_PLAN, PLAN_ORDER, PLAN_TIERS } from '../../shared/plans.js';
 import { useLandingGsapEffects } from '../hooks/useLandingGsapEffects.js';
 import { APP_MODE_UI } from '../utils/ui-depth-labels.js';
 
@@ -170,7 +170,7 @@ const GENERATION_LAYERS = [
 const FAQ = [
   {
     q: 'Quanto custa a Moont?',
-    a: `${PLAN_ORDER.map(id => `${PLAN_TIERS[id].name}: ${PLAN_TIERS[id].priceLabel}/mês`).join(' · ')}. Todos incluem o editor completo e geração de texto com IA. As imagens inclusas variam por plano.`,
+    a: `Há um plano grátis para criar à mão, sem IA e sem imagem gerada, com até ${FREE_PLAN.projectLimit} projetos guardados no aparelho. Planos pagos: ${PLAN_ORDER.map(id => `${PLAN_TIERS[id].name}: ${PLAN_TIERS[id].priceLabel}/mês`).join(' · ')}. Os pagos incluem o editor completo e geração de texto com IA. As imagens inclusas variam por plano.`,
   },
   {
     q: 'Preciso conectar uma chave de IA?',

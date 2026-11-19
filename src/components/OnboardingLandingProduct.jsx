@@ -9,7 +9,7 @@ import {
   Presentation,
 } from 'lucide-react';
 import BrandLogo from './BrandLogo.jsx';
-import { PLAN_ORDER, PLAN_TIERS } from '../../shared/plans.js';
+import { FREE_PLAN, PLAN_ORDER, PLAN_TIERS } from '../../shared/plans.js';
 import '../styles/landing-product.css';
 
 const PRODUCT = {
@@ -202,15 +202,30 @@ function WorkflowDemo({ onEnter }) {
   );
 }
 
-function Plans({ onEnter }) {
+function Plans({ onEnter, onRegister }) {
   return (
     <section id="planos" className="moont-lp-section moont-lp-plans" aria-labelledby="moont-plans-title">
       <div className="moont-lp-container">
         <p className="moont-lp-kicker">Planos</p>
         <div className="moont-lp-section-heading moont-lp-section-heading--split">
           <h2 id="moont-plans-title">Escolha quanto você quer criar por mês.</h2>
-          <p>Todos os planos incluem texto com IA, editor completo, contexto por projeto e exportação. Os planos com imagem trazem um saldo mensal para gerar e trocar visuais.</p>
+          <p>Os planos pagos incluem texto com IA, editor completo, contexto por projeto e exportação. Os planos com imagem trazem um saldo mensal para gerar e trocar visuais.</p>
         </div>
+        {onRegister && (
+          <aside className="moont-lp-free" aria-label={FREE_PLAN.name} style={{
+            display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+            margin: '0 0 28px', padding: '20px 24px', borderRadius: 20,
+            border: '1px solid rgba(17,18,24,0.22)', background: 'rgba(255,255,255,0.5)',
+          }}>
+            <div style={{ flex: '1 1 320px', minWidth: 0 }}>
+              <h3 style={{ margin: 0, fontSize: 20 }}>{FREE_PLAN.name} · {FREE_PLAN.priceLabel}</h3>
+              <p style={{ margin: '8px 0 0', lineHeight: 1.5 }}>
+                Crie à mão no editor completo: textos, layout, estilos, suas fotos e exportação. Sem IA e sem imagem gerada. Até {FREE_PLAN.projectLimit} projetos, guardados no seu aparelho.
+              </p>
+            </div>
+            <ActionButton onClick={onRegister}>Começar grátis <ArrowRight aria-hidden="true" /></ActionButton>
+          </aside>
+        )}
         <p className="moont-lp-swipe-hint" aria-hidden="true">Deslize para comparar os planos <ArrowRight /></p>
         <div className="moont-lp-plans__grid" role="region" aria-label="Comparação dos planos da Moont" tabIndex={0}>
           {PLAN_ORDER.map((id) => {
@@ -512,7 +527,7 @@ export default function OnboardingLandingProduct({ onEnter, onLogin, onRegister 
         </div>
       </section>
 
-      <Plans onEnter={onEnter} />
+      <Plans onEnter={onEnter} onRegister={onRegister} />
 
       <section className="moont-lp-section moont-lp-faq" aria-labelledby="moont-faq-title">
         <div className="moont-lp-container moont-lp-faq__grid">

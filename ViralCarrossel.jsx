@@ -7305,6 +7305,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
   const setSidebarBrand = editingCardVisual ? next => history.set(d => editCardVisualBrand(d, activeIdx, next)) : setBrand;
 
   const sidebarProps = {
+    freePlan: accessFree, onUpgrade: openUpgrade,
     saveIndicator,
     onReviewChange: review => history.set(d => ({ ...d, clientReview: review })),
     // setHookLibrary/niche: botão "salvar hook na biblioteca" (SidebarContent).
@@ -7692,6 +7693,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           onOpenBrands={() => setBrandsOpen(true)}
           accessEmail={access.email}
           accessStatus={access}
+          onUpgrade={accessFree ? openUpgrade : undefined}
           currentPeriodEnd={access.currentPeriodEnd}
           currentPeriodStart={access.currentPeriodStart}
           planTier={access.tier || null}

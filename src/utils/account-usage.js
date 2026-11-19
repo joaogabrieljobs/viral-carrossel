@@ -1,10 +1,12 @@
-import { getPlan } from '../../shared/plans.js';
+import { FREE_PLAN, getPlan } from '../../shared/plans.js';
 
 const countOrNull = (value) => (
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
 );
 
 function knownPlan(tier) {
+  // O grátis não é um plano comprável (fica fora de PLAN_TIERS), mas é um plano conhecido.
+  if (tier === FREE_PLAN.id) return FREE_PLAN;
   const plan = typeof tier === 'string' ? getPlan(tier) : null;
   return plan?.id === tier ? plan : null;
 }
@@ -24,7 +26,9 @@ export function normalizeAccountUsage({
 } = {}) {
   const plan = knownPlan(imageQuota?.tier) || knownPlan(planTier);
   const limit = countOrNull(imageQuota?.limit) ?? countOrNull(plan?.imageQuota);
-  const used = imageQuota?.status === 'unavailable' || imageQuota?.available === false ? null : countOrNull(imageQuota?.used);
+  // No grátis não há saldo a consultar: zero imagens é um fato, não uma falha de leitura.
+  const used = plan?.id === FREE_PLAN.id ? 0
+    : imageQuota?.status === 'unavailable' || imageQuota?.available === false ? null : countOrNull(imageQuota?.used);
   const hasUsage = used !== null && limit !== null;
   // The server uses this same calculation. Deriving from confirmed counts also
   // prevents an inconsistent remaining field from overstating the allowance.
@@ -41,6 +45,7 @@ export function normalizeAccountUsage({
 
   return {
     planName: plan?.name || null,
+    isFree: plan?.id === FREE_PLAN.id,
     limit,
     used,
     remaining,

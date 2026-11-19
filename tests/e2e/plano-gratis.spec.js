@@ -320,7 +320,7 @@ test.describe('Plano grátis', () => {
     await page.goto('/?billing=success');
     await expect(page.locator('[data-vc-tour="thumbnails"]')).toBeVisible({ timeout: 30_000 });
     // Mesmo projeto, mesmo card, texto intacto — sem passar pela tela inicial.
-    await expect(page.getByRole('button', { name: 'Ir para o card' })).toContainText('Card 2 / 3');
+    await expect(page.getByLabel('Ir para o card')).toHaveValue('1'); // segundo card de três
     await expect(page.locator('[data-vc-inline-editable="true"]:visible').filter({ hasText: 'Card do meio' }).first()).toBeVisible();
     await expect(page.locator('[data-vc-tour="account-home"]')).toHaveCount(0);
     const biblioteca = await page.evaluate(() => JSON.parse(localStorage.getItem('vc_library') || '[]').map((e) => e.name).sort());
@@ -329,6 +329,28 @@ test.describe('Plano grátis', () => {
     await expect(page.locator('[data-vc-save-device-only]')).toHaveCount(0);
     // Em produção (projetos V2) os dois projetos do grátis sobem para a conta recém-assinada.
     if (V2) await expect.poll(() => [...cloud.rows.keys()].sort(), { timeout: 30_000 }).toEqual(['p-outro', 'p-volta']);
+  });
+
+  test('perfil e uso dizem "Plano Grátis" e levam aos planos, sem mensagem de erro de assinatura', async ({ page }) => {
+    const chamadas = [];
+    await abrirGratis(page, { chamadas });
+    await page.getByRole('button', { name: 'Perfil', exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Plano Grátis', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Sem IA no plano grátis', exact: true })).toBeVisible();
+    await expect(page.getByText(/Plano não informado|não confirmado|Portal do cliente indisponível/)).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Abrir portal do cliente' })).toHaveCount(0);
+    // Assistentes (Claude, ChatGPT, Codex) são recurso pago: nada de instrução de conexão.
+    await expect(page.locator('[data-vc-free-agents]')).toContainText('nos planos pagos');
+    await expect(page.getByText('Endereço do MCP')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Ver planos', exact: true }).first().click();
+    await expect(paginaDePlanos(page)).toBeVisible();
+    await page.getByRole('button', { name: 'Continuar no plano grátis', exact: true }).click();
+
+    await page.getByRole('button', { name: 'Uso', exact: true }).first().click();
+    await expect(page.getByText('Sem imagens inclusas', { exact: true })).toBeVisible();
+    await expect(page.getByText('Uso indisponível')).toHaveCount(0);
+    expect(chamadas).toEqual([]);
   });
 
   test('limite de 3 projetos: criar o quarto leva à assinatura, os três existentes continuam abrindo', async ({ page }) => {

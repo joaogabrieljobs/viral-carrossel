@@ -355,6 +355,9 @@ function subscriptionAccessCopy(access, currentPeriodEnd) {
     const end = currentPeriodEnd ? new Date(currentPeriodEnd) : null;
     return `Acesso à assinatura confirmado${end && Number.isFinite(end.getTime()) ? ` · período atual até ${end.toLocaleDateString('pt-BR')}` : ''}.`;
   }
+  if (access?.free === true && access?.active === false) {
+    return 'Você cria à mão e os projetos ficam neste aparelho. IA, imagem gerada e projetos guardados na conta fazem parte dos planos pagos.';
+  }
   if (access?.active === false && access?.status === 'inactive') {
     return 'Acesso à assinatura não confirmado. Confira sua conta no portal do cliente.';
   }
@@ -380,6 +383,7 @@ export default function AccountProfile({
   accessStatus,
   onRefreshAccess,
   onOpenUsage,
+  onUpgrade,
   onProfileSaved,
   cloudProfile,
   onClose,
@@ -409,8 +413,10 @@ export default function AccountProfile({
   const name = profileDisplayName(profile, email);
   const textProvider = TEXT_PROVIDERS[aiSettings?.textProvider] || TEXT_PROVIDERS.openai;
   const imageProvider = IMAGE_PROVIDERS[aiSettings?.imageProvider] || IMAGE_PROVIDERS.openai;
-  const aiReady = hasTextAI && hasImageAI;
   const usage = normalizeAccountUsage({ imageQuota, planTier, currentPeriodEnd });
+  /** Plano grátis: sem IA e sem portal de cobrança — o caminho é ver os planos. */
+  const freePlan = accessStatus?.free === true && accessStatus?.active !== true;
+  const aiReady = !freePlan && hasTextAI && hasImageAI;
   const confirmedExempt = accessStatus?.active === true && accessStatus?.status === 'active'
     && accessStatus.billingExempt === true && accessStatus.accessSource === 'exempt'
     && !accessStatus.verificationUnavailable && !accessStatus.verificationRefreshing;
@@ -571,17 +577,20 @@ export default function AccountProfile({
           </div>
           <p role="status" style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.45 }}>
             {subscriptionAccessCopy(accessStatus, currentPeriodEnd)}
-            {onManageBilling && !accessStatus?.billingDisabled && !confirmedExempt ? ' Pagamento e cancelamento no portal seguro.' : ''}
+            {!freePlan && onManageBilling && !accessStatus?.billingDisabled && !confirmedExempt ? ' Pagamento e cancelamento no portal seguro.' : ''}
           </p>
           {confirmedExempt && onManageBilling && <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45 }}>
             A isenção de acesso não cancela assinaturas anteriores. Você pode gerenciá-las no portal do cliente.
           </p>}
-          {onRefreshAccess && <button type="button" className="vc-btn vc-btn-ghost"
+          {freePlan && onUpgrade && <button type="button" className="vc-btn vc-btn-primary" style={{ minHeight: 44 }} onClick={() => onUpgrade('text')}>
+            Ver planos
+          </button>}
+          {!freePlan && onRefreshAccess && <button type="button" className="vc-btn vc-btn-ghost"
             disabled={!!accessStatus?.verificationRefreshing}
             onClick={() => { Promise.resolve().then(() => onRefreshAccess()).catch(() => {}); }}>
             {accessStatus?.verificationRefreshing ? 'Verificando acesso…' : 'Atualizar acesso'}
           </button>}
-          {onManageBilling ? (
+          {freePlan ? null : onManageBilling ? (
             <button
               type="button"
               onClick={onManageBilling}
@@ -676,22 +685,24 @@ export default function AccountProfile({
             <div>
               <div className="vc-eyebrow" style={{ marginBottom: 4 }}>IA</div>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
-                {aiReady ? 'Pronta para gerar' : hasTextAI ? 'Texto pronto · confira as imagens' : 'Configure a IA'}
+                {freePlan ? 'Sem IA no plano grátis' : aiReady ? 'Pronta para gerar' : hasTextAI ? 'Texto pronto · confira as imagens' : 'Configure a IA'}
               </h3>
             </div>
             <Settings size={18} color="var(--text-muted)" />
           </div>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.45 }}>
+          {freePlan ? <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.45 }}>
+            Texto com IA, imagem gerada e chave própria fazem parte dos planos pagos. No grátis você escreve, diagrama e envia suas fotos.
+          </p> : <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.45 }}>
             Texto: {textProvider.name}{hasTextAI || textProvider.id === 'zai' ? '' : ' · falta chave'}
             {' · '}
             Imagens: {imageStatus}
-          </p>
-          <button type="button" onClick={onOpenUsage} style={{ minHeight: 40, borderRadius: 9999, border: '1px solid var(--border)', background: 'var(--accent-surface)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+          </p>}
+          {!freePlan && <button type="button" onClick={onOpenUsage} style={{ minHeight: 40, borderRadius: 9999, border: '1px solid var(--border)', background: 'var(--accent-surface)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
             Ver uso e saldo de imagens
-          </button>
+          </button>}
           <button
             type="button"
-            onClick={onOpenSettings}
+            onClick={freePlan && onUpgrade ? () => onUpgrade('text') : onOpenSettings}
             style={{
               height: 40,
               borderRadius: 9999,
@@ -703,7 +714,7 @@ export default function AccountProfile({
               cursor: 'pointer',
             }}
           >
-            {aiReady ? 'Ajustar configuração' : 'Configurar IA'}
+            {freePlan ? 'Ver planos com IA' : aiReady ? 'Ajustar configuração' : 'Configurar IA'}
           </button>
         </div>
       </section>
@@ -755,7 +766,18 @@ export default function AccountProfile({
         ))}
       </section>
 
-      <AgentAccessPanel />
+      {freePlan ? <section data-vc-free-agents aria-label="Integrações de IA" style={{
+        padding: 18, borderRadius: 16, border: '1px solid var(--border)', background: 'var(--bg-card)', display: 'grid', gap: 12,
+      }}>
+        <div>
+          <div className="vc-eyebrow" style={{ marginBottom: 4 }}>Integrações de IA</div>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Claude, ChatGPT e Codex nos planos pagos</h3>
+        </div>
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.45 }}>
+          Conectar um assistente para ler e editar seus projetos exige assinatura ativa e projetos guardados na conta.
+        </p>
+        {onUpgrade && <button type="button" className="vc-btn vc-btn-ghost" style={{ minHeight: 44, justifySelf: 'start' }} onClick={() => onUpgrade('agents')}>Ver planos</button>}
+      </section> : <AgentAccessPanel />}
 
       <section style={{
         padding: 18,

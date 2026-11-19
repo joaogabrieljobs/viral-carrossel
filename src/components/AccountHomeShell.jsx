@@ -64,6 +64,7 @@ function AccountHomeShell({
   onOpenBrands,
   accessEmail,
   accessStatus,
+  onUpgrade,
   currentPeriodEnd,
   currentPeriodStart,
   onRefreshUsage,
@@ -175,7 +176,8 @@ function AccountHomeShell({
               imageQuota={imageQuota} planTier={planTier} currentPeriodStart={currentPeriodStart}
               currentPeriodEnd={currentPeriodEnd} useOwnImageKey={useOwnImageKey} isMobile={isMobile}
               onRefresh={onRefreshUsage} onOpenSettings={onOpenSettings}
-              onManageBilling={accessStatus?.billingExempt && accessStatus?.accessSource === 'exempt' ? undefined : onManageBilling}
+              onManageBilling={accessStatus?.free && onUpgrade ? () => onUpgrade('image')
+                : accessStatus?.billingExempt && accessStatus?.accessSource === 'exempt' ? undefined : onManageBilling}
             />
           )}
           {accountTab === 'images' && (
@@ -193,7 +195,7 @@ function AccountHomeShell({
                 <p>Seu nome, bio, redes e assinatura.</p>
               </header>
               <AccountProfile
-                accessStatus={accessStatus} onRefreshAccess={onRefreshUsage}
+                accessStatus={accessStatus} onRefreshAccess={onRefreshUsage} onUpgrade={onUpgrade}
                 email={accessEmail} libraryCount={library.length} brandCount={brandCount}
                 totalCards={totalItems} aiSettings={aiSettings} hasTextAI={hasTextAI} hasImageAI={hasImageAI}
                 isMobile={isMobile} onOpenSettings={onOpenSettings} onManageBilling={onManageBilling}

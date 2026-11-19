@@ -375,6 +375,8 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
     // when access changes or a verification request fails.
     setAccess(current => isSameOwner(current) ? accessStateFromUsageSession(session, current) : current);
     if (next.verificationUnavailable) throw new Error(next.verificationError || 'Não foi possível consultar o uso da conta.');
+    // Conta grátis confirmada: não há saldo de imagens nem assinatura a conferir.
+    if (next.free) return null;
     if (!next.active) {
       setPaywallEmail(owner.email || '');
       setLoginHint(next.email ? ACCESS_UNCONFIRMED_HINT : ACCESS_SESSION_REQUIRED_HINT);
