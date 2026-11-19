@@ -175,7 +175,7 @@ test('A publica, B (plano grátis) encontra e aplica mantendo os próprios texto
   await ctxB.close();
 });
 
-test('moderador vê a aba Moderação, mantém um modelo denunciado e remove outro; conta comum não vê a aba', async ({ browser }) => {
+test('moderador vê a aba Moderação, mantém um modelo denunciado, remove e restaura outro; conta comum não vê a aba', async ({ browser }) => {
   await db.query("INSERT INTO moont.template_moderators (owner_id) VALUES ('cus_autora')");
   // Dois modelos de uma terceira conta, denunciados direto na rota real.
   const publicarComo = async (owner, name) => {
@@ -209,8 +209,25 @@ test('moderador vê a aba Moderação, mantém um modelo denunciado e remove out
   page.once('dialog', (dialog) => dialog.accept());
   await fila.getByRole('button', { name: 'Remover Cópia de marca' }).click();
   await expect(galeria).toContainText('Nenhuma denúncia para revisar.');
+  // Remover é reversível: o modelo fica guardado em "Removidos".
+  const depoisDeRemover = (await db.query('SELECT name, status, report_count FROM moont.published_templates ORDER BY name')).rows;
+  expect(depoisDeRemover).toEqual([
+    { name: 'Cópia de marca', status: 'removed', report_count: 3 },
+    { name: 'Modelo legítimo', status: 'published', report_count: 0 },
+  ]);
+  await galeria.getByRole('group', { name: 'O que mostrar' }).getByRole('button', { name: 'Removidos' }).click();
+  const removidos = galeria.getByRole('list', { name: 'Modelos removidos' });
+  await expect(removidos.getByRole('listitem', { name: 'Moderar Cópia de marca' })).toContainText(/Removido em \d{2}\/\d{2}\/\d{2}/);
+  await expect(removidos.getByRole('button', { name: 'Manter Cópia de marca na galeria' })).toHaveCount(0);
+  await page.waitForTimeout(500);
+  if (process.env.MOONT_CAPTURAS) await page.screenshot({ path: 'test-results/modelos-8-removidos.png' });
+  await removidos.getByRole('button', { name: 'Restaurar Cópia de marca' }).click();
+  await expect(galeria).toContainText('Nenhum modelo removido.');
   const restantes = (await db.query('SELECT name, status, report_count FROM moont.published_templates ORDER BY name')).rows;
-  expect(restantes).toEqual([{ name: 'Modelo legítimo', status: 'published', report_count: 0 }]);
+  expect(restantes).toEqual([
+    { name: 'Cópia de marca', status: 'published', report_count: 0 },
+    { name: 'Modelo legítimo', status: 'published', report_count: 0 },
+  ]);
   await ctx.close();
 
   // Conta comum: sem aba.
@@ -220,6 +237,7 @@ test('moderador vê a aba Moderação, mantém um modelo denunciado e remove out
   await entradaDaGaleria(pageB, 'Galeria de modelos');
   const galeriaB = pageB.getByRole('dialog', { name: 'Galeria de modelos' });
   await expect(galeriaB.getByRole('listitem', { name: 'Modelo Modelo legítimo' })).toBeVisible();
+  await expect(galeriaB.getByRole('listitem', { name: 'Modelo Cópia de marca' })).toBeVisible();
   await expect(galeriaB.getByRole('tab', { name: 'Moderação' })).toHaveCount(0);
   await ctxB.close();
 });

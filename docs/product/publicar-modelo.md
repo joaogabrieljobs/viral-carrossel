@@ -113,8 +113,10 @@ Para ativar em produção: aplicar `015_published_templates.sql` no Supabase "Mo
 Aba **Moderação** na galeria, visível só para contas listadas em `moont.template_moderators` (migração 016). Para as demais, a fila e a decisão respondem 404, como se não existissem.
 
 - Fila: modelos fora da galeria primeiro, depois os denunciados; com motivo e data de cada denúncia, sem identificar quem denunciou nem a autora (só "N modelos da mesma conta" e "N já removidos/ocultos").
-- Decisões: **Manter** (volta à galeria, zera as denúncias; novas denúncias recomeçam a contagem), **Ocultar** (sai da galeria sem apagar; a autora vê "em revisão"), **Remover** (apaga).
-- Cada decisão fica em `moont.template_moderation_events`, inclusive de modelos já removidos.
+- Decisões: **Manter** (volta à galeria, zera as denúncias; novas denúncias recomeçam a contagem), **Ocultar** (sai da galeria sem apagar; a autora vê "em revisão"), **Remover** e **Restaurar**.
+- **Remover é reversível** (João, 19/11): o modelo vira `status = 'removed'`, some da galeria e dos "Meus modelos" da autora (ela não edita, não apaga, ninguém denuncia nem aplica), mas fica guardado. A moderação vê os removidos em "Removidos", com a data, e pode **Restaurar**: volta à galeria com as denúncias zeradas. Removido só aceita "restaurar"; as outras decisões respondem 409.
+- Removido não conta no limite de 10 modelos da autora, mas conta no limite de 5 por dia (evita publicar e remover em ciclo).
+- Cada decisão fica em `moont.template_moderation_events`.
 - Incluir ou tirar moderador: `INSERT`/`DELETE` em `moont.template_moderators`, sem novo deploy.
 - Testes: `tests/integration/published-templates.test.js` (conta comum recebe 404; fila, decisões e histórico; mutação sem a checagem de moderador faz o teste falhar) e `tests/e2e/publicar-modelo.spec.js`.
 

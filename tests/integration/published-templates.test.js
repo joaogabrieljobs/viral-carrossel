@@ -266,7 +266,7 @@ describe('moderação da galeria', () => {
     for (const segredo of [A, B, 'cus_d1', 'cus_x1', 'owner']) expect(json).not.toContain(segredo);
   });
 
-  it('manter devolve à galeria e zera as denúncias; ocultar tira sem apagar; remover apaga; tudo vai para o histórico', async () => {
+  it('manter devolve à galeria e zera as denúncias; ocultar tira sem apagar; remover guarda e restaurar devolve; tudo vai para o histórico', async () => {
     await tornarModerador(MOD);
     const id = await denunciado(3);
     expect((await call(B, { method: 'GET' })).body.templates).toHaveLength(0);
@@ -281,16 +281,60 @@ describe('moderação da galeria', () => {
     expect((await call(B, { method: 'GET' })).body.templates).toHaveLength(0);
     expect((await call(A, { method: 'GET', url: '/api/templates?mine=1' })).body.templates[0].status).toBe('hidden');
 
-    expect((await call(MOD, { body: { action: 'moderate', id, decision: 'remove' } })).body).toMatchObject({ removed: true });
-    expect(await sql.unsafe('SELECT id FROM moont.published_templates')).toEqual([]);
+    // Restaurar só vale para removido.
+    expect((await call(MOD, { body: { action: 'moderate', id, decision: 'restore' } })).statusCode).toBe(409);
+
+    // Remover (João, 19/11): sai da galeria e dos modelos da autora, mas fica guardado.
+    expect((await call(MOD, { body: { action: 'moderate', id, decision: 'remove' } })).body).toMatchObject({ status: 'removed' });
+    const [guardado] = await sql.unsafe('SELECT status, removed_at FROM moont.published_templates WHERE id = $1', [id]);
+    expect(guardado.status).toBe('removed');
+    expect(guardado.removed_at).not.toBeNull();
+    expect((await call(B, { method: 'GET' })).body.templates).toHaveLength(0);
+    expect((await call(A, { method: 'GET', url: '/api/templates?mine=1' })).body.templates).toEqual([]);
+    expect((await call(A, { method: 'GET', url: `/api/templates?id=${id}` })).statusCode).toBe(404);
+    expect((await call(A, { body: { action: 'update', id, name: 'Volta' } })).statusCode).toBe(404);
+    expect((await call(A, { body: { action: 'delete', id } })).statusCode).toBe(404);
+    expect((await call('cus_d2', { body: { action: 'report', id } })).statusCode).toBe(404);
+    expect((await call(B, { body: { action: 'use', id } })).statusCode).toBe(404);
+    // Fora da fila de denúncias, dentro de "Removidos".
+    expect((await call(MOD, { method: 'GET', url: '/api/templates?moderation=1' })).body.templates).toEqual([]);
+    const removidos = (await call(MOD, { method: 'GET', url: '/api/templates?moderation=1&view=removed' })).body.templates;
+    expect(removidos.map((t) => [t.id, t.status])).toEqual([[id, 'removed']]);
+    expect(removidos[0].removedAt).toEqual(expect.any(String));
+    // Removido não decide de novo sem antes restaurar.
+    expect((await call(MOD, { body: { action: 'moderate', id, decision: 'keep' } })).statusCode).toBe(409);
+
+    const restaurar = await call(MOD, { body: { action: 'moderate', id, decision: 'restore' } });
+    expect(restaurar.body).toMatchObject({ decision: 'restore', status: 'published' });
+    expect((await call(B, { method: 'GET' })).body.templates.map((t) => t.id)).toEqual([id]);
+    expect((await call(A, { method: 'GET', url: '/api/templates?mine=1' })).body.templates[0]).toMatchObject({ id, status: 'published' });
+    expect((await call(MOD, { method: 'GET', url: '/api/templates?moderation=1&view=removed' })).body.templates).toEqual([]);
+    const [devolvido] = await sql.unsafe('SELECT report_count, removed_at FROM moont.published_templates WHERE id = $1', [id]);
+    expect(devolvido).toEqual({ report_count: 0, removed_at: null });
+
     const historico = await sql.unsafe('SELECT decision, template_owner_id, moderator_id, template_name FROM moont.template_moderation_events ORDER BY id');
-    expect(historico).toEqual([
-      { decision: 'keep', template_owner_id: A, moderator_id: MOD, template_name: 'Editorial clínico' },
-      { decision: 'hide', template_owner_id: A, moderator_id: MOD, template_name: 'Editorial clínico' },
-      { decision: 'remove', template_owner_id: A, moderator_id: MOD, template_name: 'Editorial clínico' },
-    ]);
-    expect((await call(MOD, { body: { action: 'moderate', id, decision: 'keep' } })).statusCode).toBe(404);
-    expect((await call(MOD, { body: { action: 'moderate', id: 'tpl_' + 'a'.repeat(20), decision: 'apagar' } })).statusCode).toBe(400);
+    expect(historico.map((h) => h.decision)).toEqual(['keep', 'hide', 'remove', 'restore']);
+    expect(historico.every((h) => h.template_owner_id === A && h.moderator_id === MOD && h.template_name === 'Editorial clínico')).toBe(true);
+    expect((await call(MOD, { body: { action: 'moderate', id: 'tpl_' + 'a'.repeat(20), decision: 'keep' } })).statusCode).toBe(404);
+    expect((await call(MOD, { body: { action: 'moderate', id, decision: 'apagar' } })).statusCode).toBe(400);
+  });
+
+  it('removido não conta no limite de modelos da autora, mas conta no limite do dia', async () => {
+    await tornarModerador(MOD);
+    const ids = [];
+    for (let i = 0; i < MAX_PUBLISHES_PER_DAY; i += 1) ids.push((await publicar(A, { name: `M${i}` })).body.template.id);
+    resetRateLimits();
+    await call(MOD, { body: { action: 'moderate', id: ids[0], decision: 'remove' } });
+    expect((await publicar(A, { name: 'ainda hoje' })).body.code).toBe('template_daily_limit');
+    resetRateLimits();
+    await sql.unsafe("UPDATE moont.published_templates SET created_at = now() - interval '3 days' WHERE owner_id = $1", [A]);
+    // 4 ativos + 6 novos = 10 ativos (em dois dias, por causa do limite diário).
+    const envelhecer = () => sql.unsafe("UPDATE moont.published_templates SET created_at = now() - interval '3 days' WHERE owner_id = $1", [A]);
+    for (let i = 0; i < MAX_PUBLISHES_PER_DAY; i += 1) expect((await publicar(A, { name: `N${i}` })).statusCode).toBe(201);
+    resetRateLimits();
+    await envelhecer();
+    expect((await publicar(A, { name: 'décimo ativo' })).statusCode).toBe(201);
+    expect((await publicar(A, { name: 'demais' })).body.code).toBe('template_owner_limit');
   });
 
   it('a fila mostra o histórico do autor sem identificá-lo', async () => {

@@ -19,7 +19,8 @@
  *
  * Moderação (só contas em `moont.template_moderators`; para as outras, 404):
  *   GET  /api/templates?moderation=1    fila: denunciados e ocultos
- *   POST { action:'moderate', id, decision: 'keep' | 'hide' | 'remove' }
+ *   GET  /api/templates?moderation=1&view=removed   removidos (restauráveis)
+ *   POST { action:'moderate', id, decision: 'keep' | 'hide' | 'remove' | 'restore' }
  */
 import { applyCors } from './lib/cors.js';
 import { readCurrentAccessCookie } from './lib/access.js';
@@ -82,7 +83,10 @@ export function createTemplatesHandler({ store = defaultStore, readAccess = read
         const id = url.searchParams.get('id');
         if (id) return res.status(200).json({ ok: true, template: await store.getTemplate(id, owner) });
         if (url.searchParams.get('mine') === '1') return res.status(200).json({ ok: true, templates: await store.listMine(owner) });
-        if (url.searchParams.get('moderation') === '1') return res.status(200).json({ ok: true, templates: await store.listModerationQueue(owner) });
+        if (url.searchParams.get('moderation') === '1') {
+          const view = url.searchParams.get('view') === 'removed' ? 'removed' : 'pending';
+          return res.status(200).json({ ok: true, templates: await store.listModerationQueue(owner, { view }) });
+        }
         const format = url.searchParams.get('format');
         if (format && !TEMPLATE_FORMATS.includes(format)) return res.status(400).json({ error: 'Formato inválido.', code: 'template_format' });
         const [page, moderator] = await Promise.all([

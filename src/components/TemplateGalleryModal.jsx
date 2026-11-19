@@ -11,7 +11,7 @@
  * conteúdo de quem publicou.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, EyeOff, Flag, Trash2, X } from 'lucide-react';
+import { Check, EyeOff, Flag, RotateCcw, Trash2, X } from 'lucide-react';
 import { useModalDialog } from '../hooks/useModalDialog.js';
 import { SlideCard } from './card/SlideCard.jsx';
 import { FORMATS } from '../utils/formats.js';
@@ -198,36 +198,48 @@ function MyTemplates({ toast, refreshKey }) {
 const DECISIONS = {
   keep: { label: 'Manter na galeria', done: 'Modelo mantido na galeria. As denúncias foram zeradas.' },
   hide: { label: 'Ocultar', done: 'Modelo fora da galeria. A autora vê como "em revisão".' },
-  remove: { label: 'Remover', done: 'Modelo removido.' },
+  remove: { label: 'Remover', done: 'Modelo removido. Ele fica em Removidos e pode ser restaurado.' },
+  restore: { label: 'Restaurar', done: 'Modelo restaurado na galeria.' },
 };
 const dataCurta = (iso) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
 
 /** Fila de moderação: só aparece para contas moderadoras (o servidor confere). */
 function ModerationQueue({ toast }) {
+  const [view, setView] = useState('pending');
   const [state, setState] = useState({ loading: true, templates: [], error: '' });
   const [busyId, setBusyId] = useState('');
   const load = useCallback(async () => {
     setState((s) => ({ ...s, loading: true, error: '' }));
-    try { setState({ loading: false, templates: (await listModerationQueue()).templates, error: '' }); }
+    try { setState({ loading: false, templates: (await listModerationQueue(view)).templates, error: '' }); }
     catch (error) { setState({ loading: false, templates: [], error: error.message }); }
-  }, []);
+  }, [view]);
   useEffect(() => { load(); }, [load]);
   const decide = async (template, decision) => {
-    if (decision === 'remove' && !window.confirm(`Remover «${template.name}» de vez? A autora perde o modelo; projetos que já o usaram não mudam.`)) return;
+    if (decision === 'remove' && !window.confirm(`Remover «${template.name}»? Ele sai da galeria e dos modelos da autora, mas fica guardado em Removidos e pode ser restaurado.`)) return;
     setBusyId(template.id);
     try {
       await moderateTemplate(template.id, decision);
       toast?.(DECISIONS[decision].done, 'success', 4000);
+      // Ocultar continua na fila (agora "fora da galeria"); as outras decisões tiram o modelo desta lista.
       setState((s) => ({ ...s, templates: s.templates.filter((t) => t.id !== template.id || decision === 'hide') }));
       if (decision === 'hide') load();
     } catch (error) { toast?.(error.message, 'error', 5000); }
     finally { setBusyId(''); }
   };
-  if (state.loading) return <p role="status" style={{ margin: 0, color: 'var(--text-muted)' }}>Carregando denúncias…</p>;
-  if (state.error) return <p role="alert" style={{ margin: 0 }}>{state.error}</p>;
-  if (!state.templates.length) return <p style={{ margin: 0, color: 'var(--text-muted)' }}>Nenhuma denúncia para revisar.</p>;
+  const seletor = (
+    <div role="group" aria-label="O que mostrar" style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+      {[['pending', 'Denúncias'], ['removed', 'Removidos']].map(([id, label]) => (
+        <button key={id} type="button" aria-pressed={view === id} onClick={() => setView(id)} className="vc-btn vc-btn-ghost"
+          style={{ minHeight: 40, borderColor: view === id ? 'var(--accent)' : undefined, fontWeight: view === id ? 700 : 500 }}>{label}</button>
+      ))}
+    </div>
+  );
+  if (state.loading) return <>{seletor}<p role="status" style={{ margin: 0, color: 'var(--text-muted)' }}>Carregando…</p></>;
+  if (state.error) return <>{seletor}<p role="alert" style={{ margin: 0 }}>{state.error}</p></>;
+  if (!state.templates.length) return <>{seletor}<p style={{ margin: 0, color: 'var(--text-muted)' }}>{view === 'removed' ? 'Nenhum modelo removido.' : 'Nenhuma denúncia para revisar.'}</p></>;
   return (
-    <ul aria-label="Fila de moderação" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 12 }}>
+    <>{seletor}
+    <ul aria-label={view === 'removed' ? 'Modelos removidos' : 'Fila de moderação'} style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 12 }}>
       {state.templates.map((template) => (
         <li key={template.id} aria-label={`Moderar ${template.name}`} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: 12, borderRadius: 14,
           border: `1px solid ${template.status === 'hidden' ? 'var(--danger, #d95c5c)' : 'var(--border)'}` }}>
@@ -240,26 +252,32 @@ function ModerationQueue({ toast }) {
               {` · ${template.authorTemplateCount} modelo${template.authorTemplateCount === 1 ? '' : 's'} da mesma conta`}
               {template.authorStrikes ? ` · ${template.authorStrikes} já removido${template.authorStrikes === 1 ? '' : 's'}/oculto${template.authorStrikes === 1 ? '' : 's'}` : ''}
             </span>
-            <span role="status" style={{ fontSize: 12, fontWeight: 600, color: template.status === 'hidden' ? 'var(--danger, #d95c5c)' : 'var(--text-primary)' }}>
-              {template.status === 'hidden' ? 'Fora da galeria' : 'Na galeria'} · {template.reportCount} denúncia{template.reportCount === 1 ? '' : 's'}
+            <span role="status" style={{ fontSize: 12, fontWeight: 600, color: template.status === 'published' ? 'var(--text-primary)' : 'var(--danger, #d95c5c)' }}>
+              {template.status === 'removed' ? `Removido em ${dataCurta(template.removedAt)}` : template.status === 'hidden' ? 'Fora da galeria' : 'Na galeria'} · {template.reportCount} denúncia{template.reportCount === 1 ? '' : 's'}
             </span>
             {template.reports.length > 0 && (
               <ul aria-label="Denúncias" style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: 'var(--text-secondary)', display: 'grid', gap: 2 }}>
                 {template.reports.map((r, i) => <li key={i}>{dataCurta(r.createdAt)} — {r.reason || 'sem motivo escrito'}</li>)}
               </ul>
             )}
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {template.status === 'removed' ? (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button type="button" className="vc-btn vc-btn-ghost" style={{ minHeight: 44 }} disabled={busyId === template.id}
+                  onClick={() => decide(template, 'restore')} aria-label={`Restaurar ${template.name}`}><RotateCcw size={14} /> Restaurar</button>
+              </div>
+            ) : <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button type="button" className="vc-btn vc-btn-ghost" style={{ minHeight: 44 }} disabled={busyId === template.id}
                 onClick={() => decide(template, 'keep')} aria-label={`Manter ${template.name} na galeria`}><Check size={14} /> Manter</button>
               {template.status !== 'hidden' && <button type="button" className="vc-btn vc-btn-ghost" style={{ minHeight: 44 }} disabled={busyId === template.id}
                 onClick={() => decide(template, 'hide')} aria-label={`Ocultar ${template.name}`}><EyeOff size={14} /> Ocultar</button>}
               <button type="button" className="vc-btn vc-btn-ghost" style={{ minHeight: 44, color: 'var(--danger, #d95c5c)' }} disabled={busyId === template.id}
                 onClick={() => decide(template, 'remove')} aria-label={`Remover ${template.name}`}><Trash2 size={14} /> Remover</button>
-            </div>
+            </div>}
           </div>
         </li>
       ))}
     </ul>
+    </>
   );
 }
 

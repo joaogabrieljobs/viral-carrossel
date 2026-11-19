@@ -28,5 +28,5 @@ export const updateTemplate = ({ id, name, description, authorName }) => request
 export const deleteTemplate = (id) => request('POST', { body: { action: 'delete', id } });
 export const recordTemplateUse = (id) => request('POST', { body: { action: 'use', id } });
 export const reportTemplate = (id, reason = '') => request('POST', { body: { action: 'report', id, reason } });
-export const listModerationQueue = () => request('GET', { query: '?moderation=1' });
+export const listModerationQueue = (view = 'pending') => request('GET', { query: `?moderation=1${view === 'removed' ? '&view=removed' : ''}` });
 export const moderateTemplate = (id, decision) => request('POST', { body: { action: 'moderate', id, decision } });
