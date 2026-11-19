@@ -2,6 +2,12 @@
 
 > **Estado atual (2026-09-29):** **4 planos mensais** (Essencial R$ 19,90 · Criador R$ 97 · Pro R$ 197 · Max R$ 297), com saldo de **0 · 50 · 150 · 300 imagens**, respectivamente. Texto incluso via Z.ai no servidor; chave própria opcional. Preços e quotas: `shared/plans.js`. [Spec de planos](./product/PRD-planos-imagem-sjinn.md). A landing usa a mesma configuração; o antigo anual de R$ 790 não é anunciado para estes quatro planos.
 
+## Plano grátis (2026-11-18)
+
+Conta sem assinatura entra no editor no **plano grátis**: cria à mão, sem IA e sem imagem gerada, até 3 projetos guardados no aparelho. Não é um plano Stripe: `FREE_PLAN` fica fora de `PLAN_ORDER` em `shared/plans.js`, então o checkout nunca o vende e as concessões manuais nunca o concedem. Cadastro, login por senha e Google emitem `vc_access` também para essa conta; `active` continua significando "pagou" e toda rota de IA, nuvem e agente segue respondendo 402. [Spec e implementação](./product/plano-gratis.md).
+
+Onde abaixo se lê "sem assinatura → paywall", vale hoje: sem **conta** → planos (com "Começar grátis"); com conta e sem assinatura → editor no plano grátis.
+
 ## Histórico do modelo anterior (não usar para novas ofertas)
 
 - **1 plano:** acesso ao studio (Criador · Diretor · Studio)
@@ -33,8 +39,8 @@ contratos e testes: [Recuperação de senha](engineering/recuperacao-senha.md).
 
 1. Landing → **Entrar** → e-mail + senha **ou** Google
 2. `POST /api/auth/login` (ou `/api/auth/register`) — senha em hash scrypt no **metadata Stripe** (`vc_pw_salt` / `vc_pw_hash`)
-3. Se assinatura Stripe ativa → cookie `vc_access`
-4. Conta nova ou senha correta com assinatura inativa → `{ needCheckout: true }` → Paywall, com vínculo temporário ao customer dessa conta. O cadastro público não pode definir senha sobre customer Stripe preexistente sem autenticação.
+3. Senha correta → cookie `vc_access`, com ou sem assinatura
+4. Conta nova ou senha correta com assinatura inativa → `{ active: false, free: true }` → editor no plano grátis. A prova curta de identidade continua sendo emitida para assinar esse mesmo customer. O cadastro público não pode definir senha sobre customer Stripe preexistente sem autenticação.
 
 Google continua disponível; o login inicia no domínio canônico configurado por `GOOGLE_REDIRECT_URI` ou `APP_URL`. O cookie de estado e o callback ficam nesse mesmo domínio.
 
@@ -44,7 +50,7 @@ Google continua disponível; o login inicia no domínio canônico configurado po
 2. `GET /api/auth/google` → OAuth Google → `/api/auth/google/callback`
 3. Servidor exige e-mail confirmado e `sub` do Google. No primeiro acesso, vincula o customer ao `sub`, revoga sessões anteriores e remove senha criada antes da confirmação Google; uma senha nova só pode ser definida pelo fluxo de recuperação por e-mail. Logins Google posteriores preservam a senha nova.
 4. Com customers Stripe duplicados, prefere o `sub` já vinculado. Sem vínculo anterior, seleciona somente se uma única conta tiver projetos na nuvem, ou, na ausência de projetos, uma única assinatura estiver ativa. Ambiguidade abre o login com orientação de recuperação; nenhuma conta é escolhida pelo acaso.
-5. Se ativo → cookie `vc_access` → `/?billing=restored&login=google`. Se inativo → paywall com e-mail pré-preenchido e prova temporária vinculada ao customer selecionado. O checkout e o token carregam uma versão aleatória da identidade (`vc_identity_epoch`); provas, sessões de compra e cookies anteriores ao vínculo, logout ou redefinição de senha não podem reabrir a conta.
+5. Se ativo → cookie `vc_access` → `/?billing=restored&login=google`. Se inativo, ou se o e-mail ainda não tem conta (o callback cria o customer) → cookie `vc_access` → `/?login=google&plan=free`, editor no plano grátis, com prova temporária vinculada ao customer para assinar depois. O checkout e o token carregam uma versão aleatória da identidade (`vc_identity_epoch`); provas, sessões de compra e cookies anteriores ao vínculo, logout ou redefinição de senha não podem reabrir a conta.
 
 ## Setup no Dashboard Stripe
 

@@ -57,7 +57,9 @@ Contexto por projeto; escolha texto/imagens; oito modos + Nenhum; oito tons; log
 
 **Headline:** Escolha pelo seu ritmo de criação.
 
-**Body:** Texto com IA incluso em todos os planos, com limite de ritmo por minuto e sem uma cota mensal como a das imagens. Para gerar imagens sem configurar uma chave própria, escolha Criador, Pro ou Max.
+**Body:** Texto com IA incluso em todos os planos pagos, com limite de ritmo por minuto e sem uma cota mensal como a das imagens. Para gerar imagens sem configurar uma chave própria, escolha Criador, Pro ou Max.
+
+**Plano grátis (2026-11-18):** bloco acima da tabela, com o botão **Começar grátis** (abre o cadastro). Texto: “Crie à mão no editor completo: textos, layout, estilos, suas fotos e exportação. Sem IA e sem imagem gerada. Até 3 projetos, guardados no seu aparelho.” Nome, preço e limite vêm de `FREE_PLAN` em `shared/plans.js`. Não dizer que o grátis inclui IA, imagem gerada ou projetos na conta.
 
 | Plano | Preço mensal | Imagens inclusas |
 | --- | --- | --- |

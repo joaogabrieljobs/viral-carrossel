@@ -1,6 +1,6 @@
 # Plano grátis — criar à mão, sem IA e sem imagem gerada
 
-**Status:** especificação, aguardando decisões do João (seção 4). Nada implementado.
+**Status:** implementado no branch `claude/free-modelos-mobile` em 2026-11-18, aguardando autorização de envio. Decisões D1–D6 respondidas "tudo como recomendado" (seção 4). O que foi feito e o que ficou de fora: seção 7.
 **Data:** 2026-11-18 · **Base:** `main` em `4257738`
 **Pedido:** "vamos criar o plano free, onde não tem IA nem imagens. você faz na mão as criações. se precisar fazer IA ou foto levamos para página de assinatura."
 
@@ -73,3 +73,43 @@ Testes existentes que mudam de expectativa: `tests/e2e/paywall.spec.js` ("anôni
 ## 6. Pronto quando
 
 Conta sem assinatura cria, edita e exporta um carrossel manual; todo ponto de IA ou imagem gerada abre a assinatura e, após assinar, volta ao mesmo projeto e card; o servidor responde 402 em toda rota de IA para essa conta; testes de integração e de navegador cobrem os dois lados; portão completo verde.
+
+## 7. Implementação (2026-11-18)
+
+### Servidor
+
+- `shared/plans.js`: `FREE_PLAN` e `FREE_PROJECT_LIMIT` (3), fora de `PLAN_ORDER`.
+- `api/auth/register.js`, `api/auth/login.js`, `api/auth/google/callback.js`: emitem `vc_access` para conta sem assinatura. O Google passa a criar a conta na primeira entrada (antes devolvia `?login=no_subscription`).
+- `api/lib/billing-handlers.js`: a sessão de conta sem assinatura responde `{ active: false, free: true, tier: 'free', plan, customerId }`.
+- Nenhuma rota de IA, nuvem ou agente foi alterada.
+
+### Editor
+
+- `src/utils/free-plan.js`: sessão grátis, portão de recurso pago, limite, retorno ao projeto e preservação de rascunhos.
+- `src/hooks/useAccess.js`, `src/utils/account-data-owner.js`: conta grátis entra no editor e tem dono de dados local (duas contas grátis no mesmo navegador não se misturam).
+- `ViralCarrossel.jsx`: `openUpgrade` é o caminho único para os planos; abrir, excluir, salvar e sair funcionam localmente mesmo com projetos V2 ligado.
+- `src/utils/ai-client.js`, `carousel-ocr.js`, `generation-prompts.js`: recusam a chamada no grátis antes de qualquer rede.
+- Planos, landing, perfil, uso, assistente de criação, indicador de gravação, equipe e agentes reconhecem o plano grátis.
+
+### Testes
+
+| Onde | O que prova |
+|---|---|
+| `tests/integration/plano-gratis.test.js` | 16 rotas pagas respondem 402 para a sessão grátis e 401 sem sessão; nenhum provedor é chamado; `free` não é comprável; cadastro e login entram no grátis |
+| `tests/integration/auth.test.js` | Expectativas antigas de login sem assinatura atualizadas; login pausado durante vínculo Google não deixa sessão utilizável |
+| `tests/unit/free-plan.test.js` | Portão, limite, retorno, preservação de rascunhos; com chave própria gravada, texto, imagem e leitura de imagem não chegam à rede |
+| `tests/e2e/plano-gratis.spec.js` | Criar, editar e exportar PNG; cada ponto de IA abre os planos e volta ao projeto; assinar e voltar ao mesmo card; limite de 3; ex-assinante não perde o que fez no grátis; perfil e uso; 390×844 |
+
+O CI roda com projetos V2 desligado; a produção roda com V2 ligado (conferido no bundle público em 2026-11-18). O arquivo de navegador do plano grátis passa nos dois modos; o modo de produção roda à mão com `VITE_PROJECTS_V2=true npx playwright test tests/e2e/plano-gratis.spec.js`.
+
+### Achado durante a implementação: ex-assinante
+
+Quem já teve projetos na conta, usa o grátis e reassina teria a lista local substituída pela biblioteca da nuvem. A solução guarda desde quando a conta usa o grátis neste navegador (`vc_free_plan_since`, que acompanha o cofre local no logout) e, ao assinar, devolve à biblioteca o que foi mexido desde então: projeto ausente volta como estava; projeto que existe na conta com conteúdo diferente e mais antigo volta como cópia "(feito no grátis)". Nada é sobrescrito.
+
+### Fica para depois
+
+- **Confirmar e-mail no cadastro por senha.** Continua sem confirmação; cada cadastro cria um cliente no Stripe.
+- **Importar backup com vários projetos** pode passar de 3: o limite barra só quando a conta já está em 3.
+- **Tela vazia "Descreva a ideia"** não foi redesenhada: no grátis a criação cai direto no editor com um card vazio, então a tela não aparece no caminho normal. Um projeto antigo vazio ainda a mostra, e o botão de gerar dali leva aos planos.
+- **Marca d'água** e **nuvem para o grátis**: fora desta versão (D4 e D5).
+- **Não validado com conta real nem com Stripe real.** Tudo simulado; o primeiro cadastro grátis em produção é o teste de verdade.

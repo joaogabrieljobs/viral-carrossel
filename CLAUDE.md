@@ -1,6 +1,6 @@
 # Moont
 
-Studio de narrativas visuais com IA para comunicação e apresentações. Vite + React 18; monólito legado `ViralCarrossel.jsx` + módulos em `src/`; serverless Vercel em `api/` (Stripe + Google OAuth + proxies IA). Produção: **Vercel** com domínio oficial **https://moont.ai** (hosts `*.vercel.app`, `www.moont.ai` e `moont.com.br` redirecionam para o oficial). `viralcarrossel.com.br` permanece ativo temporariamente para migrar dados locais salvos no navegador; não redirecionar esse host até confirmar a migração. Netlify aposentado em 2026-08-07 — só redireciona 301. O acesso usa cookie `vc_access` e Stripe; a biblioteca sincronizada usa Postgres quando `LIBRARY_SYNC_BACKEND=postgres`, mantendo dados locais no navegador. Imagens dos cards vivem em IndexedDB no browser (`src/utils/image-store.js`) e têm sincronização de mídia em nuvem quando configurada.
+Studio de narrativas visuais com IA para comunicação e apresentações. Vite + React 18; monólito legado `ViralCarrossel.jsx` + módulos em `src/`; serverless Vercel em `api/` (Stripe + Google OAuth + proxies IA). Produção: **Vercel** com domínio oficial **https://moont.ai** (hosts `*.vercel.app`, `www.moont.ai` e `moont.com.br` redirecionam para o oficial). `viralcarrossel.com.br` permanece ativo temporariamente para migrar dados locais salvos no navegador; não redirecionar esse host até confirmar a migração. Netlify aposentado em 2026-08-07 — só redireciona 301. O acesso usa cookie `vc_access` e Stripe; conta sem assinatura entra no plano grátis (sem IA, sem nuvem); a biblioteca sincronizada usa Postgres quando `LIBRARY_SYNC_BACKEND=postgres`, mantendo dados locais no navegador. Imagens dos cards vivem em IndexedDB no browser (`src/utils/image-store.js`) e têm sincronização de mídia em nuvem quando configurada.
 
 ## Documentos de contexto (spec-driven)
 
@@ -10,6 +10,8 @@ Studio de narrativas visuais com IA para comunicação e apresentações. Vite +
 - Contratos atuais: **docs/engineering/controles-geracao-projeto.md** · docs/engineering/referencias-imagem-plano.md · docs/engineering/recuperacao-senha.md
 - Landing: **docs/LANDING-COPY.md**; preços/quotas vêm de `shared/plans.js`, texto incluso e chave própria opcional.
 - Auditorias históricas: docs/audit.md (2026-08-07) · docs/audit-produto.md (2026-08-07) · docs/audit-ia-2026-09-15.md. Achados e linhas retratam a versão auditada; consultar revisões posteriores e o código atual antes de reutilizá-los.
+- Plano grátis (conta sem assinatura, sem IA, projetos no aparelho): **docs/product/plano-gratis.md**
+- Em especificação, ainda sem código: docs/product/publicar-modelo.md · docs/product/navegacao-mobile.md
 - PRD: docs/product/PRD-suite-testes-confianca.md
 - TDD: docs/engineering/TDD-suite-testes-confianca.md
 - Épicos e specs: docs/epics/
