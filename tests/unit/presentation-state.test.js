@@ -19,7 +19,7 @@ describe('estado visual de apresentações', () => {
     expect(ensureDocShape({ ...base, visualPreset: 'pds.cinematic' }).visualPreset)
       .toBe('presentation_cinematic');
     expect(ensureDocShape({ ...base, visualPreset: 'manifesto' }).visualPreset)
-      .toBe('presentation_cinematic');
+      .toBe('presentation_typographic_bold');
     expect(ensureDocShape({ ...base, visualPreset: 'custom-deck' }).visualPreset)
       .toBe('custom-deck');
   });
@@ -51,7 +51,9 @@ describe('estado visual de apresentações', () => {
       slideDefaults: { align: 'right', overlay: 30 },
     };
     const [slide] = applyPresentationVisualPresetToSlides(
-      [{ ...baseSlides[0], canvas, composition: 'custom-zone' }],
+      [{ ...baseSlides[0], canvas, composition: 'custom-zone', presentationArtDirectionVersion: 2,
+        presentationDesignFamily: 'swiss', presentationChrome: { family: 'swiss', chrome: [] },
+        presentationPhotoTreatment: 'grayscale(1)' }],
       custom.id,
       'keynote_manifesto',
       [custom],
@@ -63,6 +65,9 @@ describe('estado visual de apresentações', () => {
     expect(slide.showSwipeCue).toBe(false);
     expect(slide.presentationPatternId).toBeNull();
     expect(slide.presentationPatternVersion).toBeNull();
+    expect(slide.presentationArtDirectionVersion).toBeNull();
+    expect(slide.presentationChrome).toBeNull();
+    expect(slide.presentationPhotoTreatment).toBeNull();
     expect(slide.presentationRequiresImage).toBe(false);
     expect(slide.presentationTextLimits).toBeNull();
     expect(slide.presentationAutofit).toBeNull();

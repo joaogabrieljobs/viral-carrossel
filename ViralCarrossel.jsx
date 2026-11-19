@@ -1,4 +1,5 @@
 import { useCaptionDelivery } from './src/hooks/useCaptionDelivery.js';
+import { ensurePresentationFonts } from './src/utils/presentation-font-manifest.js';
 import { copyTextToClipboard } from './src/utils/export-package.js';
 import { GenerationScopePicker } from './src/components/GenerationScopePicker.jsx';
 import { joinSlideCaptions } from './src/utils/import-text.js';
@@ -3769,10 +3770,14 @@ export default function App() {
       document.head.appendChild(mkLink({ rel:'preconnect', href:'https://fonts.gstatic.com', crossorigin:'' }));
       document.head.appendChild(mkLink({ id:'vc-google-fonts', rel:'stylesheet', href:FONTS_URL }));
     }
+    // Faces locais da biblioteca: mesma tipografia no Studio e no export,
+    // inclusive pesos variáveis como Fraunces 380, sem folha CSS tardia.
+    ensurePresentationFonts(document);
 
     return () => {
       const s = document.getElementById('vc-global-styles'); if (s) s.remove();
       const f = document.getElementById('vc-google-fonts');  if (f) f.remove();
+      document.getElementById('vc-presentation-fonts')?.remove();
     };
   }, []);
 
@@ -5473,7 +5478,8 @@ export default function App() {
     const introLine = buildGenerationIntroLine(cp);
     const langLayer = `${buildGenerationLanguageLayer(cp, tone, effectiveMode, presentationPathId)}
 Não invente garantia, prazo, preço, item incluso ou promessa comercial que não esteja no material. Se for hipótese, escreva isso.`;
-    const imageLayer = buildGenerationImageLayer(cp, topic, n, audience, !!(styleKit.contextMd.trim() || styleKit.stylePrompt.trim()), presentationPathId);
+    const imageLayer = buildGenerationImageLayer(cp, topic, n, audience, !!(styleKit.contextMd.trim() || styleKit.stylePrompt.trim()), presentationPathId,
+      isPresentationGeneration && !effectiveVisualPresetDef?.isCustom ? effectiveVisualPreset : undefined);
     const slideLayoutRules = buildGenerationSlideLayoutRules(effectiveMode, cp, td, count, presentationPathId);
     const tendenciaPackBlock = isTendenciaCulturaPreset(cp) ? buildTendenciaCulturaPackBlock(count, td) : '';
     const apresentacaoPackBlock = isPresentationGeneration

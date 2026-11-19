@@ -77,7 +77,7 @@ export function photoPanelAspect(slide, fmt) {
 export function imageAspectRatioForSlide(slide, fmt) {
   const base = formatImageAspectRatio(fmt);
   // Deck: só a composição versionada tem painel confiável; foto suprimida não tem painel.
-  if (fmt === 'apresentacao' && (slide?.presentationCompositionVersion !== 2 || slide?.presentationSuppressPhoto)) return base;
+  if (fmt === 'apresentacao' && (![2, 3].includes(slide?.presentationCompositionVersion) || slide?.presentationSuppressPhoto)) return base;
   const panel = photoPanelAspect(slide, fmt);
   return panel ? panel.aspectRatio : base;
 }

@@ -1,0 +1,689 @@
+{
+ "notice": "Conteúdo fictício para demonstração de templates. Instituições, eventos e planos são inventados; nenhum número representa resultado real, pesquisa ou estatística.",
+ "decks": {
+  "editorial": {
+   "theme": "Arquitetura e cultura",
+   "slides": [
+    {
+     "kind": "cover",
+     "eyebrow": "Caderno de arquitetura · edição fictícia",
+     "title": "Casas que\naprendem a respirar",
+     "subtitle": "Uma leitura sobre ventilação cruzada, sombra e o desenho de cidades mais frescas.",
+     "photo": 0
+    },
+    {
+     "kind": "divider",
+     "title": "A sombra\ncomo projeto",
+     "subtitle": "Por que o primeiro gesto do arquiteto talvez seja decidir onde o sol não entra.",
+     "section": 1
+    },
+    {
+     "kind": "content",
+     "eyebrow": "Ensaio",
+     "title": "O vento também é um material de construção",
+     "subtitle": "Antes do ar-condicionado, a arquitetura tropical resolvia o calor com **aberturas opostas**, pé-direito alto e varandas profundas.",
+     "body": "Essas soluções voltam ao centro do debate quando a energia fica cara e o verão, mais longo."
+    },
+    {
+     "kind": "demo",
+     "title": "A fachada como filtro de luz",
+     "subtitle": "A malha diagonal da torre organiza estrutura e sombra num mesmo desenho.",
+     "body": "Exemplo ilustrativo; a leitura técnica é fictícia.",
+     "photo": 2,
+     "caption": "Fig. 1 — Torre com estrutura em diagrid. Foto: acervo CC0."
+    },
+    {
+     "kind": "data",
+     "title": "Três estratégias, três custos de manutenção",
+     "subtitle": "A escolha depende do clima local e de quem vai cuidar do edifício depois da entrega.",
+     "blocks": [
+      {
+       "type": "comparison",
+       "headers": [
+        "Estratégia",
+        "Quando funciona",
+        "Atenção"
+       ],
+       "rows": [
+        [
+         "Ventilação cruzada",
+         "Plantas estreitas, com aberturas opostas",
+         "Exige controle de ruído e chuva"
+        ],
+        [
+         "Brise e varanda",
+         "Fachadas com sol da tarde",
+         "Precisa de limpeza periódica"
+        ],
+        [
+         "Telhado verde",
+         "Coberturas amplas e acessíveis",
+         "Impermeabilização cuidadosa"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "closing",
+     "title": "Desenhar o clima antes do equipamento",
+     "subtitle": "Próxima edição: materiais que guardam o frio da noite."
+    }
+   ]
+  },
+  "executive": {
+   "theme": "Negócios",
+   "slides": [
+    {
+     "kind": "cover",
+     "title": "Plano operacional 2027 da Norte Logística",
+     "subtitle": "Proposta para o conselho · empresa fictícia",
+     "photo": 0
+    },
+    {
+     "kind": "divider",
+     "title": "Onde concentramos o próximo ano",
+     "subtitle": "Três frentes, uma decisão pedida hoje.",
+     "section": 2
+    },
+    {
+     "kind": "content",
+     "title": "Consolidar dois armazéns reduz deslocamentos vazios",
+     "subtitle": "A malha atual tem **rotas que se sobrepõem** entre as unidades Leste e Centro.",
+     "body": "Unificar a operação simplifica escalas, estoques e manutenção da frota.",
+     "photo": 1
+    },
+    {
+     "kind": "demo",
+     "title": "A equipe já testou o novo fluxo em uma rota piloto",
+     "subtitle": "O piloto validou o roteiro de transferência e o treinamento das equipes de doca.",
+     "body": "Ilustração com fotografia de acervo livre.",
+     "photo": 2
+    },
+    {
+     "kind": "data",
+     "title": "O cronograma cabe em três trimestres",
+     "subtitle": "Valores de planejamento da empresa fictícia; não são resultados.",
+     "blocks": [
+      {
+       "type": "metrics",
+       "items": [
+        {
+         "value": "2",
+         "label": "armazéns unificados",
+         "detail": "Leste e Centro"
+        },
+        {
+         "value": "3 tri",
+         "label": "prazo de transição",
+         "detail": "jan. a set. de 2027"
+        },
+        {
+         "value": "1",
+         "label": "sistema de gestão",
+         "detail": "substitui duas planilhas"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "closing",
+     "title": "Decisão pedida: aprovar a fase 1 até 15 de dezembro",
+     "subtitle": "Responsável: diretoria de operações. Revisão em março."
+    }
+   ]
+  },
+  "swiss": {
+   "theme": "Design e arquitetura",
+   "slides": [
+    {
+     "kind": "cover",
+     "title": "Forma\nsegue\nuso",
+     "subtitle": "Programa da Escola Aberta de Design — curso fictício, 2027.",
+     "photo": 0
+    },
+    {
+     "kind": "divider",
+     "title": "Grade antes do gesto",
+     "subtitle": "Módulo 1",
+     "section": 1
+    },
+    {
+     "kind": "content",
+     "title": "Toda página começa por uma decisão de medida",
+     "subtitle": "Colunas, entrelinha e margens definem o ritmo **antes** da primeira palavra.",
+     "body": "O estudante desenha a grade à mão e só depois abre o software."
+    },
+    {
+     "kind": "demo",
+     "title": "A estrutura aparente",
+     "subtitle": "A estação mostra sua construção: arco, cabo e laje não se escondem.",
+     "body": "Exemplo para análise em aula. Foto: acervo CC0.",
+     "photo": 1
+    },
+    {
+     "kind": "data",
+     "title": "Quatro módulos em doze semanas",
+     "subtitle": "Carga horária planejada do curso fictício.",
+     "blocks": [
+      {
+       "type": "steps",
+       "items": [
+        {
+         "title": "Grade",
+         "body": "Medidas, colunas e proporção."
+        },
+        {
+         "title": "Tipo",
+         "body": "Escala, peso e entrelinha."
+        },
+        {
+         "title": "Imagem",
+         "body": "Recorte, contraste e sequência."
+        },
+        {
+         "title": "Sistema",
+         "body": "Regras que outras pessoas aplicam."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "closing",
+     "title": "Inscrições até 30 de janeiro",
+     "subtitle": "Turma fictícia de demonstração."
+    }
+   ]
+  },
+  "cinematic": {
+   "theme": "Cultura e cinema",
+   "slides": [
+    {
+     "kind": "cover",
+     "title": "Noite\nem trânsito",
+     "subtitle": "Documentário fictício sobre quem trabalha enquanto a cidade dorme.",
+     "photo": 0
+    },
+    {
+     "kind": "divider",
+     "title": "Primeiro ato: a saída",
+     "subtitle": "22h — troca de turno.",
+     "section": 1
+    },
+    {
+     "kind": "content",
+     "title": "A cidade muda de dono depois das dez",
+     "subtitle": "Motoristas, padeiros, enfermeiras e vigias ocupam ruas que, de dia, pertencem a outros.",
+     "body": "O filme acompanha quatro personagens fictícios em uma mesma madrugada.",
+     "photo": 2
+    },
+    {
+     "kind": "demo",
+     "title": "Luz que deixa rastro",
+     "subtitle": "A longa exposição transforma o fluxo em linha — a linguagem visual do filme.",
+     "photo": 1
+    },
+    {
+     "kind": "data",
+     "title": "Plano de filmagem",
+     "subtitle": "Cronograma de produção fictício.",
+     "blocks": [
+      {
+       "type": "comparison",
+       "headers": [
+        "Etapa",
+        "Período",
+        "Locação"
+       ],
+       "rows": [
+        [
+         "Pesquisa",
+         "fev.–mar.",
+         "Centro e marginais"
+        ],
+        [
+         "Filmagem noturna",
+         "abr.–jun.",
+         "Quatro bairros"
+        ],
+        [
+         "Montagem",
+         "jul.–set.",
+         "Estúdio"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "closing",
+     "title": "Estreia prevista para o festival de inverno",
+     "subtitle": "Projeto fictício de demonstração.",
+     "photo": 4
+    }
+   ]
+  },
+  "luxury": {
+   "theme": "Gastronomia e objeto",
+   "slides": [
+    {
+     "kind": "cover",
+     "eyebrow": "Coleção de inverno",
+     "title": "A hora\ndo chá",
+     "subtitle": "Casa Alba · porcelana e infusões — marca fictícia.",
+     "photo": 0
+    },
+    {
+     "kind": "divider",
+     "title": "O ritual",
+     "subtitle": "Três gestos que não podem ser apressados.",
+     "section": 1
+    },
+    {
+     "kind": "content",
+     "title": "Porcelana fina guarda o calor por mais tempo",
+     "subtitle": "A parede delgada aquece rápido e devolve a temperatura de forma **uniforme** à infusão.",
+     "body": "Cada peça da coleção é queimada duas vezes.",
+     "photo": 3
+    },
+    {
+     "kind": "demo",
+     "title": "O gesto, antes do produto",
+     "subtitle": "Fotografamos mãos e vapor; a xícara aparece inteira, sem corte na asa.",
+     "photo": 2
+    },
+    {
+     "kind": "data",
+     "title": "Infusões da coleção",
+     "subtitle": "Indicações de preparo da marca fictícia.",
+     "blocks": [
+      {
+       "type": "comparison",
+       "headers": [
+        "Infusão",
+        "Água",
+        "Tempo"
+       ],
+       "rows": [
+        [
+         "Branco de inverno",
+         "80 °C",
+         "3 min"
+        ],
+        [
+         "Preto defumado",
+         "95 °C",
+         "4 min"
+        ],
+        [
+         "Ervas do jardim",
+         "100 °C",
+         "6 min"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "closing",
+     "title": "Visite o ateliê com hora marcada",
+     "subtitle": "Casa Alba — demonstração."
+    }
+   ]
+  },
+  "typographic": {
+   "theme": "Educação e manifesto",
+   "slides": [
+    {
+     "kind": "cover",
+     "title": "Ler\né verbo",
+     "subtitle": "Manifesto de um clube de leitura fictício.",
+     "photo": 1
+    },
+    {
+     "kind": "divider",
+     "title": "Devagar.",
+     "subtitle": "Primeira regra do clube.",
+     "section": 1
+    },
+    {
+     "kind": "content",
+     "title": "Um livro\npor mês,\nem voz alta",
+     "subtitle": "Lemos juntos, em roda, **sem pressa** e sem prova no final.",
+     "body": "Quem não terminou também participa."
+    },
+    {
+     "kind": "demo",
+     "title": "Cada um traz uma frase",
+     "subtitle": "A conversa começa pelo trecho que alguém sublinhou, não pelo resumo.",
+     "photo": 0
+    },
+    {
+     "kind": "data",
+     "title": "Como funciona",
+     "subtitle": "Formato dos encontros.",
+     "blocks": [
+      {
+       "type": "steps",
+       "items": [
+        {
+         "title": "Escolher",
+         "body": "O grupo vota o livro do mês."
+        },
+        {
+         "title": "Ler em voz alta",
+         "body": "Trinta minutos por encontro."
+        },
+        {
+         "title": "Conversar",
+         "body": "Uma frase por pessoa abre a roda."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "closing",
+     "title": "Primeiro\nsábado.\nVenha.",
+     "subtitle": "Clube fictício de demonstração."
+    }
+   ]
+  },
+  "cultural": {
+   "theme": "Festival cultural",
+   "slides": [
+    {
+     "kind": "cover",
+     "eyebrow": "Festival fictício",
+     "title": "Cor de\nrua",
+     "subtitle": "Mostra de artes visuais, dança e cartaz — edição de demonstração.",
+     "photo": 0
+    },
+    {
+     "kind": "divider",
+     "title": "Pintura em praça pública",
+     "subtitle": "Programa 1",
+     "section": 1
+    },
+    {
+     "kind": "content",
+     "title": "Ateliês abertos ao longo de três quarteirões",
+     "subtitle": "Artistas pintam diante do público e **convidam quem passa** para a última camada.",
+     "body": "As telas circulam pela cidade depois do festival.",
+     "photo": 1
+    },
+    {
+     "kind": "demo",
+     "title": "A dança ocupa o centro",
+     "subtitle": "Grupos de tradição popular abrem cada noite do festival.",
+     "body": "Foto de acervo em domínio público; evento real diferente do festival fictício.",
+     "photo": 3
+    },
+    {
+     "kind": "data",
+     "title": "Programa por dia",
+     "subtitle": "Grade fictícia de demonstração.",
+     "blocks": [
+      {
+       "type": "comparison",
+       "headers": [
+        "Dia",
+        "Linguagem",
+        "Local"
+       ],
+       "rows": [
+        [
+         "Sexta",
+         "Pintura e cartaz",
+         "Praça do Mercado"
+        ],
+        [
+         "Sábado",
+         "Dança",
+         "Largo da Estação"
+        ],
+        [
+         "Domingo",
+         "Oficinas abertas",
+         "Rua das Artes"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "closing",
+     "title": "Traga sua cor",
+     "subtitle": "Entrada livre · festival fictício.",
+     "photo": 4
+    }
+   ]
+  },
+  "technical": {
+   "theme": "Tecnologia",
+   "slides": [
+    {
+     "kind": "cover",
+     "eyebrow": "RFC interna",
+     "title": "Arquitetura de eventos da plataforma Orion",
+     "subtitle": "Proposta técnica para um sistema fictício.",
+     "photo": 0
+    },
+    {
+     "kind": "divider",
+     "title": "Por que separar escrita e leitura",
+     "subtitle": "Contexto e restrições.",
+     "section": 2
+    },
+    {
+     "kind": "content",
+     "title": "Cada serviço publica fatos, não ordens",
+     "subtitle": "Um evento descreve **o que aconteceu**; quem consome decide o que fazer com ele.",
+     "body": "Assim novos consumidores entram sem alterar quem publica.",
+     "photo": 3
+    },
+    {
+     "kind": "demo",
+     "title": "O barramento é a placa-mãe do sistema",
+     "subtitle": "Fluxos independentes compartilham o mesmo trilho, com contratos versionados.",
+     "photo": 1
+    },
+    {
+     "kind": "data",
+     "title": "Contratos de evento",
+     "subtitle": "Exemplo de especificação; valores de projeto fictício.",
+     "blocks": [
+      {
+       "type": "comparison",
+       "headers": [
+        "Evento",
+        "Produtor",
+        "Retenção"
+       ],
+       "rows": [
+        [
+         "pedido.criado",
+         "checkout",
+         "30 dias"
+        ],
+        [
+         "pagamento.aprovado",
+         "financeiro",
+         "90 dias"
+        ],
+        [
+         "envio.despachado",
+         "logística",
+         "30 dias"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "closing",
+     "title": "Revisão técnica na próxima quinta",
+     "subtitle": "Comentários no documento até quarta, 18h."
+    }
+   ]
+  },
+  "photo": {
+   "theme": "Gastronomia e pessoas",
+   "slides": [
+    {
+     "kind": "cover",
+     "title": "Mãos que alimentam o bairro",
+     "subtitle": "Ensaio sobre uma cozinha comunitária fictícia.",
+     "photo": 0
+    },
+    {
+     "kind": "divider",
+     "title": "Antes do amanhecer",
+     "subtitle": "Capítulo um",
+     "section": 1
+    },
+    {
+     "kind": "content",
+     "title": "A cozinha abre às cinco",
+     "subtitle": "O primeiro turno separa legumes, acende os fornos e decide o cardápio do dia **com o que chegou**.",
+     "body": "Ninguém tem cargo fixo: quem chega primeiro escolhe a tarefa.",
+     "photo": 2,
+     "caption": "Pães do primeiro turno."
+    },
+    {
+     "kind": "demo",
+     "title": "Fatias finas, servidas na hora",
+     "subtitle": "O corte acontece diante de quem vai comer; o prato chega em minutos.",
+     "photo": 3,
+     "caption": "Prato do almoço de sábado."
+    },
+    {
+     "kind": "data",
+     "title": "Um dia de trabalho",
+     "subtitle": "Rotina descrita pela cozinha fictícia.",
+     "blocks": [
+      {
+       "type": "steps",
+       "items": [
+        {
+         "title": "5h · Preparo",
+         "body": "Separar, lavar e cortar."
+        },
+        {
+         "title": "11h · Serviço",
+         "body": "Almoço servido no salão."
+        },
+        {
+         "title": "15h · Limpeza",
+         "body": "Cozinha pronta para amanhã."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "closing",
+     "title": "Quem cozinha também conta a história",
+     "subtitle": "Ensaio fictício de demonstração.",
+     "photo": 1
+    }
+   ]
+  },
+  "modular": {
+   "theme": "Educação",
+   "slides": [
+    {
+     "kind": "cover",
+     "eyebrow": "Curso livre",
+     "title": "Planejar projetos em equipe",
+     "subtitle": "Curso fictício de seis semanas para quem coordena pessoas pela primeira vez.",
+     "photo": 0
+    },
+    {
+     "kind": "divider",
+     "title": "Combinar antes de começar",
+     "subtitle": "Módulo 2",
+     "section": 2
+    },
+    {
+     "kind": "content",
+     "title": "Um bom quadro mostra quem decide o quê",
+     "subtitle": "Cada tarefa tem **um responsável**, um prazo e uma pessoa que precisa ser avisada.",
+     "body": "O quadro vale mais que a ferramenta escolhida."
+    },
+    {
+     "kind": "demo",
+     "title": "Papel antes da planilha",
+     "subtitle": "A primeira versão do plano é feita em post-its, na mesa, com todo o grupo.",
+     "photo": 2
+    },
+    {
+     "kind": "data",
+     "title": "Ferramentas comparadas",
+     "subtitle": "Critérios usados no curso; sem preferência comercial.",
+     "blocks": [
+      {
+       "type": "comparison",
+       "headers": [
+        "Formato",
+        "Bom para",
+        "Cuidado"
+       ],
+       "rows": [
+        [
+         "Quadro de post-its",
+         "Primeira conversa do grupo",
+         "Registrar depois em local comum"
+        ],
+        [
+         "Planilha",
+         "Prazos e responsáveis",
+         "Evitar abas demais"
+        ],
+        [
+         "Ferramenta de tarefas",
+         "Equipes distribuídas",
+         "Combinar quem atualiza"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "closing",
+     "title": "Próximo encontro: montar o primeiro plano",
+     "subtitle": "Traga um projeto real da sua equipe.",
+     "photo": 3
+    }
+   ]
+  }
+ },
+ "stress": {
+  "longTitle": "Um título bem mais longo para verificar se a família mantém hierarquia e leitura quando o texto cresce",
+  "longBody": "Este parágrafo simula um argumento maior do que o previsto pelo layout. O sistema deve reduzir o corpo em passos controlados, sem cortar palavras nem invadir a área da imagem ou da evidência.",
+  "metrics": [
+   {
+    "type": "metrics",
+    "items": [
+     {
+      "value": "12 sem.",
+      "label": "duração planejada",
+      "detail": "exemplo"
+     },
+     {
+      "value": "4",
+      "label": "módulos",
+      "detail": "exemplo"
+     },
+     {
+      "value": "2 h",
+      "label": "por encontro",
+      "detail": "exemplo"
+     }
+    ]
+   }
+  ]
+ }
+}

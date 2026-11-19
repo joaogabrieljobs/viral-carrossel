@@ -28,6 +28,11 @@ describe('tipografia pronta antes de exportar', () => {
     await expect(waitForExportFonts([system.node], { doc: system.doc })).resolves.toBeUndefined();
   });
 
+  it.each(['Instrument Sans', 'Barlow'])('recusa exportação de %s quando a fonte nova não carregou', async (family) => {
+    const { node, doc } = setup({ family: `"${family}", sans-serif`, faces: [] });
+    await expect(waitForExportFonts([node], { doc })).rejects.toThrow(`Não foi possível carregar a fonte “${family}”`);
+  });
+
   it('impede export de fonte custom inválida mesmo após fonts.ready resolver', async () => {
     const { node, doc } = setup({ family: 'VCBrandTitle-b1, serif', load: vi.fn(async () => { throw new Error('Font decode failed'); }) });
     await expect(waitForExportFonts([node], { doc })).rejects.toThrow('Não foi possível carregar a fonte da marca');

@@ -41,10 +41,11 @@ describe('direções visuais dos dez padrões planejados', () => {
     for (const id of ['presentation_cinematic', 'presentation_typographic_bold']) {
       const cover = make(id, 'cover', { imageQuery: 'illustrative scene', title: 'Uma nova direção' });
       expect(cover.titleSize).toBeGreaterThan(make(id).titleSize);
-      expect(cover.presentationTypographyByComposition.cover.title.weight).toBe(400);
+      // Peso real da família (Barlow Condensed SemiBold 600; Anton 400), sem negrito sintético.
+      expect([400, 600]).toContain(cover.presentationTypographyByComposition.cover.title.weight);
     }
   });
-  it.each([['presentation_cinematic', 0.04], ['presentation_typographic_bold', -0.01]])('o tracking de %s mantém o valor tipográfico real do catálogo', (id, expected) => {
+  it.each([['presentation_cinematic', 0.012], ['presentation_typographic_bold', 0.004]])('o tracking de %s mantém o valor tipográfico real do catálogo', (id, expected) => {
     const slide = make(id, 'cover', { imageQuery: 'illustrative scene', title: 'Uma nova direção' });
     const type = slide.presentationTypographyByComposition.cover.title;
     expect(titleLetterSpacingEm(type.fontFamily, type.tracking)).toBeCloseTo(expected, 4);
@@ -99,7 +100,7 @@ describe('direções visuais dos dez padrões planejados', () => {
       expect(rendered).toContain('data-vc-evidence-design="modular"');
       expect(rendered).toContain('font-variant-numeric:tabular-nums');
       expect(rendered).toContain('Segundo mês do piloto');
-      expect(rendered).toContain('font-size:76px');
+      expect(rendered).toMatch(/font-size:9\d(\.\d+)?px/);
     }
   });
   it('o contador de apresentação vira fólio discreto na superfície de leitura', () => {

@@ -121,6 +121,15 @@ export const FONT_ALLOWLIST = Object.freeze({
   'JetBrains Mono': '"JetBrains Mono", monospace',
   Cormorant: '"Cormorant", serif',
   Manrope: '"Manrope", sans-serif',
+  // Biblioteca 2.0 (todas SIL OFL 1.1, google/fonts).
+  Fraunces: '"Fraunces", Georgia, serif',
+  'Barlow Condensed': '"Barlow Condensed", Arial Narrow, sans-serif',
+  Barlow: '"Barlow", Arial, sans-serif',
+  'Bodoni Moda': '"Bodoni Moda", Didot, serif',
+  Syne: '"Syne", Arial, sans-serif',
+  'DM Sans': '"DM Sans", Arial, sans-serif',
+  'Instrument Serif': '"Instrument Serif", Georgia, serif',
+  'Instrument Sans': '"Instrument Sans", Arial, sans-serif',
 });
 
 // The source has a few archetypes with captions only or container-only text.

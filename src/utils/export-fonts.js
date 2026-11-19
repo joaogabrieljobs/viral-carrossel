@@ -1,8 +1,10 @@
 import { TITLE_FONTS } from './design-data.js';
 import { BODY_FONTS } from './brand-visuals.js';
+import { PRESENTATION_LIBRARY_FONTS, ensurePresentationFonts } from './presentation-font-manifest.js';
 
 const firstFamily = (value) => String(value || '').split(',')[0].trim().replace(/^['"]|['"]$/g, '');
-const WEB_FAMILIES = new Set([...TITLE_FONTS, ...BODY_FONTS].map(({ val }) => firstFamily(val)));
+const LOCAL_PRESENTATION_FAMILIES = new Set(PRESENTATION_LIBRARY_FONTS.map(({ family }) => family));
+const WEB_FAMILIES = new Set([...TITLE_FONTS, ...BODY_FONTS].map(({ val }) => firstFamily(val)).concat([...LOCAL_PRESENTATION_FAMILIES]));
 
 function fontError(family) {
   const label = family.startsWith('VCBrand') ? 'a fonte da marca' : `a fonte “${family}”`;
@@ -45,10 +47,11 @@ export async function waitForExportFonts(roots, {
     }
   }
 
+  if ([...requests.values()].some(({ family }) => LOCAL_PRESENTATION_FAMILIES.has(family))) ensurePresentationFonts(doc);
   const googleSheet = doc.getElementById?.('vc-google-fonts');
-  const needsGoogleSheet = [...requests.values()].some(({ family }) => WEB_FAMILIES.has(family));
+  const needsGoogleSheet = [...requests.values()].some(({ family }) => WEB_FAMILIES.has(family) && !LOCAL_PRESENTATION_FAMILIES.has(family));
   if (needsGoogleSheet && googleSheet && !googleSheet.sheet) {
-    const family = [...requests.values()].find((item) => WEB_FAMILIES.has(item.family)).family;
+    const family = [...requests.values()].find((item) => WEB_FAMILIES.has(item.family) && !LOCAL_PRESENTATION_FAMILIES.has(item.family)).family;
     let loaded;
     let failed;
     try {

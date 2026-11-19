@@ -19,7 +19,7 @@ import { buildPresentationMaterial } from './presentation-material.js';
 import { buildSocialTextLimitsPrompt, socialTextLimits } from './social-generation.js';
 import { buildVisualBiblePromptRules, VISUAL_BIBLE_SCHEMA } from './visual-bible.js';
 import {
-  buildPresentationFieldRules, buildPresentationLanguageRules, buildPresentationImageRules,
+  buildPresentationFieldRules, buildPresentationLanguageRules, buildPresentationImageRules, buildPresentationFamilyImageRules,
 } from './presentation.js';
 
 export const GENERATION_TOPIC_MAX_CHARS = 1500;
@@ -1126,15 +1126,15 @@ function buildGenerationSlideLayoutRules(narrativeModeId, creativePresetId, text
   return `${rules}\n\n${buildSocialTextLimitsPrompt({ densityId: textDensityId })}\n\n${SOCIAL_FACTUAL_GROUNDING_RULES}`;
 }
 
-function buildGenerationImageLayer(presetId, topic, n, audience, projectDirection = false, presentationPath = 'auto') {
+function buildGenerationImageLayer(presetId, topic, n, audience, projectDirection = false, presentationPath = 'auto', presentationFamilyKey) {
   if (presetId === 'apresentacao') {
     if (isPitchPath(presentationPath)) return `imageQuery — APOIO VISUAL DO PITCH:
 • Use "" quando o argumento depende de fluxo, comparação, modelo comercial, métricas, marcos ou responsabilidades. Essas informações devem existir nos campos de texto editáveis.
 • Uma fotografia é opcional e deve esclarecer um uso ou contexto específico de “${topic}”. Não preencha todo o deck com retratos, cenas de rotina ou acessórios; não faça um complemento parecer o produto principal.
 • Demonstrações reais usam apenas materiais fornecidos. Não peça à IA para inventar screenshot, gráfico, cliente, equipe, depoimento ou evidência.
 • Se uma imagem for útil, descreva em INGLÊS, 8–15 palavras, com composição horizontal 16:9 e espaço para texto. Não desenhe texto, números, logo ou marca-d'água.
-• ${projectDirection ? 'Preserve a estética do brief nas imagens necessárias; ela não obriga fotografia em cada slide.' : 'Mantenha coerência visual nas imagens necessárias.'}`;
-    return buildPresentationImageRules(presentationPath, topic, projectDirection);
+• ${projectDirection ? 'Preserve a estética do brief nas imagens necessárias; ela não obriga fotografia em cada slide.' : 'Mantenha coerência visual nas imagens necessárias.'}${presentationFamilyKey ? `\n${buildPresentationFamilyImageRules(presentationFamilyKey)}` : ''}`;
+    return buildPresentationImageRules(presentationPath, topic, projectDirection, presentationFamilyKey);
   }
   if (projectDirection) return `imageQuery — DIREÇÃO DO PROJETO:
 • INGLÊS, 8–15 palavras: sujeito + ação + ambiente. A linguagem visual e a luz do brief entram só quando couberem na cena — luz de interior não se aplica a uma cena externa; não repita a mesma expressão de luz em todas as queries.

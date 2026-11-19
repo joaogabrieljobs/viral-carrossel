@@ -1,8 +1,26 @@
 import React from 'react';
+import { chromeElements, chromeTokensForSlide } from '../../utils/presentation-chrome.js';
 
-/** Quiet alignment devices, not extra generated content. Shared by export. */
-export default function PresentationArtChrome({ slide, frame, accent, ink }) {
+/**
+ * Linguagem gráfica da família (fios, numerais, grade, blocos de cor, marcas
+ * de corte, fita). Dispositivos de alinhamento e ritmo, não conteúdo gerado:
+ * os únicos textos são numeração e tokens que já existem no slide.
+ * Compartilhado entre preview e exportação.
+ */
+export default function PresentationArtChrome({ slide, frame, accent, ink, index = 0, total = 1 }) {
+  if (slide.presentationArtDirectionVersion === 2 && slide.presentationChrome?.chrome) {
+    const { family, format, ground, chrome } = slide.presentationChrome;
+    const elements = chromeElements({ family, format, ground, chrome }, {
+      frame, tokens: chromeTokensForSlide(slide, { index, total }),
+    });
+    return <div aria-hidden="true" data-vc-presentation-art={family}>
+      {elements.map((item) => <div key={item.key} data-vc-art-device={item.key} style={{
+        position: 'absolute', pointerEvents: 'none', boxSizing: 'border-box', zIndex: item.z, ...item.style,
+      }}>{item.text}</div>)}
+    </div>;
+  }
   if (slide.presentationArtDirectionVersion !== 1) return null;
+  // Projetos salvos na versão 1 continuam com os fios discretos de antes.
   const family = slide.presentationDesignFamily;
   const base = { position: 'absolute', pointerEvents: 'none', zIndex: 1, boxSizing: 'border-box' };
   const line = (style, color = ink) => <div style={{ ...base, background: color, ...style }} />;

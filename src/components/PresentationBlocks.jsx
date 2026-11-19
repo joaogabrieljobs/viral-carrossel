@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
+import LegacyPresentationBlocks from './LegacyPresentationBlocks.jsx';
 import { normalizePresentationBlocks } from '../utils/presentation-quality.js';
+import { familyEvidenceStyle, familyFont, normalizeFamilyKey } from '../utils/presentation-families.js';
 
 function EditableCell({ as: Tag = 'span', value, label, onCommit, style = {} }) {
   const [editing, setEditing] = useState(false);
@@ -50,16 +52,28 @@ function EditableCell({ as: Tag = 'span', value, label, onCommit, style = {} }) 
 
 /** A small, allowlisted set of editable primitives shared by preview and export.
  * React escapes every value; generated content never controls markup or CSS. */
-export default function PresentationBlocks({ blocks: raw, rect, frame, ink, background, fontFamily, family = 'executive', accent, numericTypography, onChange, forExport = false }) {
+export default function PresentationBlocks({ blocks: raw, rect, frame, ink, background, fontFamily, family = 'executive', accent, numericTypography, onChange, forExport = false, artDirectionVersion = 2 }) {
+  if (artDirectionVersion !== 2) return <LegacyPresentationBlocks blocks={raw} rect={rect} frame={frame} ink={ink} background={background} fontFamily={fontFamily} family={family} accent={accent} numericTypography={numericTypography} onChange={onChange} forExport={forExport} />;
   const blocks = normalizePresentationBlocks(raw);
   if (!blocks.length || !rect) return null;
   const block = blocks[0];
   const unit = frame.w / (frame.h >= frame.w ? 1080 : 1920);
-  const fontSize = 25 * unit;
-  const panel = ['modular', 'premium'].includes(family);
-  const technical = ['technical', 'data'].includes(family);
-  const ruleColor = accent || ink;
-  const numberFont = numericTypography?.fontFamily || fontFamily;
+  const fontSize = 26 * unit;
+  // Tratamento de evidência da família (fios, zebra, painel, numeração).
+  const key = normalizeFamilyKey(family);
+  const st = familyEvidenceStyle(key);
+  const panel = st.panel;
+  const ruleColor = st.metricRuleColor || accent || ink;
+  const headerFont = familyFont(key, st.headerRole === 'display' ? 'display' : st.headerRole === 'label' ? 'label' : 'text');
+  const numberFont = numericTypography?.fontFamily || familyFont(key, 'numeric').css || fontFamily;
+  const panelInk = panel ? st.ink : ink;
+  const roman = ['I', 'II', 'III', 'IV', 'V'];
+  // Valor da métrica cabe numa linha da coluna (mesmo cálculo da galeria).
+  const metricColumnPx = (count) => {
+    const cols = Math.min(count, frame.h > frame.w ? 2 : 4);
+    return ((rect.w / 100) * frame.w - (cols - 1) * 28 * unit) / cols - (panel ? 52 * unit : 0);
+  };
+  const marker = (index) => st.stepMarker === 'roman' ? roman[index] : st.stepMarker === 'code' ? `0${index + 1}/` : String(index + 1).padStart(2, '0');
   const cell = (value, path, label, style) => <EditableCell
     key={path.join('.')}
     value={value}
@@ -81,27 +95,34 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, back
     data-vc-evidence-surface="true"
     data-vc-evidence-design={family}
     style={{ position: 'absolute', left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.w}%`, height: `${rect.h}%`,
-      boxSizing: 'border-box', overflow: 'hidden', zIndex: 5, color: ink, backgroundColor: background,
+      boxSizing: 'border-box', overflow: 'hidden', zIndex: 5, color: ink, backgroundColor: panel ? 'transparent' : background,
       fontFamily, fontSize, lineHeight: 1.4, textAlign: 'left', textShadow: 'none' }}
   >
-    {block.type === 'comparison' ? <table aria-label="Comparação" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 'inherit', color: 'inherit' }}>
-      <thead><tr>{block.headers.map((value, col) => <th key={col} scope="col" style={{ textAlign: 'left', verticalAlign: 'top', padding: `${12 * unit}px ${16 * unit}px`, borderBottom: `${2 * unit}px solid ${ruleColor}`, fontWeight: 700, fontSize: 23 * unit, ...(technical ? { fontFamily: numberFont } : {}) }}>
+    {block.type === 'comparison' ? <table aria-label="Comparação" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 'inherit', color: panelInk,
+      ...(panel ? { backgroundColor: st.panelColor, borderRadius: st.radius * unit, overflow: 'hidden', boxShadow: st.offsetShadow ? `${10 * unit}px ${10 * unit}px 0 ${st.offsetShadow}` : 'none' } : {}) }}>
+      <thead><tr>{block.headers.map((value, col) => <th key={col} scope="col" style={{ textAlign: 'left', verticalAlign: 'bottom', padding: `${14 * unit}px ${18 * unit}px`, borderBottom: `${Math.max(1, st.headerRule * unit)}px solid ${panelInk}`,
+        fontFamily: headerFont.css, fontWeight: st.headerRole === 'display' ? headerFont.weight : 600, fontSynthesisWeight: 'none',
+        fontSize: (st.headerRole === 'label' ? 19 : st.headerRole === 'display' ? 30 : 23) * unit,
+        textTransform: st.headerCase === 'upper' ? 'uppercase' : 'none', letterSpacing: `${st.headerTracking}em` }}>
         {cell(value, ['headers', col], `cabeçalho ${col + 1}`)}
       </th>)}</tr></thead>
-      <tbody>{block.rows.map((row, rowIndex) => <tr key={rowIndex} style={{ backgroundColor: rowIndex % 2 === 0 ? 'rgba(127,127,127,0.065)' : 'transparent' }}>{row.map((value, col) => <td key={col} style={{ verticalAlign: 'top', padding: `${12 * unit}px ${16 * unit}px`, borderBottom: `${unit}px solid rgba(127,127,127,0.25)`, fontWeight: col === 0 ? 600 : 400 }}>
+      <tbody>{block.rows.map((row, rowIndex) => <tr key={rowIndex} style={{ backgroundColor: rowIndex % 2 === 0 ? st.zebra : 'transparent' }}>{row.map((value, col) => <td key={col} style={{ verticalAlign: 'top', padding: `${14 * unit}px ${18 * unit}px`, borderBottom: `${Math.max(1, unit)}px solid ${panel ? 'rgba(0,0,0,0.12)' : 'rgba(127,127,127,0.3)'}`, fontWeight: col === 0 ? 600 : 400,
+        ...(col === 0 && key === 'technical' ? { fontFamily: numberFont, fontSize: 23 * unit } : {}) }}>
         {cell(value, ['rows', rowIndex, col], `linha ${rowIndex + 1}, coluna ${col + 1}`)}
       </td>)}</tr>)}</tbody>
     </table> : block.type === 'metrics' ? <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(block.items.length, frame.h > frame.w ? 2 : 4)}, minmax(0, 1fr))`, gap: 28 * unit }}>
-      {block.items.map((item, index) => <div key={index} style={{ minWidth: 0, padding: panel ? `${22 * unit}px` : `${20 * unit}px 0 0`, borderTop: `${(family === 'swiss' ? 5 : 2) * unit}px solid ${ruleColor}`, borderRadius: panel ? 14 * unit : 0, backgroundColor: panel ? 'rgba(127,127,127,0.08)' : 'transparent' }}>
-        {cell(item.value, ['items', index, 'value'], `valor ${index + 1}`, { display: 'block', fontFamily: numberFont, fontVariantNumeric: 'tabular-nums', fontSize: Math.max(42, (block.items.length > 3 ? 60 : 76) * Math.min(1, 12 / Math.max(12, [...item.value].length))) * unit, letterSpacing: '-0.035em', lineHeight: 1.06, fontWeight: numericTypography?.weight || 700, fontSynthesisWeight: 'none' })}
-        {cell(item.label, ['items', index, 'label'], `indicador ${index + 1}`, { display: 'block', fontSize: 25 * unit, marginTop: 18 * unit, fontWeight: 600 })}
-        {item.detail && cell(item.detail, ['items', index, 'detail'], `condição ${index + 1}`, { display: 'block', fontSize: 23 * unit, marginTop: 12 * unit })}
+      {block.items.map((item, index) => <div key={index} style={{ minWidth: 0, padding: panel ? `${26 * unit}px` : `${22 * unit}px 0 0`, borderTop: st.metricRule ? `${st.metricRule * unit}px solid ${ruleColor}` : 'none', borderRadius: st.radius * unit, backgroundColor: panel ? st.panelColor : 'transparent', color: panelInk }}>
+        {cell(item.value, ['items', index, 'value'], `valor ${index + 1}`, { display: 'block', whiteSpace: 'nowrap', fontFamily: numberFont, fontVariantNumeric: 'tabular-nums', fontSize: Math.max(40 * unit, Math.min((block.items.length > 3 ? 72 : 96) * unit, metricColumnPx(block.items.length) / Math.max(1, [...item.value].length * 0.56))), letterSpacing: '-0.02em', lineHeight: 1, fontWeight: numericTypography?.weight || familyFont(key, 'numeric').weight || 600, fontSynthesisWeight: 'none' })}
+        {cell(item.label, ['items', index, 'label'], `indicador ${index + 1}`, { display: 'block', fontSize: 26 * unit, marginTop: 18 * unit, fontWeight: 600 })}
+        {item.detail && cell(item.detail, ['items', index, 'detail'], `condição ${index + 1}`, { display: 'block', fontSize: 23 * unit, marginTop: 8 * unit, opacity: 0.75 })}
       </div>)}
-    </div> : <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gridTemplateColumns: frame.h > frame.w ? '1fr' : `repeat(${Math.min(block.items.length, 3)}, minmax(0, 1fr))`, gap: 24 * unit }}>
-      {block.items.map((item, index) => <li key={index} style={{ minWidth: 0, borderTop: `${2 * unit}px solid ${ruleColor}`, padding: panel ? `${18 * unit}px` : `${14 * unit}px 0 0`, borderRadius: panel ? 12 * unit : 0, backgroundColor: panel ? 'rgba(127,127,127,0.065)' : 'transparent' }}>
-        {!/^[A-Z][.)]?$/.test(item.title) && <span aria-hidden style={{ display: 'block', fontFamily: numberFont, fontSize: 22 * unit, marginBottom: 10 * unit, fontVariantNumeric: 'tabular-nums' }}>{String(index + 1).padStart(2, '0')}</span>}
-        {cell(item.title, ['items', index, 'title'], `etapa ${index + 1}`, { display: 'block', fontWeight: 700, fontSize: 29 * unit })}
-        {item.body && cell(item.body, ['items', index, 'body'], `explicação da etapa ${index + 1}`, { display: 'block', marginTop: 8 * unit })}
+    </div> : <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gridTemplateColumns: frame.h > frame.w ? '1fr' : `repeat(${Math.min(block.items.length, 4)}, minmax(0, 1fr))`, gap: 24 * unit }}>
+      {block.items.map((item, index) => <li key={index} style={{ minWidth: 0, borderTop: st.metricRule ? `${Math.max(1, (st.metricRule > 4 ? 6 : 2) * unit)}px solid ${ruleColor}` : 'none', padding: panel ? `${22 * unit}px` : `${16 * unit}px 0 0`, borderRadius: st.radius * unit, backgroundColor: panel ? st.panelColor : 'transparent', color: panelInk }}>
+        {!/^[A-Z][.)]?$/.test(item.title) && <span aria-hidden style={{ display: st.stepMarker === 'pill' ? 'inline-block' : 'block', fontFamily: numberFont, fontSize: (st.stepMarker === 'pill' ? 20 : 40) * unit, lineHeight: 1, marginBottom: 14 * unit, fontVariantNumeric: 'tabular-nums', color: st.accent,
+          fontStyle: st.stepMarker === 'roman' ? 'italic' : 'normal',
+          ...(st.stepMarker === 'pill' ? { backgroundColor: st.accent, color: '#fff', borderRadius: 40 * unit, padding: `${8 * unit}px ${16 * unit}px` } : {}) }}>{marker(index)}</span>}
+        {cell(item.title, ['items', index, 'title'], `etapa ${index + 1}`, { display: 'block', fontWeight: 600, fontSize: 28 * unit, lineHeight: 1.2 })}
+        {item.body && cell(item.body, ['items', index, 'body'], `explicação da etapa ${index + 1}`, { display: 'block', marginTop: 8 * unit, opacity: 0.82 })}
       </li>)}
     </ol>}
   </div>;

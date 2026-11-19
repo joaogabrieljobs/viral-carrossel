@@ -78,7 +78,7 @@ describe('proporção da imagem segue o painel onde ela aparece', () => {
   it('R2: a capa do deck gerada pelo editor deixa de ser 16:9 num painel vertical', () => {
     const base = { id: 'capa', title: 'T', subtitle: 'S', imageQuery: 'cena', presentationPlan: { visualRole: 'cover', purpose: 'introduction' } };
     const capa = { ...base, ...getPresentationCompositionOverrides('presentation_executive_minimal', { slide: base, index: 0, count: 5 }) };
-    expect(capa.canvas.zones.photo).toMatchObject({ w: 36, h: 100 });
+    expect(capa.canvas.zones.photo).toMatchObject({ w: 42, h: 100 });
     expect(imageAspectRatioForSlide(capa, 'apresentacao')).toBe('2:3');
   });
 

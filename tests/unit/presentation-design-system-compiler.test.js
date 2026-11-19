@@ -149,8 +149,8 @@ describe('compilador do design system de apresentações', () => {
       (pattern) => pattern.id === 'presentation_editorial_magazine',
     );
     expect(editorial.brand).toMatchObject({
-      titleFont: '"Playfair Display", serif',
-      subtitleFont: '"Libre Franklin", sans-serif',
+      titleFont: '"Fraunces", Georgia, serif',
+      subtitleFont: '"Source Serif 4", serif',
       bodyFont: '"Source Serif 4", serif',
     });
     expect(
@@ -222,17 +222,17 @@ describe('compilador do design system de apresentações', () => {
       (pattern) => pattern.id === 'presentation_executive_minimal',
     );
     expect(executive.brand).toMatchObject({
-      textTitleTracking: 1,
-      textSubTracking: 1,
+      textTitleTracking: 0.6,
+      textSubTracking: 0.6,
       textTitleSize: 39.68,
       textSubSize: 59.52,
-      subtitleWeight: 500,
+      subtitleWeight: 400,
       subtitleCase: 'normal',
       textTitleLeading: 110,
       textSubLeading: 130,
       textBodyAfterSize: 81.02,
       bodyWeight: 400,
-      textBodyTracking: 0.4,
+      textBodyTracking: 0,
       textBodyLeading: 145,
     });
 
@@ -240,21 +240,21 @@ describe('compilador do design system de apresentações', () => {
       (pattern) => pattern.id === 'presentation_editorial_magazine',
     );
     expect(editorial.brand).toMatchObject({
-      subtitleWeight: 600,
-      subtitleCase: 'upper',
-      textSubTracking: 15,
+      subtitleWeight: 400,
+      subtitleCase: 'normal',
+      textSubTracking: 1,
       textSubSize: 40.92,
     });
 
     const premium = GENERATED_PRESENTATION_PATTERNS.find(
       (pattern) => pattern.id === 'presentation_premium_dark',
     );
-    expect(premium.brand.textTitleWeight).toBe(300);
+    expect(premium.brand.textTitleWeight).toBe(400);
     expect(premium.slideDefaults).toMatchObject({
-      titleWeight: 300,
+      titleWeight: 400,
       bodyAfterSize: 75.23,
       bodyWeight: 400,
-      bodyTracking: 0.4,
+      bodyTracking: 0.8,
       bodyLeading: 150,
       textBg: false,
       textBgOpacity: 5,
@@ -278,25 +278,25 @@ describe('compilador do design system de apresentações', () => {
       cover: {
         title: {
           role: 'display',
-          fontFamily: '"Cormorant", serif',
+          fontFamily: '"Bodoni Moda", Didot, serif',
           sizePercent: 89.29,
           leadingPercent: 100,
-          weight: 300,
+          weight: 400,
         },
       },
       divider: {
         title: { role: 'h2', sizePercent: 32.24, leadingPercent: 115 },
         subtitle: {
           role: 'display',
-          fontFamily: '"Cormorant", serif',
+          fontFamily: '"Bodoni Moda", Didot, serif',
           sizePercent: 267.86,
-          weight: 300,
+          weight: 400,
         },
       },
       closing: {
         subtitle: {
           role: 'caption',
-          fontFamily: '"Manrope", sans-serif',
+          fontFamily: '"Jost", sans-serif',
           sizePercent: 37.2,
           weight: 400,
         },

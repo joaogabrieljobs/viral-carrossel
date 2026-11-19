@@ -364,7 +364,7 @@ function ensureDocShape(d) {
       // superior livre; a migração de carrossel não deve aumentá-la ao reabrir.
       const plannedPresentation = (migrated.productKind === 'apresentacao'
         || migrated.fmt === 'apresentacao' || migrated.creativePreset === 'apresentacao')
-        && (sl.presentationCompositionVersion === 2 || !!sl.presentationPlan);
+        && ([2, 3].includes(sl.presentationCompositionVersion) || !!sl.presentationPlan);
       const logoSize = Number(sl.logoSize);
       const normalized = {
         ...sl,

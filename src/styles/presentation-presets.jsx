@@ -545,9 +545,16 @@ const VISUAL_PRESET_ALIASES = Object.freeze({
   executivo_minimalista: 'presentation_executive_minimal',
   editorial: 'presentation_editorial_magazine',
   revista: 'presentation_editorial_magazine',
-  data: 'presentation_data_first',
-  dados: 'presentation_data_first',
-  report: 'presentation_data_first',
+  // Relatórios de dados vão para o Técnico (tabelas mono, rótulos, grade);
+  // o slot data-first passou a abrigar a família Cultural e artístico.
+  data: 'presentation_technical_blueprint',
+  dados: 'presentation_technical_blueprint',
+  report: 'presentation_executive_minimal',
+  cultural: 'presentation_data_first',
+  cultura: 'presentation_data_first',
+  artistico: 'presentation_data_first',
+  colagem: 'presentation_data_first',
+  festival: 'presentation_data_first',
   swiss: 'presentation_swiss_grid',
   grid: 'presentation_swiss_grid',
   pitch: 'presentation_premium_dark',
@@ -560,7 +567,14 @@ const VISUAL_PRESET_ALIASES = Object.freeze({
   estudo_de_caso: 'presentation_photo_essay',
   foto: 'presentation_photo_essay',
   keynote: 'presentation_cinematic',
-  manifesto: 'presentation_cinematic',
+  manifesto: 'presentation_typographic_bold',
+  filme: 'presentation_cinematic',
+  luxo: 'presentation_premium_dark',
+  luxury: 'presentation_premium_dark',
+  ensaio: 'presentation_photo_essay',
+  humano: 'presentation_photo_essay',
+  suico: 'presentation_swiss_grid',
+  modular: 'presentation_modular_cards',
   cinematico: 'presentation_cinematic',
   tipografico: 'presentation_typographic_bold',
   blueprint: 'presentation_technical_blueprint',
@@ -674,14 +688,14 @@ function resolvePresentationDesignSystemPromptPreset(presetOrId) {
 export function buildPresentationDesignSystemPromptBlock(presetOrId, presentationPath = 'auto', { planned = false } = {}) {
   const selected = resolvePresentationDesignSystemPromptPreset(presetOrId);
   if (!selected) return '';
-  if (planned) return `PADRÃO VISUAL DA APRESENTAÇÃO — ${String(selected.label || '').toUpperCase()}:
+  if (planned || selected.sourceId) return `PADRÃO VISUAL DA APRESENTAÇÃO — ${String(selected.label || '').toUpperCase()}:
 - Direção de marca: ${selected.desc}. Preserve sua paleta, suas fontes e a identidade fornecida.
 - O roteiro validado escolhe a função de cada página: cover (abertura), content (argumento), divider (transição), data (comparação ou evidência), demo (fluxo ou demonstração), closing (decisão). A função determina a composição; não repita uma moldura em todas as posições.
-- Composições próprias para leitura: título conclusivo, desenvolvimento e complemento útil, com faixa livre para a marca. Fotos ocupam uma superfície separada, preservando proporção e assunto.
+- Composições próprias para leitura: título conclusivo, desenvolvimento e complemento útil, com faixa livre para a marca. Fotos preservam proporção e assunto, em superfície separada ou com proteção de contraste quando a família compõe texto sobre fotografia.
 - Os limites obrigatórios por slide fornecidos junto ao roteiro são a referência da redação. Nos slides de leitura autônoma, subtitle desenvolve o raciocínio (normalmente 320–360 caracteres no conteúdo); nos caminhos ao vivo, mantenha ritmo com até 180 caracteres e amplie exemplos e explicações nas notas. Não preencha um mínimo com repetição.
 - Capa e fecho têm orçamento próprio. Títulos têm até 90 caracteres e duas a três linhas, respeitando o limite de cada posição. Se faltar espaço, sintetize preservando números, condições e hipóteses; não corte frases ou qualificadores.
 - Comparações, métricas e etapas podem usar presentationBlocks nativos editáveis quando houver dados suficientes. Nesse caso, subtitle contextualiza em até 180 caracteres; bodyAfterImage fica vazio e speakerNotes recebe o complemento. Não repita a tabela em parágrafos.
-- Imagem é opcional: imageQuery pode ser "". Nunca peça foto de um gráfico, screenshot, depoimento ou prova inventados. Informação factual permanece editável no texto ou bloco nativo, com suas condições.
+- Imagem é opcional: imageQuery pode ser "". Nunca peça que imageQuery fabrique gráfico, screenshot, depoimento ou prova inventados. Informação factual permanece editável no texto ou bloco nativo, com suas condições.
 ${isPitchPath(presentationPath) ? buildPitchFieldRules() : ''}`;
   if (isPitchPath(presentationPath)) return `PADRÃO VISUAL DA APRESENTAÇÃO — ${selected.label}:\nDireção: ${selected.desc}\nComposições adaptadas para leitura autônoma: título, argumento e bloco complementar legíveis. A área visual é opcional; não preencha espaços com imagens ou provas fictícias.\n${buildPitchFieldRules()}`;
   const limits = selected.textLimits || {};
@@ -829,7 +843,9 @@ export function getPresentationCompositionOverrides(
     },
   };
   if (stage?.contentMode === 'pitch') return pitchCompositionOverrides(composition, slide, kind);
-  return slide.presentationPlan || (Array.isArray(slide.presentationBlocks) && slide.presentationBlocks.length)
+  // Os dez presets atuais usam a biblioteca também na edição manual, sem IA.
+  // IDs legados continuam no catálogo oculto para leitura de projetos antigos.
+  return presetDefinition.sourceId || slide.presentationPlan || (Array.isArray(slide.presentationBlocks) && slide.presentationBlocks.length)
     ? contentAwarePresentationOverrides(composition, slide, kind, { deliveryMode: stage.deliveryMode })
     : composition;
 }

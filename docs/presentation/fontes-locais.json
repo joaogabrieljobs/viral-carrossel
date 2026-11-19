@@ -1,0 +1,255 @@
+{
+  "source": "Moont-galeria-templates-2.zip fornecido pelo usuário; TTF convertidos sem alterar o cmap; metadados/variações preservados em WOFF",
+  "faces": [
+    {
+      "family": "Fraunces",
+      "inputFile": "Fraunces.ttf",
+      "inputSha256": "177ff6c0f14e5550a3c624247cd1189611d4eb65d000b14944c63d967958abbb",
+      "file": "Fraunces.woff",
+      "sha256": "6254cabfbc85ea83ab309225a7a51ecbf05529ff9a73d48a656401df66f8bccd",
+      "license": "OFL-1.1",
+      "weight": "100 900",
+      "style": "normal"
+    },
+    {
+      "family": "Fraunces",
+      "inputFile": "Fraunces-Italic.ttf",
+      "inputSha256": "b24448c43702fac4ee856781d461a0dfba8d8e594b6e8e190234b75fed2c0e01",
+      "file": "Fraunces-Italic.woff",
+      "sha256": "49c68989867a0285aeef08235fd1c4e0780bfd26a19c7421455cacfc23d868b2",
+      "license": "OFL-1.1",
+      "weight": "100 900",
+      "style": "italic"
+    },
+    {
+      "family": "Source Serif 4",
+      "inputFile": "SourceSerif4.ttf",
+      "inputSha256": "97b2d4da6e3cb494b5a1e66ae176914d852ccabef49e0c02c0df25f3e39aca0b",
+      "file": "SourceSerif4.woff",
+      "sha256": "c2ea1b19b1756345c925a6f69758963ebbc733cabb458eaaf07ad2390e172e61",
+      "license": "OFL-1.1",
+      "weight": "200 900",
+      "style": "normal"
+    },
+    {
+      "family": "Source Serif 4",
+      "inputFile": "SourceSerif4-Italic.ttf",
+      "inputSha256": "15fbc7e4679489a501998c3669272637a6646388ef7e4bd77eebb5bf967a1f42",
+      "file": "SourceSerif4-Italic.woff",
+      "sha256": "fdaade4acc19ea9daec6303446fbb1e5d6226048176483b2422ec6599ad41036",
+      "license": "OFL-1.1",
+      "weight": "200 900",
+      "style": "italic"
+    },
+    {
+      "family": "Inter Tight",
+      "inputFile": "InterTight.ttf",
+      "inputSha256": "b81b73dcb64df3c230cabade7df6c5773bf863233f24c9ee51087519f1f88b6f",
+      "file": "InterTight.woff",
+      "sha256": "38592b7100409686b1753f79cbb69d1c1ea0df1551299f0c589341fe9341905b",
+      "license": "OFL-1.1",
+      "weight": "100 900",
+      "style": "normal"
+    },
+    {
+      "family": "Inter",
+      "inputFile": "Inter.ttf",
+      "inputSha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031",
+      "file": "Inter.woff",
+      "sha256": "ca87ab93c6b4f5fcbbe4eb49459f7413834f89a916727da1e9d6801588f897a8",
+      "license": "OFL-1.1",
+      "weight": "100 900",
+      "style": "normal"
+    },
+    {
+      "family": "Archivo",
+      "inputFile": "Archivo.ttf",
+      "inputSha256": "0e094a7d3c7c4c25cf1310c4b30014f1dae9332220b1c2c88f4fa996f0b05053",
+      "file": "Archivo.woff",
+      "sha256": "83a70a594ff0e130fb00017336d3107f434d4cc93dbe1c7b7fd691ab8fd88901",
+      "license": "OFL-1.1",
+      "weight": "100 900",
+      "style": "normal"
+    },
+    {
+      "family": "Barlow Condensed",
+      "inputFile": "BarlowCondensed-Medium.ttf",
+      "inputSha256": "262bd143292ce479ee0cd09a42b47ab173fca8e9c6eb5ed0b5c8a845bc371d17",
+      "file": "BarlowCondensed-Medium.woff",
+      "sha256": "33892f2f522d80fc526258593fce363a3d5cf5fdb64e69f7888fdac285d1250a",
+      "license": "OFL-1.1",
+      "weight": "500",
+      "style": "normal"
+    },
+    {
+      "family": "Barlow Condensed",
+      "inputFile": "BarlowCondensed-SemiBold.ttf",
+      "inputSha256": "7b619d14bc2327509a9ef32b0890f709626f7ecc9ff61191c2a4314c5499d2d9",
+      "file": "BarlowCondensed-SemiBold.woff",
+      "sha256": "e1bbefe340238cb0538c299616b219be05531d812a64f4f58a5839917875e25c",
+      "license": "OFL-1.1",
+      "weight": "600",
+      "style": "normal"
+    },
+    {
+      "family": "Barlow",
+      "inputFile": "Barlow-Regular.ttf",
+      "inputSha256": "95aa02c7c43096e0dd44d787ba6216864a67157e402adab59b35572e0c1577ea",
+      "file": "Barlow-Regular.woff",
+      "sha256": "079926acbf0f04a8270b38f9f8933b9366b18cc00b70ddefd7c737b10b02aa3d",
+      "license": "OFL-1.1",
+      "weight": "400",
+      "style": "normal"
+    },
+    {
+      "family": "Barlow",
+      "inputFile": "Barlow-Medium.ttf",
+      "inputSha256": "f8906f762cb73dca441da034bc363b2d8e2e68bc10d5c05e58717646c20cc4b4",
+      "file": "Barlow-Medium.woff",
+      "sha256": "4560e5a0ad924ef7bbc1f73cddb78c8cce9812de6612cabf8205217b4aa336c4",
+      "license": "OFL-1.1",
+      "weight": "500",
+      "style": "normal"
+    },
+    {
+      "family": "Bodoni Moda",
+      "inputFile": "BodoniModa.ttf",
+      "inputSha256": "550f5e34ee0a828d7941b1fe9bc58b34e5260d3f33a61532e6d0a0114e79a5cf",
+      "file": "BodoniModa.woff",
+      "sha256": "2af4c1783479d73b0041117bcec690e18cf52ea0de391fc3f1987c571d74adf0",
+      "license": "OFL-1.1",
+      "weight": "400 900",
+      "style": "normal"
+    },
+    {
+      "family": "Bodoni Moda",
+      "inputFile": "BodoniModa-Italic.ttf",
+      "inputSha256": "dfff1619f8f6871c6372f8855b67211f9a73b4e93d45aca868cd8f46a48622de",
+      "file": "BodoniModa-Italic.woff",
+      "sha256": "bd1b80a8ddb13edb69b80492661917771b6b0583392d7eb1a594154c43b60c0c",
+      "license": "OFL-1.1",
+      "weight": "400 900",
+      "style": "italic"
+    },
+    {
+      "family": "Jost",
+      "inputFile": "Jost.ttf",
+      "inputSha256": "6343b70971000b04c5d401c96ae08ce371086135e999d5e1e1413039c0213076",
+      "file": "Jost.woff",
+      "sha256": "c1a9a84a25be2e06e3941b0a2af8519a35b38a33790168c64e7ff1055bac52cc",
+      "license": "OFL-1.1",
+      "weight": "100 900",
+      "style": "normal"
+    },
+    {
+      "family": "Anton",
+      "inputFile": "Anton-Regular.ttf",
+      "inputSha256": "a4ba3a92350ebb031da0cb47630ac49eb265082ca1bc0450442f4a83ab947cab",
+      "file": "Anton-Regular.woff",
+      "sha256": "695ded0d595507fc1844a5a05d28d1f62c343cd090e115cd535b9604fccde3ca",
+      "license": "OFL-1.1",
+      "weight": "400",
+      "style": "normal"
+    },
+    {
+      "family": "Space Grotesk",
+      "inputFile": "SpaceGrotesk.ttf",
+      "inputSha256": "acad6de1fc93436f5c0f1f4137751ef04f1aea3063e7036535970ffcfbd79f72",
+      "file": "SpaceGrotesk.woff",
+      "sha256": "fead310dcf7c95708adfb783822e0c3250810ba08d926a3c5eb1c62ca26ac96c",
+      "license": "OFL-1.1",
+      "weight": "300 700",
+      "style": "normal"
+    },
+    {
+      "family": "Syne",
+      "inputFile": "Syne.ttf",
+      "inputSha256": "ce5ac77142a65cab2248a1a2ebb740b1d4d9c20b52488877d3ff664d1356104a",
+      "file": "Syne.woff",
+      "sha256": "32d55064d731eea5d6291c2b11845435d4aa2c012ed4fd8c7c4934b6a2e83b57",
+      "license": "OFL-1.1",
+      "weight": "400 800",
+      "style": "normal"
+    },
+    {
+      "family": "DM Sans",
+      "inputFile": "DMSans.ttf",
+      "inputSha256": "8cd08d97e89c24d0aa92edd2f0f4c8ee6195eee9b7c9f154865a58b02f0c1c0d",
+      "file": "DMSans.woff",
+      "sha256": "cf8e2093d19280814ff449afedf6c59f120775997f251a2301d99118f014d3e5",
+      "license": "OFL-1.1",
+      "weight": "100 1000",
+      "style": "normal"
+    },
+    {
+      "family": "IBM Plex Sans",
+      "inputFile": "IBMPlexSans.ttf",
+      "inputSha256": "3b031aa4216174205bd8471f88a49b91f093169e9e87bd5262242bc5967fe2e3",
+      "file": "IBMPlexSans.woff",
+      "sha256": "442009ee40e295ed215614b4c8e1c25429a67eae45b4a46b70155614444ae3da",
+      "license": "OFL-1.1",
+      "weight": "100 700",
+      "style": "normal"
+    },
+    {
+      "family": "IBM Plex Mono",
+      "inputFile": "IBMPlexMono-Regular.ttf",
+      "inputSha256": "6a3412f058c7d8dfd9170c41e85ade48e5156ecb89356110ca57a0a27734af46",
+      "file": "IBMPlexMono-Regular.woff",
+      "sha256": "82cc8aebb94cbf2862b56cada7e05e71df29eef32dc356d1f45c84075a4eec64",
+      "license": "OFL-1.1",
+      "weight": "400",
+      "style": "normal"
+    },
+    {
+      "family": "IBM Plex Mono",
+      "inputFile": "IBMPlexMono-Medium.ttf",
+      "inputSha256": "a9b4c49bb299e05b5f6c481e7fb5e78943d2793249a0c8874ab574a2d1ea6755",
+      "file": "IBMPlexMono-Medium.woff",
+      "sha256": "c3cd7ef6e90992afef72f2a033c1de80d34258f78281340fea555cd4874f4c08",
+      "license": "OFL-1.1",
+      "weight": "500",
+      "style": "normal"
+    },
+    {
+      "family": "Instrument Serif",
+      "inputFile": "InstrumentSerif-Regular.ttf",
+      "inputSha256": "498efd461f6ddfcb7a111bf9a565709d2085d48201d501ead960d93e84ffbb88",
+      "file": "InstrumentSerif-Regular.woff",
+      "sha256": "4c396be581aec455989e9ee51d6e6aed595234a4f960180161a709454567b747",
+      "license": "OFL-1.1",
+      "weight": "400",
+      "style": "normal"
+    },
+    {
+      "family": "Instrument Serif",
+      "inputFile": "InstrumentSerif-Italic.ttf",
+      "inputSha256": "08939b8bdf534afec24ae0ef5e03f948940cd9a8fe08e7fecbad040e62327385",
+      "file": "InstrumentSerif-Italic.woff",
+      "sha256": "4556dcd8fe74d6dd311566187b439d85509725bec15a0a2954cc717715ab0420",
+      "license": "OFL-1.1",
+      "weight": "400",
+      "style": "italic"
+    },
+    {
+      "family": "Instrument Sans",
+      "inputFile": "InstrumentSans.ttf",
+      "inputSha256": "b24f1812584816958afcf22e22d08e44318c5e51651e25d2438efdde389b33b1",
+      "file": "InstrumentSans.woff",
+      "sha256": "2b08ded5e8ea74cd23e94e9fd3875439efc54f149a33e8b40cde5e22caee497a",
+      "license": "OFL-1.1",
+      "weight": "400 700",
+      "style": "normal"
+    },
+    {
+      "family": "Plus Jakarta Sans",
+      "inputFile": "PlusJakartaSans.ttf",
+      "inputSha256": "89b3fb38aa0d275d7a731d0d817a4f1622b316b4d7fbdedcf02ee9099ff68bc8",
+      "file": "PlusJakartaSans.woff",
+      "sha256": "d2e3fb2d13577871383a06a6fe156fe9c068104d34ef40f37bea10901935b399",
+      "license": "OFL-1.1",
+      "weight": "200 800",
+      "style": "normal"
+    }
+  ]
+}

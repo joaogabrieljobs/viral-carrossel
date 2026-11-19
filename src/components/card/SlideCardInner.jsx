@@ -589,8 +589,17 @@ const normalizeSlideImgMode = (m) => {
 function slideStoredPresentationCssFilter(slide) {
   if (!slide?.bgImage) return undefined;
   const n = normalizePresentationImgAdjust(slide.presentationImgAdjust);
-  if (presentationAdjustIsNeutral(n)) return undefined;
+  // Ajuste manual da foto sempre vence; sem ajuste, vale o tratamento da
+  // família (ex.: P&B de alto contraste no Suíço). Mesmo filtro na exportação.
+  if (presentationAdjustIsNeutral(n)) return presentationFamilyPhotoFilter(slide);
   return buildPresentationImageFilter(n);
+}
+
+/** Tratamento fotográfico da família: só uma lista fechada de funções CSS. */
+function presentationFamilyPhotoFilter(slide) {
+  const value = String(slide?.presentationPhotoTreatment || '').trim();
+  if (!value || slide?.presentationArtDirectionVersion !== 2) return undefined;
+  return /^((grayscale|sepia|saturate|contrast|brightness)\(\d*\.?\d+\)\s*)+$/.test(value) ? value : undefined;
 }
 
 function cultureResolveSurface(slide, num) {
@@ -840,6 +849,8 @@ const ClassicCanvasInner = React.forwardRef(({
     zIndex: 2,
     overflow: 'hidden',
     position: 'relative',
+    ...(slide.presentationArtDirectionVersion === 2 && Number(slide.presentationPhotoRadius) > 0
+      ? { borderRadius: Math.min(64, Number(slide.presentationPhotoRadius)) * f.w / (f.h > f.w ? 1080 : 1920) } : {}),
     ...vcPresentationEvidenceGlassStyle(slide, f),
   };
   const photoZoneChildren = (
@@ -925,7 +936,7 @@ const ClassicCanvasInner = React.forwardRef(({
       style={{ width:f.w, height:f.h, background:bg, position:'relative', overflow:'hidden', fontFamily: bodyFF }}
     >
       <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
-      <PresentationArtChrome slide={slide} frame={f} accent={brand.accent} ink={titleInk} />
+      <PresentationArtChrome slide={slide} frame={f} accent={brand.accent} ink={titleInk} index={num - 1} total={total} />
       {!slide.presentationSuppressPhoto && <div
         {...movOu('photo', photoZoneBoxStyle)}
         data-vc-photo-zone="1"
@@ -1166,6 +1177,7 @@ const ClassicCanvasInner = React.forwardRef(({
       </OverflowScaler>
 
       {nativeEvidence && zcv.evidence && <PresentationBlocks
+        artDirectionVersion={slide.presentationArtDirectionVersion || 1}
         blocks={slide.presentationBlocks}
         rect={zcv.evidence}
         frame={f}
@@ -2149,7 +2161,7 @@ const SlideCardInner = React.forwardRef(({
           }, brand, slide, hideInstaBadge);
           const hasHeaderBar = !!(hLeft || hRight) || (!!hCenter && !!(brand.cultureHeaderLeft || '').trim());
           const hasPageBadge = !!brand.showPageBadge;
-          const quietFolio = presentationMode && slide.presentationArtDirectionVersion === 1 && footerChromeReservePx(brand, f) === 0;
+          const quietFolio = presentationMode && [1, 2].includes(slide.presentationArtDirectionVersion) && footerChromeReservePx(brand, f) === 0;
           const folioOnRight = (slide.canvas?.zones?.title?.x || 0) > 40;
           if (!hasHeaderBar && !hasPageBadge) return null;
           // Cor branca translúcida quando há foto BG; senão tom da marca.

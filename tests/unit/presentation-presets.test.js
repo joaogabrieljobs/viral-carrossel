@@ -53,7 +53,7 @@ describe('padrões visuais de apresentação', () => {
     expect(DEFAULT_PRESENTATION_VISUAL_PRESET_ID).toBe('presentation_executive_minimal');
     expect(normalizePresentationVisualPreset('Pitch')).toBe('presentation_premium_dark');
     expect(normalizePresentationVisualPreset('estudo de caso')).toBe('presentation_photo_essay');
-    expect(normalizePresentationVisualPreset({ id: 'manifesto' })).toBe('presentation_cinematic');
+    expect(normalizePresentationVisualPreset({ id: 'manifesto' })).toBe('presentation_typographic_bold');
     expect(normalizePresentationVisualPreset('pds.executive-minimal')).toBe('presentation_executive_minimal');
     expect(normalizePresentationVisualPreset('presentation_pitch_dark')).toBe('presentation_pitch_dark');
     expect(normalizePresentationVisualPreset('nao-existe')).toBe(DEFAULT_PRESENTATION_VISUAL_PRESET_ID);
@@ -234,24 +234,24 @@ describe('padrões visuais de apresentação', () => {
   it('leva limites compactos do padrão escolhido para a geração de texto', () => {
     const block = buildPresentationDesignSystemPromptBlock('pds.cinematic');
     expect(block).toMatch(/CINEMÁTICO/i);
-    expect(block).toMatch(/title: até \d+ caracteres/i);
-    expect(block).toMatch(/nunca comprima tudo em uma caixa/i);
+    expect(block).toMatch(/Títulos têm até 90 caracteres/i);
+    expect(block).toContain('não corte frases ou qualificadores');
     expect(block).toMatch(/imageQuery/i);
-    expect(block).toMatch(/limites obrigatórios da composição escolhida/i);
+    expect(block).toMatch(/limites obrigatórios por slide/i);
     expect(buildPresentationDesignSystemPromptBlock('presentation_keynote')).toBe('');
   });
 
   it('leva os limites reais de capa e conteúdo do Premium para o prompt', () => {
     const block = buildPresentationDesignSystemPromptBlock('pds.premium-dark');
-    expect(block).toMatch(/capa: title ≤50 caracteres\/2 linhas; subtitle ≤40 caracteres\/1 linhas/i);
-    expect(block).toMatch(/conteúdo: title ≤60 caracteres\/1 linhas; subtitle ≤40 caracteres\/1 linhas/i);
+    expect(block).toContain('limites obrigatórios por slide');
+    expect(block).not.toContain('subtitle ≤40');
 
     const cover = getPresentationCompositionOverrides('presentation_premium_dark', {
       stage: { visualRole: 'cover' }, index: 0, count: 6,
     });
     expect(cover.presentationTextLimits).toMatchObject({
-      title: { maxChars: 50, maxLines: 2, role: 'display' },
-      subtitle: { maxChars: 40, maxLines: 1, role: 'subtitle' },
+      title: { maxChars: 90, maxLines: 3 },
+      subtitle: { maxChars: 180, maxLines: 6 },
     });
   });
 
@@ -283,6 +283,6 @@ describe('padrões visuais de apresentação', () => {
     }).presentationRequiresImage).toBe(false);
     expect(getPresentationCompositionOverrides('presentation_photo_essay', {
       stage: { visualRole: 'context' }, index: 0, count: 6,
-    }).presentationRequiresImage).toBe(true);
+    }).presentationRequiresImage).toBe(false);
   });
 });

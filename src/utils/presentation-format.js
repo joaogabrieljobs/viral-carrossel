@@ -1,5 +1,57 @@
 import { FORMATS } from './formats.js';
 import { normalizePresentationBlocks } from './presentation-quality.js';
+import { familyLayout, normalizeFamilyKey } from './presentation-families.js';
+import { familyPresentationFields } from './presentation-composition.js';
+
+/**
+ * Recomposição 4:5 pela família: a página é redesenhada para o formato
+ * vertical (foto ganha altura, evidência ocupa a largura, título muda de
+ * lugar conforme a família) em vez de ser o slide reduzido com a foto atrás.
+ * Nenhum texto é cortado; o autofit reduz em passos e, no piso, a revisão
+ * pede divisão em outra página.
+ */
+export function familyCarouselAdaptation(source) {
+  if (source?.presentationArtDirectionVersion !== 2 || !source.presentationDesignFamily) return null;
+  const family = normalizeFamilyKey(source.presentationDesignFamily);
+  const kind = ['cover', 'divider', 'content', 'demo', 'data', 'closing'].includes(source.presentationComposition)
+    ? source.presentationComposition : 'content';
+  const structured = normalizePresentationBlocks(source.presentationBlocks).length > 0;
+  const photo = !!(source.bgImage || source.bgImageId || source.bgImageAssetId) && !source.presentationSuppressPhoto;
+  const layout = familyLayout(family, kind, { format: '4:5', photo, structured, title: source.title });
+  const { typography, ...fields } = familyPresentationFields(layout, { format: '4:5' });
+  return {
+    ...source,
+    ...fields,
+    presentationComposition: 'social-format',
+    presentationSourceComposition: kind,
+    formatAdaptedFrom: 'apresentacao',
+    photoRegion: 'full', bgFit: 'cover', photoFraming: 'auto', bgZoom: 100, bgOpacity: 100,
+    textBg: false, textInset: 0,
+    bodyAfterSize: Math.round((Math.max(24, layout.bodyPx * 0.86) / (1080 * 0.018)) * 100),
+    presentationSuppressPhoto: !layout.photo,
+    presentationRequiresImage: false,
+    presentationGlass: null,
+    presentationAutofit: { enabled: true, minScale: 0.7 },
+    elementOffsets: {},
+    logoPosition: 'tl', logoSize: 160,
+    presentationTypographyByComposition: {
+      ...source.presentationTypographyByComposition,
+      'social-format': {
+        title: { ...typography.title, sizePercent: fields.titleSize },
+        subtitle: { ...typography.subtitle, sizePercent: fields.subSize },
+      },
+    },
+    canvas: {
+      enabled: false, applied: true, variant: 'classic',
+      source: 'presentation-format', preserveZones: true,
+      zones: {
+        title: layout.title, subtitle: layout.subtitle,
+        photo: layout.photo || { x: 96, y: 94, w: 1, h: 1 },
+        ...(layout.evidence ? { evidence: layout.evidence } : {}),
+      },
+    },
+  };
+}
 
 export function hasPresentationDesign(slide, creativePreset) {
   return creativePreset === 'apresentacao'
@@ -19,6 +71,10 @@ function linesFor(text, width, fontSize) {
  * para a proporção de destino, nunca uma transformação do conteúdo original.
  */
 export function presentationForSocialFormat(source, fmt) {
+  if (fmt === 'carrossel') {
+    const recomposed = familyCarouselAdaptation(source);
+    if (recomposed) return recomposed;
+  }
   const { w, h, bottomSafePct } = FORMATS[fmt];
   const hasPhoto = !!(source.bgImage || source.bgImageId || source.bgImageAssetId);
   const square = fmt === 'quadrado';

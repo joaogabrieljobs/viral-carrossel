@@ -2,9 +2,9 @@
   "$schema": "./presentation-design-system.schema.json",
   "name": "Presentation Design System",
   "productType": "presentation",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "locale": "pt-BR",
-  "generatedAt": "2026-10-07",
+  "generatedAt": "2026-11-19",
   "canvas": {
     "width": 1920,
     "height": 1080,
@@ -145,9 +145,9 @@
   "patterns": [
     {
       "id": "pds.executive-minimal",
-      "name": "Executivo Minimalista",
+      "name": "Executivo sofisticado",
       "category": "corporate",
-      "description": "Clareza de board room: fundo claro, muito respiro, um ponto de cor e títulos de ação (a conclusão vai no título). Hierarquia por peso e posição, nunca por ornamento.",
+      "description": "Sala de conselho: títulos-conclusão, grade rigorosa, um ponto de cor e dados legíveis a distância.",
       "useCases": [
         "Reunião de board e QBR",
         "Relatório para C-level",
@@ -165,18 +165,18 @@
         "bestFor": "Decisão executiva e relatórios para liderança"
       },
       "palette": {
-        "background": "#FAFAF8",
+        "background": "#F7F7F5",
         "surface": "#FFFFFF",
-        "surfaceAlt": "#F0F1EE",
-        "primary": "#1B2B48",
-        "secondary": "#4A5568",
-        "accent": "#2563EB",
-        "textPrimary": "#14161A",
-        "textSecondary": "#4A4F57",
-        "textMuted": "#6B7079",
-        "textOnPrimary": "#FFFFFF",
-        "border": "#DADCD6",
-        "divider": "#E6E7E3",
+        "surfaceAlt": "#0F1A2E",
+        "primary": "#101418",
+        "secondary": "#4B525C",
+        "accent": "#1F4FD8",
+        "textPrimary": "#101418",
+        "textSecondary": "#4B525C",
+        "textMuted": "#4B525C",
+        "textOnPrimary": "#F7F7F5",
+        "border": "#C9CDD3",
+        "divider": "#D5D8DD",
         "semantic": {
           "positive": "#15803D",
           "negative": "#B91C1C",
@@ -213,37 +213,41 @@
         "title": {
           "family": "Inter Tight",
           "weight": 600,
-          "fallback": "Arial, sans-serif",
+          "fallback": "sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400..700&display=swap",
-          "letterSpacing": "-0.02em",
+          "href": "https://fonts.google.com/specimen/Inter+Tight",
+          "letterSpacing": "-0.024em",
+          "license": "SIL Open Font License 1.1",
           "case": "sentence"
         },
         "subtitle": {
           "family": "Inter",
-          "weight": 500,
-          "fallback": "Arial, sans-serif",
+          "weight": 400,
+          "fallback": "sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap",
-          "letterSpacing": "0",
+          "href": "https://fonts.google.com/specimen/Inter",
+          "letterSpacing": "-0.004em",
+          "license": "SIL Open Font License 1.1",
           "case": "sentence"
         },
         "body": {
           "family": "Inter",
           "weight": 400,
-          "fallback": "Arial, sans-serif",
+          "fallback": "sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap",
-          "letterSpacing": "0"
+          "href": "https://fonts.google.com/specimen/Inter",
+          "letterSpacing": "-0.004em",
+          "license": "SIL Open Font License 1.1"
         },
         "label": {
           "family": "Inter",
-          "weight": 600,
-          "fallback": "Arial, sans-serif",
+          "weight": 500,
+          "fallback": "sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap",
-          "letterSpacing": "0.08em",
-          "case": "uppercase"
+          "href": "https://fonts.google.com/specimen/Inter",
+          "letterSpacing": "-0.004em",
+          "license": "SIL Open Font License 1.1",
+          "case": "sentence"
         },
         "scale": {
           "display": {
@@ -292,8 +296,17 @@
             "size": 96,
             "min": 72,
             "max": 120,
-            "lineHeight": 1.0
+            "lineHeight": 1
           }
+        },
+        "numeric": {
+          "family": "Inter Tight",
+          "weight": 600,
+          "fallback": "sans-serif",
+          "source": "google-fonts",
+          "license": "SIL Open Font License 1.1",
+          "href": "https://fonts.google.com/specimen/Inter+Tight",
+          "letterSpacing": "-0.024em"
         }
       },
       "grid": {
@@ -341,13 +354,13 @@
         "minTouchGap": 24
       },
       "imagery": {
-        "style": "fotografia corporativa sóbria ou screenshots",
+        "style": "Ambientes de trabalho reais, arquitetura corporativa e detalhes de operação. Luz difusa de janela, paleta fria e neutra, sem pose de banco de imagens. Enquadramentos amplos com linhas retas.",
         "fit": {
           "photo": "cover",
           "screenshot": "contain"
         },
         "radius": 0,
-        "filters": "nenhum; opcional dessaturar 20%",
+        "filters": "saturate(0.85) contrast(1.03)",
         "overlay": null,
         "placement": "metade direita (split) ou bloco alinhado ao grid",
         "captions": "22px, textMuted, abaixo da imagem",
@@ -1465,13 +1478,15 @@
         ],
         "forkBehavior": "saveAs cria novo id 'pds.<slug>' com extends apontando para este id; override parcial por JSON merge patch",
         "extends": null
-      }
+      },
+      "familyKey": "executive",
+      "graphicLanguage": "Barra de acento curta acima do título, fio de rodapé, números tabulares e fundo escuro nas aberturas de seção e na decisão final."
     },
     {
       "id": "pds.editorial-magazine",
-      "name": "Editorial Magazine",
+      "name": "Editorial contemporâneo",
       "category": "editorial",
-      "description": "Linguagem de revista impressa: serifa de display, colunas de texto, capitulares, fios pretos, fólio e legendas com crédito. O slide é lido como uma página dupla.",
+      "description": "Revista de cultura: serifa expressiva, colunas, fios finos e fotografia com legenda.",
       "useCases": [
         "Relatório de tendências",
         "Brand book e storytelling de marca",
@@ -1489,18 +1504,18 @@
         "bestFor": "Narrativas longas e relatórios de tendência"
       },
       "palette": {
-        "background": "#F5F0E6",
-        "surface": "#FBF8F2",
-        "surfaceAlt": "#EAE2D3",
-        "primary": "#1C1A17",
-        "secondary": "#6B5E4F",
-        "accent": "#B3261E",
-        "textPrimary": "#1C1A17",
-        "textSecondary": "#4D443A",
-        "textMuted": "#6B5E4F",
-        "textOnPrimary": "#F5F0E6",
-        "border": "#1C1A17",
-        "divider": "#CFC4B2",
+        "background": "#F3EEE6",
+        "surface": "#EAE3D7",
+        "surfaceAlt": "#1B1916",
+        "primary": "#1B1916",
+        "secondary": "#5C554D",
+        "accent": "#A8321E",
+        "textPrimary": "#1B1916",
+        "textSecondary": "#5C554D",
+        "textMuted": "#5C554D",
+        "textOnPrimary": "#F3EEE6",
+        "border": "#1B1916",
+        "divider": "#C9BBA4",
         "semantic": {
           "positive": "#3F6B3A",
           "negative": "#B3261E",
@@ -1535,39 +1550,44 @@
       },
       "typography": {
         "title": {
-          "family": "Playfair Display",
-          "weight": 700,
+          "family": "Fraunces",
+          "weight": 380,
           "fallback": "Georgia, serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap",
-          "letterSpacing": "-0.01em",
-          "case": "sentence",
-          "italicAllowed": true
+          "href": "https://fonts.google.com/specimen/Fraunces",
+          "letterSpacing": "-0.022000000000000002em",
+          "italicAllowed": true,
+          "license": "SIL Open Font License 1.1",
+          "case": "sentence"
         },
         "subtitle": {
-          "family": "Libre Franklin",
-          "weight": 600,
-          "fallback": "Arial, sans-serif",
+          "family": "Source Serif 4",
+          "weight": 400,
+          "fallback": "serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400..700&display=swap",
-          "letterSpacing": "0.14em",
-          "case": "uppercase"
+          "href": "https://fonts.google.com/specimen/Source+Serif+4",
+          "letterSpacing": "0em",
+          "license": "SIL Open Font License 1.1",
+          "case": "sentence"
         },
         "body": {
           "family": "Source Serif 4",
           "weight": 400,
-          "fallback": "Georgia, serif",
+          "fallback": "serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300..700;1,8..60,300..700&display=swap"
+          "href": "https://fonts.google.com/specimen/Source+Serif+4",
+          "license": "SIL Open Font License 1.1",
+          "letterSpacing": "0em"
         },
         "label": {
-          "family": "Libre Franklin",
+          "family": "Source Serif 4",
           "weight": 500,
-          "fallback": "Arial, sans-serif",
+          "fallback": "serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400..700&display=swap",
-          "letterSpacing": "0.1em",
-          "case": "uppercase"
+          "href": "https://fonts.google.com/specimen/Source+Serif+4",
+          "letterSpacing": "0em",
+          "license": "SIL Open Font License 1.1",
+          "case": "sentence"
         },
         "scale": {
           "display": {
@@ -1622,8 +1642,17 @@
             "size": 18,
             "min": 18,
             "max": 20,
-            "lineHeight": 1.0
+            "lineHeight": 1
           }
+        },
+        "numeric": {
+          "family": "Fraunces",
+          "weight": 380,
+          "fallback": "Georgia, serif",
+          "source": "google-fonts",
+          "license": "SIL Open Font License 1.1",
+          "href": "https://fonts.google.com/specimen/Fraunces",
+          "letterSpacing": "-0.022000000000000002em"
         }
       },
       "grid": {
@@ -1683,12 +1712,12 @@
         }
       },
       "imagery": {
-        "style": "fotografia editorial, retratos e still life com luz natural",
+        "style": "Arquitetura, interiores e retratos ambientados. Luz natural lateral, sombras macias, tons de papel e terra. Recortes verticais com o assunto num terço; espaço negativo de parede ou céu para respirar ao lado do texto.",
         "fit": {
           "photo": "cover"
         },
         "radius": 0,
-        "filters": "leve aquecimento (+5 temperatura); P&B permitido para retratos",
+        "filters": "saturate(0.9) contrast(1.03) sepia(0.06)",
         "overlay": null,
         "placement": "sangria total, página inteira ou coluna",
         "captions": "obrigatórias: legenda 20px + crédito em label (FOTO: NOME)",
@@ -2730,13 +2759,15 @@
         ],
         "forkBehavior": "saveAs cria novo id 'pds.<slug>' com extends apontando para este id; override parcial por JSON merge patch",
         "extends": null
-      }
+      },
+      "familyKey": "editorial",
+      "graphicLanguage": "Fio fino no topo como cabeçalho de revista, fio vertical entre colunas, numeral em itálico na abertura de seção, aspas de abertura nas citações."
     },
     {
       "id": "pds.data-first",
-      "name": "Data First",
+      "name": "Cultural e artístico",
       "category": "analytics",
-      "description": "O gráfico é o herói. Faixa de cabeçalho com título-insight, grid modular de dashboard 12×6, números tabulares em mono e paleta de dados acessível. Texto existe para explicar o dado.",
+      "description": "Colagem controlada: recortes, blocos de cor deslocados, fita adesiva e formas simples — sempre com uma área limpa para ler.",
       "useCases": [
         "Review de métricas e performance",
         "Relatório de pesquisa quantitativa",
@@ -2754,18 +2785,18 @@
         "bestFor": "Análises, KPIs e relatórios quantitativos"
       },
       "palette": {
-        "background": "#F6F7F9",
-        "surface": "#FFFFFF",
-        "surfaceAlt": "#EDF0F4",
-        "primary": "#0E1726",
-        "secondary": "#475467",
-        "accent": "#2563EB",
-        "textPrimary": "#0E1726",
-        "textSecondary": "#475467",
-        "textMuted": "#667085",
-        "textOnPrimary": "#FFFFFF",
-        "border": "#E3E7ED",
-        "divider": "#EDF0F4",
+        "background": "#EFE7DA",
+        "surface": "#E5DACA",
+        "surfaceAlt": "#2B4BFF",
+        "primary": "#1C1A17",
+        "secondary": "#575148",
+        "accent": "#2B4BFF",
+        "textPrimary": "#1C1A17",
+        "textSecondary": "#575148",
+        "textMuted": "#575148",
+        "textOnPrimary": "#F7F2EA",
+        "border": "#1C1A17",
+        "divider": "#F2C14E",
         "gridline": "#E3E7ED",
         "semantic": {
           "positive": "#047857",
@@ -2803,36 +2834,43 @@
       },
       "typography": {
         "title": {
-          "family": "IBM Plex Sans",
-          "weight": 600,
+          "family": "Syne",
+          "weight": 700,
           "fallback": "Arial, sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400..700&display=swap",
-          "letterSpacing": "-0.01em",
+          "href": "https://fonts.google.com/specimen/Syne",
+          "letterSpacing": "-0.026000000000000002em",
+          "license": "SIL Open Font License 1.1",
           "case": "sentence"
         },
         "subtitle": {
-          "family": "IBM Plex Sans Condensed",
-          "weight": 500,
-          "fallback": "Arial Narrow, sans-serif",
-          "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@400..700&display=swap",
-          "case": "sentence"
-        },
-        "body": {
-          "family": "IBM Plex Sans",
+          "family": "DM Sans",
           "weight": 400,
           "fallback": "Arial, sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400..700&display=swap"
+          "href": "https://fonts.google.com/specimen/DM+Sans",
+          "license": "SIL Open Font License 1.1",
+          "letterSpacing": "-0.002em",
+          "case": "sentence"
+        },
+        "body": {
+          "family": "DM Sans",
+          "weight": 400,
+          "fallback": "Arial, sans-serif",
+          "source": "google-fonts",
+          "href": "https://fonts.google.com/specimen/DM+Sans",
+          "license": "SIL Open Font License 1.1",
+          "letterSpacing": "-0.002em"
         },
         "numeric": {
-          "family": "IBM Plex Mono",
-          "weight": 500,
-          "fallback": "monospace",
+          "family": "Syne",
+          "weight": 700,
+          "fallback": "Arial, sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400..700&display=swap",
-          "fontVariant": "tabular-nums"
+          "href": "https://fonts.google.com/specimen/Syne",
+          "fontVariant": "tabular-nums",
+          "license": "SIL Open Font License 1.1",
+          "letterSpacing": "-0.026000000000000002em"
         },
         "scale": {
           "h1": {
@@ -2857,13 +2895,13 @@
             "size": 88,
             "min": 64,
             "max": 104,
-            "lineHeight": 1.0
+            "lineHeight": 1
           },
           "kpiSmall": {
             "size": 48,
             "min": 40,
             "max": 56,
-            "lineHeight": 1.0
+            "lineHeight": 1
           },
           "axis": {
             "size": 20,
@@ -2883,6 +2921,16 @@
             "max": 20,
             "lineHeight": 1.3
           }
+        },
+        "label": {
+          "family": "DM Sans",
+          "weight": 500,
+          "fallback": "Arial, sans-serif",
+          "source": "google-fonts",
+          "license": "SIL Open Font License 1.1",
+          "href": "https://fonts.google.com/specimen/DM+Sans",
+          "letterSpacing": "-0.002em",
+          "case": "sentence"
         }
       },
       "grid": {
@@ -2960,12 +3008,12 @@
         }
       },
       "imagery": {
-        "style": "apenas screenshots de produto e prints de dashboards",
+        "style": "Obras, cartazes, performances, ateliês e objetos culturais, em preto e branco para receber cor por sobreposição. Recortes de figura com contorno limpo; texturas de papel e tinta.",
         "fit": {
           "screenshot": "contain"
         },
-        "radius": 8,
-        "filters": null,
+        "radius": 0,
+        "filters": "grayscale(1) contrast(1.18) brightness(1.03)",
         "overlay": null,
         "placement": "dentro de card com fundo surfaceAlt e anotações numeradas",
         "captions": "callouts numerados ①②③",
@@ -4218,13 +4266,15 @@
         ],
         "forkBehavior": "saveAs cria novo id 'pds.<slug>' com extends apontando para este id; override parcial por JSON merge patch",
         "extends": null
-      }
+      },
+      "familyKey": "cultural",
+      "graphicLanguage": "Bloco de cor deslocado atrás da foto, faixa de cor multiplicada sobre a imagem, fita adesiva, círculo e semicírculo como pontuação."
     },
     {
       "id": "pds.swiss-grid",
-      "name": "Swiss Grid",
+      "name": "Suíço contemporâneo",
       "category": "design",
-      "description": "Estilo Tipográfico Internacional: grid modular 8×6 visível na construção, alinhamento à esquerda com margem irregular, assimetria, sans grotesca, preto/branco e um vermelho funcional. Números e fios fortes fazem a estrutura.",
+      "description": "Grade assimétrica de 12 colunas, contraste extremo de escala, vermelho como gesto e espaço vazio estrutural.",
       "useCases": [
         "Portfólio de design/arquitetura",
         "Apresentação de estúdio e agência",
@@ -4242,19 +4292,19 @@
         "bestFor": "Design, arquitetura e marcas com rigor visual"
       },
       "palette": {
-        "background": "#F4F4F0",
-        "surface": "#FFFFFF",
-        "surfaceAlt": "#E4E4DE",
-        "primary": "#111111",
-        "secondary": "#5A5A5A",
-        "accent": "#E30613",
-        "textPrimary": "#111111",
-        "textSecondary": "#4A4A4A",
-        "textMuted": "#6A6A6A",
-        "textOnPrimary": "#F4F4F0",
+        "background": "#FFFFFF",
+        "surface": "#F1F1EF",
+        "surfaceAlt": "#E3001B",
+        "primary": "#0A0A0A",
+        "secondary": "#55554F",
+        "accent": "#E3001B",
+        "textPrimary": "#0A0A0A",
+        "textSecondary": "#55554F",
+        "textMuted": "#55554F",
+        "textOnPrimary": "#FFFFFF",
         "textOnAccent": "#FFFFFF",
-        "border": "#111111",
-        "divider": "#BDBDB6",
+        "border": "#0A0A0A",
+        "divider": "#DADAD5",
         "semantic": {
           "positive": "#111111",
           "negative": "#E30613",
@@ -4290,27 +4340,31 @@
         "title": {
           "family": "Archivo",
           "weight": 800,
-          "fallback": "Helvetica, Arial, sans-serif",
+          "fallback": "sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Archivo:wght@100..900&display=swap",
-          "letterSpacing": "-0.035em",
+          "href": "https://fonts.google.com/specimen/Archivo",
+          "letterSpacing": "-0.042em",
+          "license": "SIL Open Font License 1.1",
           "case": "sentence"
         },
         "subtitle": {
           "family": "Archivo",
-          "weight": 500,
-          "fallback": "Helvetica, Arial, sans-serif",
+          "weight": 400,
+          "fallback": "sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Archivo:wght@100..900&display=swap",
-          "letterSpacing": "-0.01em",
+          "href": "https://fonts.google.com/specimen/Archivo",
+          "letterSpacing": "-0.006em",
+          "license": "SIL Open Font License 1.1",
           "case": "sentence"
         },
         "body": {
-          "family": "Inter",
+          "family": "Archivo",
           "weight": 400,
-          "fallback": "Helvetica, Arial, sans-serif",
+          "fallback": "sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap"
+          "href": "https://fonts.google.com/specimen/Archivo",
+          "license": "SIL Open Font License 1.1",
+          "letterSpacing": "-0.006em"
         },
         "scale": {
           "index": {
@@ -4329,7 +4383,7 @@
             "size": 72,
             "min": 56,
             "max": 80,
-            "lineHeight": 1.0
+            "lineHeight": 1
           },
           "h2": {
             "size": 40,
@@ -4355,6 +4409,25 @@
             "max": 20,
             "lineHeight": 1.2
           }
+        },
+        "label": {
+          "family": "Archivo",
+          "weight": 500,
+          "fallback": "sans-serif",
+          "source": "google-fonts",
+          "license": "SIL Open Font License 1.1",
+          "href": "https://fonts.google.com/specimen/Archivo",
+          "letterSpacing": "-0.006em",
+          "case": "sentence"
+        },
+        "numeric": {
+          "family": "Archivo",
+          "weight": 800,
+          "fallback": "sans-serif",
+          "source": "google-fonts",
+          "license": "SIL Open Font License 1.1",
+          "href": "https://fonts.google.com/specimen/Archivo",
+          "letterSpacing": "-0.042em"
         }
       },
       "grid": {
@@ -4400,12 +4473,12 @@
         }
       },
       "imagery": {
-        "style": "fotografia objetiva de objeto/arquitetura; P&B por padrão",
+        "style": "Arquitetura, objetos e superfícies com geometria clara, em preto e branco de alto contraste. Ângulos frontais ou de 90°, sombras duras, muito céu ou parede lisa. Recorte quadrado ou em módulos da grade.",
         "fit": {
           "photo": "cover"
         },
         "radius": 0,
-        "filters": "grayscale(100%) padrão; cor apenas se a cor for o assunto",
+        "filters": "grayscale(1) contrast(1.12)",
         "overlay": "duotone preto/vermelho opcional",
         "placement": "sempre encaixada em módulos inteiros; nunca sangria parcial",
         "captions": "número de figura + legenda 20px",
@@ -5337,13 +5410,15 @@
         ],
         "forkBehavior": "saveAs cria novo id 'pds.<slug>' com extends apontando para este id; override parcial por JSON merge patch",
         "extends": null
-      }
+      },
+      "familyKey": "swiss",
+      "graphicLanguage": "Numeral gigante de índice, fio grosso vertical, bloco vermelho que ocupa colunas inteiras e linhas de grade quase invisíveis."
     },
     {
       "id": "pds.cinematic",
       "name": "Cinemático",
       "category": "storytelling",
-      "description": "Cada slide é um plano de filme: imagem em sangria total, barras letterbox 2.39:1, gradação teal & orange, texto como legenda ou cartela de capítulo, ritmo de corte e créditos finais.",
+      "description": "Sequência de cenas: fotografia de ponta a ponta, títulos condensados, faixas de letterbox e pausas em preto.",
       "useCases": [
         "Lançamento de marca ou campanha",
         "Pitch de filme, série ou conteúdo",
@@ -5362,17 +5437,17 @@
       },
       "palette": {
         "background": "#0B0B0C",
-        "surface": "#141416",
-        "surfaceAlt": "#1E1F22",
-        "primary": "#EDE6DA",
-        "secondary": "#2E6F73",
-        "accent": "#E0A43A",
-        "textPrimary": "#EDE6DA",
-        "textSecondary": "#B9B2A6",
-        "textMuted": "#8E887E",
-        "textOnPrimary": "#0B0B0C",
-        "border": "#2A2B2F",
-        "divider": "#2A2B2F",
+        "surface": "#151517",
+        "surfaceAlt": "#000000",
+        "primary": "#F2EFE9",
+        "secondary": "#A39E95",
+        "accent": "#E8B04A",
+        "textPrimary": "#F2EFE9",
+        "textSecondary": "#A39E95",
+        "textMuted": "#A39E95",
+        "textOnPrimary": "#F2EFE9",
+        "border": "#3A3A3E",
+        "divider": "#2A2A2D",
         "letterbox": "#000000",
         "overlay": {
           "scrimBottom": "linear-gradient(180deg, rgba(11,11,12,0) 40%, rgba(11,11,12,0.85) 100%)",
@@ -5412,29 +5487,33 @@
       },
       "typography": {
         "title": {
-          "family": "Bebas Neue",
-          "weight": 400,
-          "fallback": "Impact, sans-serif",
+          "family": "Barlow Condensed",
+          "weight": 600,
+          "fallback": "Arial Narrow, sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Bebas+Neue:wght@400&display=swap",
-          "letterSpacing": "0.04em",
+          "href": "https://fonts.google.com/specimen/Barlow+Condensed",
+          "letterSpacing": "0.012em",
+          "license": "SIL Open Font License 1.1",
           "case": "uppercase"
         },
         "subtitle": {
-          "family": "Montserrat",
-          "weight": 500,
-          "fallback": "Arial, sans-serif",
-          "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Montserrat:wght@300..700&display=swap",
-          "letterSpacing": "0.3em",
-          "case": "uppercase"
-        },
-        "body": {
-          "family": "Inter",
+          "family": "Barlow",
           "weight": 400,
           "fallback": "Arial, sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap"
+          "href": "https://fonts.google.com/specimen/Barlow",
+          "letterSpacing": "0em",
+          "license": "SIL Open Font License 1.1",
+          "case": "sentence"
+        },
+        "body": {
+          "family": "Barlow",
+          "weight": 400,
+          "fallback": "Arial, sans-serif",
+          "source": "google-fonts",
+          "href": "https://fonts.google.com/specimen/Barlow",
+          "license": "SIL Open Font License 1.1",
+          "letterSpacing": "0em"
         },
         "scale": {
           "display": {
@@ -5453,7 +5532,7 @@
             "size": 64,
             "min": 52,
             "max": 72,
-            "lineHeight": 1.0
+            "lineHeight": 1
           },
           "subtitle": {
             "size": 24,
@@ -5485,6 +5564,25 @@
             "max": 26,
             "lineHeight": 1.6
           }
+        },
+        "label": {
+          "family": "Barlow Condensed",
+          "weight": 500,
+          "fallback": "Arial Narrow, sans-serif",
+          "source": "google-fonts",
+          "license": "SIL Open Font License 1.1",
+          "href": "https://fonts.google.com/specimen/Barlow+Condensed",
+          "letterSpacing": "0.012em",
+          "case": "sentence"
+        },
+        "numeric": {
+          "family": "Barlow Condensed",
+          "weight": 600,
+          "fallback": "Arial Narrow, sans-serif",
+          "source": "google-fonts",
+          "license": "SIL Open Font License 1.1",
+          "href": "https://fonts.google.com/specimen/Barlow+Condensed",
+          "letterSpacing": "0.012em"
         }
       },
       "grid": {
@@ -5538,7 +5636,7 @@
         "image": {
           "minWidth": 1920,
           "minHeight": 1080,
-          "maxCoverage": 1.0,
+          "maxCoverage": 1,
           "minResolution": "1920×1080 (ideal 3840×2160)"
         },
         "logo": {
@@ -5550,13 +5648,13 @@
         }
       },
       "imagery": {
-        "style": "frames cinematográficos, profundidade de campo rasa, luz de recorte",
+        "style": "Paisagens, estradas, cidades à noite e pessoas pequenas no quadro. Luz de hora dourada ou neon, contraste alto, grão sutil. Enquadramento 2.39:1 com horizonte baixo para o título ocupar o céu.",
         "fit": {
           "photo": "cover",
           "video": "cover"
         },
         "radius": 0,
-        "filters": "grade teal/orange: shadows #2E6F73 15%, highlights #E0A43A 10%; contraste +10; grain 4%",
+        "filters": "contrast(1.08) saturate(0.82) brightness(0.92)",
         "overlay": "scrimBottom em todo slide com texto; vignette sempre",
         "placement": "sangria total; vídeo em loop mudo permitido",
         "captions": "como legenda de filme centralizada na barra inferior",
@@ -5564,7 +5662,7 @@
         "kenBurns": {
           "enabled": true,
           "scale": [
-            1.0,
+            1,
             1.06
           ],
           "durationMs": 8000
@@ -6371,13 +6469,15 @@
         ],
         "forkBehavior": "saveAs cria novo id 'pds.<slug>' com extends apontando para este id; override parcial por JSON merge patch",
         "extends": null
-      }
+      },
+      "familyKey": "cinematic",
+      "graphicLanguage": "Faixas de letterbox, timecode e número de cena em condensada, cartela preta centrada nas aberturas de seção."
     },
     {
       "id": "pds.typographic-bold",
-      "name": "Tipografia Bold",
+      "name": "Tipográfico expressivo",
       "category": "brand",
-      "description": "A palavra é a imagem. Títulos em corpo gigante (até 280px) que sangram, cor chapada por slide, contraste duro preto/amarelo, zero fotos por padrão. Ritmo por mudança de fundo.",
+      "description": "A palavra é a imagem: escala extrema, quebras desenhadas, fundos chapados que alternam papel, tinta e laranja.",
       "useCases": [
         "Manifesto de marca",
         "Keynote interna / all-hands",
@@ -6396,19 +6496,19 @@
         "bestFor": "Manifestos, keynotes e pitches de impacto"
       },
       "palette": {
-        "background": "#111111",
-        "surface": "#1A1A1A",
-        "surfaceAlt": "#F2F2F0",
-        "primary": "#F2F2F0",
-        "secondary": "#111111",
-        "accent": "#FFD100",
-        "textPrimary": "#F2F2F0",
-        "textSecondary": "#C9C9C4",
-        "textMuted": "#8C8C88",
-        "textOnPrimary": "#111111",
+        "background": "#ECE9E0",
+        "surface": "#E1DDD1",
+        "surfaceAlt": "#111111",
+        "primary": "#111111",
+        "secondary": "#4A4740",
+        "accent": "#E44318",
+        "textPrimary": "#111111",
+        "textSecondary": "#4A4740",
+        "textMuted": "#4A4740",
+        "textOnPrimary": "#ECE9E0",
         "textOnAccent": "#111111",
-        "border": "#F2F2F0",
-        "divider": "#3A3A3A",
+        "border": "#111111",
+        "divider": "#CFC9BA",
         "slideBackgrounds": {
           "ink": "#111111",
           "paper": "#F2F2F0",
@@ -6450,27 +6550,31 @@
         "title": {
           "family": "Anton",
           "weight": 400,
-          "fallback": "Impact, Arial Black, sans-serif",
+          "fallback": "sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Anton:wght@400&display=swap",
-          "letterSpacing": "-0.01em",
+          "href": "https://fonts.google.com/specimen/Anton",
+          "letterSpacing": "0.004em",
+          "license": "SIL Open Font License 1.1",
           "case": "uppercase"
         },
         "subtitle": {
           "family": "Space Grotesk",
-          "weight": 700,
-          "fallback": "Arial, sans-serif",
+          "weight": 400,
+          "fallback": "sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&display=swap",
-          "letterSpacing": "-0.02em",
+          "href": "https://fonts.google.com/specimen/Space+Grotesk",
+          "letterSpacing": "-0.006em",
+          "license": "SIL Open Font License 1.1",
           "case": "sentence"
         },
         "body": {
           "family": "Space Grotesk",
           "weight": 400,
-          "fallback": "Arial, sans-serif",
+          "fallback": "sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&display=swap"
+          "href": "https://fonts.google.com/specimen/Space+Grotesk",
+          "license": "SIL Open Font License 1.1",
+          "letterSpacing": "-0.006em"
         },
         "scale": {
           "mega": {
@@ -6515,6 +6619,25 @@
             "max": 26,
             "lineHeight": 1.3
           }
+        },
+        "label": {
+          "family": "Space Grotesk",
+          "weight": 500,
+          "fallback": "sans-serif",
+          "source": "google-fonts",
+          "license": "SIL Open Font License 1.1",
+          "href": "https://fonts.google.com/specimen/Space+Grotesk",
+          "letterSpacing": "-0.006em",
+          "case": "sentence"
+        },
+        "numeric": {
+          "family": "Anton",
+          "weight": 400,
+          "fallback": "sans-serif",
+          "source": "google-fonts",
+          "license": "SIL Open Font License 1.1",
+          "href": "https://fonts.google.com/specimen/Anton",
+          "letterSpacing": "0.004em"
         }
       },
       "grid": {
@@ -6556,12 +6679,12 @@
         }
       },
       "imagery": {
-        "style": "opcional; se usada, recortada em bloco com cor chapada ou duotone preto/amarelo",
+        "style": "Imagem como pontuação: recortes pequenos e duros em preto e branco, de mãos, letras, cartazes e materiais impressos. Nunca compete com a palavra; ocupa um módulo lateral.",
         "fit": {
           "photo": "cover"
         },
         "radius": 0,
-        "filters": "duotone #111111/#FFD100 obrigatório",
+        "filters": "grayscale(1) contrast(1.25) brightness(1.02)",
         "overlay": null,
         "placement": "bloco de 1/2 do slide, nunca atrás do texto",
         "captions": "nenhuma",
@@ -7377,13 +7500,15 @@
         ],
         "forkBehavior": "saveAs cria novo id 'pds.<slug>' com extends apontando para este id; override parcial por JSON merge patch",
         "extends": null
-      }
+      },
+      "familyKey": "typographic",
+      "graphicLanguage": "Palavra dominante, fio grosso, seta tipográfica e alternância de fundos chapados entre as páginas."
     },
     {
       "id": "pds.modular-cards",
-      "name": "Modular Cards",
+      "name": "Modular contemporâneo",
       "category": "product",
-      "description": "Interface de produto como linguagem de slide: cards com raio 20, elevação suave, ícones em tiles coloridos, chips e badges, fundo levemente colorido. Tudo é um componente reorganizável.",
+      "description": "Superfícies organizadas: cartões, etapas, comparações e hierarquia clara sobre um fundo neutro.",
       "useCases": [
         "Demo e pitch de SaaS/app",
         "Roadmap e release notes",
@@ -7401,19 +7526,19 @@
         "bestFor": "Produtos digitais, roadmaps e playbooks"
       },
       "palette": {
-        "background": "#EEF2F7",
+        "background": "#ECEEF2",
         "surface": "#FFFFFF",
-        "surfaceAlt": "#F7F9FC",
-        "primary": "#1E2A3B",
-        "secondary": "#5B6B82",
-        "accent": "#5B4DFF",
-        "textPrimary": "#1E2A3B",
-        "textSecondary": "#4A5A70",
-        "textMuted": "#7A889C",
+        "surfaceAlt": "#5B4BFF",
+        "primary": "#12161C",
+        "secondary": "#525B68",
+        "accent": "#5B4BFF",
+        "textPrimary": "#12161C",
+        "textSecondary": "#525B68",
+        "textMuted": "#525B68",
         "textOnPrimary": "#FFFFFF",
         "textOnAccent": "#FFFFFF",
-        "border": "#E1E6EE",
-        "divider": "#EDF0F5",
+        "border": "#D3D7DE",
+        "divider": "#D9DCF8",
         "tiles": {
           "violet": {
             "bg": "#ECE9FF",
@@ -7473,26 +7598,31 @@
         "title": {
           "family": "Plus Jakarta Sans",
           "weight": 700,
-          "fallback": "Arial, sans-serif",
+          "fallback": "sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400..800&display=swap",
-          "letterSpacing": "-0.02em",
+          "href": "https://fonts.google.com/specimen/Plus+Jakarta+Sans",
+          "letterSpacing": "-0.026000000000000002em",
+          "license": "SIL Open Font License 1.1",
           "case": "sentence"
         },
         "subtitle": {
           "family": "Plus Jakarta Sans",
-          "weight": 500,
-          "fallback": "Arial, sans-serif",
+          "weight": 400,
+          "fallback": "sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400..800&display=swap",
+          "href": "https://fonts.google.com/specimen/Plus+Jakarta+Sans",
+          "license": "SIL Open Font License 1.1",
+          "letterSpacing": "-0.003em",
           "case": "sentence"
         },
         "body": {
-          "family": "Inter",
+          "family": "Plus Jakarta Sans",
           "weight": 400,
-          "fallback": "Arial, sans-serif",
+          "fallback": "sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap"
+          "href": "https://fonts.google.com/specimen/Plus+Jakarta+Sans",
+          "license": "SIL Open Font License 1.1",
+          "letterSpacing": "-0.003em"
         },
         "scale": {
           "h1": {
@@ -7535,14 +7665,33 @@
             "size": 20,
             "min": 18,
             "max": 20,
-            "lineHeight": 1.0
+            "lineHeight": 1
           },
           "kpi": {
             "size": 72,
             "min": 56,
             "max": 88,
-            "lineHeight": 1.0
+            "lineHeight": 1
           }
+        },
+        "label": {
+          "family": "Plus Jakarta Sans",
+          "weight": 500,
+          "fallback": "sans-serif",
+          "source": "google-fonts",
+          "license": "SIL Open Font License 1.1",
+          "href": "https://fonts.google.com/specimen/Plus+Jakarta+Sans",
+          "letterSpacing": "-0.003em",
+          "case": "sentence"
+        },
+        "numeric": {
+          "family": "Plus Jakarta Sans",
+          "weight": 700,
+          "fallback": "sans-serif",
+          "source": "google-fonts",
+          "license": "SIL Open Font License 1.1",
+          "href": "https://fonts.google.com/specimen/Plus+Jakarta+Sans",
+          "letterSpacing": "-0.026000000000000002em"
         }
       },
       "grid": {
@@ -7597,13 +7746,13 @@
         }
       },
       "imagery": {
-        "style": "screenshots de produto, mockups de device, ilustrações flat",
+        "style": "Ambientes de aprendizagem e trabalho, telas e objetos de mesa. Luz clara e uniforme, cores limpas, fundo organizado. Recortes que funcionam com cantos arredondados — assunto longe das bordas.",
         "fit": {
           "screenshot": "cover-top",
           "mockup": "contain"
         },
-        "radius": 16,
-        "filters": null,
+        "radius": 28,
+        "filters": "saturate(0.95) contrast(1.02)",
         "overlay": null,
         "placement": "dentro de um card (image card) com raio herdado",
         "captions": "chip no canto superior esquerdo da imagem",
@@ -9013,13 +9162,15 @@
         ],
         "forkBehavior": "saveAs cria novo id 'pds.<slug>' com extends apontando para este id; override parcial por JSON merge patch",
         "extends": null
-      }
+      },
+      "familyKey": "modular",
+      "graphicLanguage": "Cartões brancos com cantos de 28 px, etiqueta numerada em pílula, blocos agrupados e uma superfície de cor por sequência."
     },
     {
       "id": "pds.photo-essay",
-      "name": "Photo Essay",
+      "name": "Fotográfico e humano",
       "category": "visual",
-      "description": "Fotografia em primeiro lugar, com respiro de galeria: fundo branco quente, passe-partout generoso, imagens em proporções mistas, texto mínimo em serifa humanista e legendas discretas. Ritmo de página de livro fotográfico.",
+      "description": "Ensaio fotográfico: imagem protagonista, retratos e detalhes, legendas e respiro entre fotos e texto.",
       "useCases": [
         "Portfólio fotográfico ou de arquitetura",
         "Relatório de impacto social / ONG",
@@ -9037,18 +9188,18 @@
         "bestFor": "Portfólios e relatórios de impacto com fotografia forte"
       },
       "palette": {
-        "background": "#FBFAF7",
-        "surface": "#FFFFFF",
-        "surfaceAlt": "#F1EEE8",
-        "primary": "#2B2926",
-        "secondary": "#7A7570",
-        "accent": "#8A6D4B",
-        "textPrimary": "#2B2926",
-        "textSecondary": "#55514C",
-        "textMuted": "#8A857F",
-        "textOnPrimary": "#FBFAF7",
-        "border": "#E4E0D8",
-        "divider": "#E4E0D8",
+        "background": "#FAF7F2",
+        "surface": "#F0EAE1",
+        "surfaceAlt": "#1E1B18",
+        "primary": "#1E1B18",
+        "secondary": "#675F57",
+        "accent": "#8A5A3B",
+        "textPrimary": "#1E1B18",
+        "textSecondary": "#675F57",
+        "textMuted": "#675F57",
+        "textOnPrimary": "#FAF7F2",
+        "border": "#CFC5B8",
+        "divider": "#D9CFC2",
         "semantic": {
           "positive": "#5F7A5A",
           "negative": "#A8503F",
@@ -9082,37 +9233,41 @@
       },
       "typography": {
         "title": {
-          "family": "Cormorant Garamond",
-          "weight": 500,
+          "family": "Instrument Serif",
+          "weight": 400,
           "fallback": "Georgia, serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300..700;1,300..700&display=swap",
-          "letterSpacing": "0",
-          "case": "sentence",
-          "italicAllowed": true
+          "href": "https://fonts.google.com/specimen/Instrument+Serif",
+          "letterSpacing": "-0.013999999999999999em",
+          "italicAllowed": true,
+          "license": "SIL Open Font License 1.1",
+          "case": "sentence"
         },
         "subtitle": {
-          "family": "Jost",
+          "family": "Instrument Sans",
           "weight": 400,
           "fallback": "Arial, sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Jost:wght@300..600&display=swap",
-          "letterSpacing": "0.18em",
-          "case": "uppercase"
+          "href": "https://fonts.google.com/specimen/Instrument+Sans",
+          "letterSpacing": "-0.002em",
+          "license": "SIL Open Font License 1.1",
+          "case": "sentence"
         },
         "body": {
-          "family": "Jost",
-          "weight": 300,
+          "family": "Instrument Sans",
+          "weight": 400,
           "fallback": "Arial, sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Jost:wght@300..600&display=swap"
+          "href": "https://fonts.google.com/specimen/Instrument+Sans",
+          "license": "SIL Open Font License 1.1",
+          "letterSpacing": "-0.002em"
         },
         "scale": {
           "display": {
             "size": 112,
             "min": 88,
             "max": 128,
-            "lineHeight": 1.0
+            "lineHeight": 1
           },
           "h1": {
             "size": 72,
@@ -9148,8 +9303,27 @@
             "size": 96,
             "min": 72,
             "max": 112,
-            "lineHeight": 1.0
+            "lineHeight": 1
           }
+        },
+        "label": {
+          "family": "Instrument Sans",
+          "weight": 500,
+          "fallback": "Arial, sans-serif",
+          "source": "google-fonts",
+          "license": "SIL Open Font License 1.1",
+          "href": "https://fonts.google.com/specimen/Instrument+Sans",
+          "letterSpacing": "-0.002em",
+          "case": "sentence"
+        },
+        "numeric": {
+          "family": "Instrument Serif",
+          "weight": 400,
+          "fallback": "Georgia, serif",
+          "source": "google-fonts",
+          "license": "SIL Open Font License 1.1",
+          "href": "https://fonts.google.com/specimen/Instrument+Serif",
+          "letterSpacing": "-0.013999999999999999em"
         }
       },
       "grid": {
@@ -9183,7 +9357,7 @@
         "image": {
           "minWidth": 480,
           "minHeight": 480,
-          "maxCoverage": 1.0,
+          "maxCoverage": 1,
           "minResolution": "2400px no lado maior"
         },
         "logo": {
@@ -9195,12 +9369,12 @@
         }
       },
       "imagery": {
-        "style": "fotografia autoral, luz natural, cor fiel; sem stock",
+        "style": "Pessoas no trabalho, retratos de meio corpo, mãos e detalhes de ofício, comida. Luz natural de janela, pele verdadeira, cores quentes e pouco saturadas. Rostos e mãos inteiros no recorte; olhar com espaço para onde aponta.",
         "fit": {
           "photo": "contain-in-frame ou cover em proporção declarada"
         },
         "radius": 0,
-        "filters": "nenhum; respeitar tratamento do fotógrafo",
+        "filters": "saturate(1.02) contrast(1.02) sepia(0.04)",
         "overlay": "nenhum sobre fotos (texto nunca sobre imagem, exceto capa com scrim 25%)",
         "placement": "passe-partout; proporções mistas; sangria total apenas na capa e em 'full-bleed'",
         "captions": "legenda 20px Jost abaixo, alinhada à esquerda da imagem; crédito em uppercase",
@@ -10076,13 +10250,15 @@
         ],
         "forkBehavior": "saveAs cria novo id 'pds.<slug>' com extends apontando para este id; override parcial por JSON merge patch",
         "extends": null
-      }
+      },
+      "familyKey": "photo",
+      "graphicLanguage": "Passe-partout branco, legenda numerada sob a foto, díptico de imagens e intervalo escuro entre capítulos."
     },
     {
       "id": "pds.technical-blueprint",
-      "name": "Technical Blueprint",
+      "name": "Técnico e tecnológico",
       "category": "technical",
-      "description": "Prancha de engenharia: fundo azul-blueprint com grade milimetrada sutil, linhas brancas finas, cotas, legendas em mono, carimbo (title block) no canto inferior direito e diagramas como protagonistas.",
+      "description": "Prancha técnica: grade visível, cotas, rótulos monoespaçados, números tabulares e diagramas editáveis.",
       "useCases": [
         "Arquitetura de software e sistemas",
         "Documentação técnica e RFC",
@@ -10100,19 +10276,19 @@
         "bestFor": "Engenharia, arquitetura de sistemas e documentação técnica"
       },
       "palette": {
-        "background": "#0F2B5B",
-        "surface": "#143569",
-        "surfaceAlt": "#1B4179",
-        "primary": "#E8F0FF",
-        "secondary": "#8FB3E6",
-        "accent": "#FFB454",
-        "textPrimary": "#E8F0FF",
-        "textSecondary": "#B8CDF0",
-        "textMuted": "#8FB3E6",
-        "textOnPrimary": "#0F2B5B",
+        "background": "#0E1217",
+        "surface": "#151B22",
+        "surfaceAlt": "#E8ECF1",
+        "primary": "#E8ECF1",
+        "secondary": "#8A94A3",
+        "accent": "#5CE1A5",
+        "textPrimary": "#E8ECF1",
+        "textSecondary": "#8A94A3",
+        "textMuted": "#8A94A3",
+        "textOnPrimary": "#0E1217",
         "textOnAccent": "#0F2B5B",
-        "border": "#E8F0FF",
-        "divider": "rgba(232,240,255,0.25)",
+        "border": "#2E3946",
+        "divider": "#26303B",
         "gridMinor": "rgba(232,240,255,0.06)",
         "gridMajor": "rgba(232,240,255,0.14)",
         "semantic": {
@@ -10149,29 +10325,33 @@
       },
       "typography": {
         "title": {
-          "family": "JetBrains Mono",
-          "weight": 700,
-          "fallback": "Courier New, monospace",
+          "family": "IBM Plex Sans",
+          "weight": 500,
+          "fallback": "sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400..800&display=swap",
-          "letterSpacing": "0",
-          "case": "uppercase"
+          "href": "https://fonts.google.com/specimen/IBM+Plex+Sans",
+          "letterSpacing": "-0.02em",
+          "license": "SIL Open Font License 1.1",
+          "case": "sentence"
         },
         "subtitle": {
-          "family": "JetBrains Mono",
+          "family": "IBM Plex Sans",
           "weight": 400,
-          "fallback": "Courier New, monospace",
+          "fallback": "sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400..800&display=swap",
-          "letterSpacing": "0.05em",
-          "case": "uppercase"
+          "href": "https://fonts.google.com/specimen/IBM+Plex+Sans",
+          "letterSpacing": "-0.002em",
+          "license": "SIL Open Font License 1.1",
+          "case": "sentence"
         },
         "body": {
           "family": "IBM Plex Sans",
           "weight": 400,
-          "fallback": "Arial, sans-serif",
+          "fallback": "sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400..700&display=swap"
+          "href": "https://fonts.google.com/specimen/IBM+Plex+Sans",
+          "license": "SIL Open Font License 1.1",
+          "letterSpacing": "-0.002em"
         },
         "scale": {
           "h1": {
@@ -10214,14 +10394,33 @@
             "size": 18,
             "min": 18,
             "max": 20,
-            "lineHeight": 1.0
+            "lineHeight": 1
           },
           "kpi": {
             "size": 72,
             "min": 56,
             "max": 88,
-            "lineHeight": 1.0
+            "lineHeight": 1
           }
+        },
+        "label": {
+          "family": "IBM Plex Mono",
+          "weight": 500,
+          "fallback": "monospace",
+          "source": "google-fonts",
+          "license": "SIL Open Font License 1.1",
+          "href": "https://fonts.google.com/specimen/IBM+Plex+Mono",
+          "letterSpacing": "0em",
+          "case": "sentence"
+        },
+        "numeric": {
+          "family": "IBM Plex Mono",
+          "weight": 400,
+          "fallback": "monospace",
+          "source": "google-fonts",
+          "license": "SIL Open Font License 1.1",
+          "href": "https://fonts.google.com/specimen/IBM+Plex+Mono",
+          "letterSpacing": "0em"
         }
       },
       "grid": {
@@ -10297,13 +10496,13 @@
         "arrowHead": 12
       },
       "imagery": {
-        "style": "diagramas, esquemas, screenshots de terminal/código, renders técnicos",
+        "style": "Hardware, telas, placas, data centers e mãos operando equipamentos. Luz fria de painel, fundo escuro, macro com foco crítico. Fotografia tratada como figura de prancha, com marcas de corte.",
         "fit": {
           "screenshot": "contain",
           "diagram": "contain"
         },
         "radius": 0,
-        "filters": "screenshots com borda 1px e sombra nenhuma; fotos tintadas em azul (mix-blend) 60%",
+        "filters": "grayscale(0.55) contrast(1.12) brightness(0.88)",
         "overlay": null,
         "placement": "dentro de caixa com cotas",
         "captions": "FIG. 01 — legenda em mono uppercase",
@@ -11462,13 +11661,15 @@
         ],
         "forkBehavior": "saveAs cria novo id 'pds.<slug>' com extends apontando para este id; override parcial por JSON merge patch",
         "extends": null
-      }
+      },
+      "familyKey": "technical",
+      "graphicLanguage": "Grade de 12 colunas visível, marcas de corte nas figuras, rótulos FIG./§ em mono, linha de cota e ponto de status verde."
     },
     {
       "id": "pds.premium-dark",
-      "name": "Premium Dark",
+      "name": "Luxo discreto",
       "category": "luxury",
-      "description": "Luxo tecnológico: fundo quase preto com gradiente radial profundo, painéis de vidro (glass) com borda luminosa de 1px, acento dourado-champanhe, serifa fina para títulos e muito espaço negativo.",
+      "description": "Poucos elementos, serifa de alto contraste, tons profundos alternados com linho natural e muito silêncio.",
       "useCases": [
         "Pitch para investidores (late stage)",
         "Lançamento de produto premium / fintech",
@@ -11487,22 +11688,22 @@
         "bestFor": "Pitches, lançamentos premium e keynotes de tecnologia"
       },
       "palette": {
-        "background": "#0A0A0D",
+        "background": "#15120F",
         "backgroundGradient": "radial-gradient(ellipse 80% 60% at 30% 20%, #15161C 0%, #0A0A0D 70%)",
-        "surface": "rgba(255,255,255,0.04)",
-        "surfaceAlt": "rgba(255,255,255,0.07)",
-        "primary": "#F3EFE6",
-        "secondary": "#A7A39A",
-        "accent": "#C9A96E",
+        "surface": "#1E1A16",
+        "surfaceAlt": "#E8E1D5",
+        "primary": "#EDE6DA",
+        "secondary": "#A99F91",
+        "accent": "#C2A878",
         "accentGlow": "rgba(201,169,110,0.35)",
-        "textPrimary": "#F3EFE6",
-        "textSecondary": "#C7C2B8",
-        "textMuted": "#8E8A82",
-        "textOnPrimary": "#0A0A0D",
+        "textPrimary": "#EDE6DA",
+        "textSecondary": "#A99F91",
+        "textMuted": "#A99F91",
+        "textOnPrimary": "#1E1A16",
         "textOnAccent": "#0A0A0D",
-        "border": "rgba(255,255,255,0.12)",
+        "border": "#5A5044",
         "borderGlow": "rgba(201,169,110,0.5)",
-        "divider": "rgba(255,255,255,0.08)",
+        "divider": "#3A332B",
         "semantic": {
           "positive": "#8FD0A8",
           "negative": "#E08A7A",
@@ -11537,37 +11738,41 @@
       },
       "typography": {
         "title": {
-          "family": "Cormorant",
-          "weight": 300,
-          "fallback": "Georgia, serif",
+          "family": "Bodoni Moda",
+          "weight": 400,
+          "fallback": "Didot, serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,300..700;1,300..700&display=swap",
-          "letterSpacing": "0.01em",
-          "case": "sentence",
-          "italicAllowed": true
+          "href": "https://fonts.google.com/specimen/Bodoni+Moda",
+          "letterSpacing": "-0.012em",
+          "italicAllowed": true,
+          "license": "SIL Open Font License 1.1",
+          "case": "sentence"
         },
         "subtitle": {
-          "family": "Manrope",
-          "weight": 500,
-          "fallback": "Arial, sans-serif",
+          "family": "Jost",
+          "weight": 400,
+          "fallback": "sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Manrope:wght@300..800&display=swap",
-          "letterSpacing": "0.22em",
-          "case": "uppercase"
+          "href": "https://fonts.google.com/specimen/Jost",
+          "letterSpacing": "0.004em",
+          "license": "SIL Open Font License 1.1",
+          "case": "sentence"
         },
         "body": {
-          "family": "Manrope",
+          "family": "Jost",
           "weight": 400,
-          "fallback": "Arial, sans-serif",
+          "fallback": "sans-serif",
           "source": "google-fonts",
-          "href": "https://fonts.googleapis.com/css2?family=Manrope:wght@300..800&display=swap"
+          "href": "https://fonts.google.com/specimen/Jost",
+          "license": "SIL Open Font License 1.1",
+          "letterSpacing": "0.004em"
         },
         "scale": {
           "display": {
             "size": 144,
             "min": 104,
             "max": 168,
-            "lineHeight": 1.0
+            "lineHeight": 1
           },
           "h1": {
             "size": 88,
@@ -11603,8 +11808,27 @@
             "size": 104,
             "min": 80,
             "max": 128,
-            "lineHeight": 1.0
+            "lineHeight": 1
           }
+        },
+        "label": {
+          "family": "Jost",
+          "weight": 500,
+          "fallback": "sans-serif",
+          "source": "google-fonts",
+          "license": "SIL Open Font License 1.1",
+          "href": "https://fonts.google.com/specimen/Jost",
+          "letterSpacing": "0.004em",
+          "case": "sentence"
+        },
+        "numeric": {
+          "family": "Bodoni Moda",
+          "weight": 400,
+          "fallback": "Didot, serif",
+          "source": "google-fonts",
+          "license": "SIL Open Font License 1.1",
+          "href": "https://fonts.google.com/specimen/Bodoni+Moda",
+          "letterSpacing": "-0.012em"
         }
       },
       "grid": {
@@ -11651,13 +11875,13 @@
         }
       },
       "imagery": {
-        "style": "renders 3D, produto em fundo escuro, abstratos de luz; fotos com muito preto",
+        "style": "Objetos, matérias e gestos: cerâmica, tecido, vidro, madeira, mãos. Luz rasante única, fundo escuro ou linho cru, profundidade de campo curta. Muito espaço negativo; o produto nunca cortado.",
         "fit": {
           "photo": "cover",
           "render": "contain"
         },
-        "radius": 24,
-        "filters": "contraste +15; sombras esmagadas para #0A0A0D; saturação −10",
+        "radius": 0,
+        "filters": "saturate(0.72) contrast(1.06) brightness(0.94)",
         "overlay": "gradiente para background nas bordas (fade-to-dark) para fundir com o fundo",
         "placement": "dentro de painel glass ou flutuando com glow accent atrás",
         "captions": "uppercase tracking largo em textMuted",
@@ -12773,7 +12997,9 @@
         ],
         "forkBehavior": "saveAs cria novo id 'pds.<slug>' com extends apontando para este id; override parcial por JSON merge patch",
         "extends": null
-      }
+      },
+      "familyKey": "luxury",
+      "graphicLanguage": "Fio fino dourado, monograma de numeração em itálico, margens largas, centralização apenas em capa e encerramento."
     }
   ]
 }

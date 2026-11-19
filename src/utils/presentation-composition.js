@@ -1,6 +1,10 @@
 /** Composição determinística: o modelo escolhe a função, nunca CSS ou coordenadas. */
 import { FORMATS } from './formats.js';
-import { presentationFamily, artDirectedPresentationZones, presentationTypeDirection } from './presentation-art-direction.js';
+import { presentationFamily, presentationArtLayout } from './presentation-art-direction.js';
+import {
+  familyFont, familyPhotoFilter, familySpec, rendererSubtitleSizePercent, rendererTitleSizePercent,
+} from './presentation-families.js';
+import { titleTrackingBase } from './title-tracking.js';
 const DATA_ROLES = new Set(['data', 'metric', 'result', 'matrix', 'comparison', 'priorities']);
 const DEMO_ROLES = new Set(['demo', 'example', 'evidence', 'story', 'people', 'application']);
 const DIVIDER_ROLES = new Set(['divider', 'agenda', 'question', 'reframe', 'contrast', 'statement', 'vision', 'objectives']);
@@ -71,8 +75,66 @@ export function presentationDesignFamily(base = {}) {
   return presentationFamily(base.presentationPresetId || base.presentationPatternId);
 }
 
-export function contentAwarePresentationZones(kind, slide = {}, family = 'executive') {
-  return artDirectedPresentationZones(kind, slide, family, { visual: hasVisual(slide), structured: hasBlocks(slide) });
+export function contentAwarePresentationLayout(kind, slide = {}, family = 'executive', format = '16:9') {
+  return presentationArtLayout(kind, slide, family, { visual: hasVisual(slide), structured: hasBlocks(slide), format });
+}
+
+export function contentAwarePresentationZones(kind, slide = {}, family = 'executive', format = '16:9') {
+  const layout = contentAwarePresentationLayout(kind, slide, family, format);
+  return {
+    title: layout.title, subtitle: layout.subtitle, photo: layout.photo || inactivePhoto(),
+    ...(layout.evidence ? { evidence: layout.evidence } : {}),
+  };
+}
+
+/**
+ * Campos de slide que levam a direção de arte da família ao renderer.
+ * Tudo é dado (zonas, tokens, descritores de chrome), nunca CSS do modelo.
+ */
+export function familyPresentationFields(layout, { format = '16:9' } = {}) {
+  const spec = familySpec(layout.family);
+  const display = familyFont(layout.family, 'display');
+  const text = familyFont(layout.family, 'text');
+  const ink = layout.inks;
+  const recolor = layout.ground !== 'bg' || layout.inkOnPhoto || !!layout.scrim;
+  return {
+    presentationArtDirectionVersion: 2,
+    presentationDesignFamily: layout.family,
+    presentationComposition: layout.kind,
+    presentationGround: layout.ground,
+    // Descritores resolvidos na composição: o chrome não se reposiciona se a
+    // pessoa editar o título depois, e preview/exportação leem o mesmo dado.
+    presentationChrome: { family: layout.family, format, ground: layout.ground, chrome: layout.chrome || [] },
+    presentationPhotoTreatment: familyPhotoFilter(layout.family),
+    presentationPhotoRadius: spec.photo.radius || 0,
+    titleSize: rendererTitleSizePercent(layout.titlePx, format),
+    subSize: rendererSubtitleSizePercent(layout.bodyPx, format),
+    titleLeading: Math.round(spec.type.titleLeading * 100),
+    subLeading: Math.round(spec.type.bodyLeading * 100),
+    bodyLeading: Math.round(spec.type.bodyLeading * 100),
+    align: layout.align,
+    layout: `t${layout.align === 'center' ? 'c' : layout.align === 'right' ? 'r' : 'l'}`,
+    socialZoneAnchors: { title: layout.anchors?.title || 'start', subtitle: layout.anchors?.subtitle || 'start' },
+    overlay: layout.photo && layout.scrim ? layout.scrim.amount : 0,
+    overlayMode: layout.photo && layout.scrim ? layout.scrim.mode : undefined,
+    textShadow: false,
+    ...(recolor ? { titleColor: ink.ink, subtitleColor: ink.ink, textColor: ink.muted } : {}),
+    typography: {
+      title: {
+        fontFamily: display.css, weight: display.weight,
+        // O renderer soma a base da fonte (condensada ou não) ao controle.
+        tracking: Math.round(((display.tracking || 0) - titleTrackingBase(display.css)) * 100) / 100,
+        case: display.case === 'upper' ? 'upper' : 'normal',
+        italic: !!layout.titleItalic,
+        leadingPercent: Math.round(spec.type.titleLeading * 100),
+      },
+      subtitle: {
+        fontFamily: text.css, weight: Math.max(400, text.weight || 400), case: 'normal', italic: false,
+        // O controle do subtítulo tem base -1; zero tipográfico é controle 1.
+        tracking: 1 + (text.tracking || 0), leadingPercent: Math.round(spec.type.bodyLeading * 100),
+      },
+    },
+  };
 }
 
 function titleLinesAt(value, width, size, fontFamily = '') {
@@ -126,20 +188,20 @@ export function contentAwarePresentationOverrides(base, slide = {}, kind = 'cont
   const structured = hasBlocks(slide);
   const visual = hasVisual(slide) && !structured;
   const family = presentationDesignFamily(base);
-  const zones = contentAwarePresentationZones(kind, slide, family);
+  const layout = contentAwarePresentationLayout(kind, slide, family);
+  const zones = {
+    title: layout.title, subtitle: layout.subtitle, photo: layout.photo || inactivePhoto(),
+    ...(layout.evidence ? { evidence: layout.evidence } : {}),
+  };
+  const fields = familyPresentationFields(layout);
   const previousTypography = base.presentationTypographyByComposition || {};
   const typography = previousTypography[kind] || {};
-  const centered = false;
-  const direction = presentationTypeDirection(family, kind);
-  const displaySize = direction.titleSize;
-  const titleSize = fittedTitleSize(structured ? Math.min(46, displaySize) : displaySize, slide.title, zones.title, typography.title?.fontFamily);
-  const subSize = structured ? 57 : direction.bodySize;
-  const bodyType = base.presentationBodyTypography || {};
-  const titleLeading = Math.max(96, Math.min(118, Number(typography.title?.leadingPercent) || 108));
-  const bodyLeading = Math.max(132, Math.min(152, Number(bodyType.leadingPercent) || 142));
-  const imagePosition = structured || !visual ? 'none' : family === 'editorial' ? 'left-evidence'
-    : family === 'cinematic' && kind === 'closing' ? 'left-evidence'
-    : kind === 'data' ? 'left-evidence' : 'right-evidence';
+  const displaySize = fields.titleSize;
+  const titleSize = fittedTitleSize(structured ? Math.min(46, displaySize) : displaySize, slide.title, zones.title, fields.typography.title.fontFamily);
+  const subSize = fields.subSize;
+  const titleLeading = fields.titleLeading;
+  const bodyLeading = fields.bodyLeading;
+  const imagePosition = !layout.photo ? 'none' : layout.photo.x + layout.photo.w / 2 < 50 ? 'left-evidence' : 'right-evidence';
   const rawLimits = pitch ? (base.presentationTextLimits || {}) : plannedPresentationTextLimits(kind, slide, deliveryMode);
   const narrow = zones.subtitle.w < 45 && zones.subtitle.h < 50;
   const limits = narrow ? {
@@ -147,38 +209,36 @@ export function contentAwarePresentationOverrides(base, slide = {}, kind = 'cont
     subtitle: { ...rawLimits.subtitle, maxChars: Math.min(rawLimits.subtitle?.maxChars || 180, 180), maxLines: 6 },
     body: { ...rawLimits.body, maxChars: Math.min(rawLimits.body?.maxChars || 90, 90), maxLines: 3 },
   } : rawLimits;
+  const { typography: familyTypography, ...visualFields } = fields;
   return {
     ...base,
-    layout: centered ? 'mc' : 'tl',
-    align: centered ? 'center' : 'left',
-    // Texto e imagem possuem superfícies independentes; a foto mantém seu tom.
-    overlay: 0,
-    textShadow: false,
+    ...visualFields,
+    // Texto e imagem possuem superfícies independentes; a foto mantém seu tom
+    // salvo quando a família pede texto sobre a fotografia (scrim).
+    textBg: false,
     textInset: 0,
     bgFit: 'cover',
     bgZoom: 100,
     photoFraming: 'auto',
     presentationRequiresImage: false,
-    presentationSuppressPhoto: !visual,
-    presentationCompositionVersion: 2,
+    presentationSuppressPhoto: !visual || !layout.photo,
+    presentationCompositionVersion: 3,
     titleSize,
     subSize,
     titleLeading,
     subLeading: bodyLeading,
-    subTracking: bodyType.tracking ?? 1,
-    presentationDesignFamily: family,
-    presentationArtDirectionVersion: 1,
+    subTracking: familyTypography.subtitle.tracking,
     bodyAfterSize: presentationSupportTextSize(base),
     bodyLeading,
     logoPosition: 'tl',
     logoSize: 80,
-    titlePosition: centered ? 'center' : 'top-left',
+    titlePosition: 'top-left',
     imagePosition,
     presentationLayout: {
       ...base.presentationLayout,
-      titlePosition: centered ? 'center' : 'top-left',
+      titlePosition: 'top-left',
       imagePosition,
-      evidencePosition: structured ? 'wide-lower' : null,
+      evidencePosition: structured ? 'family-evidence' : null,
     },
     presentationTextLimits: structured ? {
       ...limits,
@@ -190,9 +250,9 @@ export function contentAwarePresentationOverrides(base, slide = {}, kind = 'cont
       ...previousTypography,
       [kind]: {
         ...typography,
-        title: { ...typography.title, sizePercent: titleSize, leadingPercent: titleLeading, ...(pitch ? { case: 'normal' } : {}) },
+        title: { ...typography.title, ...familyTypography.title, sizePercent: titleSize, leadingPercent: titleLeading, ...(pitch ? { case: 'normal' } : {}) },
         // subtitle is an argument here, not the catalog's uppercase eyebrow.
-        subtitle: { ...typography.subtitle, ...bodyType, sizePercent: subSize, leadingPercent: bodyLeading, tracking: bodyType.tracking ?? 1, weight: bodyType.weight || 400, case: 'normal' },
+        subtitle: { ...typography.subtitle, ...familyTypography.subtitle, sizePercent: subSize, leadingPercent: bodyLeading },
       },
     },
     canvas: { ...base.canvas, preserveZones: true, zones },
@@ -205,7 +265,7 @@ export function contentAwarePresentationOverrides(base, slide = {}, kind = 'cont
  * helper. Geometrias livres ou já reposicionadas continuam sob controle do autor.
  */
 export function restorePresentationPhotoComposition(slide) {
-  if (!slide || slide.presentationCompositionVersion !== 2 || !slide.presentationSuppressPhoto
+  if (!slide || ![2, 3].includes(slide.presentationCompositionVersion) || !slide.presentationSuppressPhoto
     || !(slide.bgImage || slide.bgImageId || slide.bgImageAssetId) || hasBlocks(slide)
     || slide.canvas?.source !== 'presentation-preset'
     || ['title', 'subtitle', 'bodyAfterImage', 'text', 'photo'].some(key => {
@@ -213,13 +273,18 @@ export function restorePresentationPhotoComposition(slide) {
       return offset && Object.values(offset).some(value => Number(value) !== 0);
     })) return slide;
   const kind = rolesForRestoredPhoto.has(slide.presentationComposition) ? slide.presentationComposition : 'content';
+  const layout = contentAwarePresentationLayout(kind, slide, presentationDesignFamily(slide));
   const zones = contentAwarePresentationZones(kind, slide, presentationDesignFamily(slide));
   const previousTypography = slide.presentationTypographyByComposition || {};
   const typography = previousTypography[kind] || {};
   const titleSize = fittedTitleSize(typography.title?.sizePercent || slide.titleSize || 44, slide.title, zones.title, typography.title?.fontFamily);
-  const imagePosition = kind === 'data' ? 'left-evidence' : 'right-evidence';
+  const imagePosition = layout.photo && layout.photo.x + layout.photo.w / 2 < 50 ? 'left-evidence' : 'right-evidence';
   return {
     ...slide,
+    ...(slide.presentationArtDirectionVersion === 2 ? {
+      presentationChrome: familyPresentationFields(layout).presentationChrome,
+      presentationGround: layout.ground,
+    } : {}),
     presentationSuppressPhoto: false,
     align: 'left',
     layout: 'tl',
@@ -238,7 +303,7 @@ const rolesForRestoredPhoto = new Set(['cover', 'content', 'divider', 'data', 'd
 /** Gera a foto na proporção mais próxima da moldura; cover mantém escala uniforme. */
 export function presentationPhotoAspectRatio(slide) {
   const zone = slide?.canvas?.zones?.photo;
-  if (!zone || slide?.presentationCompositionVersion !== 2 || slide.presentationSuppressPhoto
+  if (!zone || ![2, 3].includes(slide?.presentationCompositionVersion) || slide.presentationSuppressPhoto
     || !['x', 'y', 'w', 'h'].every(key => Number.isFinite(zone[key]))
     || zone.w <= 0 || zone.h <= 0) return '16:9';
   const ratio = (1920 * zone.w) / (1080 * zone.h);

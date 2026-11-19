@@ -114,8 +114,8 @@ describe('montagem final dos prompts de texto', () => {
   it('apresentação leva limites do padrão visual ao prompt final', () => {
     const final = assembledPrompt('apresentacao', '1_1', 8);
     expect(final).toContain('PADRÃO VISUAL DA APRESENTAÇÃO');
-    expect(final).toContain('Teto editorial');
-    expect(final).toContain('área de evidência visual');
+    expect(final).toContain('limites obrigatórios por slide');
+    expect(final).toContain('presentationBlocks nativos editáveis');
   });
 
   it('a geração usa a definição efetiva e preserva a escolha editorial de não usar imagem', () => {

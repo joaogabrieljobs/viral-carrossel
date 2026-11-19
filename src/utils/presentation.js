@@ -19,6 +19,7 @@ export const APRESENTACAO_PRESET_ID = 'apresentacao';
 export const PRESENTATION_PRODUCT_KIND = 'apresentacao';
 export const DEFAULT_PRESENTATION_PATH_ID = 'auto';
 export const PRESENTATION_SLIDE_LIMITS = Object.freeze({ min: 5, max: 24 });
+import { FAMILY_KEYS, familySpec, familyFromPresetId, normalizeFamilyKey } from './presentation-families.js';
 
 export function isApresentacaoPreset(presetId) {
   return presetId === APRESENTACAO_PRESET_ID;
@@ -390,8 +391,19 @@ export function buildPresentationLanguageRules(pathId, tone) {
   return presentationLanguageForRoute(getPresentationPath(pathId), tone);
 }
 
-export function buildPresentationImageRules(pathId, topic, projectDirection) {
-  return presentationImagesForRoute(getPresentationPath(pathId), topic, projectDirection);
+export function buildPresentationImageRules(pathId, topic, projectDirection, familyKey) {
+  const base = presentationImagesForRoute(getPresentationPath(pathId), topic, projectDirection);
+  if (!familyKey) return base;
+  return `${base}\n${buildPresentationFamilyImageRules(familyKey)}`;
+}
+
+export function buildPresentationFamilyImageRules(familyKey) {
+  if (!familyKey) return '';
+  // Direção fotográfica da família visual escolhida (luz, paleta, recorte).
+  // Descreve a fotografia; nunca pede texto, número, gráfico ou logo na imagem.
+  const spec = familySpec(FAMILY_KEYS.includes(familyKey) || ['premium', 'data'].includes(familyKey)
+    ? normalizeFamilyKey(familyKey) : familyFromPresetId(familyKey));
+  return `DIREÇÃO FOTOGRÁFICA — ${spec.label.toUpperCase()}: ${spec.photo.direction} A mensagem e o assunto do briefing prevalecem: use esta direção para luz, tratamento e composição, sem trocar o assunto por exemplos de cena da família. Preserve a estética explicitamente pedida no briefing. Mantenha luz e tratamento coerentes no deck e varie os enquadramentos. Preserve rostos, mãos, produtos e detalhes importantes longe das bordas; deixe área calma do lado em que o texto será composto. Não inclua texto, letras, números, gráficos nem logotipos na imagem.`;
 }
 
 export function buildPresentationSummaryRules(pathId) {

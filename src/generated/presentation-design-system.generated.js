@@ -5,15 +5,15 @@
  * Do not edit by hand. SVG, href and example payloads are intentionally omitted.
  */
 
-export const PRESENTATION_DESIGN_SYSTEM_VERSION = "1.0.0";
+export const PRESENTATION_DESIGN_SYSTEM_VERSION = "2.0.0";
 
 export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
   {
     "id": "presentation_executive_minimal",
     "sourceId": "pds.executive-minimal",
     "sourceVersion": "1.0.0",
-    "label": "Executivo Minimalista",
-    "desc": "Clareza de board room: fundo claro, muito respiro, um ponto de cor e títulos de ação (a conclusão vai no título). Hierarquia por peso e posição, nunca por ornamento.",
+    "label": "Executivo sofisticado",
+    "desc": "Sala de conselho: títulos-conclusão, grade rigorosa, um ponto de cor e dados legíveis a distância.",
     "category": "corporate",
     "useCases": [
       "Reunião de board e QBR",
@@ -23,25 +23,25 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
     ],
     "previewVariant": "split",
     "brand": {
-      "bg": "#FAFAF8",
-      "titleColor": "#14161A",
-      "subtitleColor": "#4A4F57",
-      "textColor": "#4A4F57",
-      "accent": "#2563EB",
+      "bg": "#F7F7F5",
+      "titleColor": "#101418",
+      "subtitleColor": "#4B525C",
+      "textColor": "#4B525C",
+      "accent": "#1F4FD8",
       "titleFont": "\"Inter Tight\", sans-serif",
       "subtitleFont": "\"Inter\", sans-serif",
       "bodyFont": "\"Inter\", sans-serif",
       "textTitleWeight": 600,
       "textTitleCase": "normal",
-      "textTitleTracking": 1,
+      "textTitleTracking": 0.6,
       "textTitleSize": 39.68,
-      "subtitleWeight": 500,
+      "subtitleWeight": 400,
       "subtitleCase": "normal",
-      "textSubTracking": 1,
+      "textSubTracking": 0.6,
       "textSubSize": 59.52,
       "textBodyAfterSize": 81.02,
       "bodyWeight": 400,
-      "textBodyTracking": 0.4,
+      "textBodyTracking": 0,
       "textBodyLeading": 145,
       "textTitleLeading": 110,
       "textSubLeading": 130,
@@ -52,14 +52,14 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
       "align": "left",
       "titleSize": 39.68,
       "subSize": 59.52,
-      "titleTracking": 1,
-      "subTracking": 1,
+      "titleTracking": 0.6,
+      "subTracking": 0.6,
       "titleLeading": 110,
       "subLeading": 130,
       "titleWeight": 600,
       "titleCase": "normal",
       "bodyAfterSize": 81.02,
-      "bodyTracking": 0.4,
+      "bodyTracking": 0,
       "bodyLeading": 145,
       "bodyWeight": 400,
       "presentationTypographyByComposition": {
@@ -70,7 +70,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 59.52,
             "leadingPercent": 105,
             "weight": 600,
-            "tracking": 1,
+            "tracking": 0.6,
             "case": "normal",
             "italic": false
           },
@@ -79,8 +79,8 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "fontFamily": "\"Inter\", sans-serif",
             "sizePercent": 59.52,
             "leadingPercent": 130,
-            "weight": 500,
-            "tracking": 1,
+            "weight": 400,
+            "tracking": 0.6,
             "case": "normal",
             "italic": false
           }
@@ -92,7 +92,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 39.68,
             "leadingPercent": 110,
             "weight": 600,
-            "tracking": 1,
+            "tracking": 0.6,
             "case": "normal",
             "italic": false
           },
@@ -102,7 +102,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 52.08,
             "leadingPercent": 145,
             "weight": 400,
-            "tracking": 1,
+            "tracking": 0.6,
             "case": "normal",
             "italic": false
           }
@@ -114,7 +114,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 39.68,
             "leadingPercent": 110,
             "weight": 600,
-            "tracking": 1,
+            "tracking": 0.6,
             "case": "normal",
             "italic": false
           },
@@ -124,7 +124,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 178.57,
             "leadingPercent": 100,
             "weight": 600,
-            "tracking": -1,
+            "tracking": -1.4,
             "case": "normal",
             "italic": false
           }
@@ -136,7 +136,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 39.68,
             "leadingPercent": 110,
             "weight": 600,
-            "tracking": 1,
+            "tracking": 0.6,
             "case": "normal",
             "italic": false
           },
@@ -146,7 +146,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 40.92,
             "leadingPercent": 135,
             "weight": 400,
-            "tracking": 1,
+            "tracking": 0.6,
             "case": "normal",
             "italic": false
           }
@@ -158,7 +158,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 39.68,
             "leadingPercent": 110,
             "weight": 600,
-            "tracking": 1,
+            "tracking": 0.6,
             "case": "normal",
             "italic": false
           },
@@ -168,7 +168,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 52.08,
             "leadingPercent": 145,
             "weight": 400,
-            "tracking": 1,
+            "tracking": 0.6,
             "case": "normal",
             "italic": false
           }
@@ -180,7 +180,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 39.68,
             "leadingPercent": 110,
             "weight": 600,
-            "tracking": 1,
+            "tracking": 0.6,
             "case": "normal",
             "italic": false
           },
@@ -190,7 +190,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 40.92,
             "leadingPercent": 135,
             "weight": 400,
-            "tracking": 1,
+            "tracking": 0.6,
             "case": "normal",
             "italic": false
           }
@@ -200,7 +200,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
         "fontFamily": "\"Inter\", sans-serif",
         "weight": 400,
         "leadingPercent": 145,
-        "tracking": 1
+        "tracking": 0.6
       },
       "presentationNumericTypography": {
         "fontFamily": "\"Inter Tight\", sans-serif",
@@ -292,8 +292,8 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
     "id": "presentation_editorial_magazine",
     "sourceId": "pds.editorial-magazine",
     "sourceVersion": "1.0.0",
-    "label": "Editorial Magazine",
-    "desc": "Linguagem de revista impressa: serifa de display, colunas de texto, capitulares, fios pretos, fólio e legendas com crédito. O slide é lido como uma página dupla.",
+    "label": "Editorial contemporâneo",
+    "desc": "Revista de cultura: serifa expressiva, colunas, fios finos e fotografia com legenda.",
     "category": "editorial",
     "useCases": [
       "Relatório de tendências",
@@ -303,21 +303,21 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
     ],
     "previewVariant": "editorial",
     "brand": {
-      "bg": "#F5F0E6",
-      "titleColor": "#1C1A17",
-      "subtitleColor": "#4D443A",
-      "textColor": "#4D443A",
-      "accent": "#B3261E",
-      "titleFont": "\"Playfair Display\", serif",
-      "subtitleFont": "\"Libre Franklin\", sans-serif",
+      "bg": "#F3EEE6",
+      "titleColor": "#1B1916",
+      "subtitleColor": "#5C554D",
+      "textColor": "#5C554D",
+      "accent": "#A8321E",
+      "titleFont": "\"Fraunces\", Georgia, serif",
+      "subtitleFont": "\"Source Serif 4\", serif",
       "bodyFont": "\"Source Serif 4\", serif",
-      "textTitleWeight": 700,
+      "textTitleWeight": 380,
       "textTitleCase": "normal",
-      "textTitleTracking": 2,
+      "textTitleTracking": 0.8,
       "textTitleSize": 49.6,
-      "subtitleWeight": 600,
-      "subtitleCase": "upper",
-      "textSubTracking": 15,
+      "subtitleWeight": 400,
+      "subtitleCase": "normal",
+      "textSubTracking": 1,
       "textSubSize": 40.92,
       "textBodyAfterSize": 75.23,
       "bodyWeight": 400,
@@ -332,11 +332,11 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
       "align": "left",
       "titleSize": 49.6,
       "subSize": 40.92,
-      "titleTracking": 2,
-      "subTracking": 15,
+      "titleTracking": 0.8,
+      "subTracking": 1,
       "titleLeading": 105,
       "subLeading": 130,
-      "titleWeight": 700,
+      "titleWeight": 380,
       "titleCase": "normal",
       "bodyAfterSize": 75.23,
       "bodyTracking": 0.4,
@@ -346,132 +346,132 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
         "cover": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"Playfair Display\", serif",
+            "fontFamily": "\"Fraunces\", Georgia, serif",
             "sizePercent": 49.6,
             "leadingPercent": 105,
-            "weight": 700,
-            "tracking": 2,
+            "weight": 380,
+            "tracking": 0.8,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"Libre Franklin\", sans-serif",
+            "fontFamily": "\"Source Serif 4\", serif",
             "sizePercent": 40.92,
             "leadingPercent": 130,
-            "weight": 600,
-            "tracking": 15,
-            "case": "upper",
+            "weight": 400,
+            "tracking": 1,
+            "case": "normal",
             "italic": false
           }
         },
         "content": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"Playfair Display\", serif",
+            "fontFamily": "\"Fraunces\", Georgia, serif",
             "sizePercent": 49.6,
             "leadingPercent": 105,
-            "weight": 700,
-            "tracking": 2,
+            "weight": 380,
+            "tracking": 0.8,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"Libre Franklin\", sans-serif",
+            "fontFamily": "\"Source Serif 4\", serif",
             "sizePercent": 40.92,
             "leadingPercent": 130,
-            "weight": 600,
-            "tracking": 15,
-            "case": "upper",
+            "weight": 400,
+            "tracking": 1,
+            "case": "normal",
             "italic": false
           }
         },
         "divider": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"Playfair Display\", serif",
+            "fontFamily": "\"Fraunces\", Georgia, serif",
             "sizePercent": 49.6,
             "leadingPercent": 105,
-            "weight": 700,
-            "tracking": 2,
+            "weight": 380,
+            "tracking": 0.8,
             "case": "normal",
             "italic": true
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"Libre Franklin\", sans-serif",
+            "fontFamily": "\"Source Serif 4\", serif",
             "sizePercent": 40.92,
             "leadingPercent": 130,
-            "weight": 600,
-            "tracking": 15,
-            "case": "upper",
+            "weight": 400,
+            "tracking": 1,
+            "case": "normal",
             "italic": false
           }
         },
         "data": {
           "title": {
             "role": "h2",
-            "fontFamily": "\"Playfair Display\", serif",
+            "fontFamily": "\"Fraunces\", Georgia, serif",
             "sizePercent": 29.76,
             "leadingPercent": 110,
-            "weight": 700,
-            "tracking": 2,
+            "weight": 380,
+            "tracking": 0.8,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"Libre Franklin\", sans-serif",
+            "fontFamily": "\"Source Serif 4\", serif",
             "sizePercent": 40.92,
             "leadingPercent": 130,
-            "weight": 600,
-            "tracking": 15,
-            "case": "upper",
+            "weight": 400,
+            "tracking": 1,
+            "case": "normal",
             "italic": false
           }
         },
         "demo": {
           "title": {
             "role": "folio",
-            "fontFamily": "\"Libre Franklin\", sans-serif",
+            "fontFamily": "\"Source Serif 4\", serif",
             "sizePercent": 11.16,
             "leadingPercent": 100,
             "weight": 500,
-            "tracking": 13,
-            "case": "upper",
+            "tracking": 3,
+            "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"Libre Franklin\", sans-serif",
+            "fontFamily": "\"Source Serif 4\", serif",
             "sizePercent": 40.92,
             "leadingPercent": 130,
-            "weight": 600,
-            "tracking": 15,
-            "case": "upper",
+            "weight": 400,
+            "tracking": 1,
+            "case": "normal",
             "italic": false
           }
         },
         "closing": {
           "title": {
             "role": "display",
-            "fontFamily": "\"Playfair Display\", serif",
+            "fontFamily": "\"Fraunces\", Georgia, serif",
             "sizePercent": 86.81,
             "leadingPercent": 95,
-            "weight": 700,
-            "tracking": 2,
+            "weight": 380,
+            "tracking": 0.8,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "deck",
-            "fontFamily": "\"Libre Franklin\", sans-serif",
+            "fontFamily": "\"Source Serif 4\", serif",
             "sizePercent": 66.96,
             "leadingPercent": 130,
-            "weight": 600,
-            "tracking": 15,
-            "case": "upper",
+            "weight": 400,
+            "tracking": 1,
+            "case": "normal",
             "italic": false
           }
         }
@@ -483,8 +483,8 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
         "tracking": 1
       },
       "presentationNumericTypography": {
-        "fontFamily": "\"Playfair Display\", serif",
-        "weight": 700
+        "fontFamily": "\"Fraunces\", Georgia, serif",
+        "weight": 380
       },
       "presentationTitleSizeByComposition": {
         "cover": 49.6,
@@ -573,8 +573,8 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
     "id": "presentation_data_first",
     "sourceId": "pds.data-first",
     "sourceVersion": "1.0.0",
-    "label": "Data First",
-    "desc": "O gráfico é o herói. Faixa de cabeçalho com título-insight, grid modular de dashboard 12×6, números tabulares em mono e paleta de dados acessível. Texto existe para explicar o dado.",
+    "label": "Cultural e artístico",
+    "desc": "Colagem controlada: recortes, blocos de cor deslocados, fita adesiva e formas simples — sempre com uma área limpa para ler.",
     "category": "analytics",
     "useCases": [
       "Review de métricas e performance",
@@ -584,25 +584,25 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
     ],
     "previewVariant": "data",
     "brand": {
-      "bg": "#F6F7F9",
-      "titleColor": "#0E1726",
-      "subtitleColor": "#475467",
-      "textColor": "#475467",
-      "accent": "#2563EB",
-      "titleFont": "\"IBM Plex Sans\", sans-serif",
-      "subtitleFont": "\"IBM Plex Sans Condensed\", sans-serif",
-      "bodyFont": "\"IBM Plex Sans\", sans-serif",
-      "textTitleWeight": 600,
+      "bg": "#EFE7DA",
+      "titleColor": "#1C1A17",
+      "subtitleColor": "#575148",
+      "textColor": "#575148",
+      "accent": "#2B4BFF",
+      "titleFont": "\"Syne\", Arial, sans-serif",
+      "subtitleFont": "\"DM Sans\", Arial, sans-serif",
+      "bodyFont": "\"DM Sans\", Arial, sans-serif",
+      "textTitleWeight": 700,
       "textTitleCase": "normal",
-      "textTitleTracking": 2,
+      "textTitleTracking": 0.4,
       "textTitleSize": 29.76,
-      "subtitleWeight": 500,
+      "subtitleWeight": 400,
       "subtitleCase": "normal",
-      "textSubTracking": 1,
+      "textSubTracking": 0.8,
       "textSubSize": 48.36,
       "textBodyAfterSize": 69.44,
       "bodyWeight": 400,
-      "textBodyTracking": 0.4,
+      "textBodyTracking": 0.2,
       "textBodyLeading": 140,
       "textTitleLeading": 115,
       "textSubLeading": 130,
@@ -613,35 +613,35 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
       "align": "left",
       "titleSize": 29.76,
       "subSize": 48.36,
-      "titleTracking": 2,
-      "subTracking": 1,
+      "titleTracking": 0.4,
+      "subTracking": 0.8,
       "titleLeading": 115,
       "subLeading": 130,
-      "titleWeight": 600,
+      "titleWeight": 700,
       "titleCase": "normal",
       "bodyAfterSize": 69.44,
-      "bodyTracking": 0.4,
+      "bodyTracking": 0.2,
       "bodyLeading": 140,
       "bodyWeight": 400,
       "presentationTypographyByComposition": {
         "cover": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"IBM Plex Sans\", sans-serif",
+            "fontFamily": "\"Syne\", Arial, sans-serif",
             "sizePercent": 29.76,
             "leadingPercent": 115,
-            "weight": 600,
-            "tracking": 2,
+            "weight": 700,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"IBM Plex Sans Condensed\", sans-serif",
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
             "sizePercent": 48.36,
             "leadingPercent": 130,
-            "weight": 500,
-            "tracking": 1,
+            "weight": 400,
+            "tracking": 0.8,
             "case": "normal",
             "italic": false
           }
@@ -649,21 +649,21 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
         "content": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"IBM Plex Sans\", sans-serif",
+            "fontFamily": "\"Syne\", Arial, sans-serif",
             "sizePercent": 29.76,
             "leadingPercent": 115,
-            "weight": 600,
-            "tracking": 2,
+            "weight": 700,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"IBM Plex Sans Condensed\", sans-serif",
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
             "sizePercent": 48.36,
             "leadingPercent": 130,
-            "weight": 500,
-            "tracking": 1,
+            "weight": 400,
+            "tracking": 0.8,
             "case": "normal",
             "italic": false
           }
@@ -671,21 +671,21 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
         "divider": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"IBM Plex Sans\", sans-serif",
+            "fontFamily": "\"Syne\", Arial, sans-serif",
             "sizePercent": 29.76,
             "leadingPercent": 115,
-            "weight": 600,
-            "tracking": 2,
+            "weight": 700,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "caption",
-            "fontFamily": "\"IBM Plex Sans\", sans-serif",
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
             "sizePercent": 37.2,
             "leadingPercent": 130,
             "weight": 400,
-            "tracking": 1,
+            "tracking": 0.8,
             "case": "normal",
             "italic": false
           }
@@ -693,21 +693,21 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
         "data": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"IBM Plex Sans\", sans-serif",
+            "fontFamily": "\"Syne\", Arial, sans-serif",
             "sizePercent": 29.76,
             "leadingPercent": 115,
-            "weight": 600,
-            "tracking": 2,
+            "weight": 700,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"IBM Plex Sans Condensed\", sans-serif",
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
             "sizePercent": 48.36,
             "leadingPercent": 130,
-            "weight": 500,
-            "tracking": 1,
+            "weight": 400,
+            "tracking": 0.8,
             "case": "normal",
             "italic": false
           }
@@ -715,21 +715,21 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
         "demo": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"IBM Plex Sans\", sans-serif",
+            "fontFamily": "\"Syne\", Arial, sans-serif",
             "sizePercent": 29.76,
             "leadingPercent": 115,
-            "weight": 600,
-            "tracking": 2,
+            "weight": 700,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"IBM Plex Sans Condensed\", sans-serif",
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
             "sizePercent": 48.36,
             "leadingPercent": 130,
-            "weight": 500,
-            "tracking": 1,
+            "weight": 400,
+            "tracking": 0.8,
             "case": "normal",
             "italic": false
           }
@@ -737,35 +737,35 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
         "closing": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"IBM Plex Sans\", sans-serif",
+            "fontFamily": "\"Syne\", Arial, sans-serif",
             "sizePercent": 29.76,
             "leadingPercent": 115,
-            "weight": 600,
-            "tracking": 2,
+            "weight": 700,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"IBM Plex Sans Condensed\", sans-serif",
+            "fontFamily": "\"DM Sans\", Arial, sans-serif",
             "sizePercent": 48.36,
             "leadingPercent": 130,
-            "weight": 500,
-            "tracking": 1,
+            "weight": 400,
+            "tracking": 0.8,
             "case": "normal",
             "italic": false
           }
         }
       },
       "presentationBodyTypography": {
-        "fontFamily": "\"IBM Plex Sans\", sans-serif",
+        "fontFamily": "\"DM Sans\", Arial, sans-serif",
         "weight": 400,
         "leadingPercent": 140,
-        "tracking": 1
+        "tracking": 0.8
       },
       "presentationNumericTypography": {
-        "fontFamily": "\"IBM Plex Mono\", monospace",
-        "weight": 500
+        "fontFamily": "\"Syne\", Arial, sans-serif",
+        "weight": 700
       },
       "presentationTitleSizeByComposition": {
         "cover": 29.76,
@@ -855,8 +855,8 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
     "id": "presentation_swiss_grid",
     "sourceId": "pds.swiss-grid",
     "sourceVersion": "1.0.0",
-    "label": "Swiss Grid",
-    "desc": "Estilo Tipográfico Internacional: grid modular 8×6 visível na construção, alinhamento à esquerda com margem irregular, assimetria, sans grotesca, preto/branco e um vermelho funcional. Números e fios fortes fazem a estrutura.",
+    "label": "Suíço contemporâneo",
+    "desc": "Grade assimétrica de 12 colunas, contraste extremo de escala, vermelho como gesto e espaço vazio estrutural.",
     "category": "design",
     "useCases": [
       "Portfólio de design/arquitetura",
@@ -866,25 +866,25 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
     ],
     "previewVariant": "swiss",
     "brand": {
-      "bg": "#F4F4F0",
-      "titleColor": "#111111",
-      "subtitleColor": "#4A4A4A",
-      "textColor": "#4A4A4A",
-      "accent": "#E30613",
+      "bg": "#FFFFFF",
+      "titleColor": "#0A0A0A",
+      "subtitleColor": "#55554F",
+      "textColor": "#55554F",
+      "accent": "#E3001B",
       "titleFont": "\"Archivo\", sans-serif",
       "subtitleFont": "\"Archivo\", sans-serif",
-      "bodyFont": "\"Inter\", sans-serif",
+      "bodyFont": "\"Archivo\", sans-serif",
       "textTitleWeight": 800,
       "textTitleCase": "normal",
-      "textTitleTracking": -0.5,
+      "textTitleTracking": -1.2,
       "textTitleSize": 44.64,
-      "subtitleWeight": 500,
+      "subtitleWeight": 400,
       "subtitleCase": "normal",
-      "textSubTracking": 0,
+      "textSubTracking": 0.4,
       "textSubSize": 44.64,
       "textBodyAfterSize": 69.44,
       "bodyWeight": 400,
-      "textBodyTracking": 0.4,
+      "textBodyTracking": -0.2,
       "textBodyLeading": 140,
       "textTitleLeading": 100,
       "textSubLeading": 140,
@@ -895,14 +895,14 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
       "align": "left",
       "titleSize": 44.64,
       "subSize": 44.64,
-      "titleTracking": -0.5,
-      "subTracking": 0,
+      "titleTracking": -1.2,
+      "subTracking": 0.4,
       "titleLeading": 100,
       "subLeading": 140,
       "titleWeight": 800,
       "titleCase": "normal",
       "bodyAfterSize": 69.44,
-      "bodyTracking": 0.4,
+      "bodyTracking": -0.2,
       "bodyLeading": 140,
       "bodyWeight": 400,
       "presentationTypographyByComposition": {
@@ -913,17 +913,17 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 79.37,
             "leadingPercent": 95,
             "weight": 800,
-            "tracking": -0.5,
+            "tracking": -1.2,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "caption",
-            "fontFamily": "\"Inter\", sans-serif",
+            "fontFamily": "\"Archivo\", sans-serif",
             "sizePercent": 37.2,
             "leadingPercent": 130,
             "weight": 400,
-            "tracking": 0,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           }
@@ -935,17 +935,17 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 44.64,
             "leadingPercent": 100,
             "weight": 800,
-            "tracking": -0.5,
+            "tracking": -1.2,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "body",
-            "fontFamily": "\"Inter\", sans-serif",
+            "fontFamily": "\"Archivo\", sans-serif",
             "sizePercent": 44.64,
             "leadingPercent": 140,
             "weight": 400,
-            "tracking": 0,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           }
@@ -957,7 +957,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 44.64,
             "leadingPercent": 100,
             "weight": 800,
-            "tracking": -0.5,
+            "tracking": -1.2,
             "case": "normal",
             "italic": false
           },
@@ -967,7 +967,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 320,
             "leadingPercent": 85,
             "weight": 800,
-            "tracking": -2.5,
+            "tracking": -3.2,
             "case": "normal",
             "italic": false
           }
@@ -979,17 +979,17 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 44.64,
             "leadingPercent": 100,
             "weight": 800,
-            "tracking": -0.5,
+            "tracking": -1.2,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "caption",
-            "fontFamily": "\"Inter\", sans-serif",
+            "fontFamily": "\"Archivo\", sans-serif",
             "sizePercent": 37.2,
             "leadingPercent": 130,
             "weight": 400,
-            "tracking": 0,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           }
@@ -1001,7 +1001,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 24.8,
             "leadingPercent": 110,
             "weight": 800,
-            "tracking": -0.5,
+            "tracking": -1.2,
             "case": "normal",
             "italic": false
           },
@@ -1010,8 +1010,8 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "fontFamily": "\"Archivo\", sans-serif",
             "sizePercent": 133.93,
             "leadingPercent": 100,
-            "weight": 500,
-            "tracking": 0,
+            "weight": 400,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           }
@@ -1023,7 +1023,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 79.37,
             "leadingPercent": 95,
             "weight": 800,
-            "tracking": -0.5,
+            "tracking": -1.2,
             "case": "normal",
             "italic": false
           },
@@ -1032,18 +1032,18 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "fontFamily": "\"Archivo\", sans-serif",
             "sizePercent": 133.93,
             "leadingPercent": 100,
-            "weight": 500,
-            "tracking": 0,
+            "weight": 400,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           }
         }
       },
       "presentationBodyTypography": {
-        "fontFamily": "\"Inter\", sans-serif",
+        "fontFamily": "\"Archivo\", sans-serif",
         "weight": 400,
         "leadingPercent": 140,
-        "tracking": 1
+        "tracking": 0.4
       },
       "presentationNumericTypography": {
         "fontFamily": "\"Archivo\", sans-serif",
@@ -1139,7 +1139,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
     "sourceId": "pds.cinematic",
     "sourceVersion": "1.0.0",
     "label": "Cinemático",
-    "desc": "Cada slide é um plano de filme: imagem em sangria total, barras letterbox 2.39:1, gradação teal & orange, texto como legenda ou cartela de capítulo, ritmo de corte e créditos finais.",
+    "desc": "Sequência de cenas: fotografia de ponta a ponta, títulos condensados, faixas de letterbox e pausas em preto.",
     "category": "storytelling",
     "useCases": [
       "Lançamento de marca ou campanha",
@@ -1150,20 +1150,20 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
     "previewVariant": "cinematic",
     "brand": {
       "bg": "#0B0B0C",
-      "titleColor": "#EDE6DA",
-      "subtitleColor": "#B9B2A6",
-      "textColor": "#B9B2A6",
-      "accent": "#E0A43A",
-      "titleFont": "\"Bebas Neue\", sans-serif",
-      "subtitleFont": "\"Montserrat\", sans-serif",
-      "bodyFont": "\"Inter\", sans-serif",
-      "textTitleWeight": 400,
+      "titleColor": "#F2EFE9",
+      "subtitleColor": "#A39E95",
+      "textColor": "#A39E95",
+      "accent": "#E8B04A",
+      "titleFont": "\"Barlow Condensed\", Arial Narrow, sans-serif",
+      "subtitleFont": "\"Barlow\", Arial, sans-serif",
+      "bodyFont": "\"Barlow\", Arial, sans-serif",
+      "textTitleWeight": 600,
       "textTitleCase": "upper",
-      "textTitleTracking": 2.5,
+      "textTitleTracking": -0.3,
       "textTitleSize": 74.4,
-      "subtitleWeight": 500,
-      "subtitleCase": "upper",
-      "textSubTracking": 31,
+      "subtitleWeight": 400,
+      "subtitleCase": "normal",
+      "textSubTracking": 1,
       "textSubSize": 44.64,
       "textBodyAfterSize": 81.02,
       "bodyWeight": 400,
@@ -1178,11 +1178,11 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
       "align": "center",
       "titleSize": 74.4,
       "subSize": 44.64,
-      "titleTracking": 2.5,
-      "subTracking": 31,
+      "titleTracking": -0.3,
+      "subTracking": 1,
       "titleLeading": 95,
       "subLeading": 130,
-      "titleWeight": 400,
+      "titleWeight": 600,
       "titleCase": "upper",
       "bodyAfterSize": 81.02,
       "bodyTracking": 0.4,
@@ -1192,109 +1192,109 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
         "cover": {
           "title": {
             "role": "display",
-            "fontFamily": "\"Bebas Neue\", sans-serif",
+            "fontFamily": "\"Barlow Condensed\", Arial Narrow, sans-serif",
             "sizePercent": 124.01,
             "leadingPercent": 90,
-            "weight": 400,
-            "tracking": 2.5,
+            "weight": 600,
+            "tracking": -0.3,
             "case": "upper",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"Montserrat\", sans-serif",
+            "fontFamily": "\"Barlow\", Arial, sans-serif",
             "sizePercent": 44.64,
             "leadingPercent": 130,
-            "weight": 500,
-            "tracking": 31,
-            "case": "upper",
+            "weight": 400,
+            "tracking": 1,
+            "case": "normal",
             "italic": false
           }
         },
         "content": {
           "title": {
             "role": "subtitleCaption",
-            "fontFamily": "\"Montserrat\", sans-serif",
+            "fontFamily": "\"Barlow\", Arial, sans-serif",
             "sizePercent": 22.32,
             "leadingPercent": 135,
-            "weight": 500,
-            "tracking": 33,
-            "case": "upper",
+            "weight": 400,
+            "tracking": 3,
+            "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"Montserrat\", sans-serif",
+            "fontFamily": "\"Barlow\", Arial, sans-serif",
             "sizePercent": 44.64,
             "leadingPercent": 130,
-            "weight": 500,
-            "tracking": 31,
-            "case": "upper",
+            "weight": 400,
+            "tracking": 1,
+            "case": "normal",
             "italic": false
           }
         },
         "divider": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"Bebas Neue\", sans-serif",
+            "fontFamily": "\"Barlow Condensed\", Arial Narrow, sans-serif",
             "sizePercent": 74.4,
             "leadingPercent": 95,
-            "weight": 400,
-            "tracking": 2.5,
+            "weight": 600,
+            "tracking": -0.3,
             "case": "upper",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"Montserrat\", sans-serif",
+            "fontFamily": "\"Barlow\", Arial, sans-serif",
             "sizePercent": 44.64,
             "leadingPercent": 130,
-            "weight": 500,
-            "tracking": 31,
-            "case": "upper",
+            "weight": 400,
+            "tracking": 1,
+            "case": "normal",
             "italic": false
           }
         },
         "data": {
           "title": {
             "role": "display",
-            "fontFamily": "\"Bebas Neue\", sans-serif",
+            "fontFamily": "\"Barlow Condensed\", Arial Narrow, sans-serif",
             "sizePercent": 124.01,
             "leadingPercent": 90,
-            "weight": 400,
-            "tracking": 2.5,
+            "weight": 600,
+            "tracking": -0.3,
             "case": "upper",
             "italic": false
           },
           "subtitle": {
             "role": "subtitleCaption",
-            "fontFamily": "\"Montserrat\", sans-serif",
+            "fontFamily": "\"Barlow\", Arial, sans-serif",
             "sizePercent": 66.96,
             "leadingPercent": 135,
-            "weight": 500,
-            "tracking": 31,
-            "case": "upper",
+            "weight": 400,
+            "tracking": 1,
+            "case": "normal",
             "italic": false
           }
         },
         "demo": {
           "title": {
             "role": "subtitle",
-            "fontFamily": "\"Montserrat\", sans-serif",
+            "fontFamily": "\"Barlow\", Arial, sans-serif",
             "sizePercent": 14.88,
             "leadingPercent": 130,
-            "weight": 500,
-            "tracking": 33,
-            "case": "upper",
+            "weight": 400,
+            "tracking": 3,
+            "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "h2",
-            "fontFamily": "\"Bebas Neue\", sans-serif",
+            "fontFamily": "\"Barlow Condensed\", Arial Narrow, sans-serif",
             "sizePercent": 119.05,
             "leadingPercent": 100,
-            "weight": 400,
-            "tracking": 5,
+            "weight": 600,
+            "tracking": 2.2,
             "case": "upper",
             "italic": false
           }
@@ -1302,35 +1302,35 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
         "closing": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"Bebas Neue\", sans-serif",
+            "fontFamily": "\"Barlow Condensed\", Arial Narrow, sans-serif",
             "sizePercent": 74.4,
             "leadingPercent": 95,
-            "weight": 400,
-            "tracking": 2.5,
+            "weight": 600,
+            "tracking": -0.3,
             "case": "upper",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"Montserrat\", sans-serif",
+            "fontFamily": "\"Barlow\", Arial, sans-serif",
             "sizePercent": 44.64,
             "leadingPercent": 130,
-            "weight": 500,
-            "tracking": 31,
-            "case": "upper",
+            "weight": 400,
+            "tracking": 1,
+            "case": "normal",
             "italic": false
           }
         }
       },
       "presentationBodyTypography": {
-        "fontFamily": "\"Inter\", sans-serif",
+        "fontFamily": "\"Barlow\", Arial, sans-serif",
         "weight": 400,
         "leadingPercent": 145,
         "tracking": 1
       },
       "presentationNumericTypography": {
-        "fontFamily": "\"Bebas Neue\", sans-serif",
-        "weight": 400
+        "fontFamily": "\"Barlow Condensed\", Arial Narrow, sans-serif",
+        "weight": 600
       },
       "presentationTitleSizeByComposition": {
         "cover": 124.01,
@@ -1416,8 +1416,8 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
     "id": "presentation_typographic_bold",
     "sourceId": "pds.typographic-bold",
     "sourceVersion": "1.0.0",
-    "label": "Tipografia Bold",
-    "desc": "A palavra é a imagem. Títulos em corpo gigante (até 280px) que sangram, cor chapada por slide, contraste duro preto/amarelo, zero fotos por padrão. Ritmo por mudança de fundo.",
+    "label": "Tipográfico expressivo",
+    "desc": "A palavra é a imagem: escala extrema, quebras desenhadas, fundos chapados que alternam papel, tinta e laranja.",
     "category": "brand",
     "useCases": [
       "Manifesto de marca",
@@ -1428,25 +1428,25 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
     ],
     "previewVariant": "typographic",
     "brand": {
-      "bg": "#111111",
-      "titleColor": "#F2F2F0",
-      "subtitleColor": "#C9C9C4",
-      "textColor": "#C9C9C4",
-      "accent": "#FFD100",
+      "bg": "#ECE9E0",
+      "titleColor": "#111111",
+      "subtitleColor": "#4A4740",
+      "textColor": "#4A4740",
+      "accent": "#E44318",
       "titleFont": "\"Anton\", sans-serif",
       "subtitleFont": "\"Space Grotesk\", sans-serif",
       "bodyFont": "\"Space Grotesk\", sans-serif",
       "textTitleWeight": 400,
       "textTitleCase": "upper",
-      "textTitleTracking": -2.5,
+      "textTitleTracking": -1.1,
       "textTitleSize": 69.44,
-      "subtitleWeight": 700,
+      "subtitleWeight": 400,
       "subtitleCase": "normal",
-      "textSubTracking": -1,
+      "textSubTracking": 0.4,
       "textSubSize": 74.4,
       "textBodyAfterSize": 92.59,
       "bodyWeight": 400,
-      "textBodyTracking": 0.4,
+      "textBodyTracking": -0.2,
       "textBodyLeading": 135,
       "textTitleLeading": 95,
       "textSubLeading": 120,
@@ -1457,14 +1457,14 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
       "align": "left",
       "titleSize": 69.44,
       "subSize": 74.4,
-      "titleTracking": -2.5,
-      "subTracking": -1,
+      "titleTracking": -1.1,
+      "subTracking": 0.4,
       "titleLeading": 95,
       "subLeading": 120,
       "titleWeight": 400,
       "titleCase": "upper",
       "bodyAfterSize": 92.59,
-      "bodyTracking": 0.4,
+      "bodyTracking": -0.2,
       "bodyLeading": 135,
       "bodyWeight": 400,
       "presentationTypographyByComposition": {
@@ -1475,7 +1475,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 173.61,
             "leadingPercent": 85,
             "weight": 400,
-            "tracking": -2.5,
+            "tracking": -1.1,
             "case": "upper",
             "italic": false
           },
@@ -1484,8 +1484,8 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "fontFamily": "\"Space Grotesk\", sans-serif",
             "sizePercent": 74.4,
             "leadingPercent": 120,
-            "weight": 700,
-            "tracking": -1,
+            "weight": 400,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           }
@@ -1497,7 +1497,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 69.44,
             "leadingPercent": 95,
             "weight": 400,
-            "tracking": -2.5,
+            "tracking": -1.1,
             "case": "upper",
             "italic": false
           },
@@ -1507,7 +1507,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 59.52,
             "leadingPercent": 135,
             "weight": 400,
-            "tracking": -1,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           }
@@ -1519,7 +1519,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 111.61,
             "leadingPercent": 90,
             "weight": 400,
-            "tracking": -2.5,
+            "tracking": -1.1,
             "case": "upper",
             "italic": false
           },
@@ -1528,8 +1528,8 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "fontFamily": "\"Space Grotesk\", sans-serif",
             "sizePercent": 74.4,
             "leadingPercent": 120,
-            "weight": 700,
-            "tracking": -1,
+            "weight": 400,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           }
@@ -1541,7 +1541,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 39.68,
             "leadingPercent": 105,
             "weight": 400,
-            "tracking": -2.5,
+            "tracking": -1.1,
             "case": "upper",
             "italic": false
           },
@@ -1550,8 +1550,8 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "fontFamily": "\"Space Grotesk\", sans-serif",
             "sizePercent": 74.4,
             "leadingPercent": 120,
-            "weight": 700,
-            "tracking": -1,
+            "weight": 400,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           }
@@ -1563,7 +1563,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 69.44,
             "leadingPercent": 95,
             "weight": 400,
-            "tracking": -2.5,
+            "tracking": -1.1,
             "case": "upper",
             "italic": false
           },
@@ -1572,8 +1572,8 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "fontFamily": "\"Space Grotesk\", sans-serif",
             "sizePercent": 74.4,
             "leadingPercent": 120,
-            "weight": 700,
-            "tracking": -1,
+            "weight": 400,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           }
@@ -1585,7 +1585,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 173.61,
             "leadingPercent": 85,
             "weight": 400,
-            "tracking": -2.5,
+            "tracking": -1.1,
             "case": "upper",
             "italic": false
           },
@@ -1594,8 +1594,8 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "fontFamily": "\"Space Grotesk\", sans-serif",
             "sizePercent": 74.4,
             "leadingPercent": 120,
-            "weight": 700,
-            "tracking": -1,
+            "weight": 400,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           }
@@ -1605,7 +1605,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
         "fontFamily": "\"Space Grotesk\", sans-serif",
         "weight": 400,
         "leadingPercent": 135,
-        "tracking": 1
+        "tracking": 0.4
       },
       "presentationNumericTypography": {
         "fontFamily": "\"Anton\", sans-serif",
@@ -1698,8 +1698,8 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
     "id": "presentation_modular_cards",
     "sourceId": "pds.modular-cards",
     "sourceVersion": "1.0.0",
-    "label": "Modular Cards",
-    "desc": "Interface de produto como linguagem de slide: cards com raio 20, elevação suave, ícones em tiles coloridos, chips e badges, fundo levemente colorido. Tudo é um componente reorganizável.",
+    "label": "Modular contemporâneo",
+    "desc": "Superfícies organizadas: cartões, etapas, comparações e hierarquia clara sobre um fundo neutro.",
     "category": "product",
     "useCases": [
       "Demo e pitch de SaaS/app",
@@ -1709,25 +1709,25 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
     ],
     "previewVariant": "modular",
     "brand": {
-      "bg": "#EEF2F7",
-      "titleColor": "#1E2A3B",
-      "subtitleColor": "#4A5A70",
-      "textColor": "#4A5A70",
-      "accent": "#5B4DFF",
+      "bg": "#ECEEF2",
+      "titleColor": "#12161C",
+      "subtitleColor": "#525B68",
+      "textColor": "#525B68",
+      "accent": "#5B4BFF",
       "titleFont": "\"Plus Jakarta Sans\", sans-serif",
       "subtitleFont": "\"Plus Jakarta Sans\", sans-serif",
-      "bodyFont": "\"Inter\", sans-serif",
+      "bodyFont": "\"Plus Jakarta Sans\", sans-serif",
       "textTitleWeight": 700,
       "textTitleCase": "normal",
-      "textTitleTracking": 1,
+      "textTitleTracking": 0.4,
       "textTitleSize": 34.72,
-      "subtitleWeight": 500,
+      "subtitleWeight": 400,
       "subtitleCase": "normal",
-      "textSubTracking": 1,
+      "textSubTracking": 0.7,
       "textSubSize": 52.08,
       "textBodyAfterSize": 69.44,
       "bodyWeight": 400,
-      "textBodyTracking": 0.4,
+      "textBodyTracking": 0.1,
       "textBodyLeading": 145,
       "textTitleLeading": 110,
       "textSubLeading": 135,
@@ -1738,14 +1738,14 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
       "align": "left",
       "titleSize": 34.72,
       "subSize": 52.08,
-      "titleTracking": 1,
-      "subTracking": 1,
+      "titleTracking": 0.4,
+      "subTracking": 0.7,
       "titleLeading": 110,
       "subLeading": 135,
       "titleWeight": 700,
       "titleCase": "normal",
       "bodyAfterSize": 69.44,
-      "bodyTracking": 0.4,
+      "bodyTracking": 0.1,
       "bodyLeading": 145,
       "bodyWeight": 400,
       "presentationTypographyByComposition": {
@@ -1756,7 +1756,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 34.72,
             "leadingPercent": 110,
             "weight": 700,
-            "tracking": 1,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           },
@@ -1765,8 +1765,8 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "fontFamily": "\"Plus Jakarta Sans\", sans-serif",
             "sizePercent": 52.08,
             "leadingPercent": 135,
-            "weight": 500,
-            "tracking": 1,
+            "weight": 400,
+            "tracking": 0.7,
             "case": "normal",
             "italic": false
           }
@@ -1778,7 +1778,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 34.72,
             "leadingPercent": 110,
             "weight": 700,
-            "tracking": 1,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           },
@@ -1787,8 +1787,8 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "fontFamily": "\"Plus Jakarta Sans\", sans-serif",
             "sizePercent": 52.08,
             "leadingPercent": 135,
-            "weight": 500,
-            "tracking": 1,
+            "weight": 400,
+            "tracking": 0.7,
             "case": "normal",
             "italic": false
           }
@@ -1800,7 +1800,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 34.72,
             "leadingPercent": 110,
             "weight": 700,
-            "tracking": 1,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           },
@@ -1809,8 +1809,8 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "fontFamily": "\"Plus Jakarta Sans\", sans-serif",
             "sizePercent": 52.08,
             "leadingPercent": 135,
-            "weight": 500,
-            "tracking": 1,
+            "weight": 400,
+            "tracking": 0.7,
             "case": "normal",
             "italic": false
           }
@@ -1822,7 +1822,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 34.72,
             "leadingPercent": 110,
             "weight": 700,
-            "tracking": 1,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           },
@@ -1831,8 +1831,8 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "fontFamily": "\"Plus Jakarta Sans\", sans-serif",
             "sizePercent": 52.08,
             "leadingPercent": 135,
-            "weight": 500,
-            "tracking": 1,
+            "weight": 400,
+            "tracking": 0.7,
             "case": "normal",
             "italic": false
           }
@@ -1844,7 +1844,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 34.72,
             "leadingPercent": 110,
             "weight": 700,
-            "tracking": 1,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           },
@@ -1853,8 +1853,8 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "fontFamily": "\"Plus Jakarta Sans\", sans-serif",
             "sizePercent": 52.08,
             "leadingPercent": 135,
-            "weight": 500,
-            "tracking": 1,
+            "weight": 400,
+            "tracking": 0.7,
             "case": "normal",
             "italic": false
           }
@@ -1866,7 +1866,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 34.72,
             "leadingPercent": 110,
             "weight": 700,
-            "tracking": 1,
+            "tracking": 0.4,
             "case": "normal",
             "italic": false
           },
@@ -1875,18 +1875,18 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "fontFamily": "\"Plus Jakarta Sans\", sans-serif",
             "sizePercent": 52.08,
             "leadingPercent": 135,
-            "weight": 500,
-            "tracking": 1,
+            "weight": 400,
+            "tracking": 0.7,
             "case": "normal",
             "italic": false
           }
         }
       },
       "presentationBodyTypography": {
-        "fontFamily": "\"Inter\", sans-serif",
+        "fontFamily": "\"Plus Jakarta Sans\", sans-serif",
         "weight": 400,
         "leadingPercent": 145,
-        "tracking": 1
+        "tracking": 0.7
       },
       "presentationNumericTypography": {
         "fontFamily": "\"Plus Jakarta Sans\", sans-serif",
@@ -1979,8 +1979,8 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
     "id": "presentation_photo_essay",
     "sourceId": "pds.photo-essay",
     "sourceVersion": "1.0.0",
-    "label": "Photo Essay",
-    "desc": "Fotografia em primeiro lugar, com respiro de galeria: fundo branco quente, passe-partout generoso, imagens em proporções mistas, texto mínimo em serifa humanista e legendas discretas. Ritmo de página de livro fotográfico.",
+    "label": "Fotográfico e humano",
+    "desc": "Ensaio fotográfico: imagem protagonista, retratos e detalhes, legendas e respiro entre fotos e texto.",
     "category": "visual",
     "useCases": [
       "Portfólio fotográfico ou de arquitetura",
@@ -1990,25 +1990,25 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
     ],
     "previewVariant": "photo",
     "brand": {
-      "bg": "#FBFAF7",
-      "titleColor": "#2B2926",
-      "subtitleColor": "#55514C",
-      "textColor": "#55514C",
-      "accent": "#8A6D4B",
-      "titleFont": "\"Cormorant Garamond\", serif",
-      "subtitleFont": "\"Jost\", sans-serif",
-      "bodyFont": "\"Jost\", sans-serif",
-      "textTitleWeight": 500,
+      "bg": "#FAF7F2",
+      "titleColor": "#1E1B18",
+      "subtitleColor": "#675F57",
+      "textColor": "#675F57",
+      "accent": "#8A5A3B",
+      "titleFont": "\"Instrument Serif\", Georgia, serif",
+      "subtitleFont": "\"Instrument Sans\", Arial, sans-serif",
+      "bodyFont": "\"Instrument Sans\", Arial, sans-serif",
+      "textTitleWeight": 400,
       "textTitleCase": "normal",
-      "textTitleTracking": 3,
+      "textTitleTracking": 1.6,
       "textTitleSize": 44.64,
       "subtitleWeight": 400,
-      "subtitleCase": "upper",
-      "textSubTracking": 19,
+      "subtitleCase": "normal",
+      "textSubTracking": 0.8,
       "textSubSize": 37.2,
       "textBodyAfterSize": 75.23,
       "bodyWeight": 400,
-      "textBodyTracking": 0.4,
+      "textBodyTracking": 0.2,
       "textBodyLeading": 155,
       "textTitleLeading": 105,
       "textSubLeading": 140,
@@ -2019,159 +2019,159 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
       "align": "left",
       "titleSize": 44.64,
       "subSize": 37.2,
-      "titleTracking": 3,
-      "subTracking": 19,
+      "titleTracking": 1.6,
+      "subTracking": 0.8,
       "titleLeading": 105,
       "subLeading": 140,
-      "titleWeight": 500,
+      "titleWeight": 400,
       "titleCase": "normal",
       "bodyAfterSize": 75.23,
-      "bodyTracking": 0.4,
+      "bodyTracking": 0.2,
       "bodyLeading": 155,
       "bodyWeight": 400,
       "presentationTypographyByComposition": {
         "cover": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"Cormorant Garamond\", serif",
+            "fontFamily": "\"Instrument Serif\", Georgia, serif",
             "sizePercent": 44.64,
             "leadingPercent": 105,
-            "weight": 500,
-            "tracking": 3,
+            "weight": 400,
+            "tracking": 1.6,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"Jost\", sans-serif",
+            "fontFamily": "\"Instrument Sans\", Arial, sans-serif",
             "sizePercent": 37.2,
             "leadingPercent": 140,
             "weight": 400,
-            "tracking": 19,
-            "case": "upper",
+            "tracking": 0.8,
+            "case": "normal",
             "italic": false
           }
         },
         "content": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"Cormorant Garamond\", serif",
+            "fontFamily": "\"Instrument Serif\", Georgia, serif",
             "sizePercent": 44.64,
             "leadingPercent": 105,
-            "weight": 500,
-            "tracking": 3,
+            "weight": 400,
+            "tracking": 1.6,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"Jost\", sans-serif",
+            "fontFamily": "\"Instrument Sans\", Arial, sans-serif",
             "sizePercent": 37.2,
             "leadingPercent": 140,
             "weight": 400,
-            "tracking": 19,
-            "case": "upper",
+            "tracking": 0.8,
+            "case": "normal",
             "italic": false
           }
         },
         "divider": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"Cormorant Garamond\", serif",
+            "fontFamily": "\"Instrument Serif\", Georgia, serif",
             "sizePercent": 44.64,
             "leadingPercent": 105,
-            "weight": 500,
-            "tracking": 3,
+            "weight": 400,
+            "tracking": 1.6,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "body",
-            "fontFamily": "\"Jost\", sans-serif",
+            "fontFamily": "\"Instrument Sans\", Arial, sans-serif",
             "sizePercent": 48.36,
             "leadingPercent": 155,
-            "weight": 300,
-            "tracking": 19,
-            "case": "upper",
+            "weight": 400,
+            "tracking": 0.8,
+            "case": "normal",
             "italic": false
           }
         },
         "data": {
           "title": {
             "role": "number",
-            "fontFamily": "\"Cormorant Garamond\", serif",
+            "fontFamily": "\"Instrument Serif\", Georgia, serif",
             "sizePercent": 59.52,
             "leadingPercent": 100,
-            "weight": 500,
-            "tracking": 3,
+            "weight": 400,
+            "tracking": 1.6,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "body",
-            "fontFamily": "\"Jost\", sans-serif",
+            "fontFamily": "\"Instrument Sans\", Arial, sans-serif",
             "sizePercent": 48.36,
             "leadingPercent": 155,
-            "weight": 300,
-            "tracking": 19,
-            "case": "upper",
+            "weight": 400,
+            "tracking": 0.8,
+            "case": "normal",
             "italic": false
           }
         },
         "demo": {
           "title": {
             "role": "caption",
-            "fontFamily": "\"Jost\", sans-serif",
+            "fontFamily": "\"Instrument Sans\", Arial, sans-serif",
             "sizePercent": 12.4,
             "leadingPercent": 140,
-            "weight": 300,
-            "tracking": 3,
+            "weight": 400,
+            "tracking": 2.8,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"Jost\", sans-serif",
+            "fontFamily": "\"Instrument Sans\", Arial, sans-serif",
             "sizePercent": 37.2,
             "leadingPercent": 140,
             "weight": 400,
-            "tracking": 19,
-            "case": "upper",
+            "tracking": 0.8,
+            "case": "normal",
             "italic": false
           }
         },
         "closing": {
           "title": {
             "role": "h2",
-            "fontFamily": "\"Cormorant Garamond\", serif",
+            "fontFamily": "\"Instrument Serif\", Georgia, serif",
             "sizePercent": 27.28,
             "leadingPercent": 115,
-            "weight": 500,
-            "tracking": 3,
+            "weight": 400,
+            "tracking": 1.6,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"Jost\", sans-serif",
+            "fontFamily": "\"Instrument Sans\", Arial, sans-serif",
             "sizePercent": 37.2,
             "leadingPercent": 140,
             "weight": 400,
-            "tracking": 19,
-            "case": "upper",
+            "tracking": 0.8,
+            "case": "normal",
             "italic": false
           }
         }
       },
       "presentationBodyTypography": {
-        "fontFamily": "\"Jost\", sans-serif",
+        "fontFamily": "\"Instrument Sans\", Arial, sans-serif",
         "weight": 400,
         "leadingPercent": 155,
-        "tracking": 1
+        "tracking": 0.8
       },
       "presentationNumericTypography": {
-        "fontFamily": "\"Cormorant Garamond\", serif",
-        "weight": 500
+        "fontFamily": "\"Instrument Serif\", Georgia, serif",
+        "weight": 400
       },
       "presentationTitleSizeByComposition": {
         "cover": 44.64,
@@ -2255,8 +2255,8 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
     "id": "presentation_technical_blueprint",
     "sourceId": "pds.technical-blueprint",
     "sourceVersion": "1.0.0",
-    "label": "Technical Blueprint",
-    "desc": "Prancha de engenharia: fundo azul-blueprint com grade milimetrada sutil, linhas brancas finas, cotas, legendas em mono, carimbo (title block) no canto inferior direito e diagramas como protagonistas.",
+    "label": "Técnico e tecnológico",
+    "desc": "Prancha técnica: grade visível, cotas, rótulos monoespaçados, números tabulares e diagramas editáveis.",
     "category": "technical",
     "useCases": [
       "Arquitetura de software e sistemas",
@@ -2266,25 +2266,25 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
     ],
     "previewVariant": "blueprint",
     "brand": {
-      "bg": "#0F2B5B",
-      "titleColor": "#E8F0FF",
-      "subtitleColor": "#B8CDF0",
-      "textColor": "#B8CDF0",
-      "accent": "#FFB454",
-      "titleFont": "\"JetBrains Mono\", monospace",
-      "subtitleFont": "\"JetBrains Mono\", monospace",
+      "bg": "#0E1217",
+      "titleColor": "#E8ECF1",
+      "subtitleColor": "#8A94A3",
+      "textColor": "#8A94A3",
+      "accent": "#5CE1A5",
+      "titleFont": "\"IBM Plex Sans\", sans-serif",
+      "subtitleFont": "\"IBM Plex Sans\", sans-serif",
       "bodyFont": "\"IBM Plex Sans\", sans-serif",
-      "textTitleWeight": 700,
-      "textTitleCase": "upper",
-      "textTitleTracking": 3,
+      "textTitleWeight": 500,
+      "textTitleCase": "normal",
+      "textTitleTracking": 1,
       "textTitleSize": 34.72,
       "subtitleWeight": 400,
-      "subtitleCase": "upper",
-      "textSubTracking": 6,
+      "subtitleCase": "normal",
+      "textSubTracking": 0.8,
       "textSubSize": 40.92,
       "textBodyAfterSize": 69.44,
       "bodyWeight": 400,
-      "textBodyTracking": 0.4,
+      "textBodyTracking": 0.2,
       "textBodyLeading": 145,
       "textTitleLeading": 110,
       "textSubLeading": 130,
@@ -2295,146 +2295,146 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
       "align": "left",
       "titleSize": 34.72,
       "subSize": 40.92,
-      "titleTracking": 3,
-      "subTracking": 6,
+      "titleTracking": 1,
+      "subTracking": 0.8,
       "titleLeading": 110,
       "subLeading": 130,
-      "titleWeight": 700,
-      "titleCase": "upper",
+      "titleWeight": 500,
+      "titleCase": "normal",
       "bodyAfterSize": 69.44,
-      "bodyTracking": 0.4,
+      "bodyTracking": 0.2,
       "bodyLeading": 145,
       "bodyWeight": 400,
       "presentationTypographyByComposition": {
         "cover": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"JetBrains Mono\", monospace",
+            "fontFamily": "\"IBM Plex Sans\", sans-serif",
             "sizePercent": 34.72,
             "leadingPercent": 110,
-            "weight": 700,
-            "tracking": 3,
-            "case": "upper",
+            "weight": 500,
+            "tracking": 1,
+            "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"JetBrains Mono\", monospace",
+            "fontFamily": "\"IBM Plex Sans\", sans-serif",
             "sizePercent": 40.92,
             "leadingPercent": 130,
             "weight": 400,
-            "tracking": 6,
-            "case": "upper",
+            "tracking": 0.8,
+            "case": "normal",
             "italic": false
           }
         },
         "content": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"JetBrains Mono\", monospace",
+            "fontFamily": "\"IBM Plex Sans\", sans-serif",
             "sizePercent": 34.72,
             "leadingPercent": 110,
-            "weight": 700,
-            "tracking": 3,
-            "case": "upper",
+            "weight": 500,
+            "tracking": 1,
+            "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"JetBrains Mono\", monospace",
+            "fontFamily": "\"IBM Plex Sans\", sans-serif",
             "sizePercent": 40.92,
             "leadingPercent": 130,
             "weight": 400,
-            "tracking": 6,
-            "case": "upper",
+            "tracking": 0.8,
+            "case": "normal",
             "italic": false
           }
         },
         "divider": {
           "title": {
             "role": "h2",
-            "fontFamily": "\"JetBrains Mono\", monospace",
+            "fontFamily": "\"IBM Plex Sans\", sans-serif",
             "sizePercent": 22.32,
             "leadingPercent": 120,
-            "weight": 700,
-            "tracking": 3,
-            "case": "upper",
+            "weight": 500,
+            "tracking": 1,
+            "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"JetBrains Mono\", monospace",
+            "fontFamily": "\"IBM Plex Sans\", sans-serif",
             "sizePercent": 40.92,
             "leadingPercent": 130,
             "weight": 400,
-            "tracking": 6,
-            "case": "upper",
+            "tracking": 0.8,
+            "case": "normal",
             "italic": false
           }
         },
         "data": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"JetBrains Mono\", monospace",
+            "fontFamily": "\"IBM Plex Sans\", sans-serif",
             "sizePercent": 34.72,
             "leadingPercent": 110,
-            "weight": 700,
-            "tracking": 3,
-            "case": "upper",
+            "weight": 500,
+            "tracking": 1,
+            "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"JetBrains Mono\", monospace",
+            "fontFamily": "\"IBM Plex Sans\", sans-serif",
             "sizePercent": 40.92,
             "leadingPercent": 130,
             "weight": 400,
-            "tracking": 6,
-            "case": "upper",
+            "tracking": 0.8,
+            "case": "normal",
             "italic": false
           }
         },
         "demo": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"JetBrains Mono\", monospace",
+            "fontFamily": "\"IBM Plex Sans\", sans-serif",
             "sizePercent": 34.72,
             "leadingPercent": 110,
-            "weight": 700,
-            "tracking": 3,
-            "case": "upper",
+            "weight": 500,
+            "tracking": 1,
+            "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"JetBrains Mono\", monospace",
+            "fontFamily": "\"IBM Plex Sans\", sans-serif",
             "sizePercent": 40.92,
             "leadingPercent": 130,
             "weight": 400,
-            "tracking": 6,
-            "case": "upper",
+            "tracking": 0.8,
+            "case": "normal",
             "italic": false
           }
         },
         "closing": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"JetBrains Mono\", monospace",
+            "fontFamily": "\"IBM Plex Sans\", sans-serif",
             "sizePercent": 34.72,
             "leadingPercent": 110,
-            "weight": 700,
-            "tracking": 3,
-            "case": "upper",
+            "weight": 500,
+            "tracking": 1,
+            "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"JetBrains Mono\", monospace",
+            "fontFamily": "\"IBM Plex Sans\", sans-serif",
             "sizePercent": 40.92,
             "leadingPercent": 130,
             "weight": 400,
-            "tracking": 6,
-            "case": "upper",
+            "tracking": 0.8,
+            "case": "normal",
             "italic": false
           }
         }
@@ -2443,11 +2443,11 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
         "fontFamily": "\"IBM Plex Sans\", sans-serif",
         "weight": 400,
         "leadingPercent": 145,
-        "tracking": 1
+        "tracking": 0.8
       },
       "presentationNumericTypography": {
-        "fontFamily": "\"JetBrains Mono\", monospace",
-        "weight": 700
+        "fontFamily": "\"IBM Plex Mono\", monospace",
+        "weight": 400
       },
       "presentationTitleSizeByComposition": {
         "cover": 34.72,
@@ -2538,8 +2538,8 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
     "id": "presentation_premium_dark",
     "sourceId": "pds.premium-dark",
     "sourceVersion": "1.0.0",
-    "label": "Premium Dark",
-    "desc": "Luxo tecnológico: fundo quase preto com gradiente radial profundo, painéis de vidro (glass) com borda luminosa de 1px, acento dourado-champanhe, serifa fina para títulos e muito espaço negativo.",
+    "label": "Luxo discreto",
+    "desc": "Poucos elementos, serifa de alto contraste, tons profundos alternados com linho natural e muito silêncio.",
     "category": "luxury",
     "useCases": [
       "Pitch para investidores (late stage)",
@@ -2549,25 +2549,25 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
     ],
     "previewVariant": "premium",
     "brand": {
-      "bg": "#0A0A0D",
-      "titleColor": "#F3EFE6",
-      "subtitleColor": "#C7C2B8",
-      "textColor": "#C7C2B8",
-      "accent": "#C9A96E",
-      "titleFont": "\"Cormorant\", serif",
-      "subtitleFont": "\"Manrope\", sans-serif",
-      "bodyFont": "\"Manrope\", sans-serif",
-      "textTitleWeight": 300,
+      "bg": "#15120F",
+      "titleColor": "#EDE6DA",
+      "subtitleColor": "#A99F91",
+      "textColor": "#A99F91",
+      "accent": "#C2A878",
+      "titleFont": "\"Bodoni Moda\", Didot, serif",
+      "subtitleFont": "\"Jost\", sans-serif",
+      "bodyFont": "\"Jost\", sans-serif",
+      "textTitleWeight": 400,
       "textTitleCase": "normal",
-      "textTitleTracking": 4,
+      "textTitleTracking": 1.8,
       "textTitleSize": 54.56,
-      "subtitleWeight": 500,
-      "subtitleCase": "upper",
-      "textSubTracking": 23,
+      "subtitleWeight": 400,
+      "subtitleCase": "normal",
+      "textSubTracking": 1.4,
       "textSubSize": 37.2,
       "textBodyAfterSize": 75.23,
       "bodyWeight": 400,
-      "textBodyTracking": 0.4,
+      "textBodyTracking": 0.8,
       "textBodyLeading": 150,
       "textTitleLeading": 105,
       "textSubLeading": 140,
@@ -2578,79 +2578,79 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
       "align": "left",
       "titleSize": 54.56,
       "subSize": 37.2,
-      "titleTracking": 4,
-      "subTracking": 23,
+      "titleTracking": 1.8,
+      "subTracking": 1.4,
       "titleLeading": 105,
       "subLeading": 140,
-      "titleWeight": 300,
+      "titleWeight": 400,
       "titleCase": "normal",
       "bodyAfterSize": 75.23,
-      "bodyTracking": 0.4,
+      "bodyTracking": 0.8,
       "bodyLeading": 150,
       "bodyWeight": 400,
       "presentationTypographyByComposition": {
         "cover": {
           "title": {
             "role": "display",
-            "fontFamily": "\"Cormorant\", serif",
+            "fontFamily": "\"Bodoni Moda\", Didot, serif",
             "sizePercent": 89.29,
             "leadingPercent": 100,
-            "weight": 300,
-            "tracking": 4,
+            "weight": 400,
+            "tracking": 1.8,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"Manrope\", sans-serif",
+            "fontFamily": "\"Jost\", sans-serif",
             "sizePercent": 37.2,
             "leadingPercent": 140,
-            "weight": 500,
-            "tracking": 23,
-            "case": "upper",
+            "weight": 400,
+            "tracking": 1.4,
+            "case": "normal",
             "italic": false
           }
         },
         "content": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"Cormorant\", serif",
+            "fontFamily": "\"Bodoni Moda\", Didot, serif",
             "sizePercent": 54.56,
             "leadingPercent": 105,
-            "weight": 300,
-            "tracking": 4,
+            "weight": 400,
+            "tracking": 1.8,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"Manrope\", sans-serif",
+            "fontFamily": "\"Jost\", sans-serif",
             "sizePercent": 37.2,
             "leadingPercent": 140,
-            "weight": 500,
-            "tracking": 23,
-            "case": "upper",
+            "weight": 400,
+            "tracking": 1.4,
+            "case": "normal",
             "italic": false
           }
         },
         "divider": {
           "title": {
             "role": "h2",
-            "fontFamily": "\"Cormorant\", serif",
+            "fontFamily": "\"Bodoni Moda\", Didot, serif",
             "sizePercent": 32.24,
             "leadingPercent": 115,
-            "weight": 300,
-            "tracking": 4,
+            "weight": 400,
+            "tracking": 1.8,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "display",
-            "fontFamily": "\"Cormorant\", serif",
+            "fontFamily": "\"Bodoni Moda\", Didot, serif",
             "sizePercent": 267.86,
             "leadingPercent": 100,
-            "weight": 300,
-            "tracking": 2,
+            "weight": 400,
+            "tracking": -0.2,
             "case": "normal",
             "italic": false
           }
@@ -2658,79 +2658,79 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
         "data": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"Cormorant\", serif",
+            "fontFamily": "\"Bodoni Moda\", Didot, serif",
             "sizePercent": 54.56,
             "leadingPercent": 105,
-            "weight": 300,
-            "tracking": 4,
+            "weight": 400,
+            "tracking": 1.8,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"Manrope\", sans-serif",
+            "fontFamily": "\"Jost\", sans-serif",
             "sizePercent": 37.2,
             "leadingPercent": 140,
-            "weight": 500,
-            "tracking": 23,
-            "case": "upper",
+            "weight": 400,
+            "tracking": 1.4,
+            "case": "normal",
             "italic": false
           }
         },
         "demo": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"Cormorant\", serif",
+            "fontFamily": "\"Bodoni Moda\", Didot, serif",
             "sizePercent": 54.56,
             "leadingPercent": 105,
-            "weight": 300,
-            "tracking": 4,
+            "weight": 400,
+            "tracking": 1.8,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "subtitle",
-            "fontFamily": "\"Manrope\", sans-serif",
+            "fontFamily": "\"Jost\", sans-serif",
             "sizePercent": 37.2,
             "leadingPercent": 140,
-            "weight": 500,
-            "tracking": 23,
-            "case": "upper",
+            "weight": 400,
+            "tracking": 1.4,
+            "case": "normal",
             "italic": false
           }
         },
         "closing": {
           "title": {
             "role": "h1",
-            "fontFamily": "\"Cormorant\", serif",
+            "fontFamily": "\"Bodoni Moda\", Didot, serif",
             "sizePercent": 54.56,
             "leadingPercent": 105,
-            "weight": 300,
-            "tracking": 4,
+            "weight": 400,
+            "tracking": 1.8,
             "case": "normal",
             "italic": false
           },
           "subtitle": {
             "role": "caption",
-            "fontFamily": "\"Manrope\", sans-serif",
+            "fontFamily": "\"Jost\", sans-serif",
             "sizePercent": 37.2,
             "leadingPercent": 140,
             "weight": 400,
-            "tracking": 23,
-            "case": "upper",
+            "tracking": 1.4,
+            "case": "normal",
             "italic": false
           }
         }
       },
       "presentationBodyTypography": {
-        "fontFamily": "\"Manrope\", sans-serif",
+        "fontFamily": "\"Jost\", sans-serif",
         "weight": 400,
         "leadingPercent": 150,
-        "tracking": 1
+        "tracking": 1.4
       },
       "presentationNumericTypography": {
-        "fontFamily": "\"Cormorant\", serif",
-        "weight": 300
+        "fontFamily": "\"Bodoni Moda\", Didot, serif",
+        "weight": 400
       },
       "presentationTitleSizeByComposition": {
         "cover": 89.29,

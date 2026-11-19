@@ -155,7 +155,7 @@ it('preserva aula e keynote ao vivo, e a leitura autônoma dos documentos de dec
   expect(buildGenerationLanguageLayer('apresentacao', '', 'editorial', 'relatorio')).toContain('leitura autônoma');
   const design = buildPresentationDesignSystemPromptBlock('presentation_data_first', 'relatorio');
   expect(design).toContain('Nunca peça que imageQuery fabrique');
-  expect(design).toContain('Limites obrigatórios da composição');
+  expect(design).toContain('limites obrigatórios por slide');
 });
 
 it('aula reaproveita o caso fornecido e encerra com aprendizagem em redação, revisão e refinamento', () => {

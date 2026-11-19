@@ -11,6 +11,7 @@ import {
   strictPresentationAutofit,
 } from '../../src/components/card/SlideCardInner.jsx';
 import { DEFAULT_BRAND, mkSlide } from '../../src/utils/doc-schema.js';
+import { slideForFormatDisplay } from '../../src/utils/format-view.js';
 import {
   applyPresentationVisualPreset,
   getPresentationCompositionOverrides,
@@ -98,7 +99,7 @@ describe('texto complementar em cards de apresentação', () => {
     expect(html).not.toContain('Toque para inserir foto');
   });
 
-  it('respeita fontes distintas para subtítulo e corpo de apoio no padrão editorial', () => {
+  it('usa a mesma fonte de leitura no subtítulo e apoio do Editorial, com display próprio', () => {
     const presetId = 'presentation_editorial_magazine';
     const brand = applyPresentationVisualPreset(DEFAULT_BRAND, presetId);
     const composition = getPresentationCompositionOverrides(presetId, {
@@ -115,7 +116,7 @@ describe('texto complementar em cards de apresentação', () => {
       bodyAfterImage: 'BODY_FONT_MARKER',
     };
     const html = renderToStaticMarkup(React.createElement(SlideCardInner, {
-      slide,
+      slide: slideForFormatDisplay(slide, 'apresentacao'),
       fmt: 'apresentacao',
       brand,
       num: 2,
@@ -132,17 +133,18 @@ describe('texto complementar em cards de apresentação', () => {
       return html.slice(tagStart, tagEnd + 1);
     };
 
-    expect(brand.subtitleFont).not.toBe(brand.bodyFont);
+    expect(brand.subtitleFont).toBe(brand.bodyFont);
+    expect(brand.titleFont).not.toBe(brand.bodyFont);
     expect(openingTagFor('SUBTITLE_FONT_MARKER'))
-      .toMatch(/font-family:&quot;Libre Franklin&quot;,\s*sans-serif/);
-    expect(openingTagFor('SUBTITLE_FONT_MARKER')).toContain('font-weight:600');
-    expect(openingTagFor('SUBTITLE_FONT_MARKER')).toContain('text-transform:uppercase');
-    expect(openingTagFor('SUBTITLE_FONT_MARKER')).toContain('letter-spacing:0.14em');
-    expect(openingTagFor('SUBTITLE_FONT_MARKER')).toContain('line-height:1.3');
+      .toMatch(/font-family:&quot;Source Serif 4&quot;,\s*serif/);
+    expect(openingTagFor('SUBTITLE_FONT_MARKER')).toContain('font-weight:400');
+    expect(openingTagFor('SUBTITLE_FONT_MARKER')).toContain('text-transform:none');
+    expect(openingTagFor('SUBTITLE_FONT_MARKER')).toContain('letter-spacing:0em');
+    expect(openingTagFor('SUBTITLE_FONT_MARKER')).toContain('line-height:1.48');
     expect(openingTagFor('BODY_FONT_MARKER'))
       .toMatch(/font-family:&quot;Source Serif 4&quot;,\s*serif/);
     expect(openingTagFor('BODY_FONT_MARKER')).toContain('font-weight:400');
-    expect(openingTagFor('BODY_FONT_MARKER')).toContain('line-height:1.5');
+    expect(openingTagFor('BODY_FONT_MARKER')).toContain('line-height:1.48');
     expect(openingTagFor('BODY_FONT_MARKER')).toContain('letter-spacing:0em');
     expect(openingTagFor('BODY_FONT_MARKER')).toMatch(/font-size:25\.9\d*px/);
   });
@@ -158,13 +160,13 @@ describe('texto complementar em cards de apresentação', () => {
 
     expect(cover.presentationComposition).toBe('cover');
     expect(content.presentationComposition).toBe('content');
-    expect(presentationTitleSizePercent(cover)).toBe(89.29);
-    expect(presentationTitleSizePercent(content)).toBe(54.56);
+    expect(1920 * 0.084 * presentationTitleSizePercent(cover) / 100).toBeCloseTo(120, 1);
+    expect(1920 * 0.084 * presentationTitleSizePercent(content) / 100).toBeCloseTo(80, 1);
     expect(presentationTypographyToken(cover, 'title')).toMatchObject({
       role: 'display',
-      fontFamily: '"Cormorant", serif',
-      weight: 300,
-      leadingPercent: 100,
+      fontFamily: '"Bodoni Moda", Didot, serif',
+      weight: 400,
+      leadingPercent: 104,
     });
   });
 
@@ -184,7 +186,7 @@ describe('texto complementar em cards de apresentação', () => {
       subtitle: 'BODY_ROLE_MARKER',
     };
     const html = renderToStaticMarkup(React.createElement(SlideCardInner, {
-      slide,
+      slide: slideForFormatDisplay(slide, 'apresentacao'),
       fmt: 'apresentacao',
       brand,
       num: 2,
@@ -200,11 +202,11 @@ describe('texto complementar em cards de apresentação', () => {
     expect(composition.presentationTypographyByComposition.content.subtitle.role).toBe('body');
     expect(tag).toContain('font-weight:400');
     expect(tag).toContain('text-transform:none');
-    expect(tag).toContain('letter-spacing:0em');
-    expect(tag).toMatch(/font-size:27\.99\d*px/);
+    expect(tag).toMatch(/letter-spacing:-0\.00[34]/);
+    expect(tag).toMatch(/font-size:31\.0\d*px/);
   });
 
-  it('aplica os tokens glass Premium só à evidência', () => {
+  it('não cria painel de foto vazio no Luxo sem imagem e mantém o título sem glass', () => {
     const presetId = 'presentation_premium_dark';
     const brand = applyPresentationVisualPreset(DEFAULT_BRAND, presetId);
     const composition = getPresentationCompositionOverrides(presetId, {
@@ -221,7 +223,7 @@ describe('texto complementar em cards de apresentação', () => {
       bodyAfterImage: 'Corpo premium',
     };
     const html = renderToStaticMarkup(React.createElement(SlideCardInner, {
-      slide,
+      slide: slideForFormatDisplay(slide, 'apresentacao'),
       fmt: 'apresentacao',
       brand,
       num: 2,
@@ -234,11 +236,9 @@ describe('texto complementar em cards de apresentação', () => {
     const titleTagEnd = html.indexOf('>', titleTagStart);
     const titleTag = html.slice(titleTagStart, titleTagEnd + 1);
 
-    expect(html).toContain('data-vc-presentation-glass="evidence"');
-    expect(html).toContain('background:rgba(255,255,255,0.05)');
-    expect(html).toContain('backdrop-filter:blur(24px)');
-    expect(html).toContain('border:1px solid rgba(255,255,255,0.12)');
-    expect(html).toContain('border-radius:24px');
+    expect(html).not.toContain('data-vc-presentation-glass="evidence"');
+    expect(html).toContain('data-vc-presentation-art="luxury"');
+    expect(html).not.toContain('data-vc-photo-zone');
     expect(titleTag).not.toContain('backdrop-filter');
     expect(titleTag).not.toContain('background:rgba(255,255,255,0.05)');
   });
@@ -278,6 +278,7 @@ describe('texto complementar em cards de apresentação', () => {
     expect(canvasClassicTextPaddingYPx(frame, official)).toBeCloseTo(6.48, 2);
     expect(canvasClassicTitlePaddingXPx(frame, {
       ...official,
+      textInset: 20,
       canvas: { ...official.canvas, source: 'manual' },
     })).toBeGreaterThan(90);
   });

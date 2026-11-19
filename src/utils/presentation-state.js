@@ -84,6 +84,12 @@ function applyResolvedPresentationPresetToSlide(slide, preset, normalizedPath, i
       // assinatura salva pelo usuário. A geometria livre é restaurada abaixo.
       presentationPatternId: null,
       presentationPatternVersion: null,
+      presentationArtDirectionVersion: null,
+      presentationDesignFamily: null,
+      presentationChrome: null,
+      presentationPhotoTreatment: null,
+      presentationPhotoRadius: null,
+      presentationGround: null,
       presentationArchetypeId: null,
       presentationEvidenceFallback: null,
       presentationRequiresImage: false,

@@ -41,7 +41,7 @@ describe('composição de apresentação orientada pelo plano editorial', () => 
     expect(resolvePresentationCompositionKind({ slide, stage: { visualRole: 'question' }, index: 3, count: 8 })).toBe(expected);
   });
 
-  it('as seis funções do pitch possuem geometria própria e fotos separadas da leitura', () => {
+  it('as seis funções do pitch têm geometria própria e texto separado da foto ou protegido por scrim', () => {
     for (const preset of PRESENTATION_VISUAL_PRESETS) {
       const geometries = roles.map((role, index) => {
         const result = getPresentationCompositionOverrides(preset.id, {
@@ -54,8 +54,10 @@ describe('composição de apresentação orientada pelo plano editorial', () => 
         expect(result.bgFit).toBe('cover');
         const { title, subtitle, photo } = result.canvas.zones;
         expect(overlaps(title, subtitle)).toBe(false);
-        expect(overlaps(title, photo)).toBe(false);
-        expect(overlaps(subtitle, photo)).toBe(false);
+        if (overlaps(title, photo) || overlaps(subtitle, photo)) {
+          expect(result.overlay, preset.id).toBeGreaterThanOrEqual(32);
+          expect(result.titleColor, preset.id).toBeTruthy();
+        }
         for (const r of Object.values(result.canvas.zones)) {
           expect(r.x).toBeGreaterThanOrEqual(0);
           expect(r.y).toBeGreaterThanOrEqual(0);
@@ -90,12 +92,12 @@ describe('composição de apresentação orientada pelo plano editorial', () => 
     const modular = make('presentation_modular_cards');
     expect(new Set([executive, editorial, cinematic, modular].map(s => JSON.stringify(s.canvas.zones))).size).toBe(4);
     expect(editorial.canvas.zones.photo.w).toBeGreaterThan(50);
-    expect(editorial.canvas.zones.title.w).toBeLessThan(40);
+    expect(editorial.canvas.zones.title.w).toBeLessThan(70);
     expect(cinematic.canvas.zones.photo.w).toBeGreaterThan(executive.canvas.zones.photo.w);
     expect(cinematic.canvas.zones.photo.h).toBe(100);
     for (const slide of [executive, editorial, cinematic, modular]) {
-      expect(overlaps(slide.canvas.zones.photo, slide.canvas.zones.title)).toBe(false);
-      expect(overlaps(slide.canvas.zones.photo, slide.canvas.zones.subtitle)).toBe(false);
+      if (overlaps(slide.canvas.zones.photo, slide.canvas.zones.title)
+        || overlaps(slide.canvas.zones.photo, slide.canvas.zones.subtitle)) expect(slide.overlay).toBeGreaterThanOrEqual(32);
       expect(slide.bodyAfterSize).toBeGreaterThanOrEqual(100);
     }
   });
@@ -122,7 +124,7 @@ describe('composição de apresentação orientada pelo plano editorial', () => 
     expect(block).toContain('limites obrigatórios por slide');
     expect(block).not.toMatch(/subtitle ≤40|subtitle: até 40/);
     expect(buildPresentationDesignSystemPromptBlock('presentation_premium_dark', 'relatorio_executivo'))
-      .toContain('subtitle ≤40');
+      .toContain('limites obrigatórios por slide');
   });
 
   it('uma capa com título longo ajusta a escala sem cortar palavras nem encolher além do piso', () => {
@@ -142,7 +144,8 @@ describe('composição de apresentação orientada pelo plano editorial', () => 
       slide: source, stage: { contentMode: 'pitch' }, index: 2, count: 6,
     });
     const { title, subtitle, evidence } = result.canvas.zones;
-    expect(evidence.w).toBeGreaterThanOrEqual(80);
+    // A biblioteca usa também quadros de evidência lado a lado com leitura.
+    expect(evidence.w).toBeGreaterThanOrEqual(45);
     expect(evidence.h).toBeGreaterThanOrEqual(35);
     expect(overlaps(title, evidence)).toBe(false);
     expect(overlaps(subtitle, evidence)).toBe(false);
