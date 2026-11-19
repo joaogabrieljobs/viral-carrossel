@@ -143,10 +143,9 @@ describe('vcFixHtml2CanvasTextClip', () => {
   });
 });
 
-describe('vcFixHtml2CanvasTextClip na biblioteca 2.0', () => {
+describe('vcFixHtml2CanvasTextClip mantém a composição do editor', () => {
   it('fundo transparente não vira placa e o título mantém a posição do preview', () => {
     const { doc, root, glass, h1 } = makeFakeDoc();
-    root.querySelector = (sel) => (sel === '[data-vc-presentation-art]' ? {} : null);
     glass.style.backgroundColor = 'rgba(0, 0, 0, 0)';
     vcFixHtml2CanvasTextClip(doc, root);
     // Sem padding extra na zona transparente.
@@ -157,7 +156,6 @@ describe('vcFixHtml2CanvasTextClip na biblioteca 2.0', () => {
   });
   it('placa escura semitransparente continua recebendo folga', () => {
     const { doc, root, glass } = makeFakeDoc();
-    root.querySelector = (sel) => (sel === '[data-vc-presentation-art]' ? {} : null);
     vcFixHtml2CanvasTextClip(doc, root);
     expect(parseFloat(glass.style.paddingTop)).toBeGreaterThanOrEqual(14);
   });

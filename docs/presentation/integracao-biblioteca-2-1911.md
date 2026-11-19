@@ -65,7 +65,7 @@ Inspeção feita no renderer real (`SlideCardInner`), nas dez famílias, seis p�
 6. **PNG/PDF diferente do preview: título e apoio ~26 px mais baixos no arquivo.** O DOM de exportação era idêntico ao do editor; o desvio nascia no clone do html2canvas: o ajuste de “placas de texto escuras” tratava fundo transparente (`rgba(0,0,0,0)`) como placa e somava padding às zonas. Para a biblioteca 2.0, fundo com alfa 0 deixa de ser placa e a folga do `h1` é devolvida por margem. Medido por correlação de perfis em 1920 px: 25 px antes, até 4 px depois.
 7. **Tratamento de foto ausente no arquivo.** html2canvas ignora `filter` CSS; o clone de exportação aplica o filtro da família no bitmap da foto (com fallback de pixels). Regressão lê pixels do PNG do Suíço.
 
-O mesmo falso positivo de placa existe na exportação de carrosséis e projetos antigos; não foi alterado aqui para não mudar arquivos já publicados sem uma rodada própria.
+O mesmo falso positivo existia na exportação de carrosséis e projetos antigos. Corrigido na rodada seguinte (branch `claude/export-placa-transparente`), para todos os cards: medido em 1080 px, o PNG deslocava o texto +24 px no Feed 4:5, +29 no Quadrado, +33 no Stories e −26 com texto na base sobre foto; depois da correção, no máximo 2 px. A folga do título para o html2canvas (padding e `top` anulado) passou a ser devolvida por margem em todos os cards, e fundo com alfa 0 nunca é tratado como placa. Placas escuras semitransparentes de verdade continuam recebendo a folga. Regressão: `tests/e2e/export-composicao-igual-preview.spec.js`.
 
 ## Diferenças que permanecem
 
