@@ -54,6 +54,23 @@ function environment(styles = {}) {
 }
 
 describe('clone usa pixels originais, sem o resize CSS de html2canvas', () => {
+  it('grava o filtro da foto no bitmap antes de entregar o clone ao html2canvas', async () => {
+    const { doc, root, source } = environment({
+      backgroundImage: 'url("blob:original")', backgroundSize: 'cover', backgroundPosition: '50% 50%',
+      backgroundRepeat: 'no-repeat', width: '1000px', height: '1000px', position: 'absolute', filter: 'grayscale(1) contrast(1.12)',
+    });
+    const drawImage = vi.fn();
+    const ctx = { filter: 'none', drawImage };
+    const canvas = { getContext: () => ctx, toDataURL: () => 'data:image/png;base64,filtered' };
+    const create = doc.createElement;
+    doc.createElement = tag => tag === 'canvas' ? canvas : create(tag);
+    await vcFixHtml2CanvasBackgroundImages(doc, root);
+    expect(drawImage).toHaveBeenCalledOnce();
+    expect(ctx.filter).toBe('grayscale(1) contrast(1.12)');
+    expect(canvas).toMatchObject({ width: 4000, height: 2000 });
+    expect(source.children[0].src).toBe('data:image/png;base64,filtered');
+    expect(source.style.filter).toBe('none');
+  });
   it('substitui background isolado por img explícita preservando posição, zoom e espelho', async () => {
     const { doc, root, source } = environment({
       backgroundImage: 'url("blob:original")', backgroundSize: 'cover', backgroundPosition: '25% 75%',

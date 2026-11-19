@@ -28,6 +28,8 @@ export const PAGE_KINDS = Object.freeze(['cover', 'divider', 'content', 'demo', 
 export const FORMAT_SPECS = Object.freeze({
   '16:9': { w: 1920, h: 1080 },
   '4:5': { w: 1080, h: 1350 },
+  '1:1': { w: 1080, h: 1080 },
+  '9:16': { w: 1080, h: 1920 },
 });
 
 const z = (x, y, w, h) => ({ x, y, w, h });
@@ -175,7 +177,9 @@ export const PRESENTATION_FAMILIES = Object.freeze({
       filter: 'grayscale(1) contrast(1.25) brightness(1.02)', radius: 0,
       direction: 'Imagem como pontuação: recortes pequenos e duros em preto e branco, de mãos, letras, cartazes e materiais impressos. Nunca compete com a palavra; ocupa um módulo lateral.',
     },
-    type: { titleLeading: 1.03, bodyLeading: 1.42, bodyCase: 'normal' },
+    // Anton: maiúscula acentuada (É, Á, Ô) sobe 110% do corpo. Com 1,03 o acento
+    // da linha seguinte tocava o pé da anterior (medido no navegador).
+    type: { titleLeading: 1.15, bodyLeading: 1.42, bodyCase: 'normal' },
     graphic: 'Palavra dominante, fio grosso, seta tipográfica e alternância de fundos chapados entre as páginas.',
   },
   cultural: {
@@ -299,7 +303,7 @@ function editorial(kind, { photo, structured, portrait }) {
   if (portrait) {
     const top = [rule(7, 5.5, 86, 0.08, 'ink'), label(7, 6.4, 60, '{kicker}', { size: 22, italic: true })];
     if (kind === 'cover') return photo
-      ? L({ photo: z(0, 0, 100, 55), title: z(7, 59, 86, 27), subtitle: z(7, 87, 72, 9), titlePx: 92, bodyPx: 30, chrome: [rule(7, 57.5, 86, 0.08, 'ink'), rule(7, 86.2, 10, 0.25, 'accent')] })
+      ? L({ photo: z(0, 0, 100, 55), title: z(7, 59, 86, 27), subtitle: z(7, 87, 72, 9), titlePx: 92, bodyPx: 30, chrome: [rule(7, 57.5, 86, 0.08, 'ink'), rule(7, 86.2, 10, 0.25, 'accent', { follow: 'subtitle' })] })
       : L({ title: z(7, 16, 86, 50), subtitle: z(7, 72, 70, 18), titlePx: 118, bodyPx: 32, chrome: [...top, rule(7, 69.5, 86, 0.08, 'ink')] });
     if (kind === 'divider') return L({ title: z(7, 42, 86, 30), subtitle: z(7, 74, 72, 16), titlePx: 84, bodyPx: 30,
       chrome: [...top, numeral(6, 11, 60, '{section}', 300, { role: 'display', italic: true, leading: 0.9 })] });
@@ -712,15 +716,22 @@ export function groundInks(key, ground = 'bg') {
  * Layout completo de uma página.
  * @param {string} key família
  * @param {string} kind cover|divider|content|demo|data|closing
- * @param {{format?: '16:9'|'4:5', photo?: boolean, structured?: boolean}} options
+ * @param {{format?: '16:9'|'4:5'|'1:1'|'9:16', photo?: boolean, structured?: boolean}} options
  */
 export function familyLayout(key, kind, { format = '16:9', photo = false, structured = false, title = '', reading = 0 } = {}) {
   const family = normalizeFamilyKey(key);
   const safeKind = PAGE_KINDS.includes(kind) ? kind : 'content';
-  const portrait = format === '4:5';
+  const portrait = format !== '16:9';
   // Evidência estruturada é um quadro editável, não fotografia.
   const usePhoto = !!photo && !(structured && safeKind === 'data');
-  const raw = LAYOUT_FUNCTIONS[family](safeKind, { photo: usePhoto, structured, portrait });
+  let raw = LAYOUT_FUNCTIONS[family](safeKind, { photo: usePhoto, structured, portrait });
+  // O quadrado tem menos altura útil que o feed: mantém a composição da
+  // família com hierarquia própria, sem comprimir o slide 16:9 como bitmap.
+  if (format === '1:1') raw = { ...raw, titlePx: Math.max(56, raw.titlePx * .82), bodyPx: Math.max(25, raw.bodyPx * .9),
+    // Círculos medem pela largura: no quadrado (altura 1080 em vez de 1350)
+    // desceriam sobre o título; o diâmetro acompanha a altura útil.
+    chrome: (raw.chrome || []).map(c => c.size ? { ...c, size: c.size * .82 }
+      : c.t === 'circle' ? { ...c, d: Math.round(c.d * .8 * 100) / 100 } : c) };
   const ground = raw.ground || 'bg';
   const result = {
     family, kind: safeKind, format, ground,
@@ -749,9 +760,56 @@ export function familyLayout(key, kind, { format = '16:9', photo = false, struct
   // e foto estreita, em vez de esmagar o texto ou cortá-lo.
   if (reading > 300 && !structured && (result.subtitle.w < (portrait ? 80 : 50)
     || result.subtitle.w * result.subtitle.h < (portrait ? 2000 : 2500) || result.bodyPx < 30)) {
-    return longReadingLayout(result, portrait);
+    return socialSafeArea(keepRulesOffText(longReadingLayout(result, portrait)));
   }
-  return tightenStack(result, title);
+  return socialSafeArea(keepRulesOffText(tightenStack(result, title)));
+}
+
+/**
+ * Fios são separadores: nunca atravessam texto. Quando a pilha título → apoio
+ * sobe (tightenStack) ou a leitura ocupa a área de uma evidência ausente, um
+ * fio fixo pode ficar dentro da zona de texto. O horizontal passa para o vão
+ * logo acima do apoio (ou do quadro); o vertical termina antes do texto. Se não houver vão,
+ * o fio sai — nunca o texto.
+ */
+function keepRulesOffText(layout) {
+  const texts = [layout.title, layout.subtitle, layout.evidence].filter(Boolean);
+  if (!texts.length || !layout.chrome?.length) return layout;
+  const gap = layout.format === '16:9' ? 4.2 : 2.6;
+  const xIn = (c, r) => Math.min(c.x + c.w, r.x + r.w) - Math.max(c.x, r.x) > 0.3;
+  const yIn = (c, r) => Math.min(c.y + c.h, r.y + r.h) - Math.max(c.y, r.y) > 0.05;
+  // Tolerância de 1%: a borda da zona é respiro/padding, não tinta.
+  const deep = (c, r) => c.y + c.h > r.y + 1 && c.y < r.y + r.h - 1;
+  let changed = false;
+  const chrome = layout.chrome.flatMap((c) => {
+    if (c.t !== 'rule' || c.w == null || c.h == null) return [c];
+    const hits = texts.filter((r) => xIn(c, r) && yIn(c, r) && deep(c, r));
+    if (!hits.length) return [c];
+    changed = true;
+    const horizontal = c.w >= c.h;
+    if (horizontal) {
+      if (hits.includes(layout.title) || hits.length > 1) return [];
+      const s = hits[0];
+      const y = s.y - gap / 2 - c.h / 2;
+      const blocked = texts.some((r) => r !== s && xIn(c, r) && y < r.y + r.h && y + c.h > r.y);
+      return blocked || y < 0 ? [] : [{ ...c, y: Math.round(y * 100) / 100 }];
+    }
+    const end = Math.min(...hits.map((r) => r.y)) - gap / 2;
+    return end - c.y >= 8 ? [{ ...c, h: Math.round((end - c.y) * 100) / 100 }] : [];
+  });
+  return changed ? { ...layout, chrome } : layout;
+}
+
+/** Stories: texto e quadros entre 14% e 82%; fotos de sangria ficam inteiras. */
+function socialSafeArea(layout) {
+  if (layout.format !== '9:16') return layout;
+  const y = value => 14 + value * .68;
+  const zone = r => r ? { ...r, y: y(r.y), h: r.h * .68 } : r;
+  const bleed = layout.photo?.x === 0 && layout.photo?.y === 0 && layout.photo?.w === 100 && layout.photo?.h === 100;
+  const topBleed = layout.photo?.x === 0 && layout.photo?.y === 0 && layout.photo?.w === 100;
+  return { ...layout, title: zone(layout.title), subtitle: zone(layout.subtitle), evidence: zone(layout.evidence),
+    photo: bleed ? layout.photo : topBleed ? { ...layout.photo, y: 0, h: y(layout.photo.h) } : zone(layout.photo),
+    chrome: (layout.chrome || []).map(c => c.y == null ? c : { ...c, y: y(c.y), ...(c.h == null ? {} : { h: c.h * .68 }) }) };
 }
 
 /** Estimativa de linhas por quebra gulosa de palavras (respeita \n). */
@@ -789,9 +847,14 @@ function tightenStack(result, title) {
   const spec = PRESENTATION_FAMILIES[result.family];
   const d = spec.fonts.display;
   const lines = estimateTitleLines(title, (t.w / 100) * ref.w - 24, result.titlePx, d.widthFactor || 0.55, d.case === 'upper');
-  const needed = ((lines * result.titlePx * spec.type.titleLeading + 20) / ref.h) * 100;
+  // O renderer reserva tinta acima/abaixo da linha e padding da zona. A
+  // estimativa precisa incluir os dois; caso contrário aperta demais títulos
+  // curtos e o autofit chega ao piso por alguns pixels de descendente.
+  const breathing = Math.max(20, result.titlePx * .44 + ref.h * .012);
+  const usableHeight = ref.h * (result.format === '9:16' ? .68 : 1);
+  const needed = ((lines * result.titlePx * spec.type.titleLeading + breathing) / usableHeight) * 100;
   if (needed >= t.h - 1) return result;
-  const gap = result.format === '4:5' ? 2.6 : 4.2;
+  const gap = result.format === '16:9' ? 4.2 : 2.6;
   const top = Math.min(...stacked.map((r) => r.y));
   const movers = stacked.filter((r) => Math.abs(r.y - top) < 0.6);
   // Barreira: nada sobe por cima de outro elemento que está ao lado do título.

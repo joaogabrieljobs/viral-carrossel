@@ -283,3 +283,22 @@ describe('texto complementar em cards de apresentação', () => {
     })).toBeGreaterThan(90);
   });
 });
+
+describe('biblioteca 2.0: tinta do título', () => {
+  it('páginas do meio usam a tinta da família, não a cor do apoio', async () => {
+    const { FAMILY_KEYS, familySpec } = await import('../../src/utils/presentation-families.js');
+    for (const key of FAMILY_KEYS) {
+      const preset = familySpec(key).runtimeId;
+      const brand = applyPresentationVisualPreset({ ...DEFAULT_BRAND, showHandle: false, logo: null }, preset);
+      const base = { ...mkSlide(3, brand), title: 'Página do meio', subtitle: 'Apoio curto.', presentationPlan: { visualRole: 'content', purpose: 'explain' } };
+      const slide = { ...base, ...getPresentationCompositionOverrides(preset, { slide: base, index: 2, count: 6 }) };
+      if (slide.presentationGround !== 'bg') continue;
+      const html = renderToStaticMarkup(React.createElement(SlideCardInner, {
+        slide, fmt: 'apresentacao', brand, num: 3, total: 6, creativePreset: 'apresentacao', scale: 0.25, forExport: true,
+      }));
+      const h1 = html.match(/<h1[^>]*style="([^"]*)"/)?.[1] || '';
+      const expected = brand.titleColor.toLowerCase();
+      expect(h1.toLowerCase(), key).toContain(expected);
+    }
+  });
+});

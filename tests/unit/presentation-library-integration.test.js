@@ -9,6 +9,7 @@ import LegacyPresentationBlocks from '../../src/components/LegacyPresentationBlo
 import { GENERATED_PRESENTATION_PATTERNS } from '../../src/generated/presentation-design-system.generated.js';
 import { getPresentationCompositionOverrides, PRESENTATION_VISUAL_PRESET_CATALOG } from '../../src/styles/presentation-presets.jsx';
 import { ensureDocShape } from '../../src/utils/doc-schema.js';
+import { FORMATS } from '../../src/utils/formats.js';
 
 const KINDS = ['cover', 'divider', 'content', 'demo', 'data', 'closing'];
 
@@ -46,10 +47,17 @@ describe('biblioteca 2.0 no fluxo de composição', () => {
         if (kind === 'data') expect(out.canvas.zones.evidence).toBeTruthy();
         const chrome = renderToStaticMarkup(React.createElement(PresentationArtChrome, { slide: out, frame: { w: 1920, h: 1080 }, index: 1, total: 6 }));
         expect(chrome).toContain('data-vc-presentation-art');
-        const social = presentationForSocialFormat({ ...slide, ...out, bgImage: kind === 'data' ? '' : 'x.jpg' }, 'carrossel');
-        expect(social.presentationChrome.format).toBe('4:5');
-        expect(social.canvas.zones.title.h).toBeGreaterThan(5);
-        expect({ ...slide, ...social }.subtitle).toBe(slide.subtitle);
+        for (const [fmt, ratio] of [['carrossel', '4:5'], ['quadrado', '1:1'], ['stories', '9:16']]) {
+          const original = { ...slide, ...out, bgImage: kind === 'data' ? '' : 'x.jpg' };
+          const before = JSON.stringify(original);
+          const social = presentationForSocialFormat(original, fmt);
+          expect(social.presentationChrome.format).toBe(ratio);
+          expect(social.presentationDesignFamily).toBe(out.presentationDesignFamily);
+          expect(social.presentationTypographyByComposition['social-format'].title.fontFamily).toBe(out.presentationTypographyByComposition[kind].title.fontFamily);
+          expect(social.canvas.zones.title.h / 100 * FORMATS[fmt].h).toBeGreaterThanOrEqual(60);
+          for (const field of ['title', 'subtitle', 'presentationBlocks', 'bgImage']) expect(social[field]).toEqual(original[field]);
+          expect(JSON.stringify(original)).toBe(before);
+        }
       }
     });
   }

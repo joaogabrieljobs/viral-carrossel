@@ -30,20 +30,25 @@ import {applyPresentationVisualPreset,getPresentationCompositionOverrides} from 
 import {FAMILY_KEYS,familySpec} from ${source('src/utils/presentation-families.js')};
 import {slideForFormatDisplay} from ${source('src/utils/format-view.js')};
 import {ensurePresentationFonts} from ${source('src/utils/presentation-font-manifest.js')};
+import {FORMATS} from ${source('src/utils/formats.js')};
 ensurePresentationFonts(document);
 const fixture=${JSON.stringify(fixture)};
 function Review(){
- const [key,setKey]=useState('editorial');
+ const query=new URLSearchParams(location.search);
+ const [key,setKey]=useState(FAMILY_KEYS.includes(query.get('familia'))?query.get('familia'):'editorial');
+ const [fmt,setFmt]=useState(FORMATS[query.get('formato')]||query.get('formato')==='comparar'?query.get('formato'):'apresentacao');
  const spec=familySpec(key),brand=applyPresentationVisualPreset({...DEFAULT_BRAND,showHandle:false,logo:null},spec.runtimeId);
  const deck=fixture.decks[key];
- const width=Math.min(920,Math.max(360,(innerWidth-90)/2));
- return <><header><h1>Moont · biblioteca 2 no renderer real</h1><p>SlideCardInner do código integrado, com fontes locais. Conteúdo fictício e fotos ilustrativas do pacote do designer. Este ensaio não comprova geração por IA, persistência na conta ou exportação do app.</p><label>Família <select value={key} onChange={e=>setKey(e.target.value)}>{FAMILY_KEYS.map(k=><option key={k} value={k}>{familySpec(k).label}</option>)}</select></label></header><main>{deck.slides.map((item,index)=>{
+ const comparing=fmt==='comparar',formats=comparing?['carrossel','quadrado','stories']:[fmt];
+ const columns=comparing?3:2;
+ const width=Math.min(fmt==='apresentacao'?920:500,Math.max(240,(innerWidth-110)/columns));
+ return <><header><h1>Moont · biblioteca 2 no renderer real</h1><p>SlideCardInner do código integrado, com fontes locais. Conteúdo fictício e fotos ilustrativas do pacote do designer. Este ensaio não comprova geração por IA, persistência na conta ou exportação do app.</p><label>Família <select value={key} onChange={e=>setKey(e.target.value)}>{FAMILY_KEYS.map(k=><option key={k} value={k}>{familySpec(k).label}</option>)}</select></label>{' '}<label>Formato <select value={fmt} onChange={e=>setFmt(e.target.value)}>{Object.entries(FORMATS).map(([id,f])=><option key={id} value={id}>{f.label}</option>)}<option value="comparar">Comparar Feed · Quadrado · Stories</option></select></label></header><main style={{gridTemplateColumns:'repeat('+columns+',minmax(0,1fr))'}}>{deck.slides.flatMap((item,index)=>formats.map(target=>{
  const raw={...mkSlide(index+1,brand),id:key+'-'+index,title:item.title,subtitle:item.subtitle||'',bodyAfterImage:item.body||'',eyebrow:item.eyebrow||'',photoCaption:item.caption||'',presentationSectionIndex:item.section,
  presentationBlocks:item.blocks||[],bgImage:item.photo==null?'':'images/'+key+'-'+item.photo+'.jpg',imageQuery:item.photo==null?'':'illustrative photo',presentationPlan:{visualRole:item.kind,purpose:'explain'}};
  const composed={...raw,...getPresentationCompositionOverrides(spec.runtimeId,{slide:raw,index,count:deck.slides.length})};
- const slide=slideForFormatDisplay(composed,'apresentacao',{},'apresentacao');
- return <article key={key+index}><h2>{String(index+1).padStart(2,'0')} · {item.kind}</h2><SlideCardInner slide={slide} brand={brand} fmt="apresentacao" creativePreset="apresentacao" num={index+1} total={deck.slides.length} scale={width/1920} forExport={false}/></article>;
- })}</main></>;
+ const slide=slideForFormatDisplay(composed,target,{},'apresentacao');
+ return <article key={key+target+index}><h2>{String(index+1).padStart(2,'0')} · {item.kind} · {FORMATS[target].label}</h2><SlideCardInner slide={slide} brand={brand} fmt={target} creativePreset="apresentacao" num={index+1} total={deck.slides.length} scale={width/FORMATS[target].w} forExport={false}/></article>;
+ }))}</main></>;
 }
 createRoot(document.getElementById('root')).render(<Review/>);
 `);

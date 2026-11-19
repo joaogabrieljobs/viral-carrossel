@@ -4,21 +4,24 @@ import { familyLayout, normalizeFamilyKey } from './presentation-families.js';
 import { familyPresentationFields } from './presentation-composition.js';
 
 /**
- * Recomposição 4:5 pela família: a página é redesenhada para o formato
- * vertical (foto ganha altura, evidência ocupa a largura, título muda de
+ * Recomposição de Feed, Quadrado e Stories pela família: a página é redesenhada
+ * para a proporção (foto ganha altura, evidência ocupa a largura, título muda de
  * lugar conforme a família) em vez de ser o slide reduzido com a foto atrás.
  * Nenhum texto é cortado; o autofit reduz em passos e, no piso, a revisão
  * pede divisão em outra página.
  */
-export function familyCarouselAdaptation(source) {
+export function familyCarouselAdaptation(source, fmt = 'carrossel') {
   if (source?.presentationArtDirectionVersion !== 2 || !source.presentationDesignFamily) return null;
   const family = normalizeFamilyKey(source.presentationDesignFamily);
   const kind = ['cover', 'divider', 'content', 'demo', 'data', 'closing'].includes(source.presentationComposition)
     ? source.presentationComposition : 'content';
   const structured = normalizePresentationBlocks(source.presentationBlocks).length > 0;
   const photo = !!(source.bgImage || source.bgImageId || source.bgImageAssetId) && !source.presentationSuppressPhoto;
-  const layout = familyLayout(family, kind, { format: '4:5', photo, structured, title: source.title });
-  const { typography, ...fields } = familyPresentationFields(layout, { format: '4:5' });
+  const format = { carrossel: '4:5', quadrado: '1:1', stories: '9:16' }[fmt];
+  if (!format) return null;
+  const layout = familyLayout(family, kind, { format, photo, structured, title: source.title,
+    reading: String(source.subtitle || '').length + String(source.bodyAfterImage || '').length });
+  const { typography, ...fields } = familyPresentationFields(layout, { format });
   return {
     ...source,
     ...fields,
@@ -71,10 +74,8 @@ function linesFor(text, width, fontSize) {
  * para a proporção de destino, nunca uma transformação do conteúdo original.
  */
 export function presentationForSocialFormat(source, fmt) {
-  if (fmt === 'carrossel') {
-    const recomposed = familyCarouselAdaptation(source);
-    if (recomposed) return recomposed;
-  }
+  const recomposed = familyCarouselAdaptation(source, fmt);
+  if (recomposed) return recomposed;
   const { w, h, bottomSafePct } = FORMATS[fmt];
   const hasPhoto = !!(source.bgImage || source.bgImageId || source.bgImageAssetId);
   const square = fmt === 'quadrado';

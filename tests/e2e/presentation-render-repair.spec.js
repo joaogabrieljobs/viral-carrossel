@@ -24,6 +24,9 @@ for (const fontsAvailable of [true, false]) test(fontsAvailable
     const url = new URL(route.request().url());
     return ['localhost', '127.0.0.1'].includes(url.hostname) || !/^https?:$/.test(url.protocol) ? route.continue() : route.abort();
   });
+  // A biblioteca 2 serve fontes locais: bloquear só o Google já não simula
+  // uma fonte ausente. Este ramo deve perder também os WOFF do aplicativo.
+  if (!fontsAvailable) await page.route('**/fonts/presentation/**', route => route.abort());
   const stages = [];
   const longCell = 'Em estudo. O escopo precisa ser definido antes da oferta, com responsabilidades claras, critérios de avaliação, acompanhamento da jornada e condições explícitas para cada entrega ao longo de todo o período.';
   const headers = ['Oferta', 'Escopo', 'Condição', 'Critério'];

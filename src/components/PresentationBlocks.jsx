@@ -74,6 +74,8 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, back
     return ((rect.w / 100) * frame.w - (cols - 1) * 28 * unit) / cols - (panel ? 52 * unit : 0);
   };
   const marker = (index) => st.stepMarker === 'roman' ? roman[index] : st.stepMarker === 'code' ? `0${index + 1}/` : String(index + 1).padStart(2, '0');
+  const stepColumns = frame.h === frame.w ? Math.min(block.items?.length || 1, 2)
+    : frame.h > frame.w ? ((block.items?.length || 0) > 3 ? 2 : 1) : Math.min(block.items?.length || 1, 4);
   const cell = (value, path, label, style) => <EditableCell
     key={path.join('.')}
     value={value}
@@ -112,11 +114,11 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, back
       </td>)}</tr>)}</tbody>
     </table> : block.type === 'metrics' ? <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(block.items.length, frame.h > frame.w ? 2 : 4)}, minmax(0, 1fr))`, gap: 28 * unit }}>
       {block.items.map((item, index) => <div key={index} style={{ minWidth: 0, padding: panel ? `${26 * unit}px` : `${22 * unit}px 0 0`, borderTop: st.metricRule ? `${st.metricRule * unit}px solid ${ruleColor}` : 'none', borderRadius: st.radius * unit, backgroundColor: panel ? st.panelColor : 'transparent', color: panelInk }}>
-        {cell(item.value, ['items', index, 'value'], `valor ${index + 1}`, { display: 'block', whiteSpace: 'nowrap', fontFamily: numberFont, fontVariantNumeric: 'tabular-nums', fontSize: Math.max(40 * unit, Math.min((block.items.length > 3 ? 72 : 96) * unit, metricColumnPx(block.items.length) / Math.max(1, [...item.value].length * 0.56))), letterSpacing: '-0.02em', lineHeight: 1, fontWeight: numericTypography?.weight || familyFont(key, 'numeric').weight || 600, fontSynthesisWeight: 'none' })}
+        {cell(item.value, ['items', index, 'value'], `valor ${index + 1}`, { display: 'block', whiteSpace: 'nowrap', fontFamily: numberFont, fontVariantNumeric: 'tabular-nums', fontSize: Math.max(40 * unit, Math.min((block.items.length > 3 ? 72 : 96) * unit, metricColumnPx(block.items.length) / Math.max(1, [...item.value].length * 0.56))), letterSpacing: '-0.02em', lineHeight: 1.18, fontWeight: numericTypography?.weight || familyFont(key, 'numeric').weight || 600, fontSynthesisWeight: 'none' })}
         {cell(item.label, ['items', index, 'label'], `indicador ${index + 1}`, { display: 'block', fontSize: 26 * unit, marginTop: 18 * unit, fontWeight: 600 })}
         {item.detail && cell(item.detail, ['items', index, 'detail'], `condição ${index + 1}`, { display: 'block', fontSize: 23 * unit, marginTop: 8 * unit, opacity: 0.75 })}
       </div>)}
-    </div> : <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gridTemplateColumns: frame.h > frame.w ? '1fr' : `repeat(${Math.min(block.items.length, 4)}, minmax(0, 1fr))`, gap: 24 * unit }}>
+    </div> : <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gridTemplateColumns: `repeat(${stepColumns}, minmax(0, 1fr))`, gap: 24 * unit }}>
       {block.items.map((item, index) => <li key={index} style={{ minWidth: 0, borderTop: st.metricRule ? `${Math.max(1, (st.metricRule > 4 ? 6 : 2) * unit)}px solid ${ruleColor}` : 'none', padding: panel ? `${22 * unit}px` : `${16 * unit}px 0 0`, borderRadius: st.radius * unit, backgroundColor: panel ? st.panelColor : 'transparent', color: panelInk }}>
         {!/^[A-Z][.)]?$/.test(item.title) && <span aria-hidden style={{ display: st.stepMarker === 'pill' ? 'inline-block' : 'block', fontFamily: numberFont, fontSize: (st.stepMarker === 'pill' ? 20 : 40) * unit, lineHeight: 1, marginBottom: 14 * unit, fontVariantNumeric: 'tabular-nums', color: st.accent,
           fontStyle: st.stepMarker === 'roman' ? 'italic' : 'normal',

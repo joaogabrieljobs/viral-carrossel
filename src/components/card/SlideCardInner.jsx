@@ -668,7 +668,7 @@ function canvasClassicTitlePaddingXPx(f, slide) {
   // safe-area embutidas nas coordenadas. Reaplicar o `textInset` do editor
   // dentro delas removia até 208 px da largura e transformava títulos de duas
   // linhas em três ou quatro linhas.
-  if (usesImportedPresentationGeometry(slide)) return f.w * 0.006;
+  if (usesImportedPresentationGeometry(slide) || slide?.canvas?.source === 'presentation-format') return f.w * 0.006;
   const insetZn = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
   const base = f.w * (0.012 + insetZn * 0.004);
   const gutter = (f.w * CANVAS_AUTO_EDGE_PCT) / 100 * 0.34;
@@ -679,7 +679,7 @@ function canvasClassicTitlePaddingXPx(f, slide) {
 }
 
 function canvasClassicSubtitlePaddingXPx(f, slide) {
-  if (usesImportedPresentationGeometry(slide)) return f.w * 0.006;
+  if (usesImportedPresentationGeometry(slide) || slide?.canvas?.source === 'presentation-format') return f.w * 0.006;
   const insetZn = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
   const base = f.w * (0.012 + insetZn * 0.004);
   const gutter = (f.w * CANVAS_AUTO_EDGE_PCT) / 100 * 0.3;
@@ -1007,6 +1007,13 @@ const ClassicCanvasInner = React.forwardRef(({
             f.w * 0.084 * (presentationTitleSizePercent(slide) / 100) * titleScale,
             presentationTitleLeadingPercent(slide),
           ),
+          // Nas fontes novas, descendentes também ultrapassam o line box.
+          // Sem reserva inferior, flex-end cria overflow constante mesmo com
+          // uma linha curta, e o autofit reduz o título até o piso à toa.
+          paddingBottom: slide.presentationArtDirectionVersion === 2 ? vcTitleOvershootShift(
+            f.w * 0.084 * (presentationTitleSizePercent(slide) / 100) * titleScale,
+            presentationTitleLeadingPercent(slide),
+          ) : 0,
           boxSizing: 'content-box',
           fontWeight: resolvedTitleWeight,
           letterSpacing: `${titleLetterSpacingEm(resolvedTitleFF, resolvedTitleTracking)}em`,
@@ -1841,7 +1848,11 @@ const SlideCardInner = React.forwardRef(({
   const zonePatchRef = React.useRef(onCanvasZonePatch);
   const brandPal = hydrateBrandTextColors(brand);
   const carouselEdgeSlide = total >= 1 && (slideIdx === 0 || slideIdx === total - 1);
-  const carouselTitleInk = carouselEdgeSlide ? brandPal.titleColor : brandPal.subtitleColor;
+  // Biblioteca 2.0: a família define a tinta do título em todas as páginas.
+  // A regra legada (cards do meio com a cor do apoio) deixava títulos de
+  // conteúdo e evidência na cor secundária, diferente da referência.
+  const carouselTitleInk = carouselEdgeSlide || slide.presentationArtDirectionVersion === 2
+    ? brandPal.titleColor : brandPal.subtitleColor;
   const carouselBodyInk = brandPal.textColor;
   zonePatchRef.current = onCanvasZonePatch;
   const photoReqRef = React.useRef(onPhotoZoneRequest);
@@ -2206,10 +2217,15 @@ const SlideCardInner = React.forwardRef(({
                   letterSpacing:'-0.011em', fontVariantNumeric:'tabular-nums',
                   backdropFilter:'blur(6px)', WebkitBackdropFilter:'blur(6px)',
                   ...(quietFolio ? {
-                    top:'auto', bottom:f.h*0.026,
+                    // Quadrado: altura menor; 2,6% encostava o fólio em cartões que vão até 95%.
+                    top:'auto', bottom:f.h*(fmt === 'stories' ? 0.18 : fmt === 'quadrado' ? 0.013 : 0.026),
                     left:folioOnRight ? 'auto' : f.w*0.06, right:folioOnRight ? f.w*0.06 : 'auto',
-                    background:'transparent', color:displayBodyInk || '#555', padding:0, borderRadius:0,
-                    fontSize:f.w*0.011*escBadge, fontWeight:500, letterSpacing:'0.04em',
+                    // Biblioteca 2.0: fundo invertido ou de cor grava a tinta própria em
+                    // textColor; a cor da marca ficava ilegível nessas páginas.
+                    background:'transparent', padding:0, borderRadius:0,
+                    color:(slide.presentationArtDirectionVersion === 2 && slide.presentationGround && slide.presentationGround !== 'bg' && slide.textColor)
+                      || displayBodyInk || '#555',
+                    fontSize:f.w*(slide.presentationArtDirectionVersion === 2 && fmt !== 'apresentacao' ? 0.020 : 0.011)*escBadge, fontWeight:500, letterSpacing:'0.04em',
                     backdropFilter:'none', WebkitBackdropFilter:'none',
                   } : {}),
                   pointerEvents: movableElements ? 'auto' : 'none',

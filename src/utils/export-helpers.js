@@ -1,4 +1,5 @@
 import { canvasToPngBlob } from './image-storage.js';
+import { exportFilteredPhotoSource } from './export-photo-filter.js';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 
 /** Geometria explícita: html2canvas ignora object-fit e reduz backgrounds antes do scale. */
@@ -156,11 +157,13 @@ async function vcFixHtml2CanvasBackgroundImages(clonedDoc, clonedSlideRoot) {
     const geometry = vcExportImageGeometry(source.naturalWidth, source.naturalHeight,
       parseFloat(computed.width), parseFloat(computed.height), computed.backgroundSize, computed.backgroundPosition);
     if (!geometry) return;
+    const filtered = exportFilteredPhotoSource(clonedDoc, source, computed.filter);
     if (computed.position === 'static') node.style.position = 'relative';
+    if (filtered) node.style.filter = 'none';
     node.style.backgroundImage = 'none';
     node.style.overflow = 'hidden';
     node.setAttribute('data-vc-html2canvas-photo', '');
-    node.appendChild(positionedExportImage(clonedDoc, src, geometry));
+    node.appendChild(positionedExportImage(clonedDoc, filtered || src, geometry));
   }));
 }
 
@@ -198,18 +201,29 @@ function vcFixHtml2CanvasTextClip(clonedDoc, clonedSlideRoot) {
     el.style.overflow = 'visible';
   });
 
+  // Biblioteca 2.0: o arquivo precisa ter a mesma composição do preview.
+  const keepTitlePosition = !!clonedSlideRoot.querySelector?.('[data-vc-presentation-art]');
   clonedSlideRoot.querySelectorAll('h1').forEach((h1) => {
     const cs = view.getComputedStyle(h1);
     const fs = parseFloat(cs.fontSize) || 48;
     const existing = parseFloat(cs.paddingTop) || 0;
     const pad = Math.max(existing, Math.round(fs * 0.14), 8);
+    const relativeTop = cs.position === 'relative' ? parseFloat(cs.top) || 0 : 0;
+    const existingBottom = parseFloat(cs.paddingBottom) || 0;
+    const padBottom = Math.max(existingBottom, Math.round(pad * 0.4));
     // Anula o `top` de overshoot (html2canvas mede mal) e garante padding de layout.
     h1.style.top = '0';
     h1.style.position = 'relative';
     h1.style.paddingTop = `${pad}px`;
-    h1.style.paddingBottom = `${Math.max(parseFloat(cs.paddingBottom) || 0, Math.round(pad * 0.4))}px`;
+    h1.style.paddingBottom = `${padBottom}px`;
     h1.style.overflow = 'visible';
     h1.style.lineHeight = cs.lineHeight;
+    if (keepTitlePosition) {
+      // A folga do html2canvas não pode mover o título nem o apoio: margens
+      // negativas devolvem o espaço acrescentado e o deslocamento anulado.
+      h1.style.marginTop = `${(parseFloat(cs.marginTop) || 0) - (pad - existing) + relativeTop}px`;
+      h1.style.marginBottom = `${(parseFloat(cs.marginBottom) || 0) - (padBottom - existingBottom) - relativeTop}px`;
+    }
   });
 
   // Caixas com fundo de texto: um pouco mais de padding vertical no export.
@@ -219,8 +233,11 @@ function vcFixHtml2CanvasTextClip(clonedDoc, clonedSlideRoot) {
     const bg = cs.backgroundColor || '';
     if (!/rgba?\(/i.test(bg)) return;
     // Só caixas semi-transparentes escuras (placa de texto)
-    const m = bg.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    const m = bg.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?/i);
     if (!m) return;
+    // Fundo transparente (rgba(0,0,0,0)) não é placa: na biblioteca 2.0 o
+    // padding extra empurrava título e apoio ~26 px no arquivo.
+    if (keepTitlePosition && m[4] != null && Number(m[4]) === 0) return;
     const r = Number(m[1]);
     const g = Number(m[2]);
     const b = Number(m[3]);

@@ -35,3 +35,42 @@ Foi aberto em Chrome real um ensaio isolado com o `SlideCardInner` do aplicativo
 Não houve geração com IA real nesta integração; os prompts melhorados permanecem sem confirmação de qualidade por geração real. A galeria do designer usa renderer simplificado, enquanto o ensaio e os testes descritos acima usam o renderer do Moont. As fotos recebidas de cerca de 1.000 px são demonstrações, sem garantia de qualidade para sangria em 1920.
 
 Não publicado em produção nesta etapa. Resultados finais de testes e CI devem ser registrados no relatório da rodada, com o SHA validado.
+
+## Verificação da rodada da tarde (antes do push)
+
+- Vitest completo: 229 arquivos, 5.580 testes aprovados e as 4 falhas esperadas. `check:undef`, `check:props`, `check:a11y` e `npm run build` sem erro.
+- `presentation-library-browser.spec.js`: as dez famílias, seis páginas cada, em 16:9 e nas três adaptações, com fontes locais carregadas, texto completo, sem overflow, evidência sem corte, original 16:9 intacto e reabertura no formato salvo. A falha anterior de reabertura era do teste (recarregava antes do autosave gravar o formato) e do estado de carregamento da foto (`bgImageFailed`/`bgImageError`) comparado como conteúdo.
+- `presentation-library-export.spec.js` (novo): Editorial, Cinemático e Técnico exportam PDF de 6 páginas 16:9, ZIP com 6 PNG (5760 × 3240) e PNG de Stories (3240 × 5760); o PNG repete a composição do preview (deslocamento ≤ 4 px).
+- Suíte E2E completa com `SEM_FONTES_DA_REDE=1`: 311 aprovados, 18 pulados, 1 falha em `project-creation-flow.spec.js:710`. A mesma falha ocorre em 1 de 5 repetições no `5502ee0` sem as mudanças desta rodada; no estado atual passou 5 de 5 e o arquivo inteiro passou. A CI tem uma nova tentativa automática.
+- Inspeção visual: as dez famílias, seis páginas, quatro formatos, no `SlideCardInner` real (ensaio `RENDERER-REAL.html`), mais PNG exportado contra preview em três famílias. As fotos são do pacote do designer (~1.000 px) ou a foto local de teste; não comprovam nitidez de sangria em 1920 nem pertinência semântica.
+- Não houve geração com IA real.
+
+## Adaptações para Feed 4:5, Quadrado 1:1 e Stories 9:16 (rodada da tarde)
+
+As apresentações das dez famílias agora são recompostas pela família nos três formatos sociais (`presentationForSocialFormat` → `familyCarouselAdaptation(source, fmt)`), em lugar do fallback genérico que valia para Quadrado e Stories. O dado canônico continua em 16:9; trocar de formato muda só a vista, e a vista escolhida persiste ao salvar e reabrir.
+
+- **Stories**: título, apoio e quadros ficam entre 14% e 82% da altura, as mesmas áreas seguras de `formats.js` (`topSafePct: 14`, `bottomSafePct: 18`, ou 269 px e 346 px em 1080 × 1920). É mais conservador que as zonas de 210/300 px do pacote do designer, que também ficam respeitadas. Fotos de sangria continuam até a borda; a faixa vazia na base é a área segura, intencional.
+- **Quadrado**: parte da composição retrato da família com hierarquia própria (título ×0,82, leitura ×0,9, piso de 56/25 px). Círculos decorativos passam a acompanhar a altura útil (diâmetro ×0,8); sem isso, no Cultural o círculo da abertura cobria o título.
+- O pacote posterior do designer (`Moont-biblioteca-templates-2 (3).zip`, patch 5/5) trazia uma implementação paralela dos mesmos formatos. Ela não foi reaplicada: a do checkout já estava integrada e validada no navegador. Do pacote foram adotados o contrato das zonas do Stories e os dois pontos de revisão apontados (faixa inferior do Stories e fio do Tipográfico no quadrado).
+
+## Defeitos encontrados na inspeção visual e corrigidos
+
+Inspeção feita no renderer real (`SlideCardInner`), nas dez famílias, seis páginas cada, em 16:9, Feed, Quadrado e Stories, com fontes locais carregadas e conferidas.
+
+1. **Fios atravessando o texto.** Quando a pilha título → apoio sobe (título mais curto que a zona) ou a leitura ocupa a área de uma evidência ausente, fios fixos ficavam dentro do apoio. Aparecia no Tipográfico (conteúdo, demonstração e evidência), no Editorial (capa sem foto), no Suíço (evidência sem quadro, inclusive o fio vertical no 16:9) e no Tipográfico 16:9 (fio sobre o topo do quadro). `keepRulesOffText` reposiciona o fio horizontal no vão acima do apoio ou do quadro e encurta o vertical antes do texto; sem vão, o fio sai, nunca o texto. Novo contrato nos 1.920 casos geométricos: nenhum fio cruza título, apoio ou quadro.
+2. **Acento do Anton colidindo com a linha anterior.** Medido no navegador: a maiúscula acentuada do Anton (É, Á, Ô) sobe 110% do corpo; com entrelinha 1,03 o acento de “É VERBO” tocava o pé do “L” de “LER”. Entrelinha do Tipográfico passou para 1,15. As outras nove famílias têm folga positiva entre a maiúscula acentuada e a linha de base anterior.
+3. **Títulos de conteúdo na cor secundária.** O renderer aplicava a regra legada do carrossel (cards do meio com a cor do apoio) e os títulos de conteúdo, demonstração e evidência saíam em `muted` (ex.: `#4A4740` no Tipográfico, `#A39E95` no Cinemático). A galeria de referência usa a tinta da família em todas as páginas. Corrigido só para `presentationArtDirectionVersion: 2`; carrosséis e projetos antigos não mudam.
+4. **Fólio ilegível em fundo invertido ou de cor** (aberturas do Executivo, Suíço, Cultural, Modular). O fólio usava a cor de texto da marca em todas as páginas; agora usa a tinta gravada para o fundo da página.
+5. **Fólio encostado nos cartões no Quadrado** (Modular). Distância da base ajustada só no 1:1.
+6. **PNG/PDF diferente do preview: título e apoio ~26 px mais baixos no arquivo.** O DOM de exportação era idêntico ao do editor; o desvio nascia no clone do html2canvas: o ajuste de “placas de texto escuras” tratava fundo transparente (`rgba(0,0,0,0)`) como placa e somava padding às zonas. Para a biblioteca 2.0, fundo com alfa 0 deixa de ser placa e a folga do `h1` é devolvida por margem. Medido por correlação de perfis em 1920 px: 25 px antes, até 4 px depois.
+7. **Tratamento de foto ausente no arquivo.** html2canvas ignora `filter` CSS; o clone de exportação aplica o filtro da família no bitmap da foto (com fallback de pixels). Regressão lê pixels do PNG do Suíço.
+
+O mesmo falso positivo de placa existe na exportação de carrosséis e projetos antigos; não foi alterado aqui para não mudar arquivos já publicados sem uma rodada própria.
+
+## Diferenças que permanecem
+
+- Conteúdo curto deixa vazio na metade inferior em várias páginas (Editorial conteúdo, Suíço evidência 16:9, Modular cartão alto). É o comportamento documentado pelo designer; a correção é editorial (mais texto) e não foi feita completando conteúdo.
+- O apoio (`subtitle`) sai na cor `muted` em fundo claro; a galeria do designer usa a tinta cheia no apoio e `muted` só no corpo. Não alterado nesta rodada.
+- Círculos do Cultural ficam ao lado do título em capa, evidência e encerramento; com títulos bem mais longos que os do exemplo o texto pode passar sobre o círculo (mesma geometria no 4:5 original do designer).
+- Técnico 1:1: o rótulo “§01 · RFC interna” fica muito junto da base da foto e das marcas de corte.
+- No Modular retrato o cartão de acento ao lado do numeral é uma superfície lisa, sem conteúdo.
