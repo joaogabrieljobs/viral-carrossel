@@ -116,6 +116,8 @@ const path = window.location.pathname.replace(/\/+$/, '') || '/';
 const App = lazy(() => (
   path === '/redefinir-senha'
     ? import('./PasswordRecoveryPage.jsx')
+    : path === '/admin'
+    ? import('./admin/AdminEntry.jsx')
     : path === '/privacidade' || path === '/termos'
     ? import('./LegalPage.jsx')
     : shouldShowOnboardingLanding()

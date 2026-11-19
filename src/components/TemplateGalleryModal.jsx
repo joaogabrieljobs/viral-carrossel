@@ -204,7 +204,7 @@ const DECISIONS = {
 const dataCurta = (iso) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
 
 /** Fila de moderação: só aparece para contas moderadoras (o servidor confere). */
-function ModerationQueue({ toast }) {
+export function ModerationQueue({ toast }) {
   const [view, setView] = useState('pending');
   const [state, setState] = useState({ loading: true, templates: [], error: '' });
   const [busyId, setBusyId] = useState('');

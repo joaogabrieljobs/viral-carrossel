@@ -13,6 +13,7 @@ Studio de narrativas visuais com IA para comunicação e apresentações. Vite +
 - Plano grátis (conta sem assinatura, sem IA, projetos no aparelho): **docs/product/plano-gratis.md**
 - Publicar modelo (galeria pública de estrutura visual): **docs/product/publicar-modelo.md**
 - Navegação no celular: docs/product/navegacao-mobile.md
+- Console admin (`/admin`, papéis, trilha, isenção com código por e-mail): **docs/product/console-admin.md**
 - PRD: docs/product/PRD-suite-testes-confianca.md
 - TDD: docs/engineering/TDD-suite-testes-confianca.md
 - Épicos e specs: docs/epics/

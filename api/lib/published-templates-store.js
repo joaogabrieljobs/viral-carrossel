@@ -219,7 +219,11 @@ export function createPublishedTemplatesStore({ sql: injectedSql } = {}) {
     return guard(async () => {
       const rows = await connection().unsafe(`/* templates_is_moderator */
         SELECT 1 FROM moont.template_moderators WHERE owner_id = $1`, [ownerValue]);
-      return rows.length > 0;
+      if (rows.length > 0) return true;
+      // Quem tem papel no console admin (migração 018) também modera.
+      const roles = await connection().unsafe(`/* templates_is_admin */
+        SELECT 1 FROM moont.admin_roles WHERE owner_id = $1 AND revoked_at IS NULL`, [ownerValue]).catch(() => []);
+      return roles.length > 0;
     });
   }
 
