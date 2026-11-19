@@ -1,0 +1,74 @@
+{
+ "vw": 390,
+ "vh": 844,
+ "scrollWidth": 390,
+ "rolagemHorizontal": false,
+ "total": 9,
+ "menoresQue44": [],
+ "alvos": [
+  {
+   "rotulo": "Moont — início",
+   "x": 16,
+   "y": 14,
+   "w": 127,
+   "h": 46
+  },
+  {
+   "rotulo": "Ajuda",
+   "x": 304,
+   "y": 15,
+   "w": 70,
+   "h": 44
+  },
+  {
+   "rotulo": "Abrir um projetoEncontre seus projetos e continue de onde pa",
+   "x": 16,
+   "y": 255,
+   "w": 358,
+   "h": 227
+  },
+  {
+   "rotulo": "Criar um projetoEscolha o que quer criar. Vamos organizar o ",
+   "x": 16,
+   "y": 496,
+   "w": 358,
+   "h": 250
+  },
+  {
+   "rotulo": "Início",
+   "x": 12,
+   "y": 784,
+   "w": 89,
+   "h": 52
+  },
+  {
+   "rotulo": "Imagens",
+   "x": 105,
+   "y": 784,
+   "w": 89,
+   "h": 52
+  },
+  {
+   "rotulo": "Uso",
+   "x": 197,
+   "y": 784,
+   "w": 89,
+   "h": 52
+  },
+  {
+   "rotulo": "Perfil",
+   "x": 290,
+   "y": 784,
+   "w": 89,
+   "h": 52
+  },
+  {
+   "rotulo": "Fechar notificação",
+   "x": 317,
+   "y": 711,
+   "w": 44,
+   "h": 44
+  }
+ ],
+ "card": null
+}

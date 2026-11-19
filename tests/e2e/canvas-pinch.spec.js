@@ -15,8 +15,9 @@ test('pinça amplia o canvas sem mudar de card nem alterar a exportação', asyn
   });
   await page.goto('/?app=1');
   await enterEditorFromHome(page);
+  // Celular (19/11): sem barra de zoom fixa; o indicador só aparece fora de 100%.
   const zoom = page.getByLabel('Zoom da área de trabalho');
-  await expect(zoom).toHaveText('100%');
+  await expect(zoom).toHaveCount(0);
   const exportSurface = page.locator('[data-vc-export-tree] [data-vc-card-surface="pinch-1"]');
   const originalExport = await exportSurface.boundingBox();
   const board = await page.locator('#vc-cards-viewport').boundingBox();
@@ -30,6 +31,9 @@ test('pinça amplia o canvas sem mudar de card nem alterar a exportação', asyn
   }
   await cdp.send('Input.dispatchTouchEvent', { type:'touchEnd', touchPoints:[] });
   await expect.poll(async () => Number((await zoom.innerText()).replace('%', ''))).toBeGreaterThan(150);
-  await expect(page.getByLabel('Ir para o card')).toHaveValue('0');
+  await expect(page.locator('[data-canvas-active="true"]')).toContainText('Título 1');
   expect((await exportSurface.boundingBox()).width).toBe(originalExport.width);
+  // Um toque volta o card ao tamanho da tela e o indicador some.
+  await page.getByRole('button', { name: 'Ajustar card à tela' }).click();
+  await expect(zoom).toHaveCount(0);
 });

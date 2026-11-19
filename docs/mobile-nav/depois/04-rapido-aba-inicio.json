@@ -1,0 +1,291 @@
+{
+ "vw": 390,
+ "vh": 844,
+ "scrollWidth": 390,
+ "rolagemHorizontal": false,
+ "total": 28,
+ "menoresQue44": [
+  {
+   "rotulo": "Escrever o pedido e gerar",
+   "x": 243,
+   "y": -10,
+   "w": 85,
+   "h": 40
+  },
+  {
+   "rotulo": "Modo atual: Criar rápido. Clique para mudar.",
+   "x": 10,
+   "y": 41,
+   "w": 52,
+   "h": 34
+  },
+  {
+   "rotulo": "Abrir biblioteca",
+   "x": 66,
+   "y": 38,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Configurar IA",
+   "x": 110,
+   "y": 38,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Feed 4:5",
+   "x": 160,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Quadrado",
+   "x": 215,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Stories",
+   "x": 269,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Apresentação 16:9",
+   "x": 324,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Padrão",
+   "x": 16,
+   "y": 528,
+   "w": 85,
+   "h": 36
+  },
+  {
+   "rotulo": "Gerir marcas",
+   "x": 107,
+   "y": 528,
+   "w": 73,
+   "h": 36
+  },
+  {
+   "rotulo": "Abrir biblioteca de projetos salvos",
+   "x": 307,
+   "y": 763,
+   "w": 71,
+   "h": 32
+  }
+ ],
+ "alvos": [
+  {
+   "rotulo": "Projetos",
+   "x": 10,
+   "y": -12,
+   "w": 44,
+   "h": 44
+  },
+  {
+   "rotulo": "Escrever o pedido e gerar",
+   "x": 243,
+   "y": -10,
+   "w": 85,
+   "h": 40
+  },
+  {
+   "rotulo": "Perfil",
+   "x": 336,
+   "y": -12,
+   "w": 44,
+   "h": 44
+  },
+  {
+   "rotulo": "Modo atual: Criar rápido. Clique para mudar.",
+   "x": 10,
+   "y": 41,
+   "w": 52,
+   "h": 34
+  },
+  {
+   "rotulo": "Abrir biblioteca",
+   "x": 66,
+   "y": 38,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Configurar IA",
+   "x": 110,
+   "y": 38,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Feed 4:5",
+   "x": 160,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Quadrado",
+   "x": 215,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Stories",
+   "x": 269,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Apresentação 16:9",
+   "x": 324,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Fechar editor",
+   "x": 336,
+   "y": 389,
+   "w": 44,
+   "h": 44
+  },
+  {
+   "rotulo": "Início",
+   "x": 0,
+   "y": 412,
+   "w": 195,
+   "h": 48
+  },
+  {
+   "rotulo": "Ajustes",
+   "x": 196,
+   "y": 412,
+   "w": 195,
+   "h": 48
+  },
+  {
+   "rotulo": "Padrão",
+   "x": 16,
+   "y": 528,
+   "w": 85,
+   "h": 36
+  },
+  {
+   "rotulo": "Gerir marcas",
+   "x": 107,
+   "y": 528,
+   "w": 73,
+   "h": 36
+  },
+  {
+   "rotulo": "Carrossel",
+   "x": 21,
+   "y": 608,
+   "w": 172,
+   "h": 58
+  },
+  {
+   "rotulo": "Apresentação",
+   "x": 197,
+   "y": 608,
+   "w": 172,
+   "h": 58
+  },
+  {
+   "rotulo": "Abrir narrativa de comunicação 5 erros no Instagram",
+   "x": 16,
+   "y": 691,
+   "w": 174,
+   "h": 117
+  },
+  {
+   "rotulo": "Criar nova comunicação",
+   "x": 198,
+   "y": 691,
+   "w": 174,
+   "h": 117
+  },
+  {
+   "rotulo": "Biblioteca",
+   "x": 16,
+   "y": 827,
+   "w": 358,
+   "h": 44
+  },
+  {
+   "rotulo": "Opções de download",
+   "x": 12,
+   "y": 757,
+   "w": 114,
+   "h": 44
+  },
+  {
+   "rotulo": "Abrir biblioteca de projetos salvos",
+   "x": 307,
+   "y": 763,
+   "w": 71,
+   "h": 32
+  },
+  {
+   "rotulo": "Card 1 de 5",
+   "x": 10,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card 2 de 5",
+   "x": 60,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card 3 de 5",
+   "x": 110,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card 4 de 5",
+   "x": 160,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card 5 de 5",
+   "x": 210,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Adicionar card ao carrossel",
+   "x": 260,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  }
+ ],
+ "card": {
+  "x": 53,
+  "y": 10,
+  "w": 285,
+  "h": 356,
+  "fracaoVisivel": 100
+ }
+}

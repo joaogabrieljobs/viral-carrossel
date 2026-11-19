@@ -1,6 +1,23 @@
 # Navegação no celular — menos coisa na tela, card primeiro
 
-**Status:** inventário feito e proposta visual pronta, aguardando aprovação do João. Nada implementado. Começa depois de publicar modelo.
+**Status:** primeira parte implementada em 2026-11-19, a pedido do João ("deixar no mobile o card grande na tela; jogue as coisas pra cima e aperte o espaço; ao abrir caixa de edição, um preview do card em miniatura"). O resto da proposta (barra inferior única, menu "⋯" do card) segue aguardando aprovação.
+
+### Feito em 2026-11-19
+
+| Medida em 390×844 (feed 4:5) | Antes | Depois |
+|---|---|---|
+| Início do card | y=352 | y=193 |
+| Tamanho do card | 330×413 | 366×458 |
+| Alvos de toque abaixo de 44 px na primeira dobra | 30 | 22 |
+| Stories com contexto ativo | card cortado embaixo | card inteiro (254×451) |
+| Painel de edição aberto | card cortado pelo painel | miniatura do card inteiro acima do painel |
+
+- Topo em duas linhas finas: projetos · nome e gravação · Gerar · perfil; depois modo, biblioteca, IA e formato (só a proporção: 4:5, 1:1, 9:16, 16:9). Saíram a logo e "Sem cliente definido".
+- Faixa "Contexto ON" em uma linha, com desfazer só no ícone.
+- Barra de zoom e "Card 1/5" saíram do celular: troca de card pela fila e pelo deslize, zoom pela pinça; o indicador "Ajustar · N%" aparece só fora de 100%.
+- O card ocupa a largura e, em formato alto, cabe na altura livre.
+- Com o painel aberto, a área acima dele mostra o card em miniatura, que acompanha a edição; tocar nela fecha o painel.
+- Testes: `tests/e2e/navegacao-mobile.spec.js`. Capturas: `docs/mobile-nav/depois/` e `docs/mobile-nav/antes-depois-*.png` (agora com o app real, não a maquete).
 **Data:** 2026-11-18 · **Base:** `main` em `4257738`
 **Pedido:** "vamos melhorar a navegação mobile, tá muito cheio de coisas e confuso, difícil de usar."
 

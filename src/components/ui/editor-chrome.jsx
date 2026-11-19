@@ -5,6 +5,9 @@ import { SectionLabel as S } from './SectionLabel.jsx';
 import { FORMATS } from '../../utils/formats.js';
 import { APP_MODE_UI, DEPTH_LAYERS_HINT } from '../../utils/ui-depth-labels.js';
 
+/** No celular o seletor divide a linha com as ferramentas: mostra só a proporção. */
+const FORMAT_RATIO_LABEL = { carrossel: '4:5', quadrado: '1:1', stories: '9:16', apresentacao: '16:9' };
+
 /** Proporção de exportação — uma linha no desktop; grelha largura total no mobile (evita barra apertada). */
 function EditorFormatSelector({ fmt, setFmt, layout }) {
   // Mobile: segmented pill compacto (38px) em vez de grid 3-cards 80px+.
@@ -20,8 +23,8 @@ function EditorFormatSelector({ fmt, setFmt, layout }) {
         padding: 3,
         gap: 2,
         border: '1px solid var(--border)',
-        width: '100%',
-        flexShrink: 0,
+        flex: '1 1 auto',
+        minWidth: 0,
       }
     : {
         display: 'flex',
@@ -47,6 +50,7 @@ function EditorFormatSelector({ fmt, setFmt, layout }) {
             key={k}
             type="button"
             aria-pressed={isActive}
+            aria-label={layout === 'mobile' ? v.label : undefined}
             onClick={() => setFmt(k)}
             title={`${v.label} · ${v.w}×${v.h}`}
             style={
@@ -75,7 +79,7 @@ function EditorFormatSelector({ fmt, setFmt, layout }) {
                     // 3 botões dividirem largura igualmente; no desktop
                     // fica padding natural (auto-width pill clássico).
                     flex: layout === 'mobile' ? '1 1 0' : 'initial',
-                    minHeight: 32,
+                    minHeight: layout === 'mobile' ? 36 : 32,
                     padding: layout === 'mobile' ? '6px 10px' : '6px 14px',
                     borderRadius: 9999,
                     fontSize: layout === 'mobile' ? 12 : 13,
@@ -107,7 +111,7 @@ function EditorFormatSelector({ fmt, setFmt, layout }) {
                 }}
               />
             )}
-            {layout === 'mobile' ? compactLabel : (grid ? compactLabel : v.label)}
+            {layout === 'mobile' ? (FORMAT_RATIO_LABEL[k] || compactLabel) : (grid ? compactLabel : v.label)}
           </button>
         );
       })}
@@ -272,7 +276,44 @@ const DRAWER_SNAPS = [
 ];
 const DRAWER_DEFAULT_SNAP = 1;
 
-function MobileDrawer({ open, onClose, children }) {
+/**
+ * Área acima da gaveta aberta: mostra o card atual em miniatura, para ver o
+ * efeito da edição sem fechar o painel (João, 19/11). Tocar nela fecha a gaveta,
+ * como o fundo escurecido fazia.
+ */
+function DrawerCardPreview({ heightDvh, onClose, renderPreview }) {
+  const boxRef = useRef(null);
+  const [size, setSize] = useState(null);
+  useLayoutEffect(() => {
+    const box = boxRef.current;
+    if (!box) return undefined;
+    const measure = () => setSize({ width: box.clientWidth, height: box.clientHeight });
+    measure();
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
+    observer?.observe(box);
+    window.addEventListener('resize', measure);
+    return () => { observer?.disconnect(); window.removeEventListener('resize', measure); };
+  }, [heightDvh]);
+  return (
+    <div
+      onClick={onClose}
+      aria-hidden="true"
+      data-vc-drawer-preview
+      style={{
+        position: 'fixed', left: 0, right: 0, top: 0, bottom: `${heightDvh}dvh`, zIndex: 31,
+        background: 'var(--bg-base)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 'calc(10px + env(safe-area-inset-top, 0)) 16px 14px', boxSizing: 'border-box',
+        transition: 'bottom 0.28s var(--ease-smooth)', overflow: 'hidden',
+      }}
+    >
+      <div ref={boxRef} style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+        {size && size.height > 40 ? renderPreview(size) : null}
+      </div>
+    </div>
+  );
+}
+
+function MobileDrawer({ open, onClose, children, renderPreview = null }) {
   const panelRef  = useRef(null);
   const closeRef  = useRef(null);
   const returnFocusRef = useRef(null);
@@ -390,6 +431,7 @@ function MobileDrawer({ open, onClose, children }) {
 
   return (
     <>
+      {renderPreview && <DrawerCardPreview heightDvh={currentDvh} onClose={onClose} renderPreview={renderPreview} />}
       {/* Backdrop dim leve sem blur — cards visíveis acima */}
       <div
         onClick={onClose}

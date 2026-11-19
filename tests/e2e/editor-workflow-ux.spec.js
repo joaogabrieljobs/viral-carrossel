@@ -55,7 +55,13 @@ test('mobile identifica projeto, tem Ajustes, exporta conjunto e rola por uma al
   await expect(page.getByText('Café Aurora — outubro', { exact:true })).toBeVisible();
   const textTab = page.getByRole('button', { name:'Abrir aba Ajustes', exact:true });
   await expect(textTab).toBeInViewport();
-  await page.getByRole('button', { name:'Aumentar zoom', exact:true }).click();
+  // Celular (19/11): zoom pelo gesto; o indicador "Ajustar" aparece fora de 100%.
+  const boardBox = await page.locator('#vc-cards-viewport').boundingBox();
+  await page.mouse.move(boardBox.x + boardBox.width / 2, boardBox.y + 160);
+  await page.keyboard.down('Control');
+  await page.mouse.wheel(0, -60);
+  await page.keyboard.up('Control');
+  await expect(page.getByRole('button', { name:'Ajustar card à tela' })).toBeVisible();
   const rail = page.getByRole('scrollbar', { name:'Rolar área dos cards' });
   await expect(rail).toBeVisible();
   await page.screenshot({ path:testInfo.outputPath('mobile-zoom.png') });

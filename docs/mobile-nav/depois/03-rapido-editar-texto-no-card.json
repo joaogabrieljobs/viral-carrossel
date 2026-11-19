@@ -1,0 +1,319 @@
+{
+ "vw": 390,
+ "vh": 844,
+ "scrollWidth": 390,
+ "rolagemHorizontal": false,
+ "total": 34,
+ "menoresQue44": [
+  {
+   "rotulo": "Escrever o pedido e gerar",
+   "x": 243,
+   "y": -10,
+   "w": 85,
+   "h": 40
+  },
+  {
+   "rotulo": "Modo atual: Criar rápido. Clique para mudar.",
+   "x": 10,
+   "y": 41,
+   "w": 52,
+   "h": 34
+  },
+  {
+   "rotulo": "Abrir biblioteca",
+   "x": 66,
+   "y": 38,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Configurar IA",
+   "x": 110,
+   "y": 38,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Feed 4:5",
+   "x": 160,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Quadrado",
+   "x": 215,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Stories",
+   "x": 269,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Apresentação 16:9",
+   "x": 324,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Abrir biblioteca de projetos salvos",
+   "x": 307,
+   "y": 763,
+   "w": 71,
+   "h": 32
+  }
+ ],
+ "alvos": [
+  {
+   "rotulo": "Projetos",
+   "x": 10,
+   "y": -12,
+   "w": 44,
+   "h": 44
+  },
+  {
+   "rotulo": "Escrever o pedido e gerar",
+   "x": 243,
+   "y": -10,
+   "w": 85,
+   "h": 40
+  },
+  {
+   "rotulo": "Perfil",
+   "x": 336,
+   "y": -12,
+   "w": 44,
+   "h": 44
+  },
+  {
+   "rotulo": "Modo atual: Criar rápido. Clique para mudar.",
+   "x": 10,
+   "y": 41,
+   "w": 52,
+   "h": 34
+  },
+  {
+   "rotulo": "Abrir biblioteca",
+   "x": 66,
+   "y": 38,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Configurar IA",
+   "x": 110,
+   "y": 38,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Feed 4:5",
+   "x": 160,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Quadrado",
+   "x": 215,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Stories",
+   "x": 269,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Apresentação 16:9",
+   "x": 324,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Fechar editor",
+   "x": 336,
+   "y": 389,
+   "w": 44,
+   "h": 44
+  },
+  {
+   "rotulo": "Início",
+   "x": 0,
+   "y": 412,
+   "w": 195,
+   "h": 48
+  },
+  {
+   "rotulo": "Ajustes",
+   "x": 196,
+   "y": 412,
+   "w": 195,
+   "h": 48
+  },
+  {
+   "rotulo": "Estilo Sports Editorial",
+   "x": 16,
+   "y": -18,
+   "w": 175,
+   "h": 120
+  },
+  {
+   "rotulo": "Estilo Case Study Neon",
+   "x": 199,
+   "y": -18,
+   "w": 175,
+   "h": 120
+  },
+  {
+   "rotulo": "Estilo Mood Sépia",
+   "x": 16,
+   "y": 110,
+   "w": 175,
+   "h": 120
+  },
+  {
+   "rotulo": "Estilo Bold Promo Pink",
+   "x": 199,
+   "y": 110,
+   "w": 175,
+   "h": 120
+  },
+  {
+   "rotulo": "Estilo Reflexivo Serif",
+   "x": 16,
+   "y": 238,
+   "w": 175,
+   "h": 120
+  },
+  {
+   "rotulo": "Estilo Tabloid Keywords",
+   "x": 199,
+   "y": 238,
+   "w": 175,
+   "h": 120
+  },
+  {
+   "rotulo": "Ver todos os estilos (12)",
+   "x": 16,
+   "y": 368,
+   "w": 358,
+   "h": 44
+  },
+  {
+   "rotulo": "Título deste card",
+   "x": 29,
+   "y": 554,
+   "w": 332,
+   "h": 92
+  },
+  {
+   "rotulo": "Texto de apoio deste card",
+   "x": 29,
+   "y": 684,
+   "w": 332,
+   "h": 115
+  },
+  {
+   "rotulo": "Menor",
+   "x": 33,
+   "y": 841,
+   "w": 106,
+   "h": 44
+  },
+  {
+   "rotulo": "Padrão",
+   "x": 142,
+   "y": 841,
+   "w": 106,
+   "h": 44
+  },
+  {
+   "rotulo": "Maior",
+   "x": 251,
+   "y": 841,
+   "w": 106,
+   "h": 44
+  },
+  {
+   "rotulo": "Opções de download",
+   "x": 12,
+   "y": 757,
+   "w": 114,
+   "h": 44
+  },
+  {
+   "rotulo": "Abrir biblioteca de projetos salvos",
+   "x": 307,
+   "y": 763,
+   "w": 71,
+   "h": 32
+  },
+  {
+   "rotulo": "Card 1 de 5",
+   "x": 10,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card 2 de 5",
+   "x": 60,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card 3 de 5",
+   "x": 110,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card 4 de 5",
+   "x": 160,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card 5 de 5",
+   "x": 210,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Adicionar card ao carrossel",
+   "x": 260,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Fechar notificação",
+   "x": 317,
+   "y": 711,
+   "w": 44,
+   "h": 44
+  }
+ ],
+ "card": {
+  "x": 53,
+  "y": 10,
+  "w": 285,
+  "h": 356,
+  "fracaoVisivel": 100
+ }
+}

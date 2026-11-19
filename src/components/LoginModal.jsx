@@ -266,7 +266,7 @@ export default function LoginModal({
             textAlign: 'center',
           }}>
             Ao criar a conta, você aceita os <a href="/termos" style={{ color: 'inherit' }}>termos</a> e a <a href="/privacidade" style={{ color: 'inherit' }}>política de privacidade</a>.
-            {' '}Novo e ainda sem plano? Crie a conta e depois escolha o plano em Começar agora.
+            {' '}Conta nova começa no plano grátis: crie à mão e assine quando quiser usar IA.
           </p>
           </>}
         </div>

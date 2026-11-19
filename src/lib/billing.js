@@ -133,6 +133,23 @@ export async function logoutAccess({ signal } = {}) {
   return data;
 }
 
+/**
+ * Confere a senha da conta já aberta, antes de uma ação destrutiva.
+ * Não troca a sessão. Conta só com Google devolve `{ hasPassword: false }`.
+ */
+export async function confirmCurrentPassword(password) {
+  const r = await fetch('/api/auth/login', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ purpose: 'confirm', password }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 401 && data.hasPassword) return { verified: false, hasPassword: true, error: data.error || 'Senha incorreta.' };
+  if (!r.ok) throw new Error(data.error || 'Não foi possível confirmar a senha agora.');
+  return { verified: data.verified === true, hasPassword: data.hasPassword !== false };
+}
+
 export async function loginWithPassword(email, password) {
   const r = await fetch('/api/auth/login', {
     method: 'POST',

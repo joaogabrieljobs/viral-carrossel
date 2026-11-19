@@ -1,0 +1,277 @@
+{
+ "vw": 390,
+ "vh": 844,
+ "scrollWidth": 390,
+ "rolagemHorizontal": false,
+ "total": 28,
+ "menoresQue44": [
+  {
+   "rotulo": "Gerar carrossel com IA",
+   "x": 243,
+   "y": -10,
+   "w": 85,
+   "h": 40
+  },
+  {
+   "rotulo": "Modo atual: Controle profissional. Clique para mudar.",
+   "x": 10,
+   "y": 41,
+   "w": 52,
+   "h": 34
+  },
+  {
+   "rotulo": "Abrir biblioteca",
+   "x": 66,
+   "y": 38,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Configurar IA",
+   "x": 110,
+   "y": 38,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Feed 4:5",
+   "x": 160,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Quadrado",
+   "x": 215,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Stories",
+   "x": 269,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Apresentação 16:9",
+   "x": 324,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Abrir biblioteca de projetos salvos",
+   "x": 307,
+   "y": 763,
+   "w": 71,
+   "h": 32
+  }
+ ],
+ "alvos": [
+  {
+   "rotulo": "Projetos",
+   "x": 10,
+   "y": -12,
+   "w": 44,
+   "h": 44
+  },
+  {
+   "rotulo": "Gerar carrossel com IA",
+   "x": 243,
+   "y": -10,
+   "w": 85,
+   "h": 40
+  },
+  {
+   "rotulo": "Perfil",
+   "x": 336,
+   "y": -12,
+   "w": 44,
+   "h": 44
+  },
+  {
+   "rotulo": "Modo atual: Controle profissional. Clique para mudar.",
+   "x": 10,
+   "y": 41,
+   "w": 52,
+   "h": 34
+  },
+  {
+   "rotulo": "Abrir biblioteca",
+   "x": 66,
+   "y": 38,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Configurar IA",
+   "x": 110,
+   "y": 38,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Feed 4:5",
+   "x": 160,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Quadrado",
+   "x": 215,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Stories",
+   "x": 269,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Apresentação 16:9",
+   "x": 324,
+   "y": 40,
+   "w": 53,
+   "h": 36
+  },
+  {
+   "rotulo": "Fechar editor",
+   "x": 336,
+   "y": 389,
+   "w": 44,
+   "h": 44
+  },
+  {
+   "rotulo": "Início",
+   "x": 0,
+   "y": 412,
+   "w": 129,
+   "h": 48
+  },
+  {
+   "rotulo": "Marca",
+   "x": 130,
+   "y": 412,
+   "w": 129,
+   "h": 48
+  },
+  {
+   "rotulo": "Narrativa",
+   "x": 261,
+   "y": 412,
+   "w": 129,
+   "h": 48
+  },
+  {
+   "rotulo": "Visual",
+   "x": 0,
+   "y": 460,
+   "w": 129,
+   "h": 48
+  },
+  {
+   "rotulo": "Imagem",
+   "x": 130,
+   "y": 460,
+   "w": 129,
+   "h": 48
+  },
+  {
+   "rotulo": "Texto",
+   "x": 261,
+   "y": 460,
+   "w": 129,
+   "h": 48
+  },
+  {
+   "rotulo": "Prompt para gerarEx.: criar card sobre a ferramenta X",
+   "x": 16,
+   "y": 525,
+   "w": 358,
+   "h": 58
+  },
+  {
+   "rotulo": "Prompt para gerar",
+   "x": 31,
+   "y": 665,
+   "w": 328,
+   "h": 131
+  },
+  {
+   "rotulo": "Modo narrativo",
+   "x": 31,
+   "y": 838,
+   "w": 328,
+   "h": 46
+  },
+  {
+   "rotulo": "Opções de download",
+   "x": 12,
+   "y": 757,
+   "w": 114,
+   "h": 44
+  },
+  {
+   "rotulo": "Abrir biblioteca de projetos salvos",
+   "x": 307,
+   "y": 763,
+   "w": 71,
+   "h": 32
+  },
+  {
+   "rotulo": "Card 1 de 5",
+   "x": 10,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card 2 de 5",
+   "x": 60,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card 3 de 5",
+   "x": 110,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card 4 de 5",
+   "x": 160,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card 5 de 5",
+   "x": 210,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Adicionar card ao carrossel",
+   "x": 260,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  }
+ ],
+ "card": {
+  "x": 53,
+  "y": 10,
+  "w": 285,
+  "h": 356,
+  "fracaoVisivel": 100
+ }
+}

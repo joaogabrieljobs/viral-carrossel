@@ -1,6 +1,6 @@
 # Publicar modelo — diagramação e visual para outros usuários
 
-**Status:** especificação, aguardando decisões do João (seção 4). Nada implementado. Começa depois do plano grátis.
+**Status:** especificação com decisões respondidas pelo João em 2026-11-19 (seção 4). Nada implementado.
 **Data:** 2026-11-18 · **Base:** `main` em `4257738`
 **Pedido:** "um usuário pode criar um modelo de diagramação, visual e publicar para outro usuário usar."
 
@@ -55,6 +55,21 @@ Nada de galeria, publicação ou catálogo entre usuários existe no código nem
 | D3 | Quem publica e quem usa? | **Publica: planos pagos. Usa: todos, inclusive grátis** | Publicar pago segura spam e dá benefício ao assinante. Usar no grátis enriquece o plano manual sem custo de IA |
 | D4 | Fotos e textos de exemplo? | **Só estrutura; prévia com texto fictício do Moont** | É o que garante cliente fora do modelo. Exemplo do autor reabre o risco de vazamento e exige moderação de imagem |
 | D5 | Atribuição ao autor? | **Sim, opcional**: nome de exibição escolhido pelo autor, nunca o e-mail | Reconhecimento incentiva publicar; anonimato continua possível |
+
+### Respostas do João (2026-11-19)
+
+| # | Resposta | Diferença da recomendação |
+|---|---|---|
+| D1 | **Só galeria pública.** Todo modelo publicado aparece para todos; não há modelo só por link | Recomendação era galeria e link |
+| D2 | **Publica direto**, com denúncia e remoção pelo João | igual |
+| D3 | **Todos publicam e usam, inclusive o plano grátis** | Recomendação era só pago publicar |
+| D4 | **Só a estrutura**; prévia com texto fictício do Moont | igual |
+| D5 | **Nome de exibição opcional**; e-mail nunca aparece | igual |
+
+Consequências no desenho:
+- Sem modelo privado por link, "Meus modelos" precisa de **despublicar** e **apagar** claros: publicar é sempre público.
+- Com o grátis publicando, a galeria fica aberta a contas sem confirmação de e-mail. Entram limite por conta (sugestão: 10 modelos publicados e 5 publicações por dia), denúncia desde o primeiro dia e moderação do nome e da descrição do modelo, que é o único texto livre que vai para a galeria.
+- Rota `api/templates.js` aceita sessão grátis para publicar e listar, ao contrário das rotas pagas; o teste de permissão cobre conta grátis, paga e anônima.
 
 ## 5. Riscos
 

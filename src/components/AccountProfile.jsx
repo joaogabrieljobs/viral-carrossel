@@ -14,6 +14,90 @@ import { TEXT_PROVIDERS, IMAGE_PROVIDERS } from '../config/ai-providers.js';
 import { normalizeAccountUsage } from '../utils/account-usage.js';
 import AgentAccessPanel from './AgentAccessPanel.jsx';
 import { useModalDialog } from '../hooks/useModalDialog.js';
+import { confirmCurrentPassword } from '../lib/billing.js';
+import PasswordField from './PasswordField.jsx';
+
+/**
+ * Confirma "Sair e apagar deste aparelho". Pede a senha da conta aberta; conta
+ * que entra só com Google (sem senha) confirma digitando o próprio e-mail.
+ */
+function WipeDeviceDialog({ open, email, onClose, onConfirmed }) {
+  const [password, setPassword] = useState('');
+  const [typedEmail, setTypedEmail] = useState('');
+  const [needsEmail, setNeedsEmail] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const inputRef = useRef(null);
+  const { overlayRef, dialogRef, onDialogKeyDown } = useModalDialog({ open, onClose, initialFocusRef: needsEmail ? inputRef : null });
+  useEffect(() => {
+    if (!open) return;
+    setPassword(''); setTypedEmail(''); setNeedsEmail(false); setBusy(false); setError('');
+  }, [open]);
+  if (!open) return null;
+  const submit = async (event) => {
+    event.preventDefault();
+    if (busy) return;
+    setError('');
+    if (needsEmail) {
+      if (typedEmail.trim().toLowerCase() !== String(email || '').trim().toLowerCase()) {
+        setError('O e-mail digitado não é o desta conta.');
+        return;
+      }
+      onConfirmed();
+      return;
+    }
+    if (!password) { setError('Digite sua senha.'); return; }
+    setBusy(true);
+    try {
+      const result = await confirmCurrentPassword(password);
+      if (result.verified) { onConfirmed(); return; }
+      if (!result.hasPassword) { setNeedsEmail(true); return; }
+      setError(result.error || 'Senha incorreta.');
+    } catch (err) {
+      setError(err?.message || 'Não foi possível confirmar a senha agora.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div ref={overlayRef} className="modal-overlay" onClick={onClose} role="presentation" style={{ zIndex: 12000 }}>
+      <form
+        ref={dialogRef}
+        className="modal-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="wipe-device-title"
+        onKeyDown={onDialogKeyDown}
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={submit}
+        style={{ width: 'min(440px, calc(100vw - 24px))', padding: 20, display: 'grid', gap: 14 }}
+      >
+        <h2 id="wipe-device-title" style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>Sair e apagar deste aparelho</h2>
+        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: 'var(--text-muted)' }}>
+          O Moont confirma o salvamento na sua conta e apaga deste aparelho os projetos, imagens e preferências. A conta e os projetos na nuvem continuam.
+        </p>
+        {needsEmail ? (
+          <label style={{ display: 'grid', gap: 6, fontSize: 13, fontWeight: 600 }}>
+            Esta conta entra com Google e não tem senha. Digite seu e-mail para confirmar.
+            <input ref={inputRef} className="vc-input" type="email" autoComplete="off" value={typedEmail}
+              onChange={(e) => setTypedEmail(e.target.value)} placeholder={email || 'seu e-mail'} style={{ minHeight: 44 }} />
+          </label>
+        ) : (
+          <PasswordField label="Senha" value={password} onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password" disabled={busy} />
+        )}
+        {error && <p role="alert" style={{ margin: 0, fontSize: 13, color: 'var(--danger, #d95c5c)' }}>{error}</p>}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <button type="button" className="vc-btn vc-btn-ghost" style={{ minHeight: 44 }} onClick={onClose}>Cancelar</button>
+          <button type="submit" disabled={busy} style={{
+            minHeight: 44, padding: '0 18px', borderRadius: 9999, border: '1px solid var(--danger, #d95c5c)',
+            background: 'var(--danger, #d95c5c)', color: '#fff', fontWeight: 600, fontSize: 13, cursor: busy ? 'wait' : 'pointer',
+          }}>{busy ? 'Confirmando…' : 'Apagar deste aparelho'}</button>
+        </div>
+      </form>
+    </div>
+  );
+}
 
 const SOCIAL_FIELDS = [
   { id: 'instagram', prefix: 'instagram.com/', placeholder: 'seuhandle' },
@@ -391,6 +475,7 @@ export default function AccountProfile({
   const [profile, setProfile] = useState(() => loadUserProfile());
   const [editing, setEditing] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [wipeOpen, setWipeOpen] = useState(false);
   const [draft, setDraft] = useState(DEFAULT_USER_PROFILE);
 
   useEffect(() => {
@@ -640,37 +725,6 @@ export default function AccountProfile({
               >
                 {loggingOut ? 'Salvando e saindo…' : 'Sair da conta'}
               </button>
-              {/* No grátis os projetos existem só neste aparelho: apagar o aparelho
-                  seria apagar tudo, sem cópia na conta. A opção só existe para quem tem nuvem. */}
-              {!freePlan && <button
-                type="button"
-                disabled={loggingOut}
-                onClick={async (e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (loggingOut) return;
-                  const confirmed = window.confirm(
-                    'O Moont confirmará o salvamento na sua conta e apagará projetos, imagens e preferências deste aparelho. Deseja continuar?',
-                  );
-                  if (!confirmed) return;
-                  setLoggingOut(true);
-                  try { await onLogout({ wipeDevice: true }); }
-                  catch (err) { console.warn('[logout/wipe-device]', err); }
-                  finally { setLoggingOut(false); }
-                }}
-                style={{
-                  minHeight: 38,
-                  borderRadius: 9999,
-                  border: '1px solid var(--danger, #d95c5c)',
-                  background: 'transparent',
-                  color: 'var(--danger, #d95c5c)',
-                  fontWeight: 600,
-                  fontSize: 13,
-                  cursor: loggingOut ? 'wait' : 'pointer',
-                }}
-              >
-                Sair e apagar deste aparelho
-              </button>}
               {freePlan && <p style={{ margin: 0, fontSize: 12, lineHeight: 1.45, color: 'var(--text-muted)' }}>
                 Ao sair, seus projetos ficam guardados neste navegador e voltam quando você entrar de novo com esta conta.
               </p>}
@@ -847,6 +901,38 @@ export default function AccountProfile({
           </div>
         )}
       </section>
+
+      {/* Ação destrutiva fica por último no Perfil e pede a senha (João, 19/11).
+          No grátis não existe: os projetos estão só neste aparelho. */}
+      {onLogout && !freePlan && (
+        <section aria-label="Apagar dados deste aparelho" style={{
+          padding: 18, borderRadius: 16, border: '1px solid rgba(217,92,92,0.35)', background: 'var(--bg-card)',
+          display: 'grid', gap: 10,
+        }}>
+          <div className="vc-eyebrow">Este aparelho</div>
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: 'var(--text-muted)' }}>
+            Sai da conta e apaga deste navegador os projetos, imagens e preferências. A conta e a nuvem continuam.
+          </p>
+          <button type="button" disabled={loggingOut} onClick={() => setWipeOpen(true)} style={{
+            minHeight: 44, borderRadius: 9999, border: '1px solid var(--danger, #d95c5c)', background: 'transparent',
+            color: 'var(--danger, #d95c5c)', fontWeight: 600, fontSize: 13, cursor: loggingOut ? 'wait' : 'pointer',
+          }}>
+            Sair e apagar deste aparelho
+          </button>
+        </section>
+      )}
+      <WipeDeviceDialog
+        open={wipeOpen}
+        email={email}
+        onClose={() => setWipeOpen(false)}
+        onConfirmed={async () => {
+          setWipeOpen(false);
+          setLoggingOut(true);
+          try { await onLogout({ wipeDevice: true }); }
+          catch (err) { console.warn('[logout/wipe-device]', err); }
+          finally { setLoggingOut(false); }
+        }}
+      />
 
       <EditProfileModal
         open={editing}

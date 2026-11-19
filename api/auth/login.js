@@ -1,16 +1,47 @@
 import { applyCors } from '../lib/cors.js';
-import { createAccessToken, setAccessCookie, setCheckoutIdentityCookie, setLoginHintCookie } from '../lib/access.js';
+import { createAccessToken, readCurrentAccessCookie, setAccessCookie, setCheckoutIdentityCookie, setLoginHintCookie } from '../lib/access.js';
 import {
   normalizeEmail,
   isValidEmail,
   getAuthRecordsMatchingPassword,
   passwordAuthConfigured,
+  verifyPassword,
 } from '../lib/password-auth.js';
 import { getStripe } from '../lib/stripe.js';
 import { FREE_PLAN } from '../../shared/plans.js';
 import { resolveAccountEntitlement } from '../lib/account-entitlements.js';
 import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
-import { accountIdentityBackendEnabled, getAccountByStripeCustomerId } from '../lib/account-identity-postgres.js';
+import {
+  accountIdentityBackendEnabled, getAccountByStripeCustomerId, getPasswordRecordByStripeCustomerId,
+} from '../lib/account-identity-postgres.js';
+
+/**
+ * Confirma a senha da conta JÁ autenticada, antes de uma ação destrutiva
+ * (ex.: "Sair e apagar deste aparelho"). Não emite nem altera cookie: a conta
+ * vem da sessão, nunca do corpo, então não serve para entrar em outra conta.
+ * Conta sem senha (só Google) responde `hasPassword: false`.
+ */
+async function confirmCurrentPassword(req, res, password) {
+  let access;
+  try { access = await readCurrentAccessCookie(req); }
+  catch { return res.status(503).json({ error: 'Não foi possível verificar sua sessão. Tente novamente.' }); }
+  if (!access?.customerId) return res.status(401).json({ error: 'Entre na sua conta para continuar.' });
+  let record;
+  if (accountIdentityBackendEnabled()) {
+    record = await getPasswordRecordByStripeCustomerId(access.customerId);
+  } else {
+    const customer = await getStripe().customers.retrieve(access.customerId);
+    record = customer && !customer.deleted
+      ? { salt: customer.metadata?.vc_pw_salt || null, hash: customer.metadata?.vc_pw_hash || null }
+      : null;
+  }
+  const hasPassword = !!(record?.salt && record?.hash);
+  if (!hasPassword) return res.status(200).json({ verified: false, hasPassword: false });
+  const verified = verifyPassword(String(password || ''), record);
+  return res.status(verified ? 200 : 401).json(verified
+    ? { verified: true, hasPassword: true }
+    : { verified: false, hasPassword: true, error: 'Senha incorreta.' });
+}
 
 function readBody(req) {
   if (!req.body) return {};
@@ -38,7 +69,14 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'Login por e-mail indisponível.' });
   }
 
-  const { email, password } = readBody(req);
+  const { email, password, purpose } = readBody(req);
+  if (purpose === 'confirm') {
+    try { return await confirmCurrentPassword(req, res, password); }
+    catch (e) {
+      console.error('[auth/login confirm]', e?.message || e);
+      return res.status(e?.status === 503 ? 503 : 500).json({ error: 'Não foi possível confirmar a senha agora.' });
+    }
+  }
   const cleanEmail = normalizeEmail(email);
   if (!isValidEmail(cleanEmail) || !String(password || '')) {
     return res.status(400).json({ error: 'Informe e-mail e senha.' });

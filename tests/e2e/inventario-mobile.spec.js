@@ -9,7 +9,7 @@ import path from 'node:path';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 import { enterEditorFromHome } from './helpers/project-entry.js';
 
-const OUT = path.resolve('docs/mobile-nav/antes');
+const OUT = path.resolve(process.env.MOONT_INVENTARIO_SAIDA || 'docs/mobile-nav/antes');
 const iphone = devices['iPhone 13'];
 test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, userAgent: iphone.userAgent });
 test.skip(process.env.MOONT_INVENTARIO !== '1', 'Inventário manual: rodar com MOONT_INVENTARIO=1');
@@ -157,4 +157,46 @@ test('inventário 390×844: abrir, editar texto, trocar estilo, exportar', async
   await abrirAba('Texto', '10-profissional-aba-texto');
   await abrirAba('Imagem', '11-profissional-aba-imagem');
   await abrirAba('Mais', '12-profissional-aba-mais');
+});
+
+// Caso do João (19/11): Stories, projeto com contexto e referência ativos.
+test('inventário 390×844: Stories com contexto ativo e painel de texto aberto', async ({ page }) => {
+  let manifest = null;
+  await mockApi(page, {
+    session: { ...SESSAO_ATIVA, tier: 'creator' },
+    extra: {
+      '/api/library-sync': (route) => {
+        const request = route.request();
+        const url = new URL(request.url());
+        const body = request.method() === 'POST' ? request.postDataJSON() : {};
+        if (body.action === 'push') manifest = { ...body.manifest, revision: 1, updatedAt: Date.now() };
+        if (url.searchParams.get('full') === '1') return route.fulfill({ json: { ok: true, manifest } });
+        const meta = manifest && { revision: 1, updatedAt: manifest.updatedAt, projectCount: manifest.docs.length, assetIds: [] };
+        return route.fulfill({ json: { ok: true, empty: !manifest, meta, ...meta } });
+      },
+    },
+  });
+  await page.addInitScript(({ owner }) => {
+    if (localStorage.getItem('vc_library') !== null) return;
+    localStorage.setItem('vc_data_owner', JSON.stringify(owner));
+    localStorage.setItem('vc_library', JSON.stringify([{
+      id: 'inv-stories', name: 'Teste Clínica Janine', updatedAt: Date.now(),
+      doc: {
+        fmt: 'stories',
+        styleKit: { contextMd: 'Clínica de medicina regenerativa.', stylePrompt: '', refImages: [{ id: 'r1', dataUrl: '' }] },
+        slides: ['Medicina regenerativa não mascara o problema', 'O que muda no tratamento', 'Como o corpo recebe o estímulo', 'Agende sua avaliação']
+          .map((title, i) => ({ id: `st-${i}`, num: i + 1, title, subtitle: 'Ela estimula os mecanismos naturais de autocura do corpo.', layout: 'mc', align: 'center', textShadow: false })),
+      },
+    }]));
+    localStorage.setItem('vc_active_doc_id', JSON.stringify('inv-stories'));
+  }, { owner: `email:${SESSAO_ATIVA.email}` });
+  await page.goto('/?app=1');
+  await expect(page.locator('[data-vc-tour="account-home"]')).toBeVisible({ timeout: 30_000 });
+  await enterEditorFromHome(page);
+  await page.waitForTimeout(1500);
+  await medir(page, '20-stories-contexto-primeira-dobra');
+  const titulo = page.locator('[data-vc-inline-editable="true"]:visible').filter({ hasText: 'Medicina' }).first();
+  await titulo.click();
+  await page.waitForTimeout(1200);
+  await medir(page, '21-stories-painel-texto-aberto');
 });

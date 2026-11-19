@@ -541,6 +541,11 @@ import CloudPhotoProgress from './src/components/CloudPhotoProgress.jsx';
 
 // A rota por projeto só é ativada depois do banco, importação e API estarem
 // prontos no mesmo deploy. O fluxo anterior permanece intacto sem a flag.
+/* Quadro do celular: margens do card e reservas abaixo dele (ações do card e barra inferior fixa). */
+const MOBILE_BOARD_SIDE = 12;
+const MOBILE_BOARD_TOP = 8;
+const MOBILE_CARD_ACTIONS = 56;
+const MOBILE_BOARD_BOTTOM = 84;
 const PROJECTS_V2 = import.meta.env.VITE_PROJECTS_V2 === 'true';
 
 function accountBrandsContentSnapshot(brands) {
@@ -3835,12 +3840,27 @@ export default function App() {
   /* <1000px: some o atalho "Projetos" do header (o rodapé já tem um igual). */
   const headerVeryTight = !isMobile && vw < 1000;
   const f = FORMATS[fmt] || FORMATS.carrossel;
+  const [mobileBoardHeight, setMobileBoardHeight] = useState(0);
+  useLayoutEffect(() => {
+    if (!isMobile) return undefined;
+    const root = boardScrollRef.current;
+    if (!root) return undefined;
+    const measure = () => setMobileBoardHeight(root.clientHeight);
+    measure();
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
+    observer?.observe(root);
+    return () => observer?.disconnect();
+  }, [isMobile, shellView, accountLibraryReady, activeDocId]);
   const { zoom: canvasZoom, changeZoom } = useCanvasZoom(boardScrollRef, `${activeDocId}:${fmt}:${shellView}:${isMobile}:${accountLibraryReady}`);
   const previewBaseScale = useMemo(() => {
     if (isMobile) {
-      /* Margens laterais maiores para o texto não “escorrer” junto ao bezel / overscroll */
-      const side = Math.max(16, vw * 0.04);
-      const base = Math.min((vw - side - 44) / f.w, 0.92);
+      // Card grande (João, 19/11): largura toda menos 12px de cada lado e, se
+      // o formato for alto (Stories), cabe na altura livre do quadro — acima
+      // da fila de ações do card e da barra inferior.
+      const byWidth = (vw - MOBILE_BOARD_SIDE * 2) / f.w;
+      const freeHeight = mobileBoardHeight - MOBILE_BOARD_TOP - MOBILE_CARD_ACTIONS - MOBILE_BOARD_BOTTOM;
+      const byHeight = freeHeight > 160 ? freeHeight / f.h : byWidth;
+      const base = Math.min(byWidth, byHeight, 0.92);
       return thumbQaMode ? base * 0.72 : base;
     }
     // No desktop, a apresentação é uma superfície de edição 16:9. Limitá-la à
@@ -3852,7 +3872,7 @@ export default function App() {
       : 360;
     const base = Math.min(targetWidth / f.w, fmt === 'apresentacao' ? 0.5 : 0.44);
     return thumbQaMode ? Math.min(base * 0.7, 0.28) : base;
-  }, [isMobile, vw, f, fmt, thumbQaMode]);
+  }, [isMobile, vw, f, fmt, thumbQaMode, mobileBoardHeight]);
   const previewScale = previewBaseScale * canvasZoom;
 
   const slide = slides[activeIdx] ?? slides[0] ?? mkSlide(1, brand);
@@ -7740,8 +7760,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'stretch',
-          gap: 10,
-          padding: `calc(10px + env(safe-area-inset-top, 0)) max(12px, env(safe-area-inset-left, 0px)) 12px max(12px, env(safe-area-inset-right, 0px))`,
+          gap: 6,
+          padding: `calc(6px + env(safe-area-inset-top, 0)) max(10px, env(safe-area-inset-left, 0px)) 6px max(10px, env(safe-area-inset-right, 0px))`,
           /* maxHeight grande pra não cortar quando aberto; collapse pra 0 quando drawer abre */
           maxHeight: drawerOpen ? 0 : 240,
         } : {
@@ -7765,75 +7785,48 @@ Retorne APENAS JSON: ${refineAllWantsBody
       }}>
         {isMobile ? (
           <>
-            {/* Linha 1 — navegação: Início · marca · Gerar · Perfil */}
-            <div style={{
-              display:'flex',
-              alignItems:'center',
-              justifyContent:'space-between',
-              width:'100%',
-              gap:8,
-              minHeight: 44,
-            }}>
-              <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0, flex:1 }}>
-                <button
-                  type="button"
-                  onClick={() => goAccount('projects')}
-                  title="Projetos"
-                  aria-label="Projetos"
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 9999,
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-card)',
-                    color: 'var(--text-muted)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  <Home size={15} />
-                </button>
-                <BrandLogo height={22} style={{ maxWidth: 'min(100%, 140px)' }} />
+            {/* Celular (João, 19/11): o card manda. Duas linhas finas no topo:
+                1) projetos · nome e gravação · Gerar · perfil
+                2) modo / biblioteca / IA · formato */}
+            <div style={{ display:'flex', alignItems:'center', gap:8, width:'100%', minHeight:44 }}>
+              <button
+                type="button"
+                onClick={() => goAccount('projects')}
+                title="Projetos"
+                aria-label="Projetos"
+                style={{
+                  width: 44, height: 44, borderRadius: 9999,
+                  border: '1px solid var(--border)', background: 'var(--bg-card)',
+                  color: 'var(--text-muted)', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}
+              >
+                <Home size={16} />
+              </button>
+              <div style={{ minWidth:0, flex:1, display:'grid', gap:1 }}>
+                <strong style={{ fontSize:14, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{activeEntry?.name || 'Novo projeto'}</strong>
+                <div style={{ minWidth:0, overflow:'hidden' }}>{saveIndicator}</div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                {editorGenerateBtn}
-                <button
-                  type="button"
-                  onClick={() => goAccount('profile')}
-                  title="Perfil"
-                  aria-label="Perfil"
-                  style={{
-                    width: 40, height: 40, borderRadius: 9999,
-                    border: '1px solid var(--border)', background: 'var(--bg-card)',
-                    color: 'var(--text-muted)', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                >
-                  <User size={15} />
-                </button>
-              </div>
+              {editorGenerateBtn}
+              <button
+                type="button"
+                onClick={() => goAccount('profile')}
+                title="Perfil"
+                aria-label="Perfil"
+                style={{
+                  width: 44, height: 44, borderRadius: 9999,
+                  border: '1px solid var(--border)', background: 'var(--bg-card)',
+                  color: 'var(--text-muted)', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}
+              >
+                <User size={16} />
+              </button>
             </div>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, minWidth:0 }}>
-              <div style={{ minWidth:0, fontSize:12 }}>
-                <strong style={{ display:'block', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{activeEntry?.name || 'Novo projeto'}</strong>
-                <span style={{ color:'var(--text-muted)' }}>{brand.name === 'Padrão' ? 'Sem cliente definido' : (brand.name || brand.handle || 'Sem cliente definido')}</span>
-              </div>
-              {saveIndicator}
-            </div>
-            {/* Linha 2 — ferramentas secundárias (modo / biblioteca / IA) */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              width: '100%',
-              minHeight: 40,
-            }}>
+            <div style={{ display:'flex', alignItems:'center', gap:6, width:'100%', minHeight:40 }}>
               {editorHeaderActions}
+              <EditorFormatSelector fmt={fmt} setFmt={setFmt} layout="mobile" />
             </div>
-            <EditorFormatSelector fmt={fmt} setFmt={setFmt} layout="mobile" />
           </>
         ) : (
           <>
@@ -7926,12 +7919,13 @@ Retorne APENAS JSON: ${refineAllWantsBody
         </div>
       )}
 
-      <ProjectContextBanner
+      {!(isMobile && drawerOpen) && <ProjectContextBanner
         styleKit={styleKit}
         projectName={activeEntry?.name}
         onUndo={history.undo}
         canUndo={history.canUndo}
-      />
+        compact={isMobile}
+      />}
 
       {/* ── BODY ── */}
       <div className="vc-editor-shell" style={{ flex:1, display:'flex', overflow:'hidden' }}>
@@ -7954,7 +7948,22 @@ Retorne APENAS JSON: ${refineAllWantsBody
         {/* Mobile drawer com backdrop + swipe-to-dismiss
             (puxa o handle pra baixo > 80px ou velocidade > 0.4 → fecha) */}
         {isMobile && (
-          <MobileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+          <MobileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)}
+            renderPreview={empty ? null : ({ width, height }) => (
+              <div data-vc-drawer-preview-card style={{ borderRadius:10, overflow:'hidden', boxShadow:'0 8px 24px rgba(0,0,0,0.35)' }}>
+                <SlideCard
+                  slide={displaySlides[activeIdx] || slide}
+                  fmt={fmt}
+                  brand={displayBrand}
+                  num={activeIdx + 1}
+                  total={slides.length}
+                  scale={Math.min(width / f.w, height / f.h)}
+                  creativePreset={creativePreset}
+                  slideIndex={activeIdx}
+                  showCanvasChrome={false}
+                />
+              </div>
+            )}>
             <SidebarContent {...sidebarProps}/>
           </MobileDrawer>
         )}
@@ -8040,14 +8049,28 @@ Retorne APENAS JSON: ${refineAllWantsBody
           </div>
 
           {/* ── MAIN CANVAS AREA ── */}
-          {!empty && <CanvasNavigator zoom={canvasZoom} onZoom={changeZoom} onFit={() => {
+          {!empty && isMobile && Math.round(canvasZoom * 100) !== 100 && (
+            <div style={{ position:'relative', height:0, zIndex:5 }}>
+              <button type="button" onClick={() => { changeZoom(1); setBoardJump(n => n + 1); }}
+                aria-label="Ajustar card à tela"
+                style={{ position:'absolute', right:10, top:8, minHeight:40, padding:'0 14px', borderRadius:9999,
+                  border:'1px solid var(--border)', background:'var(--bg-card)', color:'var(--text-primary)',
+                  fontSize:12, fontWeight:600, display:'inline-flex', alignItems:'center', gap:6, boxShadow:'0 4px 12px rgba(0,0,0,0.35)' }}>
+                Ajustar · <output aria-label="Zoom da área de trabalho">{Math.round(canvasZoom * 100)}%</output>
+              </button>
+            </div>
+          )}
+          {!empty && !isMobile && <CanvasNavigator zoom={canvasZoom} onZoom={changeZoom} onFit={() => {
             const root = boardScrollRef.current;
             if (!root) return;
             changeZoom(Math.min(1, (root.clientWidth - (isMobile ? 56 : 96)) / (f.w * previewBaseScale), (root.clientHeight - (isMobile ? 108 : 110)) / (f.h * previewBaseScale)));
             setBoardJump(n => n + 1);
           }} index={activeIdx} count={slides.length} isPresentation={isPresentationProject} onNavigate={index => { setActiveIdx(index); setBoardJump(n => n + 1); }} />}
           <div style={{ flex: 1, minHeight: 0, position: 'relative', display: 'flex' }}>
-          <div id="vc-cards-viewport" className="vc-cards-viewport" ref={boardScrollRef} style={{ flex:1, minWidth:0, overflow:'auto', overscrollBehavior:'contain', touchAction:'pan-x pan-y' }}>
+          <div id="vc-cards-viewport" className="vc-cards-viewport" ref={boardScrollRef} style={{ flex:1, minWidth:0, overflow:'auto', overscrollBehavior:'contain', touchAction:'pan-x pan-y',
+            // Painel aberto no celular: quem mostra o card é a miniatura acima
+            // dele. O quadro some para os controles do card não vazarem por cima.
+            ...(isMobile && drawerOpen ? { visibility:'hidden' } : {}) }}>
             {!setupOpen && generationPreviewContext?.projectId === activeDocId && ((generationRef.current && genProgress) || (['draft', 'writing', 'reviewing'].includes(creationPreviewPhase) && (creationPreviewSlides.length > 0 || creationPreviewPlan))) && <div className="vc-editor-generation-preview">
               <GenerationPreview active={!!generationRef.current && !!genProgress} startedAt={generationPreviewContext.startedAt} progress={genProgress} slides={creationPreviewSlides} phase={creationPreviewPhase} isPresentation={generationPreviewContext.isPresentation} plan={creationPreviewPlan} completedCount={creationPreviewCompletedCount} totalCount={creationPreviewTotalCount}/>
               {!genProgress && <button type="button" className="vc-btn vc-btn-ghost" onClick={() => { setCreationPreviewSlides([]); setGenerationPreviewContext(null); }}>Fechar prévia da geração</button>}
@@ -8307,8 +8330,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
               <div
                 style={{
                   display:'flex', flexDirection:'column', alignItems:'center',
-                  padding:'16px 44px calc(108px + env(safe-area-inset-bottom, 0)) 12px',
-                  minWidth: Math.max(vw, f.w * previewScale + 56), boxSizing: 'border-box',
+                  padding:`${MOBILE_BOARD_TOP}px ${MOBILE_BOARD_SIDE}px calc(${MOBILE_BOARD_BOTTOM}px + env(safe-area-inset-bottom, 0)) ${MOBILE_BOARD_SIDE}px`,
+                  minWidth: Math.max(vw, f.w * previewScale + MOBILE_BOARD_SIDE * 2), boxSizing: 'border-box',
                   minHeight:'100%', position:'relative',
                 }}
                 onTouchStart={e => {
@@ -8449,7 +8472,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                 {/* Ações rápidas do card atual — pill flutuante com tela cheia,
                     baixar, grade. Acima dos dots pra ficar visível mesmo quando
                     o drawer está aberto (área do card é metade superior). */}
-                <div style={{ display:'flex', justifyContent:'center', marginTop:12 }}>
+                <div style={{ display:'flex', justifyContent:'center', marginTop:8 }}>
                   <div style={{
                     display:'inline-flex', alignItems:'center', gap:2,
                     padding:4, borderRadius:9999,

@@ -759,3 +759,54 @@ describe('identidade para renovar assinatura por senha', () => {
     expect(stripeMock.customers.update).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('confirmar a senha da conta aberta antes de apagar o aparelho', () => {
+  const contaComSenha = () => {
+    const { salt, hash } = hashPassword('SenhaDaConta123!');
+    return { id: 'cus_confirma', email: 'dona@teste.exemplo', metadata: { vc_pw_salt: salt, vc_pw_hash: hash } };
+  };
+  const confirmar = async (cookie, password, extra = {}) => {
+    const res = makeRes();
+    await loginHandler(makeReq({ method: 'POST', cookie, body: { purpose: 'confirm', password, ...extra } }), res);
+    return res;
+  };
+
+  it('senha certa confirma sem emitir nem trocar a sessão', async () => {
+    const customer = contaComSenha();
+    stripeMock.customers.retrieve.mockResolvedValue(customer);
+    const res = await confirmar(cookieFor(customer.id, customer.email), 'SenhaDaConta123!');
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ verified: true, hasPassword: true });
+    expect(cookieValue(res, COOKIE_NAME)).toBeNull();
+    expect(stripeMock.customers.list).not.toHaveBeenCalled();
+  });
+
+  it('senha errada é recusada', async () => {
+    const customer = contaComSenha();
+    stripeMock.customers.retrieve.mockResolvedValue(customer);
+    const res = await confirmar(cookieFor(customer.id, customer.email), 'OutraSenha123!');
+    expect(res.statusCode).toBe(401);
+    expect(res.body).toMatchObject({ verified: false, hasPassword: true });
+  });
+
+  it('a conta vem da sessão: e-mail de outra pessoa no corpo não muda quem é verificado', async () => {
+    const customer = contaComSenha();
+    stripeMock.customers.retrieve.mockImplementation(async (id) => (id === customer.id ? customer : null));
+    const res = await confirmar(cookieFor(customer.id, customer.email), 'SenhaDaConta123!', { email: 'outra@teste.exemplo' });
+    expect(res.statusCode).toBe(200);
+    expect(stripeMock.customers.retrieve).toHaveBeenCalledWith(customer.id);
+  });
+
+  it('conta só com Google responde que não há senha', async () => {
+    stripeMock.customers.retrieve.mockResolvedValue({ id: 'cus_google', email: 'g@teste.exemplo', metadata: { vc_google_sub: 'sub' } });
+    const res = await confirmar(cookieFor('cus_google', 'g@teste.exemplo'), 'qualquer');
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ verified: false, hasPassword: false });
+  });
+
+  it('sem sessão não confirma nada', async () => {
+    const res = await confirmar('', 'SenhaDaConta123!');
+    expect(res.statusCode).toBe(401);
+    expect(stripeMock.customers.retrieve).not.toHaveBeenCalled();
+  });
+});
