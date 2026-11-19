@@ -319,9 +319,9 @@ const callCompatibleChat = async (
     throwIfGenerationCancelled(signal);
     const model = modelCandidates[i];
     const payload = { ...basePayload, model };
-    // Structured presentation steps need bounded JSON, not a hidden reasoning
-    // response consuming the output budget. Scope this to supported Z.ai models
-    // and explicit callers; leave social generation and other providers intact.
+    // Structured generation needs bounded JSON rather than hidden reasoning
+    // consuming its output budget. Only explicit callers and supported Z.ai
+    // models get this parameter; other providers retain their own behavior.
     if (provider === 'zai' && thinking === 'disabled' && /^glm-(?:4\.[67](?:-|$)|5(?:\.[012])?(?:-|$))/i.test(model)) {
       payload.thinking = { type: 'disabled' };
     }

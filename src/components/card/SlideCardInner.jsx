@@ -21,6 +21,7 @@ import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks, inkI
 import { resolvePresetChrome, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
 import { footerChromeReservePx, footerGuardApplies, footerPillBottomPx, footerPillColors, textZonesAboveFooter } from '../../utils/card-chrome.js';
 import { titleLetterSpacingEm } from '../../utils/title-tracking.js';
+import { photoPlaceholderRect } from '../../utils/photo-placeholder.js';
 import { cultureAccentRenderablePieces } from '../../utils/text-spans.js';
 import { elementOffsetStyle, hasElementOffset, getElementOffset, clampPct0a100 } from '../../utils/card-elements.js';
 import { normalizeOverlays, overlayMoveKey } from '../../utils/card-overlays.js';
@@ -822,6 +823,16 @@ const ClassicCanvasInner = React.forwardRef(({
   const nativeEvidence = showSupportingText && normalizePresentationBlocks(slide.presentationBlocks).length > 0;
   const photoZoneInteractive = !!(onPhotoZoneClick && (showCanvasChrome || pendingPhotoZone || photoFailed));
   const photoZoneNativeHit = !!(photoZoneInteractive && onPhotoZoneFileChange);
+  const photoOffset = getElementOffset(slide, 'photo');
+  const placeholderRect = photoPlaceholderRect(
+    { ...pr, x: pr.x + photoOffset.x, y: pr.y + photoOffset.y },
+    [[tr, 'title', slide.title], [sr, 'subtitle', slide.subtitle || supportingText || nativeEvidence]]
+      .filter(([, , content]) => !!content)
+      .map(([rect, key]) => {
+        const offset = getElementOffset(slide, key);
+        return { ...rect, x: rect.x + offset.x, y: rect.y + offset.y };
+      }),
+  );
   const evidenceGlassActive = presentationEvidenceGlassActive(slide);
   const photoZoneBoxStyle = {
     ...pctBox(pr, f),
@@ -888,11 +899,16 @@ const ClassicCanvasInner = React.forwardRef(({
             </span>
           </div>
         )}
-        {(showCanvasChrome || pendingPhotoZone || photoFailed) && (!slide.bgImage || imgErr) && !imgLoading && !generateImageBusy && !forExport && (
-          <div style={{
-            position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
+        {placeholderRect && (showCanvasChrome || pendingPhotoZone || photoFailed) && (!slide.bgImage || imgErr) && !imgLoading && !generateImageBusy && !forExport && (
+          <div data-vc-photo-placeholder="1" style={{
+            position:'absolute',
+            left:`${(placeholderRect.x - pr.x - photoOffset.x) / pr.w * 100}%`,
+            top:`${(placeholderRect.y - pr.y - photoOffset.y) / pr.h * 100}%`,
+            width:`${placeholderRect.w / pr.w * 100}%`, height:`${placeholderRect.h / pr.h * 100}%`,
+            display:'flex', alignItems:'center', justifyContent:'center',
             background:'rgba(0,0,0,0.45)',
-            color:'#fff', fontSize:f.w*0.026, fontWeight:600, textAlign:'center', padding:f.w*0.06,
+            color:'#fff', fontSize:f.w*0.026, fontWeight:600, textAlign:'center', padding:f.w*0.018,
+            boxSizing:'border-box', overflow:'hidden',
           }}>
             {photoFailed
               ? 'Imagem indisponível — toque para substituir'

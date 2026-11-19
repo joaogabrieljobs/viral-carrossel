@@ -464,6 +464,10 @@ export async function generateReviewedCarousel({ prompt, config, aiOptions, onRe
     ...aiOptions,
     ...presentationAIOptions(config?.presetId, config?.presentationPath),
     json: true,
+    // GLM-4.7 thinks by default. Hidden reasoning shares the bounded output
+    // budget and was exhausting it before the social JSON could finish.
+    // The transport scopes this option to models that support the switch.
+    thinking: 'disabled',
   };
   // Entregue os limites ao primeiro rascunho, quando ainda há liberdade para
   // estruturar cada slide. A revisão continua sendo a segunda barreira, mas
