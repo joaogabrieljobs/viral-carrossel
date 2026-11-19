@@ -201,8 +201,6 @@ function vcFixHtml2CanvasTextClip(clonedDoc, clonedSlideRoot) {
     el.style.overflow = 'visible';
   });
 
-  // Biblioteca 2.0: o arquivo precisa ter a mesma composição do preview.
-  const keepTitlePosition = !!clonedSlideRoot.querySelector?.('[data-vc-presentation-art]');
   clonedSlideRoot.querySelectorAll('h1').forEach((h1) => {
     const cs = view.getComputedStyle(h1);
     const fs = parseFloat(cs.fontSize) || 48;
@@ -218,12 +216,10 @@ function vcFixHtml2CanvasTextClip(clonedDoc, clonedSlideRoot) {
     h1.style.paddingBottom = `${padBottom}px`;
     h1.style.overflow = 'visible';
     h1.style.lineHeight = cs.lineHeight;
-    if (keepTitlePosition) {
-      // A folga do html2canvas não pode mover o título nem o apoio: margens
-      // negativas devolvem o espaço acrescentado e o deslocamento anulado.
-      h1.style.marginTop = `${(parseFloat(cs.marginTop) || 0) - (pad - existing) + relativeTop}px`;
-      h1.style.marginBottom = `${(parseFloat(cs.marginBottom) || 0) - (padBottom - existingBottom) - relativeTop}px`;
-    }
+    // O arquivo precisa repetir a composição do editor: margens negativas
+    // devolvem a folga acrescentada para o html2canvas e o `top` anulado.
+    h1.style.marginTop = `${(parseFloat(cs.marginTop) || 0) - (pad - existing) + relativeTop}px`;
+    h1.style.marginBottom = `${(parseFloat(cs.marginBottom) || 0) - (padBottom - existingBottom) - relativeTop}px`;
   });
 
   // Caixas com fundo de texto: um pouco mais de padding vertical no export.
@@ -235,9 +231,10 @@ function vcFixHtml2CanvasTextClip(clonedDoc, clonedSlideRoot) {
     // Só caixas semi-transparentes escuras (placa de texto)
     const m = bg.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?/i);
     if (!m) return;
-    // Fundo transparente (rgba(0,0,0,0)) não é placa: na biblioteca 2.0 o
-    // padding extra empurrava título e apoio ~26 px no arquivo.
-    if (keepTitlePosition && m[4] != null && Number(m[4]) === 0) return;
+    // Fundo transparente (rgba(0,0,0,0)) não é placa. Tratado como placa, o
+    // padding extra movia título e apoio 24–33 px no arquivo (desce com texto
+    // no alto, sobe com texto na base) em carrosséis, quadrado e stories.
+    if (m[4] != null && Number(m[4]) === 0) return;
     const r = Number(m[1]);
     const g = Number(m[2]);
     const b = Number(m[3]);
