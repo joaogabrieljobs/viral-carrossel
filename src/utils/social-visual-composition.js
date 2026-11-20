@@ -207,7 +207,7 @@ export function applySocialVisualCompositionV3(slides, { preset, photoRegion = '
 }
 
 /** Marcas que a composição grava no card; sem as caixas elas não significam nada. */
-const SOCIAL_COMPOSITION_FIELDS = ['socialComposition', 'socialCompositionVersion', 'socialVisualPresetId', 'socialZoneAnchors', 'overlayMode', 'socialArt', 'socialFunction', 'socialFamily', 'socialPhotoTreatment', 'titleItalic', 'subtitleWeight', 'hideFooterPill', 'subtitleCase', 'subtitleItalic'];
+const SOCIAL_COMPOSITION_FIELDS = ['socialComposition', 'socialCompositionVersion', 'socialVisualPresetId', 'socialZoneAnchors', 'overlayMode', 'socialScrimTop', 'socialArt', 'socialFunction', 'socialFamily', 'socialPhotoTreatment', 'titleItalic', 'subtitleWeight', 'hideFooterPill', 'subtitleCase', 'subtitleItalic'];
 
 /**
  * Troca de padrão num projeto já gerado.
@@ -489,12 +489,21 @@ export function socialFormatPatch(slide, formato = 'carrossel') {
   // Cor-assinatura (não branca) sobre foto: proteção localizada mais densa
   // atrás do texto, em vez de trocar a cor do título.
   const scrimAmount = L.scrim ? Math.min(80, L.scrim.amount + (art.signatureOnPhoto ? 14 : 0)) : 0;
+  // Topo real do texto sobre a foto (em %, de cima): o degradê precisa cobrir
+  // o título inteiro. Título longo ou maior sobe até a parte clara da foto e,
+  // com o degradê fixo, ficava sem proteção.
+  const titleAnchor = L.anchors?.title || 'start';
+  const titleUsedPct = Math.min(fit.title.h, fit.titleUsed ?? fit.title.h);
+  const textTop = titleAnchor === 'end' ? fit.title.y + fit.title.h - titleUsedPct
+    : titleAnchor === 'center' ? fit.title.y + (fit.title.h - titleUsedPct) / 2 : fit.title.y;
+  const scrimTop = L.scrim && L.onPhoto ? round2(Math.max(0, textTop - 5)) : undefined;
   return {
     layout: L.align === 'center' ? 'tc' : 'tl',
     align: L.align,
     bgFit: L.photoFit === 'contain' ? 'contain' : 'cover',
     overlay: scrimAmount,
     overlayMode: L.scrim ? 'scrim' : null,
+    socialScrimTop: scrimTop,
     titleSize: toTitleSize(fit.titlePx),
     subSize: toSubSize(fit.bodyPx),
     bodyAfterSize: toBodySize(fit.supportPx),

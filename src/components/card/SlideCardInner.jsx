@@ -95,6 +95,23 @@ function subtitleTextTransform(brand) {
   return 'none';
 }
 
+/**
+ * Degradê da composição social v4 sobre foto: cobre do pé do card até o topo
+ * real do texto (`socialScrimTop`, em % de cima). O título que sobe para a
+ * parte clara da foto continua sobre fundo escuro; acima dele a foto fica limpa.
+ * Cor-assinatura escura (vermelho, coral) pede proteção mais densa.
+ */
+function socialScrimGradient(slide) {
+  const ov = Math.max(0, Math.min(100, Number(slide.overlay) || 0)) / 100;
+  const t = Math.max(24, Math.min(100, 100 - slide.socialScrimTop));
+  const strong = slide.socialArt?.signatureOnPhoto ? 0.86 : Math.min(0.74, Math.max(0.6, ov * 1.1));
+  const base = Math.max(strong, Math.min(0.9, ov * 1.4));
+  const fade = Math.min(100, t + 16);
+  return `linear-gradient(to top, rgba(0,0,0,${base}) 0%, rgba(0,0,0,${strong}) ${round1(t * 0.55)}%, rgba(0,0,0,${round1(strong * 0.9 * 100) / 100}) ${round1(t)}%, transparent ${round1(fade)}%), linear-gradient(to bottom, rgba(0,0,0,${ov * 0.6}) 0%, transparent 17%)`;
+}
+
+const round1 = (n) => Math.round(n * 10) / 10;
+
 function finiteNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
@@ -892,7 +909,9 @@ const ClassicCanvasInner = React.forwardRef(({
         {slide.bgImage && imgReady && !imgErr && slide.overlay > 0 && (
           <div style={{
             position:'absolute', inset:0, pointerEvents:'none',
-            background: slide.overlayMode === 'scrim'
+            background: slide.overlayMode === 'scrim' && Number.isFinite(slide.socialScrimTop)
+              ? socialScrimGradient(slide)
+              : slide.overlayMode === 'scrim'
               // Capa social: escuro só onde o texto está; o resto da foto fica limpo.
               ? `linear-gradient(to top, rgba(0,0,0,${Math.min(0.9, slide.overlay/100 * 1.4)}) 0%, rgba(0,0,0,${Math.min(0.72, slide.overlay/100 * 1.1)}) 30%, rgba(0,0,0,${slide.overlay/100*0.3}) 56%, transparent 76%), linear-gradient(to bottom, rgba(0,0,0,${slide.overlay/100*0.6}) 0%, transparent 17%)`
               : slide.overlayMode === 'top'

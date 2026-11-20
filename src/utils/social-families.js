@@ -517,8 +517,18 @@ function viralDevices(kind, fn, L, F, { photo }) {
   const out = [];
   const B = titleBox(L);
   const center = L.align === 'center';
-  const under = (w, h, color, extra) => block(center ? 50 - w / 2 : B.x, B.y + B.h + 0.6, w, h, color, extra);
-  const over = (w, h, color, gap = 1.6, extra) => block(center ? 50 - w / 2 : B.x, B.y - gap - h, w, h, color, extra);
+  // Centro da coluna do texto (não do card): na coluna ao lado da foto o
+  // texto centraliza na própria coluna, e o fio precisa acompanhar.
+  const cx = B.x + B.w / 2;
+  const under = (w, h, color, extra) => block(center ? cx - w / 2 : B.x, B.y + B.h + 0.6, w, h, color, extra);
+  // Fio acima do título não é desenhado sobre a foto (card com foto no topo
+  // ou em coluna): encostado na borda da foto ele parece um corte errado.
+  const P = !L.onPhoto ? L.photo : null;
+  const onPhoto = (b) => P && b.x < P.x + P.w && b.x + b.w > P.x && b.y < P.y + P.h + 1.2 && b.y + b.h > P.y;
+  const over = (w, h, color, gap = 1.6, extra) => {
+    const b = block(center ? cx - w / 2 : B.x, B.y - gap - h, w, h, color, extra);
+    return onPhoto(b) ? null : b;
+  };
   const numeral = (color, size = 230) => {
     const h = F.py(size * 0.92);
     if (!['opener', 'development'].includes(fn) || L.onPhoto || B.y - h - 1 < F.t - 1) return;
@@ -542,8 +552,8 @@ function viralDevices(kind, fn, L, F, { photo }) {
       // para a ponta do sublinhado.
       if (['cover', 'statement', 'closing'].includes(fn)) {
         const above = B.y - (F.kind === 'tall' ? 3.2 : 4.2);
-        if (above - 2.6 >= F.t - 0.5) out.push({ t: 'star', x: center ? 50 : B.x + 2.6, y: above, d: 5.2, color: 'accent' });
-        else out.push({ t: 'star', x: (center ? 50 + 17 : B.x + 34) + 3.6, y: B.y + B.h + 0.6 + (F.kind === 'tall' ? 0.4 : 0.55), d: 5.2, color: 'accent' });
+        if (above - 2.6 >= F.t - 0.5) out.push({ t: 'star', x: center ? cx : B.x + 2.6, y: above, d: 5.2, color: 'accent' });
+        else out.push({ t: 'star', x: (center ? cx + 17 : B.x + 34) + 3.6, y: B.y + B.h + 0.6 + (F.kind === 'tall' ? 0.4 : 0.55), d: 5.2, color: 'accent' });
       }
       if (fn === 'cover') out.push(text(B.x, B.y - (F.kind === 'tall' ? 7.4 : 9.6), 100 - 2 * F.e, '{eyebrow?}', { size: 28, color: 'accent', weight: 700, tracking: 6, case: 'upper', requires: 'eyebrow' }));
       numeral('accent');
@@ -561,8 +571,8 @@ function viralDevices(kind, fn, L, F, { photo }) {
       numeral('accent');
       break;
     case 'reflexivo':
-      if (fn === 'statement') out.push(text(F.e, B.y - F.py(190), 100 - 2 * F.e, '“', { size: 240, color: 'accent', role: 'title', leading: 1, align: 'center' }));
-      else { out.push({ t: 'diamond', x: 50, y: B.y - 2.4, d: 1.6, color: 'accent' }); out.push(block(50 - 11, B.y - 2.4, 8, 0.12, 'accent')); out.push(block(50 + 3, B.y - 2.4, 8, 0.12, 'accent')); }
+      if (fn === 'statement') out.push(text(B.x, B.y - F.py(190), B.w, '“', { size: 240, color: 'accent', role: 'title', leading: 1, align: 'center' }));
+      else { out.push({ t: 'diamond', x: cx, y: B.y - 2.4, d: 1.6, color: 'accent' }); out.push(block(cx - 11, B.y - 2.4, 8, 0.12, 'accent')); out.push(block(cx + 3, B.y - 2.4, 8, 0.12, 'accent')); }
       break;
     case 'tabloid':
       if (!L.onPhoto) out.push(block(0, Math.max(1.5, F.t - 2.4), 100, F.kind === 'tall' ? 0.6 : 0.9, 'accent'));
@@ -593,12 +603,12 @@ function viralDevices(kind, fn, L, F, { photo }) {
       out.push(over(10, 0.45, 'accent', 2.2));
       numeral('accent', 200);
       break;
-    case 'minimal':
+    case 'minimalClean':
       out.push(over(6, 0.16, 'ink', 2.2));
       break;
     default:
   }
-  return out;
+  return out.filter(Boolean);
 }
 
 const FICHA_LABEL = { opener: 'CONTEXTO', development: 'PONTO', photo: 'FIGURA', statement: 'TESE', list: 'ETAPAS', comparison: 'COMPARAÇÃO', closing: 'FECHO' };

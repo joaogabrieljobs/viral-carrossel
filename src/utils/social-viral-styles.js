@@ -147,7 +147,7 @@ export const VIRAL_STYLES = Object.freeze({
     scale: { cover: 120, statement: 140, opener: 108, development: 100, photo: 92, list: 92, closing: 112, body: 44, support: 34 },
     pick: { cover: COVER, opener: 'vDevCenter', development: ['vDevCenter', 'vDevCenter'], photo: ['vPhotoTop', 'vPhotoTop'], statement: 'vStatement', list: 'vList', comparison: 'compare', closing: CLOSING },
     photo: { filter: 'saturate(0.95) contrast(1.02)', directionEn: 'Clean bright photography, few elements, tidy light background, sharp subject with generous empty space.', direction: 'Foto limpa e clara, poucos elementos, fundo claro e organizado, assunto nítido com muito espaço livre.' },
-    devices: 'minimal',
+    devices: 'minimalClean',
   }),
 });
 
