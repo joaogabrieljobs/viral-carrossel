@@ -14,6 +14,7 @@ import { normalizeOverlays } from './card-overlays.js';
 import { LOGO_SIZE_DEFAULT, LOGO_SIZE_MAX, LOGO_SIZE_MIN } from './slide-logo.js';
 import { normalizePresentationPath } from './presentation.js';
 import { resolvePresentationVisualPresetDefinition } from '../styles/presentation-presets.jsx';
+import { repairMissingPresentationEvidence } from './presentation-composition.js';
 
 /** Logos ≤140px na escala 1080 ficavam ilegíveis / “fora” do preview. */
 function coerceReadableLogoSize(size) {
@@ -380,10 +381,11 @@ function ensureDocShape(d) {
       // Projetos anteriores à edição individual não tinham este campo. Migra
       // os offsets antes de ativar os alvos separados para a composição não
       // saltar (no Cultura antigo, `subtitle` deslocava a zona inferior).
+      const withEvidence = plannedPresentation ? repairMissingPresentationEvidence(normalized) : normalized;
       if (!Object.prototype.hasOwnProperty.call(sl, 'elementsUnlocked')) {
-        return { ...normalized, ...unlockGroupedElementsPatch(normalized) };
+        return { ...withEvidence, ...unlockGroupedElementsPatch(withEvidence) };
       }
-      return { ...normalized, elementsUnlocked: sl.elementsUnlocked !== false };
+      return { ...withEvidence, elementsUnlocked: sl.elementsUnlocked !== false };
     });
   }
   if (!FORMATS[out.fmt]) out.fmt = 'carrossel';

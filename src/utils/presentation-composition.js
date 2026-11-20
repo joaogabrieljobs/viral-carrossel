@@ -50,6 +50,11 @@ export function resolvePresentationVisualRole(slide = {}, stage = {}) {
 }
 
 export function resolvePresentationCompositionKind({ slide = {}, stage = {}, index = 0, count = 1 } = {}) {
+  // Bloco nativo (tabela, métricas, etapas) só tem onde ser desenhado na página
+  // de dados: é a única composição com zona de evidência. Em capa, conteúdo ou
+  // fechamento o bloco ficava sem área, o slide saía com metade vazia e a
+  // exportação era barrada ("A área de dados não tem dimensões válidas").
+  if (hasBlocks(slide)) return 'data';
   if (index === 0) return 'cover';
   if (index >= count - 1) return 'closing';
   const role = resolvePresentationVisualRole(slide, stage);
@@ -316,3 +321,24 @@ export function presentationPhotoAspectRatio(slide) {
     return value(candidate) < value(best) ? candidate : best;
   }, choices[0]);
 }
+
+const validZone = zone => zone && ['x', 'y', 'w', 'h'].every(key => Number.isFinite(zone[key])) && zone.w > 0 && zone.h > 0;
+
+/**
+ * Projetos gerados antes da regra "bloco nativo → página de dados" guardaram
+ * slides com tabela/métricas/etapas numa composição sem zona de evidência: o
+ * bloco não aparecia e a exportação era barrada. Ao abrir, esses slides (e só
+ * eles) são recompostos como página de dados da mesma família. Texto, foto,
+ * bloco e cores escolhidas pela pessoa não mudam.
+ */
+export function repairMissingPresentationEvidence(slide) {
+  if (!slide || typeof slide !== 'object' || !hasBlocks(slide)) return slide;
+  const canvas = slide.canvas;
+  if (!canvas?.zones || !(canvas.applied || canvas.enabled)) return slide;
+  if (validZone(canvas.zones.evidence)) return slide;
+  if (!slide.presentationPresetId && !slide.presentationPatternId) return slide;
+  const repaired = contentAwarePresentationOverrides(slide, slide, 'data', { deliveryMode: slide.presentationDeliveryMode || 'hybrid' });
+  if (!validZone(repaired.canvas?.zones?.evidence)) return slide;
+  return { ...repaired, presentationComposition: 'data', presentationEvidenceRepaired: true };
+}
+

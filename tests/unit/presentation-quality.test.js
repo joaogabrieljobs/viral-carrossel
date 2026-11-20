@@ -84,7 +84,7 @@ describe('presentation geometry audit and bounded repairs', () => {
   it('does not apply the new export gate to legacy free-positioned slides', () => {
     expect(() => assertPresentationExportQuality({ slides: [slide({ presentationQualityVersion: undefined, presentationBlocks: [] })], roots: [] })).not.toThrow();
     const broken = slide(); broken.canvas.zones.evidence.y = 90;
-    expect(() => assertPresentationExportQuality({ slides: [broken], roots: [] })).toThrow('Revise o slide 1');
+    expect(() => assertPresentationExportQuality({ slides: [broken], roots: [] })).toThrow('Slide 1:');
   });
   it.each(['stories', 'quadrado', 'carrossel'])('keeps native evidence visible and separate when adapted to %s', (fmt) => {
     const adapted = presentationForSocialFormat(slide(), fmt);

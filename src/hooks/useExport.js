@@ -197,6 +197,18 @@ export function exportRenderScope(slides, refs, slideIndexes = null) {
   };
 }
 
+/** Problema no conteúdo que impede um arquivo fiel: fica na tela até a
+ * pessoa fechar o aviso e diz onde corrigir. */
+export function exportQualityError(message) {
+  const error = new Error(message);
+  error.code = 'export_quality';
+  return error;
+}
+
+function listNumbers(numbers) {
+  return numbers.length > 1 ? `${numbers.slice(0, -1).join(', ')} e ${numbers.at(-1)}` : String(numbers[0]);
+}
+
 /** Legacy decks keep their existing export behavior. The new planning pipeline
  * opts into measured quality gates; native evidence blocks always opt in. */
 export function assertPresentationExportQuality(scope) {
@@ -212,7 +224,7 @@ export function assertPresentationExportQuality(scope) {
     slideIndex: managed[issue.slideIndex]?.index ?? issue.slideIndex,
   })));
   const error = issues.find((issue) => issue.severity === 'error');
-  if (error) throw new Error(`Revise o slide ${error.slideIndex + 1} antes de baixar: ${error.message}`);
+  if (error) throw exportQualityError(`Slide ${error.slideIndex + 1}: ${error.message} Abra o slide ${error.slideIndex + 1} para corrigir antes de baixar.`);
 }
 
 export function useExport({
@@ -235,10 +247,17 @@ export function useExport({
     const scope = exportRenderScope(slides, slideRefs.current, slideIndexes);
     await waitForExportReadiness(scope);
     const { roots } = scope;
-    const overflow = presentationOverflowAtFloor(roots);
-    if (overflow.length) {
-      throw new Error(
-        `O texto excede a área segura em ${overflow.length} slide${overflow.length === 1 ? '' : 's'}. Use “Autoajustar todos” ou reduza o texto antes de baixar.`,
+    const overflowSlides = scope.slides
+      .map((slide, i) => (presentationOverflowAtFloor([roots.find((root) => root?.getAttribute?.('data-vc-card-surface') === slide.id
+        || root?.closest?.('[data-vc-card-surface]')?.getAttribute?.('data-vc-card-surface') === slide.id)]).length
+        ? slides.indexOf(slide) + 1 : null))
+      .filter(Boolean);
+    if (overflowSlides.length || presentationOverflowAtFloor(roots).length) {
+      const where = overflowSlides.length
+        ? `${overflowSlides.length === 1 ? 'Slide' : 'Slides'} ${listNumbers(overflowSlides)}`
+        : 'Um slide';
+      throw exportQualityError(
+        `${where}: o texto passa da área segura e seria cortado no arquivo. Abra ${overflowSlides.length === 1 ? 'o slide' : 'cada slide'} e reduza o texto na aba Texto, ou aumente a caixa arrastando a borda.`,
       );
     }
     if (isPresentation) assertPresentationExportQuality(scope);
@@ -316,7 +335,7 @@ export function useExport({
       toast(`${isPresentation ? 'Slide' : 'Card'} ${idx+1} baixado`, 'success');
       return true;
     } catch(e) {
-      if (e?.code !== 'export_cancelled') setError('Erro ao exportar: '+e.message);
+      if (e?.code === 'export_quality') toast(e.message, 'error', 0); else if (e?.code !== 'export_cancelled') setError('Erro ao exportar: '+e.message);
       return false;
     }
     finally { finishExport(); }
@@ -393,7 +412,7 @@ export function useExport({
       trackEvent('export_zip', { card_count: String(slides.length), videos: String(videoSlides.length) });
       return true;
     } catch(e) {
-      if (e?.code !== 'export_cancelled') setError('Erro ao exportar: '+e.message);
+      if (e?.code === 'export_quality') toast(e.message, 'error', 0); else if (e?.code !== 'export_cancelled') setError('Erro ao exportar: '+e.message);
       return false;
     }
     finally { finishExport(); }
@@ -479,7 +498,7 @@ export function useExport({
       toast(`PDF com ${slides.length} ${itemLabel}s gerado`, 'success');
       return true;
     } catch(e) {
-      if (e?.code !== 'export_cancelled') setError('Erro ao gerar PDF: '+e.message);
+      if (e?.code === 'export_quality') toast(e.message, 'error', 0); else if (e?.code !== 'export_cancelled') setError('Erro ao gerar PDF: '+e.message);
       return false;
     }
     finally { finishExport(); }
