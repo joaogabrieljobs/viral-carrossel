@@ -5,6 +5,8 @@ import CardThumbnail, { cardThumbnailModel } from '../../src/components/card/Car
 import { AccountHomeShell } from '../../src/components/AccountHomeShell.jsx';
 import LibraryModal from '../../src/components/LibraryModal.jsx';
 import { brandForFormatDisplay, slideForFormatDisplay } from '../../src/utils/format-view.js';
+import { PRESENTATION_VISUAL_PRESETS, applyPresentationVisualPreset, getPresentationCompositionOverrides } from '../../src/styles/presentation-presets.jsx';
+import { DEFAULT_BRAND, mkSlide } from '../../src/utils/doc-schema.js';
 
 describe('CardThumbnail', () => {
   it('mostra o texto do card 1 também em fundos claros da Biblioteca', () => {
@@ -100,3 +102,20 @@ describe('CardThumbnail', () => {
     expect(modelsFor(before).map((model) => model.titleColor)).toEqual(['#ffffff', '#ffffff']);
   });
 });
+
+// MF-09 (reteste 19/11): slide escuro (fechamento marinho do Executivo) aparecia
+// branco na faixa de miniaturas, porque o fundo é pintado pela família.
+describe('miniatura segue o fundo da página da família', () => {
+  it('fechamento com fundo inverso fica escuro e o título legível', () => {
+    const preset = PRESENTATION_VISUAL_PRESETS.find((p) => p.id === 'presentation_executive_minimal');
+    const brand = applyPresentationVisualPreset({ ...DEFAULT_BRAND }, preset.id);
+    const base = { ...mkSlide(10, brand), title: 'Encomende pelo WhatsApp', presentationPlan: { visualRole: 'closing' } };
+    const slide = { ...base, ...getPresentationCompositionOverrides(preset.id, { slide: base, stage: {}, index: 9, count: 10 }) };
+    expect(slide.presentationChrome.ground).not.toBe('bg');
+    const model = cardThumbnailModel(slide, brand, 9);
+    expect(model.background.toLowerCase()).not.toBe(String(brand.bg).toLowerCase());
+    expect(model.background.toLowerCase()).toBe('#0f1a2e');
+    expect(model.titleColor.toLowerCase()).toBe('#f7f7f5');
+  });
+});
+
