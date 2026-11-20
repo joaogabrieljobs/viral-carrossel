@@ -32,3 +32,15 @@ describe('nota interna da IA não chega ao slide', () => {
     expect(buildFactualGroundingPrompt({ factualSource: 'Padaria Fermento Lento' })).toMatch(/não escreva isso no card nem no slide/);
   });
 });
+
+describe('travessão no texto gerado', () => {
+  it('vira vírgula e não sobra traço solto', () => {
+    expect(stripLeadingSlideCardLabel('A padaria — aberta em 2019 — fica no Rio Vermelho.')).toBe('A padaria, aberta em 2019, fica no Rio Vermelho.');
+    expect(stripLeadingSlideCardLabel('Pão de verdade — feito devagar.')).toBe('Pão de verdade, feito devagar.');
+    expect(stripLeadingSlideCardLabel('Seis pessoas na equipe —')).toBe('Seis pessoas na equipe');
+  });
+  it('mantém faixa de horário e marcador de lista com meia-risca', () => {
+    expect(stripLeadingSlideCardLabel('Aberta das 7h–13h')).toBe('Aberta das 7h–13h');
+    expect(stripLeadingSlideCardLabel('– Francês\n– Integral')).toBe('– Francês\n– Integral');
+  });
+});

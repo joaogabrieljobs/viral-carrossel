@@ -134,6 +134,7 @@ Separe internamente: fato explícito; inferência prudente; exemplo hipotético 
 Não acrescente duração, frequência, números por extenso, maioria, histórico de cliente, causa, resultado ou canal de atendimento ao caso fornecido. Telefone antigo não significa que mudou três vezes nem que está errado há dois anos. Enumeração de passos não é prova estatística.
 Não transforme benefício esperado em garantia. Não invente preço, prazo, taxas, serviços inclusos, gratuidade, agendamento ou WhatsApp/DM/comentários como canal da oferta. Preserve o público e os termos do usuário (clientes não viram pacientes).
 Quando um dado não foi informado (endereço, telefone, preço, horário), não escreva isso no card nem no slide: nada de "não foi informado", "não informado", "o briefing não traz", "a confirmar" ou colchetes para preencher. O texto é para o público final, não um bilhete para quem pediu. Omita o dado e siga a sequência.
+Não use travessão (—): use vírgula, dois-pontos ou ponto.
 O CTA usa a ação pedida. Não acrescente canal, recompensa ou condição comercial. Não repita o mesmo fato/argumento para preencher cards; cada card deve avançar a sequência. Quando faltar informação, mantenha uma formulação útil e neutra, sem completar com um detalhe plausível.`;
 }
 
@@ -158,5 +159,23 @@ export function stripBriefingNotes(text) {
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+/**
+ * Travessão no texto gerado (reteste 19/11: 4 de 7 apresentações). Vira
+ * vírgula entre orações; travessão de abertura de linha some. Faixa numérica
+ * sem espaço ("7h–13h") fica como está.
+ */
+export function replaceEmDashes(text) {
+  if (typeof text !== 'string' || !/[—–]/.test(text)) return text;
+  return text
+    .split('\n')
+    .map(line => line
+      .replace(/^(\s*)—\s*/, '$1')
+      .replace(/\s*—\s*(?=[.!?,;:]|$)/g, '')
+      .replace(/(\S)\s+[—–]\s+(?=\S)|(\S)—(?=\S)/g, (_, a, b) => `${a || b}, `)
+      .replace(/,\s*,/g, ',')
+      .replace(/\s+,/g, ','))
+    .join('\n');
 }
 
