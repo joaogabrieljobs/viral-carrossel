@@ -1,0 +1,241 @@
+// Console admin (docs/product/console-admin.md) contra Postgres de verdade
+// (PGlite) com todas as migrações: papéis, trilha imutável, código por e-mail
+// e isenção na mesma transação que a trilha.
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest';
+
+// PGlite com todas as migrações fica lento com a máquina carregada.
+vi.setConfig({ testTimeout: 30_000 });
+import { readFileSync, readdirSync } from 'node:fs';
+import { PGlite } from '@electric-sql/pglite';
+import { makeReq, makeRes } from '../helpers/http.js';
+import { createAdminHandler } from '../../api/admin.js';
+import { createAdminStore } from '../../api/lib/admin-store.js';
+import { createAccountEntitlementStore } from '../../api/lib/account-entitlements.js';
+import { createPublishedTemplatesStore } from '../../api/lib/published-templates-store.js';
+import { resetRateLimits } from '../../api/lib/rate-limit.js';
+
+const ADMIN = 'cus_admin';
+const SUPORTE = 'cus_suporte';
+const COMUM = 'cus_comum';
+const EMERGENCIA = 'cus_emergencia';
+const CLIENTE_ID = '33333333-3333-4333-8333-333333333333';
+const CLIENTE = 'cus_cliente';
+
+let db;
+let sql;
+let clock;
+let emails;
+let subscriptions;
+let handler;
+
+beforeAll(async () => {
+  db = new PGlite();
+  const dir = new URL('../../db/migrations/', import.meta.url);
+  for (const arquivo of readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()) {
+    await db.exec(readFileSync(new URL(arquivo, dir), 'utf8'));
+  }
+  sql = {
+    unsafe: (statement, params = []) => db.query(statement, params).then((r) => r.rows),
+    begin: (work) => db.transaction((tx) => work({ unsafe: (statement, params = []) => tx.query(statement, params).then((r) => r.rows) })),
+  };
+  const entitlements = createAccountEntitlementStore({ sql });
+  handler = createAdminHandler({
+    store: createAdminStore({ sql, env: { MOONT_ADMIN_ACCOUNTS: EMERGENCIA } }),
+    readAccess: async (req) => (req.headers['x-test-owner'] ? { customerId: req.headers['x-test-owner'], email: `${req.headers['x-test-owner']}@teste.exemplo` } : null),
+    grant: (input, hooks) => entitlements.grantAccess(input, hooks),
+    revoke: (input, hooks) => entitlements.revokeAccess(input, hooks),
+    sendCode: async (mail) => { emails.push(mail); },
+    countSubscriptions: async () => subscriptions(),
+    findSubscription: async () => ({ status: 'none' }),
+    now: () => clock,
+  });
+}, 60_000);
+
+afterAll(async () => { await db?.close(); });
+
+beforeEach(async () => {
+  resetRateLimits();
+  clock = Date.parse('2026-11-19T12:00:00Z');
+  emails = [];
+  subscriptions = async () => ({ total: 4, byTier: { creator: 3, max: 1 } });
+  // Trilha é imutável por trigger: cada teste recria só o que pode.
+  await db.exec(`
+    DROP TRIGGER IF EXISTS admin_actions_append_only ON moont.admin_actions;
+    DROP TRIGGER IF EXISTS account_access_grant_events_append_only ON moont.account_access_grant_events;
+    TRUNCATE moont.admin_actions, moont.admin_challenges, moont.admin_roles, moont.account_access_grant_events CASCADE;
+    CREATE TRIGGER admin_actions_append_only BEFORE UPDATE OR DELETE OR TRUNCATE ON moont.admin_actions
+      FOR EACH STATEMENT EXECUTE FUNCTION moont.prevent_admin_action_mutation();
+    CREATE TRIGGER account_access_grant_events_append_only BEFORE UPDATE OR DELETE OR TRUNCATE ON moont.account_access_grant_events
+      FOR EACH STATEMENT EXECUTE FUNCTION moont.prevent_access_grant_event_mutation();
+    DELETE FROM moont.account_access_grants; DELETE FROM moont.image_quota_operations; DELETE FROM moont.image_quota_periods;
+    DELETE FROM moont.account_identities; DELETE FROM moont.account_stripe_customers; DELETE FROM moont.accounts;
+    DELETE FROM moont.template_moderators;
+  `);
+  await sql.unsafe(`INSERT INTO moont.admin_roles (owner_id, role, granted_by, reason) VALUES
+    ($1, 'admin', 'teste', 'teste'), ($2, 'suporte', 'teste', 'teste')`, [ADMIN, SUPORTE]);
+  await sql.unsafe(`INSERT INTO moont.accounts (id, primary_email) VALUES ($1::uuid, 'cliente@empresa.exemplo')`, [CLIENTE_ID]);
+  await sql.unsafe(`INSERT INTO moont.account_stripe_customers (stripe_customer_id, account_id, verified_at) VALUES ($1, $2::uuid, now())`, [CLIENTE, CLIENTE_ID]);
+  await sql.unsafe(`INSERT INTO moont.account_identities (account_id, provider, provider_subject, email_normalized, migration_source)
+    VALUES ($1::uuid, 'password', $2, 'cliente@empresa.exemplo', 'registration')`, [CLIENTE_ID, CLIENTE]);
+  const inicioCiclo = Math.floor(Date.parse('2026-11-10T00:00:00Z') / 1000);
+  await sql.unsafe(`INSERT INTO moont.image_quota_periods (owner_id, period_start_sec, used, legacy_used) VALUES ($1, $2, 46, 0)`, [CLIENTE, inicioCiclo]);
+});
+
+async function call(ownerId, { method = 'GET', url = '/api/admin', body } = {}) {
+  const res = makeRes();
+  await handler(makeReq({ method, url, body, headers: ownerId ? { 'x-test-owner': ownerId } : {} }), res);
+  return res;
+}
+
+const pedido = { accountId: CLIENTE_ID, tier: 'max', unlimitedImages: true, reason: 'Conta do dono, sem limite' };
+async function pedirCodigo(owner = ADMIN, intent = 'grant', payload = pedido) {
+  const res = await call(owner, { method: 'POST', body: { action: 'challenge', intent, payload } });
+  return { res, code: emails.at(-1)?.code, challengeId: res.body?.challengeId };
+}
+
+describe('console admin — quem entra', () => {
+  it('sem sessão ou sem papel, toda a rota responde 404 como se não existisse', async () => {
+    for (const conta of [null, COMUM]) {
+      for (const url of ['/api/admin?view=me', '/api/admin?view=overview', `/api/admin?view=account&id=${CLIENTE_ID}`]) {
+        expect((await call(conta, { url })).statusCode).toBe(404);
+      }
+      expect((await call(conta, { method: 'POST', body: { action: 'challenge', intent: 'grant', payload: pedido } })).statusCode).toBe(404);
+    }
+    expect(emails).toEqual([]);
+    expect(await sql.unsafe('SELECT * FROM moont.admin_actions')).toEqual([]);
+  });
+
+  it('a conta de emergência (variável de ambiente) entra como admin sem linha no banco', async () => {
+    expect((await call(EMERGENCIA, { url: '/api/admin?view=me' })).body).toMatchObject({ role: 'admin' });
+  });
+
+  it('papel revogado não entra', async () => {
+    await sql.unsafe(`UPDATE moont.admin_roles SET revoked_at = now(), revoked_by = 'teste' WHERE owner_id = $1`, [SUPORTE]);
+    expect((await call(SUPORTE, { url: '/api/admin?view=me' })).statusCode).toBe(404);
+  });
+
+  it('suporte consulta tudo mas não pede código nem concede', async () => {
+    expect((await call(SUPORTE, { url: '/api/admin?view=overview' })).statusCode).toBe(200);
+    expect((await call(SUPORTE, { url: '/api/admin?view=accounts&q=cliente' })).body.accounts).toHaveLength(1);
+    const negado = await call(SUPORTE, { method: 'POST', body: { action: 'challenge', intent: 'grant', payload: pedido } });
+    expect(negado.statusCode).toBe(403);
+    expect(emails).toEqual([]);
+  });
+});
+
+describe('console admin — leitura', () => {
+  it('início: números do banco e do Stripe; fonte fora vira "—" com motivo, nunca zero', async () => {
+    const ok = (await call(ADMIN, { url: '/api/admin?view=overview' })).body;
+    expect(ok.accounts.value).toMatchObject({ total: 1, last7: 1 });
+    expect(ok.subscriptions.value).toEqual({ total: 4, byTier: { creator: 3, max: 1 } });
+    subscriptions = async () => { throw new Error('stripe fora'); };
+    const fora = (await call(ADMIN, { url: '/api/admin?view=overview' })).body;
+    expect(fora.subscriptions).toMatchObject({ value: null, reason: expect.any(String) });
+    expect(fora.accounts.value.total).toBe(1);
+  });
+
+  it('busca por e-mail e abre a ficha; abrir a ficha fica na trilha', async () => {
+    const busca = (await call(ADMIN, { url: '/api/admin?view=accounts&q=EMPRESA.exemplo' })).body;
+    expect(busca.accounts.map((a) => a.id)).toEqual([CLIENTE_ID]);
+    const ficha = (await call(ADMIN, { url: `/api/admin?view=account&id=${CLIENTE_ID}` })).body.account;
+    expect(ficha).toMatchObject({ email: 'cliente@empresa.exemplo', customerId: CLIENTE, grants: [] });
+    expect(ficha.quota.value[0]).toMatchObject({ used: 46 });
+    expect(JSON.stringify(ficha)).not.toContain('password_hash');
+    const trilha = await sql.unsafe('SELECT actor_id, action, target FROM moont.admin_actions');
+    expect(trilha).toEqual([{ actor_id: ADMIN, action: 'view_account', target: CLIENTE_ID }]);
+    expect((await call(ADMIN, { url: '/api/admin?view=account&id=nao-e-uuid' })).statusCode).toBe(400);
+  });
+
+  it('saúde e trilha respondem sem erro com o banco vazio', async () => {
+    const saude = (await call(ADMIN, { url: '/api/admin?view=health' })).body;
+    expect(saude.stuckReservations.value).toEqual({ count: 0, oldest: null });
+    expect(saude.agentJobs.value).toEqual({ failedByCode: [], stuckPending: 0 });
+    expect((await call(ADMIN, { url: '/api/admin?view=actions' })).body.actions).toEqual([]);
+  });
+});
+
+describe('console admin — isenção com código por e-mail', () => {
+  it('concede Max sem limite com o código certo, na mesma transação da trilha, mantendo o ciclo da cota', async () => {
+    const { res, code, challengeId } = await pedirCodigo();
+    expect(res.body).toMatchObject({ sentTo: expect.stringMatching(/^cu•+@teste\.exemplo$/), expiresInMinutes: 10 });
+    expect(emails[0]).toMatchObject({ to: `${ADMIN}@teste.exemplo`, intent: 'grant' });
+    expect(code).toMatch(/^\d{6}$/);
+    expect(JSON.stringify(res.body)).not.toContain(code);
+
+    const ok = await call(ADMIN, { method: 'POST', body: { action: 'grant', challengeId, code, ...pedido } });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.body.grant).toMatchObject({ tier: 'max', unlimitedImages: true });
+    const [g] = await sql.unsafe('SELECT tier, unlimited_images, quota_anchor_sec, actor FROM moont.account_access_grants');
+    expect(g).toMatchObject({ tier: 'max', unlimited_images: true, actor: `admin:${ADMIN}` });
+    expect(Number(g.quota_anchor_sec)).toBe(Math.floor(Date.parse('2026-11-10T00:00:00Z') / 1000));
+    const trilha = await sql.unsafe(`SELECT action, target, reason, details FROM moont.admin_actions WHERE action = 'grant_exemption'`);
+    expect(trilha).toEqual([{ action: 'grant_exemption', target: CLIENTE_ID, reason: pedido.reason,
+      details: { grantId: ok.body.grant.id, tier: 'max', unlimitedImages: true } }]);
+
+    // O mesmo código não serve duas vezes.
+    expect((await call(ADMIN, { method: 'POST', body: { action: 'grant', challengeId, code, ...pedido } })).statusCode).toBe(403);
+    // Com isenção ativa, outra concessão pede revogar antes.
+    const outro = await pedirCodigo();
+    const conflito = await call(ADMIN, { method: 'POST', body: { action: 'grant', challengeId: outro.challengeId, code: outro.code, ...pedido } });
+    expect(conflito.statusCode).toBe(409);
+    expect((await sql.unsafe('SELECT used_at FROM moont.admin_challenges WHERE id = $1::uuid', [outro.challengeId]))[0].used_at).toBeNull();
+  });
+
+  it('código errado, de outra ação, de outro admin ou vencido não concede nada', async () => {
+    const { code, challengeId } = await pedirCodigo();
+    const errado = String((Number(code) + 1) % 1_000_000).padStart(6, '0');
+    expect((await call(ADMIN, { method: 'POST', body: { action: 'grant', challengeId, code: errado, ...pedido } })).body.code).toBe('admin_code_invalid');
+    expect((await sql.unsafe('SELECT attempts FROM moont.admin_challenges'))[0].attempts).toBe(1);
+    // Código pedido para "sem limite", usado para Pro com limite: recusado.
+    expect((await call(ADMIN, { method: 'POST', body: { action: 'grant', challengeId, code, ...pedido, tier: 'pro', unlimitedImages: false } })).body.code).toBe('admin_code_mismatch');
+    // Outro admin não usa o código de quem pediu.
+    expect((await call(EMERGENCIA, { method: 'POST', body: { action: 'grant', challengeId, code, ...pedido } })).statusCode).toBe(403);
+    clock += 11 * 60_000;
+    expect((await call(ADMIN, { method: 'POST', body: { action: 'grant', challengeId, code, ...pedido } })).body.code).toBe('admin_code_expired');
+    expect(await sql.unsafe('SELECT id FROM moont.account_access_grants')).toEqual([]);
+    expect(await sql.unsafe(`SELECT id FROM moont.admin_actions WHERE action = 'grant_exemption'`)).toEqual([]);
+  });
+
+  it('cinco erros travam o código', async () => {
+    const { code, challengeId } = await pedirCodigo();
+    const errado = String((Number(code) + 1) % 1_000_000).padStart(6, '0');
+    for (let i = 0; i < 5; i += 1) await call(ADMIN, { method: 'POST', body: { action: 'grant', challengeId, code: errado, ...pedido } });
+    expect((await call(ADMIN, { method: 'POST', body: { action: 'grant', challengeId, code, ...pedido } })).body.code).toBe('admin_code_locked');
+  });
+
+  it('revoga com código e trilha', async () => {
+    const c1 = await pedirCodigo();
+    const grantId = (await call(ADMIN, { method: 'POST', body: { action: 'grant', challengeId: c1.challengeId, code: c1.code, ...pedido } })).body.grant.id;
+    const revogar = { accountId: CLIENTE_ID, grantId, reason: 'Fim do teste' };
+    const c2 = await pedirCodigo(ADMIN, 'revoke', revogar);
+    const ok = await call(ADMIN, { method: 'POST', body: { action: 'revoke', challengeId: c2.challengeId, code: c2.code, ...revogar } });
+    expect(ok.body).toMatchObject({ revoked: true });
+    expect((await sql.unsafe('SELECT revoked_at FROM moont.account_access_grants'))[0].revoked_at).not.toBeNull();
+    expect((await call(ADMIN, { url: '/api/admin?view=grants' })).body.grants).toEqual([]);
+    const acoes = (await call(ADMIN, { url: `/api/admin?view=actions&target=${CLIENTE_ID}` })).body.actions.map((a) => a.action);
+    expect(acoes).toEqual(['revoke_exemption', 'grant_exemption']);
+  });
+
+  it('motivo é obrigatório', async () => {
+    const res = await call(ADMIN, { method: 'POST', body: { action: 'challenge', intent: 'grant', payload: { ...pedido, reason: '   ' } } });
+    expect(res.statusCode).toBe(400);
+    expect(emails).toEqual([]);
+  });
+});
+
+describe('console admin — trilha e moderação', () => {
+  it('a trilha não aceita alteração nem exclusão', async () => {
+    await call(ADMIN, { url: `/api/admin?view=account&id=${CLIENTE_ID}` });
+    await expect(sql.unsafe(`UPDATE moont.admin_actions SET reason = 'apagado'`)).rejects.toThrow(/não aceita/);
+    await expect(sql.unsafe('DELETE FROM moont.admin_actions')).rejects.toThrow(/não aceita/);
+  });
+
+  it('quem tem papel no console modera modelos; papel revogado deixa de moderar', async () => {
+    const templates = createPublishedTemplatesStore({ sql });
+    expect(await templates.isModerator(ADMIN)).toBe(true);
+    expect(await templates.isModerator(SUPORTE)).toBe(true);
+    expect(await templates.isModerator(COMUM)).toBe(false);
+    await sql.unsafe(`UPDATE moont.admin_roles SET revoked_at = now(), revoked_by = 'teste' WHERE owner_id = $1`, [ADMIN]);
+    expect(await templates.isModerator(ADMIN)).toBe(false);
+  });
+});

@@ -11,6 +11,7 @@ vi.mock('@vercel/functions', () => ({ waitUntil: mocked.waitUntil }));
 vi.mock('../../api/lib/stripe.js', () => ({ findActiveSubscription: mocked.subscription }));
 vi.mock('../../api/lib/plans.js', () => ({
   resolveTierFromSubscription: () => 'creator', imageQuotaForTier: () => 50,
+  imageLimitForEntitlement: (entitlement) => (entitlement?.unlimitedImages === true ? 1_000_000 : 50),
   periodBoundsFromSubscription: () => ({ periodStartSec: 100, periodEndSec: 200 }),
 }));
 vi.mock('../../api/lib/image-quota.js', () => ({

@@ -66,13 +66,13 @@ function activityContext(item) {
   };
 }
 
-function UsageMetric({ label, value, description, prominent = false, isMobile }) {
+function UsageMetric({ label, value, text = '', description, prominent = false, isMobile }) {
   return (
     <div style={{ minWidth: 0, padding: isMobile ? '14px 16px' : '20px 22px', background: prominent ? 'var(--accent-surface)' : 'var(--bg-pearl)', borderRadius: 12 }}>
       <dt style={{ fontSize: 12, lineHeight: 1.4, color: 'var(--text-secondary)', fontWeight: 500 }}>{label}</dt>
       <dd style={{ margin: '10px 0 0' }}>
         <span style={{ display: 'block', marginBottom: 5, fontSize: isMobile ? 34 : 44, fontWeight: 600, letterSpacing: '-0.045em', fontFamily: 'var(--font-display)', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums', color: prominent ? 'var(--accent)' : 'var(--text-primary)' }}>
-          {value === null ? <abbr title="Indisponível" style={{ textDecoration: 'none' }}>—</abbr> : formatCount(value)}
+          {text || (value === null ? <abbr title="Indisponível" style={{ textDecoration: 'none' }}>—</abbr> : formatCount(value))}
         </span>
         <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>{description}</span>
       </dd>
@@ -97,13 +97,14 @@ export default function AccountUsage({
   const usage = normalizeAccountUsage({ imageQuota, planTier, currentPeriodStart, currentPeriodEnd });
   const activity = Array.isArray(imageQuota?.activity) ? imageQuota.activity : [];
   // Ciclos que atravessam a correção podem ter contadores legados incompletos.
-  const hasLegacyCycle = usage.limit > 0 && usage.periodStart?.slice(0, 10) <= '2026-10-14';
+  const hasLegacyCycle = !usage.unlimited && usage.limit > 0 && usage.periodStart?.slice(0, 10) <= '2026-10-14';
   const padding = isMobile ? 18 : 26;
   const quotaState = usage.noIncludedImages
     ? 'Sem imagens inclusas'
     : !usage.hasUsage
       ? 'Uso indisponível'
-      : usage.exhausted ? 'Limite do ciclo atingido' : 'Ciclo em andamento';
+      : usage.unlimited ? 'Sem limite de imagens'
+        : usage.exhausted ? 'Limite do ciclo atingido' : 'Ciclo em andamento';
 
   const refresh = async () => {
     if (refreshInFlight.current || typeof onRefresh !== 'function') return;
@@ -156,8 +157,8 @@ export default function AccountUsage({
 
         <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
           <UsageMetric label="Geradas neste ciclo" value={usage.used} description="Com as imagens inclusas no plano" prominent isMobile={isMobile} />
-          <UsageMetric label="Disponíveis" value={usage.remaining} description="Para gerar até o fim deste ciclo" isMobile={isMobile} />
-          <UsageMetric label="Total do plano" value={usage.limit} description="Imagens inclusas por ciclo" isMobile={isMobile} />
+          <UsageMetric label="Disponíveis" value={usage.remaining} text={usage.unlimited ? 'Sem limite' : ''} description="Para gerar até o fim deste ciclo" isMobile={isMobile} />
+          <UsageMetric label="Total do plano" value={usage.limit} text={usage.unlimited ? 'Sem limite' : ''} description={usage.unlimited ? 'Conta isenta, sem teto de imagens' : 'Imagens inclusas por ciclo'} isMobile={isMobile} />
         </dl>
 
         <div style={{ display: 'grid', gap: 10 }}>
@@ -175,7 +176,9 @@ export default function AccountUsage({
               ? 'Este plano não inclui geração de imagens com IA. Você pode importar suas imagens ou escolher um plano com imagens inclusas.'
               : !usage.hasUsage
                 ? 'Não foi possível consultar o consumo deste ciclo. Atualize o uso para tentar novamente.'
-                : usage.exhausted
+                : usage.unlimited
+                  ? 'Esta conta não tem limite de imagens. Cada geração continua registrada aqui.'
+                  : usage.exhausted
                   ? 'Você utilizou todas as imagens disponíveis neste ciclo. Aguarde a renovação ou consulte as opções do seu plano.'
                   : 'O saldo considera apenas as imagens geradas com o plano e é renovado a cada ciclo.'}
           </p>
@@ -186,7 +189,7 @@ export default function AccountUsage({
         </div>
       </section>
 
-      {usage.limit > 0 && usage.hasUsage && (
+      {(usage.unlimited || usage.limit > 0) && usage.hasUsage && (
         <section aria-labelledby="image-activity-title" style={{ ...panelStyle, padding, display: 'grid', gap: 14 }}>
           <div>
             <h3 id="image-activity-title" style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Últimas atividades deste ciclo</h3>

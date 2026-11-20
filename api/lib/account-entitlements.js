@@ -52,13 +52,14 @@ function grantFromRow(row) {
   if (!row) return null;
   return { id: row.id, accountId: row.account_id, tier: row.tier,
     startsAtSec: Number(row.starts_at_sec), expiresAtSec: row.expires_at_sec == null ? null : Number(row.expires_at_sec),
-    quotaAnchorSec: Number(row.quota_anchor_sec), revokedAt: row.revoked_at || null };
+    quotaAnchorSec: Number(row.quota_anchor_sec), revokedAt: row.revoked_at || null,
+    unlimitedImages: row.unlimited_images === true };
 }
 
 async function storage(work) {
   try { return await work(); }
   catch (error) {
-    if (error?.code?.startsWith('entitlement_')) throw error;
+    if (error?.code?.startsWith('entitlement_') || error?.code?.startsWith('admin_')) throw error;
     throw fail('entitlement_store_unavailable', 'Não foi possível verificar o acesso da conta. Tente novamente.');
   }
 }
@@ -87,7 +88,7 @@ export function createAccountEntitlementStore({ sql: injectedSql } = {}) {
 
   /** Idempotent account-scoped issuance. An explicit historical anchor preserves consumed quota. */
   async function grantAccess({ accountId, tier, startsAtSec, expiresAtSec = null,
-    quotaAnchorSec, requestId, actor, reason }) {
+    quotaAnchorSec, requestId, actor, reason, unlimitedImages = false }, hooks = {}) {
     if (!UUID.test(accountId || '') || !PLAN_ORDER.includes(tier)) throw fail('entitlement_invalid_input', 'Conta ou plano inválido.', 400);
     const start = second(startsAtSec, 'Início');
     const expiry = expiresAtSec == null ? null : second(expiresAtSec, 'Validade');
@@ -98,12 +99,15 @@ export function createAccountEntitlementStore({ sql: injectedSql } = {}) {
     const why = textField(reason, 'Motivo', 1000);
     return storage(() => connection().begin(async tx => {
       await tx.unsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`access-grant:${key}`]);
+      // Console admin: confere o código por e-mail dentro desta transação.
+      if (hooks.before) await hooks.before(tx);
       const replay = (await tx.unsafe(`SELECT g.* FROM moont.account_access_grants g WHERE request_id = $1`, [key]))[0];
       if (replay) {
         if (String(replay.account_id) !== accountId || replay.tier !== tier
           || Number(replay.starts_at_sec) !== start || Number(replay.quota_anchor_sec) !== anchor
           || (replay.expires_at_sec == null ? null : Number(replay.expires_at_sec)) !== expiry
-          || replay.actor !== operator || replay.reason !== why) {
+          || replay.actor !== operator || replay.reason !== why
+          || (replay.unlimited_images === true) !== (unlimitedImages === true)) {
           throw fail('entitlement_request_conflict', 'Idempotência já utilizada para outra concessão.', 409);
         }
         return { grant: grantFromRow(replay), replayed: true };
@@ -121,24 +125,28 @@ export function createAccountEntitlementStore({ sql: injectedSql } = {}) {
           AND ($3::bigint IS NULL OR starts_at_sec < $3::bigint)`, [accountId, start, expiry]);
       if (existing.length) throw fail('entitlement_grant_conflict', 'Já existe concessão neste período. Revogue-a antes de substituir.', 409);
       const row = (await tx.unsafe(`INSERT INTO moont.account_access_grants
-        (account_id, tier, starts_at_sec, expires_at_sec, quota_anchor_sec, request_id, actor, reason)
-        VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [accountId, tier, start, expiry, anchor, key, operator, why]))[0];
+        (account_id, tier, starts_at_sec, expires_at_sec, quota_anchor_sec, request_id, actor, reason, unlimited_images)
+        VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [accountId, tier, start, expiry, anchor, key, operator, why, unlimitedImages === true]))[0];
       await tx.unsafe(`INSERT INTO moont.account_access_grant_events
         (grant_id, account_id, action, request_id, actor, reason, details)
         VALUES ($1::uuid, $2::uuid, 'granted', $3, $4, $5, $6::jsonb)`,
-      [row.id, accountId, key, operator, why, JSON.stringify({ tier, startsAtSec: start, expiresAtSec: expiry, quotaAnchorSec: anchor })]);
-      return { grant: grantFromRow(row), replayed: false };
+      [row.id, accountId, key, operator, why, JSON.stringify({ tier, startsAtSec: start, expiresAtSec: expiry, quotaAnchorSec: anchor, unlimitedImages: unlimitedImages === true })]);
+      const result = { grant: grantFromRow(row), replayed: false };
+      // Console admin: a trilha entra na mesma transação da concessão.
+      if (hooks.after) await hooks.after(tx, result);
+      return result;
     }));
   }
 
-  async function revokeAccess({ accountId, grantId, requestId, actor, reason }) {
+  async function revokeAccess({ accountId, grantId, requestId, actor, reason }, hooks = {}) {
     if (!UUID.test(accountId || '') || !UUID.test(grantId || '')) throw fail('entitlement_invalid_input', 'Concessão inválida.', 400);
     const key = textField(requestId, 'Idempotência', 200);
     const operator = textField(actor, 'Responsável', 200);
     const why = textField(reason, 'Motivo', 1000);
     return storage(() => connection().begin(async tx => {
       await tx.unsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`access-grant:${key}`]);
+      if (hooks.before) await hooks.before(tx);
       const replay = (await tx.unsafe(`SELECT * FROM moont.account_access_grant_events WHERE request_id = $1`, [key]))[0];
       if (replay) {
         if (replay.action !== 'revoked' || replay.account_id !== accountId || replay.grant_id !== grantId
@@ -152,6 +160,7 @@ export function createAccountEntitlementStore({ sql: injectedSql } = {}) {
       await tx.unsafe(`INSERT INTO moont.account_access_grant_events
         (grant_id, account_id, action, request_id, actor, reason, details)
         VALUES ($1::uuid, $2::uuid, 'revoked', $3, $4, $5, '{}'::jsonb)`, [grantId, accountId, key, operator, why]);
+      if (hooks.after) await hooks.after(tx, { revoked: true });
       return { revoked: true, replayed: false };
     }));
   }
@@ -159,8 +168,8 @@ export function createAccountEntitlementStore({ sql: injectedSql } = {}) {
 }
 
 const defaultStore = createAccountEntitlementStore();
-export const grantAccountAccess = input => defaultStore.grantAccess(input);
-export const revokeAccountAccess = input => defaultStore.revokeAccess(input);
+export const grantAccountAccess = (input, hooks) => defaultStore.grantAccess(input, hooks);
+export const revokeAccountAccess = (input, hooks) => defaultStore.revokeAccess(input, hooks);
 
 export async function resolveAccountExemption(customerId, { nowSec = Math.floor(Date.now() / 1000),
   enabled = accountEntitlementsEnabled(), store = defaultStore } = {}) {
@@ -170,7 +179,7 @@ export async function resolveAccountExemption(customerId, { nowSec = Math.floor(
   if (!grant || grant.revokedAt || grant.startsAtSec > nowSec || (grant.expiresAtSec != null && grant.expiresAtSec <= nowSec)) return null;
   const bounds = monthlyQuotaBounds(grant.quotaAnchorSec, nowSec);
   return { active: true, accessSource: 'exempt', billingExempt: true, status: 'exempt',
-    tier: grant.tier, accountId: grant.accountId,
+    tier: grant.tier, accountId: grant.accountId, unlimitedImages: grant.unlimitedImages === true,
     quotaPeriodStart: bounds.periodStart, quotaPeriodEnd: bounds.periodEnd,
     quotaPeriodStartSec: bounds.periodStartSec, quotaPeriodEndSec: bounds.periodEndSec };
 }

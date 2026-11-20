@@ -20,7 +20,9 @@ let handler;
 test.beforeAll(async () => {
   db = new PGlite();
   await db.exec('CREATE SCHEMA moont;');
-  await db.exec(readFileSync(new URL('../../db/migrations/015_published_templates.sql', import.meta.url), 'utf8'));
+  for (const arquivo of ['015_published_templates.sql', '016_template_moderation.sql']) {
+    await db.exec(readFileSync(new URL(`../../db/migrations/${arquivo}`, import.meta.url), 'utf8'));
+  }
   const sql = {
     unsafe: (statement, params = []) => db.query(statement, params).then((r) => r.rows),
     begin: (work) => db.transaction((tx) => work({ unsafe: (statement, params = []) => tx.query(statement, params).then((r) => r.rows) })),
@@ -31,7 +33,7 @@ test.beforeAll(async () => {
   });
 });
 test.afterAll(async () => { await db?.close(); });
-test.beforeEach(async () => { resetRateLimits(); await db.exec('DELETE FROM moont.published_template_reports; DELETE FROM moont.published_templates;'); });
+test.beforeEach(async () => { resetRateLimits(); await db.exec('DELETE FROM moont.published_template_reports; DELETE FROM moont.published_templates; DELETE FROM moont.template_moderators; DELETE FROM moont.template_moderation_events;'); });
 
 /** Encaminha /api/templates do navegador para a rota real, com a conta da página. */
 function rotaReal(owner) {
@@ -170,6 +172,73 @@ test('A publica, B (plano grátis) encontra e aplica mantendo os próprios texto
   const depois = await pageB.evaluate(() => JSON.parse(localStorage.getItem('vc_library')).find((e) => e.id === 'proj-b').doc.slides[0].layout);
   expect(depois).toBe('mc');
   await ctxA.close();
+  await ctxB.close();
+});
+
+test('moderador vê a aba Moderação, mantém um modelo denunciado, remove e restaura outro; conta comum não vê a aba', async ({ browser }) => {
+  await db.query("INSERT INTO moont.template_moderators (owner_id) VALUES ('cus_autora')");
+  // Dois modelos de uma terceira conta, denunciados direto na rota real.
+  const publicarComo = async (owner, name) => {
+    const res = { statusCode: 0, body: null, headers: {}, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; },
+      end() { return this; }, setHeader() { return this; }, getHeader() { return undefined; } };
+    await handler({ method: 'POST', url: '/api/templates', headers: { 'x-e2e-owner': owner }, body: { action: 'publish', name,
+      content: { v: 1, format: 'carrossel', brand: { bg: '#222222', titleColor: '#ffffff' }, slides: [{ role: 'cover', layout: 'mc', align: 'center' }] } } }, res);
+    return res.body.template.id;
+  };
+  const denunciar = async (owner, id, reason) => handler({ method: 'POST', url: '/api/templates', headers: { 'x-e2e-owner': owner },
+    body: { action: 'report', id, reason } }, { status() { return this; }, json() { return this; }, end() { return this; }, setHeader() { return this; }, getHeader() {} });
+  const bom = await publicarComo('cus_terceira', 'Modelo legítimo');
+  const ruim = await publicarComo('cus_terceira', 'Cópia de marca');
+  await denunciar('cus_d1', bom, 'não gostei');
+  for (const conta of ['cus_d1', 'cus_d2', 'cus_d3']) await denunciar(conta, ruim, 'copia a marca de outra empresa');
+
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 960 } });
+  const page = await ctx.newPage();
+  await abrir(page, CONTA_A, projetoA);
+  await entradaDaGaleria(page, 'Galeria de modelos');
+  const galeria = page.getByRole('dialog', { name: 'Galeria de modelos' });
+  await galeria.getByRole('tab', { name: 'Moderação' }).click();
+  const fila = galeria.getByRole('list', { name: 'Fila de moderação' });
+  await expect(fila.getByRole('listitem', { name: 'Moderar Cópia de marca' })).toContainText('Fora da galeria · 3 denúncias');
+  await expect(fila.getByRole('listitem', { name: 'Moderar Cópia de marca' })).toContainText('copia a marca de outra empresa');
+  await expect(fila).not.toContainText('cus_');
+  await page.waitForTimeout(500);
+  if (process.env.MOONT_CAPTURAS) await page.screenshot({ path: 'test-results/modelos-7-moderacao.png' });
+  await fila.getByRole('button', { name: 'Manter Modelo legítimo na galeria' }).click();
+  await expect(fila.getByRole('listitem', { name: 'Moderar Modelo legítimo' })).toHaveCount(0);
+  page.once('dialog', (dialog) => dialog.accept());
+  await fila.getByRole('button', { name: 'Remover Cópia de marca' }).click();
+  await expect(galeria).toContainText('Nenhuma denúncia para revisar.');
+  // Remover é reversível: o modelo fica guardado em "Removidos".
+  const depoisDeRemover = (await db.query('SELECT name, status, report_count FROM moont.published_templates ORDER BY name')).rows;
+  expect(depoisDeRemover).toEqual([
+    { name: 'Cópia de marca', status: 'removed', report_count: 3 },
+    { name: 'Modelo legítimo', status: 'published', report_count: 0 },
+  ]);
+  await galeria.getByRole('group', { name: 'O que mostrar' }).getByRole('button', { name: 'Removidos' }).click();
+  const removidos = galeria.getByRole('list', { name: 'Modelos removidos' });
+  await expect(removidos.getByRole('listitem', { name: 'Moderar Cópia de marca' })).toContainText(/Removido em \d{2}\/\d{2}\/\d{2}/);
+  await expect(removidos.getByRole('button', { name: 'Manter Cópia de marca na galeria' })).toHaveCount(0);
+  await page.waitForTimeout(500);
+  if (process.env.MOONT_CAPTURAS) await page.screenshot({ path: 'test-results/modelos-8-removidos.png' });
+  await removidos.getByRole('button', { name: 'Restaurar Cópia de marca' }).click();
+  await expect(galeria).toContainText('Nenhum modelo removido.');
+  const restantes = (await db.query('SELECT name, status, report_count FROM moont.published_templates ORDER BY name')).rows;
+  expect(restantes).toEqual([
+    { name: 'Cópia de marca', status: 'published', report_count: 0 },
+    { name: 'Modelo legítimo', status: 'published', report_count: 0 },
+  ]);
+  await ctx.close();
+
+  // Conta comum: sem aba.
+  const ctxB = await browser.newContext({ viewport: { width: 1440, height: 960 } });
+  const pageB = await ctxB.newPage();
+  await abrir(pageB, CONTA_B, projetoB);
+  await entradaDaGaleria(pageB, 'Galeria de modelos');
+  const galeriaB = pageB.getByRole('dialog', { name: 'Galeria de modelos' });
+  await expect(galeriaB.getByRole('listitem', { name: 'Modelo Modelo legítimo' })).toBeVisible();
+  await expect(galeriaB.getByRole('listitem', { name: 'Modelo Cópia de marca' })).toBeVisible();
+  await expect(galeriaB.getByRole('tab', { name: 'Moderação' })).toHaveCount(0);
   await ctxB.close();
 });
 

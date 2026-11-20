@@ -13,7 +13,7 @@
 import { createHash } from 'node:crypto';
 import { waitUntil } from '@vercel/functions';
 import { resolveAccountEntitlement } from './account-entitlements.js';
-import { imageQuotaForTier } from './plans.js';
+import { imageLimitForEntitlement } from './plans.js';
 import { consumeImageCredit, refundImageCredit, settleImageCredit, getQuotaUsage } from './image-quota.js';
 import {
   isSjinnConfigured, createGptImage2Task, waitForSjinnTask, downloadImageAsBase64,
@@ -89,13 +89,13 @@ async function quotaContext(ownerId) {
     .catch(() => fail(503, 'entitlement_unavailable', 'Não foi possível verificar o acesso agora.'));
   if (!entitlement.active) fail(402, 'subscription_inactive', 'Assinatura inativa.');
   const tier = entitlement.tier;
-  const limit = imageQuotaForTier(tier);
+  const limit = imageLimitForEntitlement(entitlement);
   if (limit <= 0) fail(402, 'plan_no_images', 'Seu plano não inclui geração de imagens.');
   const { quotaPeriodStartSec: periodStartSec, quotaPeriodEndSec: periodEndSec } = entitlement;
   if (!periodStartSec || !periodEndSec) {
     fail(503, 'quota_period_unavailable', 'Não foi possível confirmar o período da assinatura. Nenhum crédito foi usado.');
   }
-  return { tier, limit, periodStartSec, periodEndSec };
+  return { tier, limit, periodStartSec, periodEndSec, unlimited: entitlement.unlimitedImages === true };
 }
 
 async function refundAll(ownerId, periodStartSec, operationIds) {
@@ -162,7 +162,7 @@ async function reserveCredits(ownerId, quota, slides, projectContext = {}) {
   return {
     reserved,
     ownedReservations,
-    quota: { used: last?.used ?? null, limit: quota.limit, remaining: last?.remaining ?? null, tier: quota.tier },
+    quota: { used: last?.used ?? null, limit: quota.limit, remaining: last?.remaining ?? null, tier: quota.tier, ...(quota.unlimited ? { unlimited: true } : {}) },
   };
 }
 

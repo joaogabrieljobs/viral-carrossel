@@ -107,3 +107,17 @@ Testes:
 - `tests/e2e/publicar-modelo.spec.js`: conta paga publica, conta grátis encontra e aplica mantendo os próprios textos, não consegue apagar o modelo alheio, autora despublica e o modelo some; galeria em 390 px.
 
 Para ativar em produção: aplicar `015_published_templates.sql` no Supabase "Moont Production" antes do envio. Sem a tabela, a rota responde 503 "A galeria de modelos ainda não foi ativada" e o resto do app segue normal.
+
+## 8. Moderação (2026-11-19)
+
+Aba **Moderação** na galeria, visível só para contas listadas em `moont.template_moderators` (migração 016). Para as demais, a fila e a decisão respondem 404, como se não existissem.
+
+- Fila: modelos fora da galeria primeiro, depois os denunciados; com motivo e data de cada denúncia, sem identificar quem denunciou nem a autora (só "N modelos da mesma conta" e "N já removidos/ocultos").
+- Decisões: **Manter** (volta à galeria, zera as denúncias; novas denúncias recomeçam a contagem), **Ocultar** (sai da galeria sem apagar; a autora vê "em revisão"), **Remover** e **Restaurar**.
+- **Remover é reversível** (João, 19/11): o modelo vira `status = 'removed'`, some da galeria e dos "Meus modelos" da autora (ela não edita, não apaga, ninguém denuncia nem aplica), mas fica guardado. A moderação vê os removidos em "Removidos", com a data, e pode **Restaurar**: volta à galeria com as denúncias zeradas. Removido só aceita "restaurar"; as outras decisões respondem 409.
+- Removido não conta no limite de 10 modelos da autora, mas conta no limite de 5 por dia (evita publicar e remover em ciclo).
+- Cada decisão fica em `moont.template_moderation_events`.
+- Incluir ou tirar moderador: `INSERT`/`DELETE` em `moont.template_moderators`, sem novo deploy.
+- Testes: `tests/integration/published-templates.test.js` (conta comum recebe 404; fila, decisões e histórico; mutação sem a checagem de moderador faz o teste falhar) e `tests/e2e/publicar-modelo.spec.js`.
+
+Não existe console admin geral no Moont; esta aba é a primeira peça de administração dentro do app.
