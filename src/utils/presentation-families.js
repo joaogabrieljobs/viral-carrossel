@@ -1,3 +1,4 @@
+import { wcagContrast } from './wcag.js';
 /**
  * Biblioteca de direção de arte do Moont — fonte única de verdade.
  *
@@ -706,10 +707,23 @@ export function familyFont(key, role = 'text') {
 /** Cores de tinta para o fundo da página. */
 export function groundInks(key, ground = 'bg') {
   const p = familySpec(key).palette;
-  if (ground === 'inverse') return { bg: p.inverse, ink: p.inverseInk, muted: p.inverseMuted };
-  if (ground === 'accent') return { bg: p.accent, ink: p.inverseInk || '#FFFFFF', muted: p.inverseMuted || p.inverseInk };
-  if (ground === 'surface') return { bg: p.surface, ink: p.ink, muted: p.muted };
-  return { bg: p.bg, ink: p.ink, muted: p.muted };
+  const raw = ground === 'inverse' ? { bg: p.inverse, ink: p.inverseInk, muted: p.inverseMuted }
+    : ground === 'accent' ? { bg: p.accent, ink: p.inverseInk || '#FFFFFF', muted: p.inverseMuted || p.inverseInk }
+      : ground === 'surface' ? { bg: p.surface, ink: p.ink, muted: p.muted }
+        : { bg: p.bg, ink: p.ink, muted: p.muted };
+  // Texto da página precisa ler no fundo da página (>= 4,5). Paletas de acento
+  // (vermelho suíço, laranja tipográfico, dourado do cinema) não garantiam
+  // isso para a tinta nem para o apoio (MF-08). Cai para a tinta da família
+  // que lê melhor e, se nenhuma ler, para preto ou branco.
+  const ink = readableOn(raw.bg, [raw.ink, p.ink, p.inverseInk]);
+  const muted = readableOn(raw.bg, [raw.muted, ink]);
+  return { bg: raw.bg, ink, muted };
+}
+
+function readableOn(bg, candidates) {
+  for (const color of candidates) if (color && bg && wcagContrast(color, bg) >= 4.5) return color;
+  if (!bg) return candidates[0];
+  return wcagContrast('#000000', bg) >= wcagContrast('#FFFFFF', bg) ? '#000000' : '#FFFFFF';
 }
 
 /**

@@ -21,6 +21,7 @@ import { pctBox, CanvasZonesOverlay } from './CanvasZonesOverlay.jsx';
 import { VcBgPatternLayer, CultureInlineRich, CultureRichParagraphs, OverflowScaler } from './render-primitives.jsx';
 import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks, inkIfReadable, accentInkOnSurface } from '../../utils/brand-visuals.js';
 import { displayListMarkers } from '../../utils/list-markers.js';
+import { groundInks } from '../../utils/presentation-families.js';
 import { resolvePresetChrome, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
 import { footerChromeReservePx, footerGuardApplies, footerPillBottomPx, footerPillColors, textZonesAboveFooter, STORIES_FOOTER_LIFT } from '../../utils/card-chrome.js';
 import { titleLetterSpacingEm } from '../../utils/title-tracking.js';
@@ -2152,13 +2153,20 @@ const SlideCardInner = React.forwardRef(({
   const showCultureIdx = !!brand.showPageBadge;
   const brandAccent = brand.accent || '#000000';
 
-  const slideCardBg = resolveSlideBrandBg(brand, slideIdx, slide) || '#fafafc';
+  // Página da família com fundo próprio (inverso, acento, superfície): o fundo
+  // é pintado pela camada de chrome, não pela marca. A tinta do texto precisa
+  // ser medida contra esse fundo real (MF-08: apoio cinza da marca sobre o
+  // marinho do fechamento do Executivo).
+  const familyGround = slide.presentationArtDirectionVersion === 2 && slide.presentationChrome?.family
+    && slide.presentationChrome.ground && slide.presentationChrome.ground !== 'bg'
+    ? groundInks(slide.presentationChrome.family, slide.presentationChrome.ground) : null;
+  const slideCardBg = familyGround?.bg || resolveSlideBrandBg(brand, slideIdx, slide) || '#fafafc';
   const photoInk = needsLightPhotoText(slide);
   const inkSurface = photoInk ? '#111111' : slideCardBg;
   const readableInks = cultureReadableInks(inkSurface, carouselTitleInk, carouselBodyInk, brandAccent);
   let cultureAccentCol = photoInk ? accentInkOnSurface(brandAccent, '#111111') : readableInks.accentInk;
   let displayTitleInk = carouselTitleInk;
-  let displayBodyInk = carouselBodyInk;
+  let displayBodyInk = familyGround ? (slide.textColor || familyGround.muted || carouselBodyInk) : carouselBodyInk;
   if (culturePack || sandwichSkin) {
     displayTitleInk = readableInks.titleInk;
     displayBodyInk = readableInks.bodyInk;
@@ -2194,7 +2202,8 @@ const SlideCardInner = React.forwardRef(({
   const composedForPhoto = (slide.presentationArtDirectionVersion === 2 || slide.socialCompositionVersion >= 4)
     && (!slide.bgImage || imgErr) && !photoInk;
   const surfaceRgb = vcHexToRgb(vcNormalizeHex(inkSurface) || '#fafafc');
-  const plainInk = surfaceRgb && vcRelLuminance01(surfaceRgb) > 0.18 ? '#141414' : '#f7f5f0';
+  // Preto ou branco, o que tiver mais contraste com o fundo real.
+  const plainInk = surfaceRgb && vcRelLuminance01(surfaceRgb) > 0.179 ? '#000000' : '#ffffff';
   const savedInk = (color, fallback) => (color && composedForPhoto
     ? inkIfReadable(color, inkSurface, inkIfReadable(fallback, inkSurface, plainInk, 4.5), 4.5)
     : color);
