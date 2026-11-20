@@ -2,12 +2,16 @@ import { getPresentationPath } from './presentation.js';
 
 // Direção visual e arco narrativo são escolhas independentes: recomendar uma
 // pele nunca troca o modo de escrita nem injeta o texto de um template.
+// Os 12 estilos virais ficam com os modos de atenção e emoção; as famílias
+// editoriais (v4) com os modos estruturados (passo a passo, ir a fundo,
+// informar). As chaves de pacote criativo seguem a mesma escolha do seletor
+// (SUGGESTED_VISUAL_PRESET_BY_CREATIVE em slide-design-system.js).
 const SOCIAL_STYLES = Object.freeze({
-  none: 'social_minimal', editorial: 'social_grade', how_to: 'social_ficha',
-  storytelling: 'social_documental', viral: 'social_manchete', pain: 'social_cinema',
-  deep: 'social_revista', jornalistico: 'social_ficha', sensacionalista: 'social_poster',
-  tendencia_cultura: 'social_revista', quick_erro_comum: 'social_ficha',
-  quick_tendencia: 'social_manchete', quick_decodificacao: 'social_revista',
+  none: 'minimal_clean', editorial: 'authority_black', how_to: 'social_ficha',
+  storytelling: 'mood_sepia', viral: 'tabloid_keywords', pain: 'reflexivo_cream',
+  deep: 'social_revista', jornalistico: 'social_grade', sensacionalista: 'viral_hype_dark',
+  tendencia_cultura: 'editorial_magazine', quick_erro_comum: 'authority_black',
+  quick_tendencia: 'tabloid_keywords', quick_decodificacao: 'case_study_neon',
   quick_comportamento: 'social_documental',
 });
 

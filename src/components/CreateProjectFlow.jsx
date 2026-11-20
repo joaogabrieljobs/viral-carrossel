@@ -127,7 +127,7 @@ export default function CreateProjectFlow({
     ? `${selectedVisualLabel} · recomendado${visualSelection.preserveBrandIdentity ? ' · cores e fontes da marca' : ''}`
     : selectedVisualLabel;
   const recommendedPresets = [visualSelection.preset,
-    ...['social_revista', 'social_minimal', 'social_documental', 'presentation_editorial_magazine', 'presentation_modular_cards', 'presentation_premium_dark'].map(id => presets.find(p => p.id === id)),
+    ...['tabloid_keywords', 'social_revista', 'minimal_clean', 'social_documental', 'presentation_editorial_magazine', 'presentation_modular_cards', 'presentation_premium_dark'].map(id => presets.find(p => p.id === id)),
     ...presets.filter(p => !p.hidden && !p.isCustom)]
     .filter((p, i, all) => p && all.findIndex(item => item?.id === p.id) === i).slice(0, 3);
   const identitySummary = creationIdentitySummary(brand, styleKit);

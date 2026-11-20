@@ -17,6 +17,16 @@ describe('design recomendado na criação', () => {
     });
     expect(new Set(ids).size).toBeGreaterThanOrEqual(6);
   });
+  it('recomenda os 12 estilos virais e também as famílias editoriais, sempre visíveis no seletor', () => {
+    const ids = NARRATIVE_CHOICES.map(({ id }) => recommendedGenerationVisualPreset({ narrative: id, presets }));
+    for (const p of ids) expect(p.hidden).toBeFalsy();
+    const virais = ids.filter((p) => !p.socialFamily).map((p) => p.id);
+    const familias = ids.filter((p) => p.socialFamily).map((p) => p.id);
+    expect(new Set(virais).size).toBeGreaterThanOrEqual(4);
+    expect(new Set(familias).size).toBeGreaterThanOrEqual(2);
+    expect(recommendedGenerationVisualPreset({ narrative: 'viral', presets }).id).toBe('tabloid_keywords');
+    expect(recommendedGenerationVisualPreset({ narrative: 'how_to', presets }).id).toBe('social_ficha');
+  });
   it('usa os presets de apresentação associados aos sete caminhos', () => {
     for (const path of PRESENTATION_PATHS) {
       const result = recommendedGenerationVisualPreset({ productKind: 'apresentacao', presentationPath: path.id, presets });

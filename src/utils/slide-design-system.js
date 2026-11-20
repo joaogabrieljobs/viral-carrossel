@@ -238,13 +238,13 @@ export function suggestCreativePresetForVisual(visualPresetId) {
  * o picker poder marcar "combina com seu conteúdo".
  */
 export const SUGGESTED_VISUAL_PRESET_BY_CREATIVE = {
-  // Biblioteca de carrosséis v4 (famílias visíveis no seletor).
-  quick_erro_comum: 'social_ficha',         // informação modular, rótulos
-  quick_tendencia: 'social_manchete',       // tipografia de manchete
-  quick_decodificacao: 'social_grade',      // estrutura, contraste de escala
-  quick_comportamento: 'social_documental', // retrato e legenda
-  tendencia_cultura: 'social_revista',      // capa de revista
-  livre: 'social_minimal',                  // sem pacote: tipografia limpa
+  // Os 12 estilos virais e as famílias editoriais (v4) se somam no seletor.
+  quick_erro_comum: 'authority_black',        // autoridade escura + ficha técnica
+  quick_tendencia: 'tabloid_keywords',        // manchete de plantão + destaques
+  quick_decodificacao: 'case_study_neon',     // estudo de caso com prova
+  quick_comportamento: 'social_documental',   // retrato e legenda (família v4)
+  tendencia_cultura: 'editorial_magazine',    // capa de revista
+  livre: 'minimal_clean',                     // sem pacote: tipografia limpa
 };
 
 export function suggestVisualPresetForCreative(creativePresetId) {
