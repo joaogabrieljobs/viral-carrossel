@@ -97,6 +97,10 @@ export function socialChromeElements(art, { frame, brand, tokens = {}, fonts = {
   const inks = socialGround(brand, art.ground);
   const scale = frame.w / 1080;
   const pct = (v) => `${v}%`;
+  // Recuo interno da caixa do título no renderer: dispositivos ancorados ao
+  // texto andam junto, para a barra não começar fora da margem do texto.
+  const insetPx = Math.max(0, Number(fonts.titleInsetPx) || 0);
+  const at = (d, v) => (d.anchor === 'text' && insetPx ? `calc(${pct(v)} + ${insetPx}px)` : pct(v));
   const out = [];
   art.chrome.forEach((d, i) => {
     const key = `${d.t}-${i}`;
@@ -108,7 +112,7 @@ export function socialChromeElements(art, { frame, brand, tokens = {}, fonts = {
     if (opacity === 0) return;
     if (d.t === 'rule' || d.t === 'block') {
       out.push({ key, z: zIndex, style: {
-        left: pct(d.x), top: pct(d.y), width: Math.max(1, (d.w / 100) * frame.w), height: Math.max(1, (d.h / 100) * frame.h),
+        left: at(d, d.x), top: pct(d.y), width: Math.max(1, (d.w / 100) * frame.w), height: Math.max(1, (d.h / 100) * frame.h),
         background: color, opacity, borderRadius: d.radius ? d.radius * scale : 0,
         transform: d.rotate ? `rotate(${d.rotate}deg)` : undefined,
       } });
@@ -135,7 +139,7 @@ export function socialChromeElements(art, { frame, brand, tokens = {}, fonts = {
       if (!t) return;
       const family = d.role === 'title' ? fonts.title : d.role === 'label' ? (fonts.label || fonts.body) : fonts.body;
       out.push({ key, z: zIndex, text: t, style: {
-        left: pct(d.x), top: pct(d.y), width: d.w != null ? pct(d.w) : undefined, textAlign: d.align || 'left',
+        left: at(d, d.x), top: pct(d.y), width: d.w != null ? pct(d.w) : undefined, textAlign: d.align || 'left',
         fontFamily: family, fontSize: d.size * scale,
         fontWeight: d.weight === 'title' ? (fonts.titleWeight || undefined) : (d.weight || (d.role === 'title' ? undefined : 500)),
         transform: d.rotate ? `rotate(${d.rotate}deg)` : undefined, transformOrigin: 'left top',

@@ -6,13 +6,13 @@ import { socialChromeElements, socialChromeTokens } from '../../utils/social-chr
  * blocos, molduras, letterbox). Mesmo componente no editor e na exportação.
  * Só desenha quando o card foi composto pela biblioteca v4 (`socialArt`).
  */
-export default function SocialArtChrome({ slide, brand, frame, titleFont, bodyFont, index = 0, total = 1 }) {
+export default function SocialArtChrome({ slide, brand, frame, titleFont, bodyFont, index = 0, total = 1, titleInsetPx = 0 }) {
   const art = slide?.socialArt;
   if (!art || slide.socialCompositionVersion < 4) return null;
   const elements = socialChromeElements(art, {
     frame, brand,
     tokens: socialChromeTokens(brand, { index, total, slide }),
-    fonts: { title: titleFont, body: bodyFont, label: art.labelFont || bodyFont, titleWeight: slide.titleWeight },
+    fonts: { title: titleFont, body: bodyFont, label: art.labelFont || bodyFont, titleWeight: slide.titleWeight, titleInsetPx },
   });
   if (!elements.length) return null;
   return <div aria-hidden="true" data-vc-social-art={art.family} data-vc-social-function={art.fn}>

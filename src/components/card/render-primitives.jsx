@@ -1,4 +1,5 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
+import { displayListMarkers } from '../../utils/list-markers.js';
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import AutoFitText from '../AutoFitText.jsx';
 import { AUTOFIT_MIN_SCALE } from '../../utils/slide-design-system.js';
@@ -117,7 +118,7 @@ function CultureRichParagraphs({
   destaqueSpans = null,
   paragraphProps = null,
 }) {
-  const full = text ?? '';
+  const full = displayListMarkers(text);
   const windows = listCultureParagraphWindows(full);
   const globSpans = unifyAccentIntervalsUtf16(full, destaqueSpans);
   if (!windows.length) return null;

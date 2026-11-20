@@ -20,6 +20,7 @@ import { normalizePresentationImgAdjust, buildPresentationImageFilter, presentat
 import { pctBox, CanvasZonesOverlay } from './CanvasZonesOverlay.jsx';
 import { VcBgPatternLayer, CultureInlineRich, CultureRichParagraphs, OverflowScaler } from './render-primitives.jsx';
 import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks, inkIfReadable, accentInkOnSurface } from '../../utils/brand-visuals.js';
+import { displayListMarkers } from '../../utils/list-markers.js';
 import { resolvePresetChrome, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
 import { footerChromeReservePx, footerGuardApplies, footerPillBottomPx, footerPillColors, textZonesAboveFooter, STORIES_FOOTER_LIFT } from '../../utils/card-chrome.js';
 import { titleLetterSpacingEm } from '../../utils/title-tracking.js';
@@ -41,7 +42,7 @@ import { DEFAULT_SLIDE_TEXT_INSET, SANDWICH_PHOTO_ZONE_MIN_H_PCT, clampRect, DEF
  * Sem trechos marcados devolve o texto original, sem tocar em nada.
  */
 function textoComDestaque(text, spans, accentColor, accentWeight) {
-  const t = String(text ?? '');
+  const t = displayListMarkers(text);
   if (!t) return t;
   const pieces = cultureAccentRenderablePieces(t, spans);
   if (!pieces.some((p) => p.type === 'accent' || p.type === 'italic')) return t;
@@ -983,7 +984,7 @@ const ClassicCanvasInner = React.forwardRef(({
     >
       <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
       <PresentationArtChrome slide={slide} frame={f} accent={brand.accent} ink={titleInk} index={num - 1} total={total} />
-      <SocialArtChrome slide={slide} brand={brand} frame={f} titleFont={titleFF} bodyFont={bodyFF} index={num - 1} total={total} />
+      <SocialArtChrome slide={slide} brand={brand} frame={f} titleFont={titleFF} bodyFont={bodyFF} index={num - 1} total={total} titleInsetPx={padTitleXp} />
       {!slide.presentationSuppressPhoto && <div
         {...movOu('photo', photoZoneBoxStyle)}
         data-vc-photo-zone="1"
@@ -1065,7 +1066,11 @@ const ClassicCanvasInner = React.forwardRef(({
           fontWeight: resolvedTitleWeight,
           letterSpacing: `${titleLetterSpacingEm(resolvedTitleFF, resolvedTitleTracking)}em`,
           margin: 0,
-          overflowWrap: 'break-word',
+          // Biblioteca (apresentação e estilos sociais v4): palavra nunca se
+          // parte no meio ("Camponê / s", MF-07). Sem a quebra forçada, a
+          // palavra longa transborda na horizontal e o OverflowScaler reduz o
+          // título até ela caber inteira.
+          overflowWrap: (slide.presentationArtDirectionVersion === 2 || slide.socialCompositionVersion >= 4) ? 'normal' : 'break-word',
           wordBreak: 'normal',
           whiteSpace: 'pre-line',
           textWrap: 'balance',

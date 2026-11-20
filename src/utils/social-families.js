@@ -520,19 +520,22 @@ function viralDevices(kind, fn, L, F, { photo }) {
   // Centro da coluna do texto (não do card): na coluna ao lado da foto o
   // texto centraliza na própria coluna, e o fio precisa acompanhar.
   const cx = B.x + B.w / 2;
-  const under = (w, h, color, extra) => block(center ? cx - w / 2 : B.x, B.y + B.h + 0.6, w, h, color, extra);
+  // Alinhado à esquerda, o dispositivo segue a margem do texto (a caixa do
+  // título tem recuo interno no renderer): `anchor: 'text'` (MF-05).
+  const atText = center ? {} : { anchor: 'text' };
+  const under = (w, h, color, extra) => block(center ? cx - w / 2 : B.x, B.y + B.h + 0.6, w, h, color, { ...atText, ...extra });
   // Fio acima do título não é desenhado sobre a foto (card com foto no topo
   // ou em coluna): encostado na borda da foto ele parece um corte errado.
   const P = !L.onPhoto ? L.photo : null;
   const onPhoto = (b) => P && b.x < P.x + P.w && b.x + b.w > P.x && b.y < P.y + P.h + 1.2 && b.y + b.h > P.y;
   const over = (w, h, color, gap = 1.6, extra) => {
-    const b = block(center ? cx - w / 2 : B.x, B.y - gap - h, w, h, color, extra);
+    const b = block(center ? cx - w / 2 : B.x, B.y - gap - h, w, h, color, { ...atText, ...extra });
     return onPhoto(b) ? null : b;
   };
   const numeral = (color, size = 230) => {
     const h = F.py(size * 0.92);
     if (!['opener', 'development'].includes(fn) || L.onPhoto || B.y - h - 1 < F.t - 1) return;
-    out.push(text(center ? F.e : B.x, B.y - h - 1, center ? 100 - 2 * F.e : 40, '{n}', { size, color, role: 'title', weight: 'title', leading: 0.92, align: center ? 'center' : 'left' }));
+    out.push(text(center ? F.e : B.x, B.y - h - 1, center ? 100 - 2 * F.e : 40, '{n}', { size, color, role: 'title', weight: 'title', leading: 0.92, align: center ? 'center' : 'left', ...atText }));
   };
   // Moldura fina abaixo da faixa do cabeçalho/contador (que fica até ~6,5%).
   const frame = (color) => {
@@ -589,7 +592,7 @@ function viralDevices(kind, fn, L, F, { photo }) {
       numeral('accent', 210);
       break;
     case 'hype':
-      out.push(block(Math.max(1.5, B.x - 3), B.y + 0.6, F.kind === 'tall' ? 0.9 : 1.1, Math.max(3, B.h - 1.2), 'accent'));
+      out.push(block(Math.max(1.5, B.x - 3), B.y + 0.6, F.kind === 'tall' ? 0.9 : 1.1, Math.max(3, B.h - 1.2), 'accent', atText));
       numeral('accent');
       break;
     case 'cinematic':
