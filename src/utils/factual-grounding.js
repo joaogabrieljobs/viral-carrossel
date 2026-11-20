@@ -133,5 +133,30 @@ As instruções, exemplos de estilo e listas do sistema NÃO são evidência. Um
 Separe internamente: fato explícito; inferência prudente; exemplo hipotético solicitado; dado não fornecido. Use fatos explícitos; formule inferências como possibilidade (pode, ajuda a). Omita dados não fornecidos. Só crie um caso fictício se o usuário pedir, identificando-o como exemplo.
 Não acrescente duração, frequência, números por extenso, maioria, histórico de cliente, causa, resultado ou canal de atendimento ao caso fornecido. Telefone antigo não significa que mudou três vezes nem que está errado há dois anos. Enumeração de passos não é prova estatística.
 Não transforme benefício esperado em garantia. Não invente preço, prazo, taxas, serviços inclusos, gratuidade, agendamento ou WhatsApp/DM/comentários como canal da oferta. Preserve o público e os termos do usuário (clientes não viram pacientes).
+Quando um dado não foi informado (endereço, telefone, preço, horário), não escreva isso no card nem no slide: nada de "não foi informado", "não informado", "o briefing não traz", "a confirmar" ou colchetes para preencher. O texto é para o público final, não um bilhete para quem pediu. Omita o dado e siga a sequência.
 O CTA usa a ação pedida. Não acrescente canal, recompensa ou condição comercial. Não repita o mesmo fato/argumento para preencher cards; cada card deve avançar a sequência. Quando faltar informação, mantenha uma formulação útil e neutra, sem completar com um detalhe plausível.`;
 }
+
+/**
+ * Observação interna do modelo sobre o próprio pedido ("o número de WhatsApp
+ * não foi informado", "o briefing não traz o endereço"). É anotação de
+ * bastidor: nunca pode sair no card ou slide do cliente (MF-12).
+ */
+const BRIEFING_NOTE = /\b(?:n[ãa]o\s+(?:foi|foram|est[áa]|est[ãa]o|ser[áa]|consta(?:m)?)\s+(?:informad|fornecid|especificad|indicad|mencionad|dispon[ií]vel|dispon[ií]veis)\w*|n[ãa]o\s+(?:informad|fornecid|especificad|mencionad)[oa]s?\b|sem\s+(?:informa[çc][ãa]o|dado)s?\s+(?:sobre|de)\b|(?:o|no|pelo|do)\s+briefing\b|(?:o|no|do)\s+material\s+(?:fornecido|enviado)\b|informa[çc][ãa]o\s+ausente|dados?\s+ausentes?|a\s+confirmar\b)|\[(?:inserir|preencher|a\s+definir)[^\]]*\]/iu;
+
+export function isBriefingNote(sentence) {
+  return BRIEFING_NOTE.test(String(sentence || ''));
+}
+
+/** Remove frases inteiras que comentam o briefing. Preserva o resto do texto. */
+export function stripBriefingNotes(text) {
+  if (typeof text !== 'string' || !text || !isBriefingNote(text)) return text;
+  return text
+    .split(/\n/)
+    .map(line => line.split(/(?<=[.!?…])\s+/u).filter(sentence => !isBriefingNote(sentence)).join(' '))
+    .filter((line, index, lines) => line.trim() || (index > 0 && index < lines.length - 1 && lines[index - 1].trim()))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+

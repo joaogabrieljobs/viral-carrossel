@@ -9,6 +9,7 @@ import {
   GraduationCap, ScrollText, Megaphone,
 } from 'lucide-react';
 import { TEMPLATES, PALETTES } from './design-data.js';
+import { stripBriefingNotes } from './factual-grounding.js';
 import { assertPaidFeature } from './free-plan.js';
 import { INSTAGRAM_HASHTAG_LIMIT, INSTAGRAM_CAPTION_LIMIT } from './editorial-strategy.js';
 import { REFERENCE_PROFILE_BY_ID } from './brand-visuals.js';
@@ -721,6 +722,9 @@ function buildSlideTextDensityRefineHint(densityId) {
  */
 function stripLeadingSlideCardLabel(text) {
   if (text == null || typeof text !== 'string') return '';
+  // Toda saída de texto da IA passa por aqui: a nota de bastidor sobre dado
+  // ausente sai antes de chegar ao card ou slide (MF-12).
+  text = stripBriefingNotes(text);
   let t = text.replace(/^\uFEFF/, '').trim();
   let prev;
   do {
