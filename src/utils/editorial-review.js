@@ -682,8 +682,14 @@ async function writePresentationBatches({ prompt, plan, config, textOptions, onS
   const diagnostics = [];
   const batchSize = 3;
   let caption = '';
-  for (let offset = 0; offset < plan.slides.length; offset += batchSize) {
-    const entries = plan.slides.slice(offset, offset + batchSize);
+  // N1 (reteste 20/11): um lote de três que falha duas vezes não encerra mais
+  // a geração. Ele volta à fila como posições individuais, com resposta menor
+  // e as mesmas duas tentativas; só uma posição isolada que falha interrompe.
+  const queue = [];
+  for (let offset = 0; offset < plan.slides.length; offset += batchSize) queue.push([offset, Math.min(batchSize, plan.slides.length - offset)]);
+  while (queue.length) {
+    const [offset, size] = queue.shift();
+    const entries = plan.slides.slice(offset, offset + size);
     const batchPlan = { ...plan, slides: entries };
     let batch;
     let previousIssue;
@@ -743,6 +749,12 @@ ${attempt > 1 ? `A resposta anterior deste lote não pôde ser utilizada. Refaç
           outcome: accessError ? 'access_interrupted' : 'failed', issue: previousIssue,
           ...(httpStatus ? { httpStatus } : {}), ...(response ? { response } : {}) });
         if (accessError && !slides.length) { error.writingDiagnostics = diagnostics; throw error; }
+        if (attempt === 2 && !accessError && entries.length > 1) {
+          diagnostics.push({ stage: 'writing', from: offset + 1, to: offset + entries.length, outcome: 'split_into_single_slides' });
+          queue.unshift(...entries.map((_, index) => [offset + index, 1]));
+          batch = null;
+          break;
+        }
         if (attempt === 2 || accessError) {
           if (!slides.length) throw Object.assign(new Error('O roteiro está pronto, mas não foi possível escrever os primeiros slides. Tente novamente com as mesmas escolhas.'), { code: 'presentation_writing_failed', stage: 'writing', writingDiagnostics: diagnostics });
           onStage?.('writing_interrupted', { completedCount: slides.length, totalCount: plan.slides.length, interruptionReason, diagnostics });
@@ -750,6 +762,7 @@ ${attempt > 1 ? `A resposta anterior deste lote não pôde ser utilizada. Refaç
         }
       }
     }
+    if (!batch) continue;
     slides.push(...batch.slides);
     if (batch.caption && !caption) caption = batch.caption;
     throwIfGenerationCancelled(textOptions.signal);

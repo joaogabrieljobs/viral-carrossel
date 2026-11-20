@@ -291,3 +291,14 @@ describe('MF-04 — conta com preços informados não é preço inventado', () =
     expect(auditDraftFactuality(um('Combo por R$ 50.'), cfg)).toContainEqual(expect.objectContaining({ category: 'preço', claim: 'R$ 50' }));
   });
 });
+
+describe('MF-04 (reteste 20/11) — anos informados', () => {
+  const cfg = { count: 1, presetId: 'livre', densityId: '1_1', factualSource: 'Fundada em 2019. Em 2025 vendeu 41.200 pães.' };
+  const um = text => ({ slides: [{ title: 'Volume', subtitle: text, bodyAfterImage: '' }] });
+  it.each(['Em um ano, a padaria atingiu esse volume.', 'São seis anos de padaria, de 2019 a 2025.'])('aceita %s', text => {
+    expect(auditDraftFactuality(um(text), cfg)).toEqual([]);
+  });
+  it('continua marcando período que os anos não sustentam', () => {
+    expect(auditDraftFactuality(um('Em três anos dobrou as vendas.'), cfg)).toContainEqual(expect.objectContaining({ claim: 'três anos' }));
+  });
+});

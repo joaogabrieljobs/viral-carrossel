@@ -50,9 +50,68 @@ function EditableCell({ as: Tag = 'span', value, label, onCommit, style = {} }) 
   >{value}</Tag>;
 }
 
+// Largura real do texto na fonte do quadro (canvas). Sem canvas (SSR/testes),
+// estimativa conservadora de fonte monoespaçada.
+const widthCache = new Map();
+export function measureMetricText(text, fontFamily, weight = 600) {
+  const value = String(text || '');
+  const key = `${weight}|${fontFamily}|${value}`;
+  if (widthCache.has(key)) return widthCache.get(key);
+  let perPx = [...value].length * 0.62;
+  try {
+    const ctx = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
+    if (ctx) {
+      ctx.font = `${weight} 100px ${fontFamily || 'sans-serif'}`;
+      const measured = ctx.measureText(value).width / 100;
+      if (measured > 0) perPx = measured;
+    }
+  } catch { /* estimativa acima */ }
+  widthCache.set(key, perPx);
+  return perPx;
+}
+
+/**
+ * Tamanho do valor da métrica (MF-13): o maior que cabe na coluna, até o teto
+ * do layout. Abaixo do mínimo legível, o valor quebra em linhas em vez de ser
+ * cortado na borda (o "36 horas" e o horário no quadro de 4 valores).
+ */
+export function metricValueFit({ value, columnPx, unit, count, fontFamily, weight }) {
+  const max = (count > 3 ? 72 : 96) * unit;
+  const min = 30 * unit;
+  const perPx = measureMetricText(value, fontFamily, weight);
+  const fits = perPx > 0 ? (columnPx * 0.96) / perPx : max;
+  if (fits >= min) return { fontSize: Math.min(max, fits), wrap: false };
+  return { fontSize: min, wrap: true };
+}
+
+/**
+ * Mesmo tamanho para todos os valores da linha, como num painel: o menor que
+ * cabe, com piso legível. Um valor longo demais para o piso ("Ter-Dom,
+ * 7h–13h") quebra em linhas no mesmo tamanho dos outros.
+ */
+export function metricRowFit({ values, columnPx, unit, fontFamily, weight }) {
+  const count = values.length;
+  const max = (count > 3 ? 72 : 96) * unit;
+  const floor = 44 * unit;
+  const fits = values.map(value => metricValueFit({ value, columnPx, unit, count, fontFamily, weight }));
+  const size = Math.min(max, Math.max(floor, Math.min(...fits.map(fit => (fit.wrap ? 0 : fit.fontSize)))));
+  return values.map(value => {
+    const perPx = measureMetricText(value, fontFamily, weight);
+    return { fontSize: size, wrap: perPx * size > columnPx * 0.96 };
+  });
+}
+
 /** A small, allowlisted set of editable primitives shared by preview and export.
  * React escapes every value; generated content never controls markup or CSS. */
 export default function PresentationBlocks({ blocks: raw, rect, frame, ink, background, fontFamily, family = 'executive', accent, numericTypography, onChange, forExport = false, artDirectionVersion = 2 }) {
+  // Mede de novo quando as fontes terminam de carregar (a exportação espera
+  // por elas; a primeira medida pode usar a fonte de reserva).
+  const [, setFontsReady] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    document.fonts?.ready?.then(() => { if (alive) { widthCache.clear(); setFontsReady(n => n + 1); } });
+    return () => { alive = false; };
+  }, []);
   if (artDirectionVersion !== 2) return <LegacyPresentationBlocks blocks={raw} rect={rect} frame={frame} ink={ink} background={background} fontFamily={fontFamily} family={family} accent={accent} numericTypography={numericTypography} onChange={onChange} forExport={forExport} />;
   const blocks = normalizePresentationBlocks(raw);
   if (!blocks.length || !rect) return null;
@@ -114,7 +173,11 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, back
       </td>)}</tr>)}</tbody>
     </table> : block.type === 'metrics' ? <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(block.items.length, frame.h > frame.w ? 2 : 4)}, minmax(0, 1fr))`, gap: 28 * unit }}>
       {block.items.map((item, index) => <div key={index} style={{ minWidth: 0, padding: panel ? `${26 * unit}px` : `${22 * unit}px 0 0`, borderTop: st.metricRule ? `${st.metricRule * unit}px solid ${ruleColor}` : 'none', borderRadius: st.radius * unit, backgroundColor: panel ? st.panelColor : 'transparent', color: panelInk }}>
-        {cell(item.value, ['items', index, 'value'], `valor ${index + 1}`, { display: 'block', whiteSpace: 'nowrap', fontFamily: numberFont, fontVariantNumeric: 'tabular-nums', fontSize: Math.max(40 * unit, Math.min((block.items.length > 3 ? 72 : 96) * unit, metricColumnPx(block.items.length) / Math.max(1, [...item.value].length * 0.56))), letterSpacing: '-0.02em', lineHeight: 1.18, fontWeight: numericTypography?.weight || familyFont(key, 'numeric').weight || 600, fontSynthesisWeight: 'none' })}
+        {(() => {
+          const weight = numericTypography?.weight || familyFont(key, 'numeric').weight || 600;
+          const fit = metricRowFit({ values: block.items.map(entry => entry.value), columnPx: metricColumnPx(block.items.length), unit, fontFamily: numberFont, weight })[index];
+          return cell(item.value, ['items', index, 'value'], `valor ${index + 1}`, { display: 'block', whiteSpace: fit.wrap ? 'normal' : 'nowrap', overflowWrap: fit.wrap ? 'anywhere' : 'normal', fontFamily: numberFont, fontVariantNumeric: 'tabular-nums', fontSize: fit.fontSize, letterSpacing: '-0.02em', lineHeight: fit.wrap ? 1.1 : 1.18, fontWeight: weight, fontSynthesisWeight: 'none' });
+        })()}
         {cell(item.label, ['items', index, 'label'], `indicador ${index + 1}`, { display: 'block', fontSize: 26 * unit, marginTop: 18 * unit, fontWeight: 600 })}
         {item.detail && cell(item.detail, ['items', index, 'detail'], `condição ${index + 1}`, { display: 'block', fontSize: 23 * unit, marginTop: 8 * unit, opacity: 0.75 })}
       </div>)}

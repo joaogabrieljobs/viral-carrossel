@@ -57,8 +57,8 @@ const HOUR_RANGE = /\b(\d{1,2})\s*(?:h|:00|horas?)\s*(?:as|a|ate|to|-)\s*(\d{1,2
 
 /**
  * Contagens que decorrem diretamente do material (MF-04): "terça a domingo"
- * sustenta "seis dias"; "das 7h às 13h" sustenta "seis horas". Aritmética
- * sobre um intervalo informado não é dado novo.
+ * sustenta "seis dias"; "das 7h às 13h" sustenta "seis horas"; um ano
+ * informado sustenta "um ano". Aritmética sobre o informado não é dado novo.
  */
 function derivedQuantityKeys(text) {
   const t = normalize(text);
@@ -71,6 +71,11 @@ function derivedQuantityKeys(text) {
     const diff = Number(to) - Number(from);
     if (diff > 0 && diff < 24) keys.push(`${diff}hours`);
   }
+  // "Em 2025 vendeu 41.200" sustenta "em um ano"; "fundada em 2019" e "em
+  // 2025" sustentam "seis anos" entre as duas datas (reteste 20/11, Caso).
+  const years = [...new Set([...t.matchAll(/\b(19|20)\d{2}\b/g)].map(match => Number(match[0])))];
+  if (years.length) keys.push('1years');
+  for (const a of years) for (const b of years) if (b > a) keys.push(`${b - a}years`);
   return keys;
 }
 const quantityKeys = text => new Set([

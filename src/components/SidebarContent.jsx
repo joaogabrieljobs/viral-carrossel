@@ -4012,10 +4012,13 @@ function SidebarContent({
                     }
                     setImageBatchConfirmOpen(true);
                   }}
-                  style={{ minHeight: 44, fontSize: 11 }}
+                  title={selectedSlideIds.length ? 'Gerar imagens dos itens selecionados' : 'Gerar as imagens pendentes'}
+                  style={{ minHeight: 44, fontSize: 11, lineHeight: 1.15, padding: '6px 12px', textAlign: 'center' }}
                 >
-                  {imagesBatchBusy ? <Loader2 size={14} style={{ animation:'spin .8s linear infinite' }}/> : <ImageIcon size={14}/>}
-                  {selectedSlideIds.length ? `Gerar imagens (${pendingImageCreditCount})` : `Gerar imagens pendentes (${pendingImageCreditCount})`}
+                  {imagesBatchBusy ? <Loader2 size={14} style={{ animation:'spin .8s linear infinite', flexShrink: 0 }}/> : <ImageIcon size={14} style={{ flexShrink: 0 }}/>}
+                  {/* Rótulo curto: no grid de 2 colunas "Gerar imagens pendentes (1)"
+                      quebrava em 3 linhas e passava da altura da pílula (reteste 20/11). */}
+                  {`Gerar imagens (${pendingImageCreditCount})`}
                 </button>
                 <button
                   type="button"

@@ -231,18 +231,36 @@ describe('apresentação planejada e revisada', () => {
     expect(onStage.mock.calls.map(call => call[0])).toEqual(['planning', ...Array(count / 3).fill('writing'), 'reviewing']);
   });
 
-  it('preserva três slides completos quando o lote seguinte falha duas vezes', async () => {
+  it('preserva os slides completos quando o lote e depois uma posição isolada falham duas vezes', async () => {
+    const truncado = () => Object.assign(new Error('truncado'), { code: 'ai_output_truncated' });
     const ai = vi.fn().mockResolvedValueOnce(planWithCount(6)).mockResolvedValueOnce(batch(0))
-      .mockRejectedValueOnce(Object.assign(new Error('truncado'), { code: 'ai_output_truncated' }))
-      .mockRejectedValueOnce(Object.assign(new Error('truncado'), { code: 'ai_output_truncated' }));
+      .mockRejectedValueOnce(truncado()).mockRejectedValueOnce(truncado())
+      .mockRejectedValueOnce(truncado()).mockRejectedValueOnce(truncado());
     const onDraft = vi.fn(); const onReview = vi.fn();
     const output = await generateReviewedCarousel({ prompt: '', config: config({ count: 6 }), onDraft, onReview }, ai);
-    expect(ai).toHaveBeenCalledTimes(4);
+    expect(ai).toHaveBeenCalledTimes(6);
+    expect(ai.mock.calls[4][0]).toContain('EXATAMENTE 1 objetos');
     expect(output).toMatchObject({ incomplete: true, completedCount: 3, totalCount: 6, reviewStatus: 'needs_attention' });
     expect(output.result.slides.map(slide => slide.title)).toEqual(['Mensagem 1', 'Mensagem 2', 'Mensagem 3']);
     expect(output.violations).toContainEqual(expect.objectContaining({ code: 'presentation_incomplete', completedCount: 3, totalCount: 6 }));
     expect(onDraft).toHaveBeenCalledTimes(1);
     expect(onReview).not.toHaveBeenCalled();
+  });
+
+  // N1 (reteste 20/11): Proposta parou em 9 de 12 slides. O lote que falha
+  // duas vezes é reescrito posição a posição e a apresentação sai completa.
+  it('reescreve posição a posição o lote que falhou e completa a apresentação', async () => {
+    const truncado = () => Object.assign(new Error('truncado'), { code: 'ai_output_truncated' });
+    const one = index => { const value = batch(index, 1); return value; };
+    const ai = vi.fn().mockResolvedValueOnce(planWithCount(6)).mockResolvedValueOnce(batch(0))
+      .mockRejectedValueOnce(truncado()).mockRejectedValueOnce(truncado())
+      .mockResolvedValueOnce(one(3)).mockResolvedValueOnce(one(4)).mockResolvedValueOnce(one(5))
+      .mockResolvedValueOnce({ edits: [] });
+    const output = await generateReviewedCarousel({ prompt: '', config: config({ count: 6 }) }, ai);
+    expect(output.incomplete).toBeFalsy();
+    expect(output.result.slides.map(slide => slide.title)).toEqual(['Mensagem 1', 'Mensagem 2', 'Mensagem 3', 'Mensagem 4', 'Mensagem 5', 'Mensagem 6']);
+    expect(output.result.slides.at(-1).presentationPlan).toMatchObject({ index: 6, visualRole: 'closing' });
+    expect(ai.mock.calls[5][0]).toContain('apenas as posições 5');
   });
 
   it('o último lote de uma apresentação com cinco slides contém apenas as duas posições restantes', async () => {
