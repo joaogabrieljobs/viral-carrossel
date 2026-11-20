@@ -209,11 +209,17 @@ export function contentAwarePresentationOverrides(base, slide = {}, kind = 'cont
   const imagePosition = !layout.photo ? 'none' : layout.photo.x + layout.photo.w / 2 < 50 ? 'left-evidence' : 'right-evidence';
   const rawLimits = pitch ? (base.presentationTextLimits || {}) : plannedPresentationTextLimits(kind, slide, deliveryMode);
   const narrow = zones.subtitle.w < 45 && zones.subtitle.h < 50;
-  const limits = narrow ? {
+  const narrowed = narrow ? {
     ...rawLimits,
     subtitle: { ...rawLimits.subtitle, maxChars: Math.min(rawLimits.subtitle?.maxChars || 180, 180), maxLines: 6 },
     body: { ...rawLimits.body, maxChars: Math.min(rawLimits.body?.maxChars || 90, 90), maxLines: 3 },
   } : rawLimits;
+  // Capa e fechamento têm caixa de apoio pequena; o pedido ao modelo segue a
+  // caixa. Páginas de conteúdo mantêm os limites de leitura (o ajuste
+  // automático acomoda a variação), para não cortar argumento já aprovado.
+  const limits = kind === 'cover' || kind === 'closing'
+    ? fitLimitsToZone(narrowed, zones.subtitle, subSize, bodyLeading)
+    : narrowed;
   const { typography: familyTypography, ...visualFields } = fields;
   return {
     ...base,
@@ -340,5 +346,35 @@ export function repairMissingPresentationEvidence(slide) {
   const repaired = contentAwarePresentationOverrides(slide, slide, 'data', { deliveryMode: slide.presentationDeliveryMode || 'hybrid' });
   if (!validZone(repaired.canvas?.zones?.evidence)) return slide;
   return { ...repaired, presentationComposition: 'data', presentationEvidenceRepaired: true };
+}
+
+/**
+ * O limite de texto pedido ao modelo não pode ser maior que a caixa de leitura
+ * da composição. Na capa do Pitch (editorial) a caixa do apoio tem 35% × 15%
+ * do slide, cerca de três linhas, mas o pedido era 180 caracteres e 6 linhas:
+ * o texto passava da área segura e a exportação era barrada (MF-10). Apoio e
+ * texto final dividem a mesma caixa; a estimativa usa 0,5 em por caractere e
+ * deixa 10% de folga para quebras.
+ */
+export function fitLimitsToZone(limits, zone, subSizePercent, leadingPercent = 140, format = '16:9') {
+  if (!limits || !zone || !Number.isFinite(zone.w) || !Number.isFinite(zone.h)) return limits;
+  const frame = FORMATS[format === '16:9' ? 'apresentacao' : format] || FORMATS.apresentacao;
+  const fontPx = frame.w * 0.028 * (Number(subSizePercent) || 100) / 100;
+  const lineH = fontPx * (Number(leadingPercent) || 140) / 100;
+  const lines = Math.max(1, Math.floor((zone.h / 100 * frame.h) / lineH));
+  const perLine = Math.max(8, Math.floor((zone.w / 100 * frame.w) / (fontPx * 0.5)));
+  // 1,25×: o ajuste automático ainda reduz o corpo até ~85% antes do piso.
+  const capacity = Math.floor(lines * perLine * 0.9 * 1.25);
+  const sub = limits.subtitle || {};
+  const body = limits.body || {};
+  const bodyChars = Math.min(body.maxChars ?? 0, Math.floor(capacity * 0.3));
+  const bodyLines = body.maxLines ? Math.min(body.maxLines, Math.max(1, Math.floor(lines * 0.3))) : body.maxLines;
+  const subChars = Math.max(40, Math.min(sub.maxChars ?? capacity, capacity - bodyChars));
+  const subLines = Math.max(1, Math.min(sub.maxLines ?? lines, lines - (bodyChars ? (bodyLines || 1) : 0)));
+  return {
+    ...limits,
+    subtitle: { ...sub, maxChars: subChars, maxLines: subLines },
+    ...(limits.body ? { body: { ...body, maxChars: bodyChars, maxLines: bodyChars ? bodyLines : 0 } } : {}),
+  };
 }
 

@@ -251,10 +251,11 @@ describe('padrões visuais de apresentação', () => {
     const cover = getPresentationCompositionOverrides('presentation_premium_dark', {
       stage: { visualRole: 'cover' }, index: 0, count: 6,
     });
-    expect(cover.presentationTextLimits).toMatchObject({
-      title: { maxChars: 90, maxLines: 3 },
-      subtitle: { maxChars: 180, maxLines: 6 },
-    });
+    expect(cover.presentationTextLimits).toMatchObject({ title: { maxChars: 90, maxLines: 3 } });
+    // MF-10: o apoio da capa segue a caixa real (antes: 180 caracteres em 6
+    // linhas numa caixa onde cabem duas ou três).
+    expect(cover.presentationTextLimits.subtitle.maxChars).toBeLessThanOrEqual(180);
+    expect(cover.presentationTextLimits.subtitle.maxLines).toBeLessThanOrEqual(4);
   });
 
   it('não aplica o prompt Executivo como fallback em padrões customizados ou desconhecidos', () => {
