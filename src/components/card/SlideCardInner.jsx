@@ -112,6 +112,20 @@ function socialScrimGradient(slide) {
 
 const round1 = (n) => Math.round(n * 10) / 10;
 
+/**
+ * Sombra só existe para separar texto de uma foto (ou placa escura) atrás
+ * dele. Sem foto carregada, a sombra preta só borrava o texto sobre o fundo
+ * liso, inclusive no PNG exportado (MF-01): a composição pode ter pedido
+ * sombra esperando uma foto que não chegou.
+ */
+export function textShadowFor(slide, photoBehindText) {
+  if (slide?.textShadow === false) return 'none';
+  return photoBehindText || slide?.textBg ? '0 2px 24px rgba(0,0,0,0.85), 0 1px 6px rgba(0,0,0,0.95)' : 'none';
+}
+
+const zonesOverlap = (a, b) => !!(a && b && Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 0.5
+  && Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 0.5);
+
 function finiteNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
@@ -846,9 +860,10 @@ const ClassicCanvasInner = React.forwardRef(({
     const reservaPx = footerChromeReservePx(brand, f);
     if (reservaPx > 0) ({ title: tr, subtitle: sr } = textZonesAboveFooter({ title: tr, subtitle: sr }, 100 - (reservaPx / f.h) * 100));
   }
-  const shadow = slide.textShadow !== false
-    ? '0 2px 24px rgba(0,0,0,0.85), 0 1px 6px rgba(0,0,0,0.95)'
-    : 'none';
+  const photoLoaded = !!(slide.bgImage && imgReady && !imgErr);
+  const photoZone = zcv.photo;
+  const photoBehindText = photoLoaded && (!photoZone || zonesOverlap(photoZone, tr) || zonesOverlap(photoZone, sr));
+  const shadow = textShadowFor(slide, photoBehindText);
   const textBgColor = slide.textBg
     ? `rgba(0,0,0,${(slide.textBgOpacity ?? 55) / 100 * 0.75})`
     : 'transparent';
@@ -1407,9 +1422,8 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
   const bandH = f.h * bandFrac;
   const inset = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
   const padH = f.w * (0.04 + inset * 0.004);
-  const shadow = slide.textShadow !== false
-    ? '0 2px 24px rgba(0,0,0,0.85), 0 1px 6px rgba(0,0,0,0.95)'
-    : 'none';
+  // A foto fica numa faixa própria; o texto não está sobre ela.
+  const shadow = textShadowFor(slide, false);
   const textBgColor = slide.textBg
     ? `rgba(0,0,0,${(slide.textBgOpacity ?? 55) / 100 * 0.75})`
     : 'transparent';
@@ -3602,9 +3616,8 @@ const SlideCardInner = React.forwardRef(({
           f.h * (0.06 + inset * 0.003),
           footerChromeReservePx(brand, f),
         );
-        const shadow = slide.textShadow !== false
-          ? '0 2px 24px rgba(0,0,0,0.85), 0 1px 6px rgba(0,0,0,0.95)'
-          : 'none';
+        // Foto de fundo do card inteiro; no sanduíche a foto fica numa faixa.
+        const shadow = textShadowFor(slide, !!(slide.bgImage && imgReady && !imgErr && !sandwich));
         const textBgColor = slide.textBg
           ? `rgba(0,0,0,${(slide.textBgOpacity ?? 55) / 100 * 0.75})`
           : 'transparent';
