@@ -1,4 +1,5 @@
 import { GEN_MODES, resolveGenMode, normalizeNarrativeModeId } from '../../utils/generation-prompts.js';
+import { PRESENTATION_PATHS, getPresentationPath } from '../../utils/presentation.js';
 import React, { useState } from 'react';
 import { GenerationScopePicker } from '../GenerationScopePicker.jsx';
 import { ChevronDown, FileText, Loader2, Sparkles, Type } from 'lucide-react';
@@ -131,6 +132,11 @@ function NarrativaStudioPanels({
   hasImages = false,
   narrativeMode = 'none',
   onNarrativeModeChange = () => {},
+  // Apresentação usa os caminhos de apresentação (Pitch, Aula, Proposta…),
+  // nunca os modos do carrossel ("Explicar com autoridade").
+  isPresentation = false,
+  presentationPath = 'auto',
+  onPresentationPathChange = () => {},
   activeIdx = 0,
   slidesCount = 1,
   cardChildren = null,
@@ -196,6 +202,21 @@ function NarrativaStudioPanels({
             }}
           />
           <fieldset disabled={genBusy} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+            {isPresentation ? (<>
+            <legend style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Tipo de apresentação</legend>
+            <select
+              className="vc-input"
+              aria-label="Tipo de apresentação"
+              value={getPresentationPath(presentationPath).id}
+              onChange={(e) => onPresentationPathChange(e.target.value)}
+              style={{ width: '100%', minHeight: 44, borderRadius: 10, cursor: genBusy ? 'not-allowed' : 'pointer', appearance: 'auto' }}
+            >
+              {PRESENTATION_PATHS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+            </select>
+            <p style={{ fontSize: 11, lineHeight: 1.5, color: 'var(--text-muted)', margin: '8px 0 0' }}>
+              {getPresentationPath(presentationPath).description || ''}
+            </p>
+            </>) : (<>
             <legend style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Modo narrativo</legend>
             <select
               className="vc-input"
@@ -221,6 +242,7 @@ function NarrativaStudioPanels({
             <p style={{ fontSize: 11, lineHeight: 1.5, color: 'var(--text-muted)', margin: '8px 0 0' }}>
               {modeDef?.desc}
             </p>
+            </>)}
             {toneReady ? (
               <label style={{
                 display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 12,

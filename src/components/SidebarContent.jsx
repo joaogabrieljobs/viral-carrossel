@@ -921,6 +921,9 @@ function SidebarContent({
             onGenerationScopeChange={onGenerationScopeChange}
             narrativeMode={quickNarrativeMode}
             onNarrativeModeChange={onQuickNarrativeModeChange}
+            isPresentation={isPresentationProject}
+            presentationPath={presentationPath}
+            onPresentationPathChange={setPresentationPath}
             brand={brand}
             setBrand={setBrand}
             hasOpenAI={hasTextAI}
