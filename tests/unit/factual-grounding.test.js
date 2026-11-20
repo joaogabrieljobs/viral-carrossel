@@ -206,3 +206,88 @@ describe('fidelidade ao briefing — regressões dos nove modos', () => {
     expect(ai).toHaveBeenCalledTimes(2);
   });
 });
+
+// MF-04: o auditor reprovava a dedução correta ("seis dias" de terça a
+// domingo) e a célula de uma tabela colada ao cabeçalho seguinte ("41.200" +
+// "Ano"), entregando a apresentação como "Rascunho preservado".
+describe('MF-04 — deduções de calendário e tabelas não são dado inventado', () => {
+  const padaria = 'Padaria de bairro. Equipe de 6 funcionários. Funciona de terça a domingo, das 7h às 13h. Fechada às segundas. Em 2025 vendeu 41.200 pães.';
+  const cfg = { count: 1, presetId: 'livre', densityId: '1_1', factualSource: padaria };
+  const um = text => ({ slides: [{ title: 'Horário', subtitle: text, bodyAfterImage: '' }] });
+
+  it.each([
+    'A padaria abre seis dias por semana.',
+    'São 6 dias de pão fresco.',
+    'Seis horas de loja aberta por dia.',
+  ])('aceita contagem deduzida do horário informado: %s', text => {
+    expect(auditDraftFactuality(um(text), cfg)).toEqual([]);
+  });
+
+  it('continua reprovando contagem que o horário não sustenta', () => {
+    expect(auditDraftFactuality(um('Aberta sete dias por semana.'), cfg)).toContainEqual(expect.objectContaining({ claim: 'sete dias' }));
+    expect(auditDraftFactuality(um('Oito horas de loja aberta.'), cfg)).toContainEqual(expect.objectContaining({ claim: 'Oito horas' }));
+  });
+
+  it('não junta o número de uma célula com a palavra da linha seguinte', () => {
+    const draft = um('Volume do ano.');
+    draft.slides[0].bodyAfterImage = 'Pães vendidos\n41.200\nAno\n2025';
+    expect(auditDraftFactuality(draft, cfg)).toEqual([]);
+  });
+
+  it('segunda a sexta e monday to friday contam cinco dias', () => {
+    const semana = { ...cfg, factualSource: 'Atendimento de segunda a sexta. Support Monday to Friday.' };
+    expect(auditDraftFactuality(um('Cinco dias de atendimento. Five days a week.'), semana)).toEqual([]);
+  });
+});
+
+describe('MF-04 — revisão conferida e generalização sobre terceiros', () => {
+  const padaria = 'Padaria Fermento da Marta. Todos os pães usam fermentação natural de 36 horas. Encomendas com 1 dia de antecedência.';
+  const cfg = { count: 3, presetId: 'livre', densityId: '1_1', factualSource: padaria };
+  const rascunho = () => ({ caption: 'Conheça a padaria.', slides: [
+    { title: 'Pão do bairro', subtitle: 'Fermentação natural de 36 horas.', bodyAfterImage: '', imageQuery: '' },
+    { title: 'Sem pressa', subtitle: 'Todos os pães usam fermentação natural.', bodyAfterImage: '', imageQuery: '' },
+    { title: 'Encomende', subtitle: 'Encomendas com 1 dia de antecedência.', bodyAfterImage: '', imageQuery: '' },
+  ] });
+
+  it('"a maioria dos pães industrializados" é generalização sem fonte', () => {
+    const draft = rascunho();
+    draft.slides[1].subtitle = 'A maioria dos pães industrializados acelera o processo.';
+    expect(auditDraftFactuality(draft, cfg)).toContainEqual(expect.objectContaining({ slideIndex: 1, category: 'afirmação absoluta' }));
+  });
+
+  it('revisão válida com todas as edições recusadas por fato novo não vira "revisão não concluída"', async () => {
+    const callAI = vi.fn()
+      .mockResolvedValueOnce(rascunho())
+      .mockResolvedValueOnce({ edits: [{ slideIndex: 1, reason: 'mais concreto', subtitle: 'Feito em 2 horas, todos os dias.' }] });
+    const out = await generateReviewedCarousel({ prompt: 'Carrossel', config: cfg, aiOptions: {} }, callAI);
+    expect(out.reviewStatus).toBe('unchanged');
+    expect(out.result.slides[1].subtitle).toBe('Todos os pães usam fermentação natural.');
+  });
+});
+
+describe('MF-04/MF-12 — rotina inventada e nota de briefing em oração', () => {
+  const cfg = { count: 1, presetId: 'livre', densityId: '1_1', factualSource: 'Padaria de bairro. Funciona de terça a domingo, das 7h às 13h.' };
+  const um = text => ({ slides: [{ title: 'Pão', subtitle: text, bodyAfterImage: '' }] });
+  it.each(['Equipe pequena, pão feito à mão.', 'Pão fresco todos os dias.', 'Pão quentinho toda manhã.'])('marca rotina ou feitura sem fonte: %s', text => {
+    expect(auditDraftFactuality(um(text), cfg)).toContainEqual(expect.objectContaining({ category: 'rotina ou feitura sem fonte' }));
+  });
+  it('não marca quando o material informa', () => {
+    expect(auditDraftFactuality(um('Pão feito à mão.'), { ...cfg, factualSource: 'Todo pão é feito à mão.' })).toEqual([]);
+  });
+  it('remove só a oração da nota e preserva o restante do título', async () => {
+    const { stripBriefingNotes } = await import('../../src/utils/factual-grounding.js');
+    expect(stripBriefingNotes('Preços dos pães definidos; investimento da proposta não informado')).toBe('Preços dos pães definidos');
+    expect(stripBriefingNotes('Investimento não informado.')).toBe('');
+  });
+});
+
+describe('MF-04 — conta com preços informados não é preço inventado', () => {
+  const cfg = { count: 1, presetId: 'livre', densityId: '1_1', factualSource: 'Camponês: R$ 28. Brioche: R$ 36.' };
+  const um = text => ({ slides: [{ title: 'Resposta', subtitle: text, bodyAfterImage: '' }] });
+  it('aceita a soma de unidades dos preços do material', () => {
+    expect(auditDraftFactuality(um('Dois Camponês (R$ 56) e um Brioche: R$ 92.'), cfg)).toEqual([]);
+  });
+  it('continua marcando preço que não sai dos preços informados', () => {
+    expect(auditDraftFactuality(um('Combo por R$ 50.'), cfg)).toContainEqual(expect.objectContaining({ category: 'preço', claim: 'R$ 50' }));
+  });
+});

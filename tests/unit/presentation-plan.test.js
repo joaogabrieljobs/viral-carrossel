@@ -140,7 +140,10 @@ describe('avaliação determinística do contrato de planejamento', () => {
     const prompt = buildPresentationPlanPrompt({ brief: 'Tema', count: 8, presentationPath: path });
     expect(prompt).toContain(stage);
     expect(prompt).toContain(delivery);
-    expect(prompt).toContain('sem alocar por índice fixo');
+    // MF-11: cada posição recebe uma etapa do caminho, na ordem; o plano não
+    // escolhe livremente e o layout usa a mesma etapa.
+    expect(prompt).toContain('ROTEIRO POR POSIÇÃO — 8 slides');
+    expect(prompt).not.toContain('sem alocar por índice fixo');
   });
   it('retorna diagnósticos de campo sem IDs ou valores recebidos', () => {
     const input = plan(); input.evidence[0].id = 'PRIVATE_IDENTIFIER'; input.evidence[0].quote = 'PRIVATE_TEXT';

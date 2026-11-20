@@ -7,7 +7,7 @@ import { buildPresentationPlanBlock, attachPresentationPlan } from './presentati
 import { generatePresentationPlan, parsePresentationPlanResponse, presentationResponseMetadata } from './presentation-planning.js';
 import { buildPresentationBlocksPrompt, normalizePresentationBlocks } from './presentation-quality.js';
 import { requiresSocialTitles, recoverSocialTitle, recoverSocialTitleForEditing, missingSocialTitleIndexes, auditSocialTextDensity, buildSocialTextLimitsPrompt } from './social-generation.js';
-import { auditDraftFactuality, auditUnsupportedCommercialClaims, buildFactualGroundingPrompt } from './factual-grounding.js';
+import { auditDraftFactuality, auditUnsupportedCommercialClaims, buildFactualGroundingPrompt, buildReviewFactCheckPrompt } from './factual-grounding.js';
 export { auditUnsupportedCommercialClaims } from './factual-grounding.js';
 
 const isObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -270,6 +270,9 @@ export function validateCarouselDraft(rawDraft, { count, presetId, densityId, pr
     const titleConfig = { presetId, narrativeMode, densityId };
     const slide = pitch ? cleanPitchSlide(s)
       : requiresSocialTitles(titleConfig) ? recoverSocialTitle({ ...s }) : { ...s };
+    // "funcao" orienta a escrita card a card (roteiro do modo, MF-06); não é
+    // conteúdo do card e não vai para o projeto.
+    delete slide.funcao;
     if (presetId === 'apresentacao' && draft.presentationPlan && !String(slide.title || '').trim()) {
       throw Object.assign(new Error(`O slide ${index + 1} precisa de um título específico.`), { code: 'presentation_title_missing', field: 'title', slideIndex: index });
     }
@@ -337,7 +340,8 @@ export function buildEditorialReviewPrompt(prompt, draft, config = {}) {
 O briefing abaixo é referência, não um pedido para gerar o deck novamente.
 <briefing>\n${prompt}\n</briefing>
 <rascunho>\n${JSON.stringify(reviewDraft)}\n</rascunho>
-Verifique: promessa da capa entregue; caminho escolhido respeitado; uma ideia por slide; progressão sem repetição; títulos legíveis a distância; argumentos e exemplos sustentados pelo material; síntese e próximo passo coerentes.${limitsBlock}
+${buildReviewFactCheckPrompt()}
+Verifique também: promessa da capa entregue; caminho escolhido respeitado; uma ideia por slide; progressão sem repetição; títulos legíveis a distância; argumentos e exemplos sustentados pelo material; síntese e próximo passo coerentes.${limitsBlock}
 Leia todos os campos do rascunho, inclusive blocos nativos, speakerNotes e caption. Verifique fatos, estágio e condições em cada campo, não apenas no texto principal. Decisão pendente permanece pendente; aceite não autoriza deduzir encerramento contratual. Base, período e condições essenciais de indicadores e escopo devem estar visíveis no slide correspondente, não somente nas notas.
 Corrija apenas problemas identificados. Preserve ordem, quantidade, assunto, arco, números e fatos sustentados.${lessonRepair} Remova ou qualifique alegações sem apoio; não acrescente fontes ou fatos. Não altere imageQuery nem configuração visual.
 Use slideIndex começando em zero. Não envie edições para slides que já estejam bons. Cada índice aparece no máximo uma vez. ${buildPresentationReviewRules(config.presentationPath)}
@@ -361,7 +365,8 @@ O briefing abaixo é referência, não um pedido para gerar o carrossel novament
 <briefing>\n${prompt}\n</briefing>
 <rascunho>\n${JSON.stringify(draft)}\n</rascunho>
 ${buildFactualGroundingPrompt(config)}
-Verifique: promessa da capa entregue pelo miolo; slide 2 útil; progressão sem repetição; exemplos concretos; afirmações sustentadas pelo material; voz e densidade; legenda complementar; um CTA coerente com o objetivo; linguagem idiomática e natural. Corrija traduções literais, provérbios inventados, ditados combinados e metáforas ambíguas ou sem sentido.${titleRule}${claimsRule}${explicitScriptRule}
+${buildReviewFactCheckPrompt()}
+Verifique também: promessa da capa entregue pelo miolo; slide 2 útil; progressão sem repetição; exemplos concretos; afirmações sustentadas pelo material; voz e densidade; legenda complementar; um CTA coerente com o objetivo; linguagem idiomática e natural. Corrija traduções literais, provérbios inventados, ditados combinados e metáforas ambíguas ou sem sentido.${titleRule}${claimsRule}${explicitScriptRule}
 Corrija apenas problemas identificados. Preserve ordem, quantidade, assunto, arco, números e fatos sustentados. Remova ou qualifique alegações sem apoio; não acrescente fontes ou fatos. Não altere imageQuery, cultureTone, layout nem qualquer configuração visual.
 Use slideIndex começando em zero. Não envie edições para slides que já estejam bons. Cada índice aparece no máximo uma vez. Nunca preencha bodyAfterImage onde o layout exige vazio.
 Resposta: um único objeto JSON {"edits":[{"slideIndex":0,"reason":"problema concreto","title":"texto corrigido"}],"caption":"legenda corrigida apenas se necessário"}.
@@ -533,6 +538,43 @@ export async function generateReviewedCarousel({ prompt, config, aiOptions, onRe
   }
 }
 
+/**
+ * MF-04: uma única edição com campo fora do layout (ex.: corpo num card que
+ * não tem corpo) descartava a revisão inteira, e as correções de fatos da
+ * mesma resposta se perdiam ("Rascunho preservado"). Aqui o campo inválido sai
+ * e as demais edições seguem. Resposta sem nada aproveitável, índice repetido
+ * ou fora do formato continua inválida.
+ */
+function salvageSocialReview(draft, review, config) {
+  const value = unwrapEditorialReview(review);
+  if (!isObject(value) || !Array.isArray(value.edits)) return value;
+  const count = draft.slides.length;
+  const indexes = value.edits.map(edit => edit?.slideIndex);
+  if (new Set(indexes).size !== indexes.length) return value;
+  let dropped = 0;
+  const edits = [];
+  for (const edit of value.edits) {
+    if (!isObject(edit) || !Number.isInteger(edit.slideIndex) || edit.slideIndex < 0 || edit.slideIndex >= count
+        || typeof edit.reason !== 'string' || !edit.reason.trim()) { dropped += 1; continue; }
+    const clean = { slideIndex: edit.slideIndex, reason: edit.reason };
+    for (const field of ['title', 'subtitle', 'bodyAfterImage']) {
+      if (!hasOwn(edit, field)) continue;
+      if (typeof edit[field] !== 'string'
+          || (field === 'bodyAfterImage' && !bodyAllowed(edit.slideIndex, count, config.presetId, config.densityId))) { dropped += 1; continue; }
+      clean[field] = edit[field];
+    }
+    if (Object.keys(clean).length > 2) edits.push(clean);
+  }
+  const salvaged = { edits };
+  if (hasOwn(value, 'caption')) {
+    if (typeof value.caption === 'string') salvaged.caption = value.caption;
+    else dropped += 1;
+  }
+  // Nada aproveitável numa resposta com partes inválidas: revisão inválida.
+  if (dropped && !edits.length && !hasOwn(salvaged, 'caption')) return value;
+  return salvaged;
+}
+
 async function reviewSocialDraft({ prompt, draft, config, textOptions, onStage }, callAI) {
   let candidate = draft;
   let reviewResponded = false;
@@ -541,10 +583,13 @@ async function reviewSocialDraft({ prompt, draft, config, textOptions, onStage }
     const review = await callAI(buildEditorialReviewPrompt(prompt, draft, config), textOptions);
     throwIfGenerationCancelled(textOptions.signal);
     reviewResponded = true;
-    const proposed = applyEditorialReview(draft, review, config, { deferQualityChecks: true });
+    const proposed = applyEditorialReview(draft, salvageSocialReview(draft, review, config), config, { deferQualityChecks: true });
     const accepted = retainGroundedFields(proposed, draft, config);
     candidate = accepted.result;
-    reviewApplied = !accepted.rejected || JSON.stringify(candidate) !== JSON.stringify(draft);
+    // MF-04: uma revisão válida cujas edições foram todas recusadas por
+    // acrescentar fato sem fonte ainda conferiu o rascunho. Não é "revisão não
+    // concluída"; o rascunho segue para as auditorias como conferido.
+    reviewApplied = true;
   } catch (error) {
     if (isGenerationCancelled(error) || textOptions.signal?.aborted) throw error;
   }
@@ -780,28 +825,94 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
   onStage?.('reviewing');
   onReview?.();
   const reviewOptions = { ...textOptions, systemPrompt: PRESENTATION_REVIEW_SYSTEM_PROMPT };
-  const reviewPrompt = buildEditorialReviewPrompt(plannedReviewBriefing(config, planning, sources), draft, plannedConfig);
+  const briefing = plannedReviewBriefing(config, planning, sources);
+  const reviewPrompt = buildEditorialReviewPrompt(briefing, draft, plannedConfig);
+  const limitsFor = slides => (typeof config.presentationLimitsForPlan === 'function'
+    ? config.presentationLimitsForPlan(plan, slides) : plannedConfig.presentationTextLimits);
+  let review;
   try {
-    const review = await callAI(reviewPrompt, reviewOptions);
+    review = await callAI(reviewPrompt, reviewOptions);
     throwIfGenerationCancelled(aiOptions?.signal);
     const result = applyEditorialReview(draft, review, plannedConfig);
     return finish(result, JSON.stringify(result) === JSON.stringify(draft) ? 'unchanged' : 'revised');
   } catch (error) {
     if (isGenerationCancelled(error) || aiOptions?.signal?.aborted) throw error;
-    if (!violations.length) return finish(draft, 'unavailable');
-    // Never cut the end of a sentence to fit: it may contain a condition or risk.
-    // One semantic repair is limited to fields/slides known to exceed the layout.
-    const indexes = [...new Set(violations.map(item => item.slideIndex))];
-    onStage?.('repairing');
-    try {
-      const repair = await callAI(`${reviewPrompt}\nREPARO DIRECIONADO: edite somente os slides com slideIndex ${indexes.join(', ')}. Reescreva sem perder números, unidades, hipóteses ou condições. Transfira explicações complementares para speakerNotes, mantendo a conclusão compreensível na página. Não corte frases por caracteres.`, reviewOptions);
-      throwIfGenerationCancelled(aiOptions?.signal);
-      if (!Array.isArray(repair?.edits) || repair.edits.some(edit => !indexes.includes(edit?.slideIndex))) throw new Error('Reparo fora do escopo');
-      const result = applyEditorialReview(draft, repair, plannedConfig);
-      return finish(result, 'repaired');
-    } catch (repairError) {
-      if (isGenerationCancelled(repairError) || aiOptions?.signal?.aborted) throw repairError;
-      return finish(draft, 'needs_attention', { violations });
-    }
   }
+  // MF-04: a revisão era tudo-ou-nada. Se o texto revisado ainda passava do
+  // limite, as correções de fato da mesma resposta iam embora, o reparo
+  // partia do rascunho original e o deck saía como "Rascunho preservado".
+  // Agora a revisão válida é mantida e só o excesso é reparado.
+  const base = review === undefined ? draft : leniently(() => {
+    const reviewed = applyEditorialReview(draft, review, plannedConfig, { deferQualityChecks: true });
+    const claimSource = [plannedConfig.factualSource, plannedConfig.userInstructions].filter(Boolean).join('\n');
+    const before = new Set(auditUnsupportedCommercialClaims(draft.slides, claimSource).map(item => item.claim));
+    // Revisão que acrescenta promessa comercial não entra.
+    if (auditUnsupportedCommercialClaims(reviewed.slides, claimSource).some(item => !before.has(item.claim))) return draft;
+    return reviewed;
+  }, draft);
+  // Excesso de até 10% cabe pelo autoajuste do layout; a exportação ainda mede
+  // a página real (presentation-quality). Só o excesso maior pede reparo.
+  const overLimits = slides => auditPresentationTextLimits(slides, limitsFor(slides))
+    .filter(item => item.rule !== 'maxChars' || !(item.max > 0) || item.actual > item.max * 1.1);
+  let current = base;
+  let remaining = overLimits(current.slides);
+  if (!remaining.length) {
+    const same = JSON.stringify(current) === JSON.stringify(draft);
+    return finish(current, current === draft ? 'unavailable' : same ? 'unchanged' : 'revised');
+  }
+  // Never cut the end of a sentence to fit: it may contain a condition or risk.
+  // One semantic repair is limited to fields/slides known to exceed the layout.
+  const indexes = [...new Set(remaining.map(item => item.slideIndex))];
+  onStage?.('repairing');
+  try {
+    const repair = await callAI(`${buildEditorialReviewPrompt(briefing, current, plannedConfig)}\nREPARO DIRECIONADO: edite somente os slides com slideIndex ${indexes.join(', ')}. Reescreva sem perder números, unidades, hipóteses ou condições. Transfira explicações complementares para speakerNotes, mantendo a conclusão compreensível na página. Não corte frases por caracteres.`, reviewOptions);
+    throwIfGenerationCancelled(aiOptions?.signal);
+    if (!Array.isArray(repair?.edits) || repair.edits.some(edit => !indexes.includes(edit?.slideIndex))) throw new Error('Reparo fora do escopo');
+    const repaired = applyEditorialReview(current, repair, plannedConfig, { deferQualityChecks: true });
+    const left = overLimits(repaired.slides);
+    if (left.length < remaining.length) { current = repaired; remaining = left; }
+    if (!remaining.length) return finish(current, 'repaired');
+  } catch (repairError) {
+    if (isGenerationCancelled(repairError) || aiOptions?.signal?.aborted) throw repairError;
+  }
+  // Último recurso sem perder conteúdo: frases inteiras que excedem o apoio
+  // vão para as notas do apresentador. Título e frase única não são cortados.
+  const moved = moveOverflowToSpeakerNotes(current.slides, limitsFor(current.slides));
+  const afterMove = overLimits(moved.slides);
+  if (!afterMove.length) return finish({ ...current, slides: moved.slides }, 'fitted', { fits: moved.fits });
+  return finish(current, 'needs_attention', { violations: remaining });
+}
+
+function leniently(task, fallback) {
+  try { return task(); } catch { return fallback; }
+}
+
+/**
+ * Move frases inteiras do fim do apoio (subtitle/bodyAfterImage) para as
+ * notas do apresentador até caber. Nunca corta uma frase nem mexe no título.
+ */
+export function moveOverflowToSpeakerNotes(slides, limits) {
+  const normalized = normalizePresentationTextLimits(limits, slides.length);
+  const fits = [];
+  const next = slides.map((slide, slideIndex) => {
+    const copy = { ...slide };
+    for (const field of ['bodyAfterImage', 'subtitle']) {
+      const max = normalized[slideIndex]?.[field]?.maxChars;
+      const text = String(copy[field] || '').trim();
+      if (!max || text.length <= max) continue;
+      const sentences = text.split(/(?<=[.!?…])\s+/u);
+      const keep = [];
+      for (const sentence of sentences) {
+        if ([...keep, sentence].join(' ').length > max) break;
+        keep.push(sentence);
+      }
+      if (!keep.length) continue;
+      const rest = sentences.slice(keep.length).join(' ');
+      copy[field] = keep.join(' ');
+      copy.speakerNotes = [rest, String(copy.speakerNotes || '').trim()].filter(Boolean).join('\n\n');
+      fits.push({ slideIndex, field, max, movedToNotes: true });
+    }
+    return copy;
+  });
+  return { slides: next, fits };
 }

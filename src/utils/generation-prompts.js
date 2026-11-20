@@ -1473,7 +1473,7 @@ function buildGenerationJsonContract(presetId, densityId, count, projectDesignSc
     slide.bodyAfterImage = '';
   }
   return `Retorne um único objeto JSON com exatamente ${count} itens em slides, na ordem do arco, e caption como string.
-Use apenas os campos do modelo; todos os campos de texto são strings, nunca null, arrays ou objetos. As strings vazias do modelo indicam tipos, não conteúdo pronto.
+Use apenas os campos do modelo (e "funcao", se um ROTEIRO DO MODO pedir); todos os campos de texto são strings, nunca null, arrays ou objetos. As strings vazias do modelo indicam tipos, não conteúdo pronto.
 ${isPresentation
     ? isPitchPath(presentationPath)
       ? 'subtitle desenvolve o argumento; bodyAfterImage acrescenta evidência, exemplo, detalhe ou ressalva útil. Não inclua referências aos arquivos, ao manual ou ao processo de extração em nenhum campo.'

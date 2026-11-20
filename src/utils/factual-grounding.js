@@ -23,7 +23,9 @@ const TENS = { vinte: 20, trinta: 30, quarenta: 40, cinquenta: 50, sessenta: 60,
 const SINGLE = 'um|uma|dois|duas|tr[eê]s|quatro|cinco|seis|sete|oito|nove|one|two|three|four|five|six|seven|eight|nine';
 const COMPOUND = `(?:${Object.keys(TENS).join('|')})(?:\\s+e\\s+|[ -])(?:${SINGLE})`;
 const COUNT = `(?:\\d+(?:[.,]\\d+)?|${COMPOUND}|${SINGLE}|dez|vinte|trinta|cem|ten|hundred)`;
-const QUANTITY = new RegExp(`\\b${COUNT}\\s*(?:%|por cento|percent|vezes|vez|times?|anos?|years?|meses|m[eê]s|months?|semanas?|weeks?|dias?|days?|horas?|hours?|minutos?|minutes?|segundos?|seconds?|cliques?|clicks?|toques?|taps?|clientes?|customers?|patients?|pacientes?)\\b`, 'giu');
+// Quantidade e unidade na mesma linha: numa tabela, "41.200" seguido da
+// célula "Ano" não é a alegação "41.200 anos" (MF-04).
+const QUANTITY = new RegExp(`\\b${COUNT}[^\\S\\n]*(?:%|por cento|percent|vezes|vez|times?|anos?|years?|meses|m[eê]s|months?|semanas?|weeks?|dias?|days?|horas?|hours?|minutos?|minutes?|segundos?|seconds?|cliques?|clicks?|toques?|taps?|clientes?|customers?|patients?|pacientes?)\\b`, 'giu');
 // Percent signs have no word boundary after them; keep that alternative apart.
 const PERCENTAGE = /\b\d+(?:[.,]\d+)?\s*%/gu;
 const UNIT_ALIASES = [
@@ -42,9 +44,47 @@ const canonicalQuantity = text => {
   for (const [pattern, replacement] of UNIT_ALIASES) value = value.replace(pattern, replacement);
   return value.replace(/\s+/g, '').replace(',', '.');
 };
-const quantityKeys = text => new Set([...String(text).matchAll(QUANTITY), ...String(text).matchAll(PERCENTAGE)].map(match => canonicalQuantity(match[0])));
+const WEEKDAYS = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+const WEEKDAYS_EN = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+const dayIndex = word => {
+  const w = String(word).replace(/-feira$|s$/, '');
+  const pt = WEEKDAYS.indexOf(w);
+  return pt >= 0 ? pt : WEEKDAYS_EN.indexOf(w);
+};
+const DAY = '(segunda|terca|quarta|quinta|sexta|sabado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:-feira)?s?';
+const DAY_RANGE = new RegExp(`\\b${DAY}\\s+(?:a|ate|to|through|-)\\s+${DAY}\\b`, 'g');
+const HOUR_RANGE = /\b(\d{1,2})\s*(?:h|:00|horas?)\s*(?:as|a|ate|to|-)\s*(\d{1,2})\s*(?:h|:00|horas?)?\b/g;
 
-const ABSOLUTES = /\b(?:a maioria (?:das pessoas|dos (?:clientes|acessos|consumidores))|most (?:people|customers|visitors)|unicos? argumentos? que convertem|adaptacao perfeita|friccao zero|friction.free|vai (?:aumentar|converter|garantir)|(?:desiste e )?vai para o concorrente|site desatualizado e pior que nenhum)\b/giu;
+/**
+ * Contagens que decorrem diretamente do material (MF-04): "terça a domingo"
+ * sustenta "seis dias"; "das 7h às 13h" sustenta "seis horas". Aritmética
+ * sobre um intervalo informado não é dado novo.
+ */
+function derivedQuantityKeys(text) {
+  const t = normalize(text);
+  const keys = [];
+  for (const [, from, to] of t.matchAll(DAY_RANGE)) {
+    const a = dayIndex(from); const b = dayIndex(to);
+    if (a >= 0 && b >= 0) keys.push(`${((b - a + 7) % 7) + 1}days`);
+  }
+  for (const [, from, to] of t.matchAll(HOUR_RANGE)) {
+    const diff = Number(to) - Number(from);
+    if (diff > 0 && diff < 24) keys.push(`${diff}hours`);
+  }
+  return keys;
+}
+const quantityKeys = text => new Set([
+  ...[...String(text).matchAll(QUANTITY), ...String(text).matchAll(PERCENTAGE)].map(match => canonicalQuantity(match[0])),
+  ...derivedQuantityKeys(text),
+]);
+
+// "A maioria dos pães industrializados..." generaliza sobre terceiros sem
+// fonte (MF-04); qualquer "a maioria de/das/dos" precisa estar no material.
+const ABSOLUTES = /\b(?:a maioria d(?:e|as|os) [a-z]+|most (?:people|customers|visitors|[a-z]+ (?:brands|companies|bakeries|stores))|unicos? argumentos? que convertem|adaptacao perfeita|friccao zero|friction.free|vai (?:aumentar|converter|garantir)|(?:desiste e )?vai para o concorrente|site desatualizado e pior que nenhum)\b/giu;
+// Rotina e feitura que o material não informa: o QA viu passar "à mão,
+// todos os dias" e "pão fresco toda manhã" (MF-04). Só vale quando o material
+// não traz a expressão.
+const ROUTINES = /\b(?:feit[oa]s? a mao|a mao|todos os dias|todo dia|toda manha|todas as manhas|diariamente|producao diaria|quentinh[oa]s?|fresquinh[oa]s?|saindo do forno|recem-said[oa]s? do forno)\b/gu;
 const CHANNELS = /\b(?:whatsapp|DM|direct|coment[aá]rios|agendamento|agende (?:uma )?consulta|patients?|pacientes?)\b/giu;
 const CONDITIONAL = /\b(?:pode|podem|poderia|talvez|se (?:voce|sua|seu|ja)|por exemplo|uma opcao|may|might|could|if (?:you|your)|for example|an option)\b/;
 const negatedGuarantee = (text, index) => /\b(?:nao|nem|no|not|never|without)\b(?:\s+[\p{L}]+){0,4}\s*$/u.test(normalize(text.slice(0, index).split(/[.!?;\n]/u).pop()));
@@ -81,6 +121,33 @@ export function auditUnsupportedCommercialClaims(slides, source) {
   return violations;
 }
 
+const moneyValue = text => {
+  const digits = String(text).replace(/^[^\d]*/, '').replace(/\.(?=\d{3}\b)/g, '').replace(',', '.');
+  const value = Number.parseFloat(digits);
+  return Number.isFinite(value) ? value : null;
+};
+const sourcePrices = text => [...new Set([...String(text).matchAll(/(?:R\$|US\$|\$|€)\s*\d(?:[\d.,]*\d)?/gu)]
+  .map(match => moneyValue(match[0])).filter(value => value > 0))].slice(0, 6);
+
+/**
+ * Conta com os preços informados (resposta-modelo de Aula: 2 × R$ 28 + R$ 36
+ * = R$ 92) não é preço inventado. Aceita somas de até 4 unidades de cada
+ * preço do material; qualquer outro valor continua sem fonte.
+ */
+function derivedPrice(claim, prices) {
+  const target = moneyValue(claim);
+  if (target == null || !prices.length) return false;
+  const walk = (index, total) => {
+    if (Math.abs(total - target) < 0.005) return true;
+    if (index >= prices.length || total > target) return false;
+    for (let units = 0; units <= 4; units += 1) {
+      if (walk(index + 1, total + units * prices[index])) return true;
+    }
+    return false;
+  };
+  return walk(0, 0);
+}
+
 export function auditDraftFactuality(draft, config = {}) {
   // Never treat the fully expanded generation prompt (examples, templates,
   // narrative recipes) as evidence. Callers pass raw user material explicitly.
@@ -92,6 +159,7 @@ export function auditDraftFactuality(draft, config = {}) {
   const sourceText = normalize(evidence);
   const quantities = quantityKeys(evidence);
   const channels = new Set([...evidence.matchAll(CHANNELS)].map(match => normalize(match[0])));
+  const prices = sourcePrices(evidence);
   const violations = [];
   for (const { slideIndex, field, text } of textFields(draft)) {
     const add = (category, claim) => {
@@ -104,6 +172,7 @@ export function auditDraftFactuality(draft, config = {}) {
         const claim = match[0].trim();
         if (rule.category === 'garantia' && negatedGuarantee(text, match.index)) continue;
         if (rule.category === 'item incluso' && (negatedInclusion(text, match.index) || inclusionWithoutItem(claim))) continue;
+        if (rule.category === 'preço' && derivedPrice(claim, prices)) continue;
         if (!sourceText.includes(normalize(claim))) add(rule.category, claim);
       }
     }
@@ -114,6 +183,9 @@ export function auditDraftFactuality(draft, config = {}) {
       const normalized = normalize(sentence);
       for (const match of normalized.matchAll(ABSOLUTES)) {
         if (!sourceText.includes(match[0]) && !CONDITIONAL.test(normalized)) add('afirmação absoluta', sentence.trim());
+      }
+      for (const match of normalized.matchAll(ROUTINES)) {
+        if (!sourceText.includes(match[0]) && !CONDITIONAL.test(normalized)) add('rotina ou feitura sem fonte', match[0]);
       }
       for (const match of sentence.matchAll(CHANNELS)) {
         if (!channels.has(normalize(match[0])) && !CONDITIONAL.test(normalized)) add('canal ou serviço não informado', match[0]);
@@ -139,6 +211,26 @@ O CTA usa a ação pedida. Não acrescente canal, recompensa ou condição comer
 }
 
 /**
+ * Checagem de fatos da revisão (MF-04). A revisão lia o pedido inteiro e se
+ * ocupava de tamanho e clareza; invenções plausíveis passavam ("à mão, todos
+ * os dias", "volta do trabalho" com loja que fecha às 13h, "seis mãos" para 6
+ * funcionários). A conferência frase a frase vem antes das outras correções e
+ * nomeia os tipos de detalhe que costumam escapar.
+ */
+export function buildReviewFactCheckPrompt() {
+  return `CHECAGEM DE FATOS — faça antes de qualquer outra correção.
+Leia cada frase do rascunho, inclusive títulos, blocos e legenda, e confira no material: a frase está nele ou decorre dele por conta direta (terça a domingo = seis dias)? Se não, reescreva sem o detalhe ou remova a frase. Saem, quando o material não os traz:
+- características de produto ou serviço: ingredientes, textura, sabor, durabilidade, uso, combinações, "artesanal", "feito à mão";
+- rotina e frequência: "todos os dias", "toda manhã", "na hora", "quentinho", "sai do forno às";
+- motivo ou intenção atribuídos: por que fecha, por que demora, para que serve;
+- comparação com terceiros ou com o que não se faz ("sem fermento industrial", "nada de produção em escala");
+- reação, sensação ou benefício do cliente apresentado como fato;
+- conveniência que contradiz um fato (ex.: "na volta do trabalho" para loja que fecha às 13h; "retire quando quiser" com horário definido);
+- número reinterpretado ("seis mãos" para 6 funcionários).
+Corrija também erros de digitação e palavras inexistentes. Uma frase verdadeira e simples vale mais que um detalhe específico inventado. Ao corrigir, mantenha a função do card no arco.`;
+}
+
+/**
  * Observação interna do modelo sobre o próprio pedido ("o número de WhatsApp
  * não foi informado", "o briefing não traz o endereço"). É anotação de
  * bastidor: nunca pode sair no card ou slide do cliente (MF-12).
@@ -150,11 +242,21 @@ export function isBriefingNote(sentence) {
 }
 
 /** Remove frases inteiras que comentam o briefing. Preserva o resto do texto. */
+// "Preços definidos; investimento não informado" (título de Proposta, reteste
+// 20/11): só a oração da nota sai, o resto do título fica.
+function dropNoteClauses(sentence) {
+  if (!isBriefingNote(sentence) || !/[;:]/.test(sentence)) return sentence;
+  const kept = sentence.split(/\s*[;:]\s*/u).filter(clause => clause && !isBriefingNote(clause));
+  if (!kept.length) return '';
+  const joined = kept.join('; ');
+  return /[.!?…]$/u.test(sentence) && !/[.!?…]$/u.test(joined) ? `${joined}.` : joined;
+}
+
 export function stripBriefingNotes(text) {
   if (typeof text !== 'string' || !text || !isBriefingNote(text)) return text;
   return text
     .split(/\n/)
-    .map(line => line.split(/(?<=[.!?…])\s+/u).filter(sentence => !isBriefingNote(sentence)).join(' '))
+    .map(line => line.split(/(?<=[.!?…])\s+/u).map(dropNoteClauses).filter(sentence => sentence && !isBriefingNote(sentence)).join(' '))
     .filter((line, index, lines) => line.trim() || (index > 0 && index < lines.length - 1 && lines[index - 1].trim()))
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')

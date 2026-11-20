@@ -470,3 +470,24 @@ describe('geração com uma revisão editorial', () => {
     )).not.toThrow();
   });
 });
+
+// MF-04: uma edição com corpo num card sem corpo descartava a revisão inteira,
+// inclusive as correções de fatos da mesma resposta.
+describe('revisão de carrossel aproveita as edições válidas', () => {
+  const cfg = { count: 3, presetId: 'livre', densityId: '1_2' };
+  const rascunho = () => ({ caption: 'Legenda', slides: [
+    { title: 'Capa', subtitle: 'Abre', imageQuery: 'one' },
+    { title: 'Meio', subtitle: 'O fermento quebra açúcares.', imageQuery: 'two' },
+    { title: 'Fecho', subtitle: 'Encomende', imageQuery: 'three' },
+  ] });
+  it('descarta só o campo fora do layout e aplica a correção de fato', async () => {
+    const ai = vi.fn().mockResolvedValueOnce(rascunho()).mockResolvedValueOnce({ edits: [
+      { slideIndex: 0, reason: 'layout', bodyAfterImage: 'Não cabe' },
+      { slideIndex: 1, reason: 'fato sem fonte', subtitle: 'O processo leva tempo.' },
+    ] });
+    const out = await generateReviewedCarousel({ prompt: '', config: cfg }, ai);
+    expect(out.reviewStatus).toBe('revised');
+    expect(out.result.slides[1].subtitle).toBe('O processo leva tempo.');
+    expect(out.result.slides[0].bodyAfterImage ?? '').toBe('');
+  });
+});

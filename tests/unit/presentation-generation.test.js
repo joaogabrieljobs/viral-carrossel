@@ -411,3 +411,42 @@ describe('apresentação planejada e revisada', () => {
     expect(flagged.violations).toContainEqual(expect.objectContaining({ field: 'title', claim: '90%', kind: 'factual' }));
   });
 });
+
+// MF-04: 6 de 7 apresentações saíam como "Rascunho preservado". A revisão era
+// tudo-ou-nada: texto ainda acima do limite descartava as correções de fato.
+describe('MF-04 — revisão de apresentação mantém as correções', () => {
+  it('mantém a correção de fato da revisão e repara só o excesso a partir do texto revisado', async () => {
+    const limits = [{ title: { maxChars: 18 } }];
+    const ai = vi.fn().mockResolvedValueOnce(plan()).mockResolvedValueOnce(draft())
+      .mockResolvedValueOnce({ edits: [{ slideIndex: 2, reason: 'fato sem fonte', subtitle: 'A próxima validação é o piloto pago.' }] })
+      .mockResolvedValueOnce({ edits: [{ slideIndex: 0, reason: 'caber', title: 'Histórico contínuo' }] });
+    const output = await generateReviewedCarousel({ prompt: '', config: config({ presentationTextLimits: limits }) }, ai);
+    expect(output.reviewStatus).toBe('repaired');
+    expect(output.result.slides[2].subtitle).toBe('A próxima validação é o piloto pago.');
+    expect(output.result.slides[0].title).toBe('Histórico contínuo');
+    expect(ai.mock.calls[3][0]).toContain('A próxima validação é o piloto pago.');
+  });
+
+  it('sem reparo, move frases inteiras excedentes para as notas em vez de cortar', async () => {
+    const first = draft();
+    first.slides[2].subtitle = 'A próxima validação depende de escopo. O preço ainda será definido.';
+    const limits = [{}, {}, { subtitle: { maxChars: 40 } }];
+    const ai = vi.fn().mockResolvedValueOnce(plan()).mockResolvedValueOnce(first)
+      .mockResolvedValueOnce({ edits: [] }).mockRejectedValueOnce(new Error('reparo indisponível'));
+    const output = await generateReviewedCarousel({ prompt: '', config: config({ presentationTextLimits: limits }) }, ai);
+    expect(output.reviewStatus).toBe('fitted');
+    expect(output.result.slides[2].subtitle).toBe('A próxima validação depende de escopo.');
+    expect(output.result.slides[2].speakerNotes).toContain('O preço ainda será definido.');
+  });
+});
+
+describe('MF-04 — excesso mínimo não vira rascunho preservado', () => {
+  it('1 caractere acima do limite cabe pelo autoajuste: sem reparo nem aviso', async () => {
+    const first = draft();
+    first.slides[2].subtitle = 'x'.repeat(41);
+    const ai = vi.fn().mockResolvedValueOnce(plan()).mockResolvedValueOnce(first).mockResolvedValueOnce({ edits: [] });
+    const output = await generateReviewedCarousel({ prompt: '', config: config({ presentationTextLimits: [{}, {}, { subtitle: { maxChars: 40 } }] }) }, ai);
+    expect(ai).toHaveBeenCalledTimes(3);
+    expect(output.reviewStatus).toBe('unchanged');
+  });
+});

@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import * as prompts from '../../src/utils/generation-prompts.js';
 import { buildGenerationTaskBlock } from '../../src/utils/style-kit.js';
 import { buildEditorialStrategyBlock } from '../../src/utils/editorial-strategy.js';
+import { buildNarrativeModeSequence } from '../../src/utils/narrative-sequence.js';
 import { buildPresentationDesignSystemPromptBlock } from '../../src/styles/presentation-presets.jsx';
 
 const src = readFileSync(
@@ -67,6 +68,7 @@ function assembledPrompt(cp, density = '1_1', count = 7, performanceGuidance = {
     langLayer: prompts.buildGenerationLanguageLayer(cp, 'próximo', 'editorial'),
     imageLayer: prompts.buildGenerationImageLayer(cp, 'Reuniões sem pauta', '', ''),
     explicitCardScriptBlock: '',
+    modeSequenceBlock: cp === 'livre' ? buildNarrativeModeSequence('editorial', cp, count) : '',
     jsonShapeLine: prompts.buildGenerationJsonContract(cp, density, count),
   };
   return new Function(...Object.keys(context), `return ${literal};`)(...Object.values(context));

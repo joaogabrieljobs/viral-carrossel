@@ -21,6 +21,7 @@ import {
   sanitizeCustomVisualPresetSlideDefaults,
 } from './custom-visual-presets.js';
 import { resolvePresentationVisualRole } from './presentation-composition.js';
+import { presentationRoadmap } from './presentation-roadmap.js';
 
 export const DEFAULT_CAROUSEL_VISUAL_PRESET_ID = 'minimal_clean';
 
@@ -39,8 +40,10 @@ export function presentationStageAt(pathId, index, count) {
   const stages = getPresentationPath(pathId).stages || [];
   if (!stages.length) return {};
   if (stages.length === 1 || count <= 1) return stages[0];
-  const stageIndex = Math.round((index * (stages.length - 1)) / (count - 1));
-  return stages[Math.max(0, Math.min(stages.length - 1, stageIndex))] || stages[0];
+  // Mesma etapa que o plano recebeu para esta posição (MF-11): texto e
+  // composição seguem o mesmo roteiro.
+  const roadmap = presentationRoadmap(pathId, count);
+  return roadmap[Math.max(0, Math.min(roadmap.length - 1, Math.round(index)))] || stages[0];
 }
 
 function applyResolvedPresentationPresetToSlide(slide, preset, normalizedPath, index, count) {

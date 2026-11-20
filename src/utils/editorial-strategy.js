@@ -91,12 +91,19 @@ ${structure ? `Ação final: ${structure.cta}` : 'Escolha uma única ação fina
 Preserve a promessa já feita e o modo/pacote escolhido; objetivo não autoriza novos fatos ou oferta inventada.`;
 }
 
-export function buildEditorialStrategyBlock(value, presetId = 'livre', preferredStructureId = null) {
+export function buildEditorialStrategyBlock(value, presetId = 'livre', preferredStructureId = null, { narrativeMode = null } = {}) {
   const id = normalizeContentObjective(value);
-  const candidates = id === 'auto' ? EDITORIAL_STRUCTURES : EDITORIAL_STRUCTURES.filter(s => s.objective === id || s.id === preferredStructureId);
+  // MF-06: no objetivo automático, seis arcos alternativos competiam com o
+  // roteiro do modo e a IA caía na ordem dos fatos do briefing. Com um modo
+  // escolhido, o arco é do modo; a biblioteca só entra com objetivo explícito.
+  const modeOwnsArc = id === 'auto' && presetId === 'livre' && !!narrativeMode && narrativeMode !== 'none';
+  const candidates = modeOwnsArc ? [] : id === 'auto' ? EDITORIAL_STRUCTURES : EDITORIAL_STRUCTURES.filter(s => s.objective === id || s.id === preferredStructureId);
+  const library = candidates.length
+    ? `BIBLIOTECA EDITORIAL (${EDITORIAL_LIBRARY_VERSION}; hipóteses de escrita, sem garantia de desempenho):
+${candidates.map(s => `- ${s.label}: ${s.arc}. Use quando: ${s.useWhen} Evite quando: ${s.avoidWhen} Exemplo ilustrativo, não copie: "${s.example}".`).join('\n')}`
+    : 'O arco vem do ROTEIRO DO MODO deste pedido; use o objetivo só para escolher argumento, exemplo e CTA.';
   return `${buildContentObjectiveReminder(id)}
-BIBLIOTECA EDITORIAL (${EDITORIAL_LIBRARY_VERSION}; hipóteses de escrita, sem garantia de desempenho):
-${candidates.map(s => `- ${s.label}: ${s.arc}. Use quando: ${s.useWhen} Evite quando: ${s.avoidWhen} Exemplo ilustrativo, não copie: "${s.example}".`).join('\n')}
+${library}
 ${presetId === 'livre'
     ? 'O modo narrativo define a forma (cena, tutorial, análise); use a estrutura como funções adaptáveis dentro dele, sem trocar o modo.'
     : 'O pacote ativo mantém seu arco e layout. Use o objetivo para selecionar argumento, exemplo e CTA; não sobreponha um segundo arco.'}

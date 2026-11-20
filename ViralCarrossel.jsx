@@ -94,6 +94,7 @@ import { VISUAL_PRESETS, applyVisualPreset, getSlideOverridesForPreset, PRESET_B
 import { recommendedGenerationVisualPreset } from './src/utils/generation-visual-choice.js';
 import { applySocialVisualComposition, isFlattenedSocialSlide, restoreSocialCompositionTypography, restyleSocialSlides, usesSocialLibrary } from './src/utils/social-visual-composition.js';
 import { buildSocialSequencePrompt } from './src/utils/social-sequence.js';
+import { buildNarrativeModeSequence } from './src/utils/narrative-sequence.js';
 import { socialFamilyFor } from './src/utils/social-families.js';
 import { propagateBrandTypography } from './src/utils/brand-typography.js';
 import { imageAspectRatioForSlide } from './shared/image-aspect.js';
@@ -5569,6 +5570,11 @@ Não invente garantia, prazo, preço, item incluso ou promessa comercial que nã
       ? `TAREFA: transforme o tema e as fontes em um deck pronto para apresentar. Cada slide deve avançar o caminho escolhido, sustentar uma única ideia e funcionar em uma tela 16:9. A conclusão deve deixar clara a decisão, aprendizagem ou próxima ação.`
       : buildGenerationTaskBlock(topic, announcement);
     const explicitCardScriptBlock = buildExplicitCardScriptPrompt(explicitCardScript);
+    // MF-06: o arco do modo vira uma função por card. Roteiro do usuário e
+    // anúncio sem modo escolhido mantêm a estrutura própria.
+    const modeSequenceBlock = explicitCardScript || (announcement && !chosenNarrativeMode)
+      ? ''
+      : buildNarrativeModeSequence(effectiveMode, cp, count);
 
     const prompt = `${introLine}
 ${hasPromptMaterial ? `${materialBlock}${materialPriorityBlock}` : ''}${deliveryLine}
@@ -5579,7 +5585,7 @@ ${generationTaskBlock}
 ${explicitCardScriptBlock}
 ${idiomaRegra}
 
-${effectiveMode === 'none' || isPresentationGeneration ? '' : buildEditorialStrategyBlock(objective, cp, performanceGuidance.preferredStructureId)}
+${effectiveMode === 'none' || isPresentationGeneration ? '' : buildEditorialStrategyBlock(objective, cp, performanceGuidance.preferredStructureId, { narrativeMode: modeSequenceBlock ? effectiveMode : null })}
 ${effectiveMode === 'none' || isPresentationGeneration ? '' : performanceGuidance.prompt}
 
 ${modoNarrativoBloco}
@@ -5599,6 +5605,7 @@ ${remixBlock}
 
 ${buildCaptionOutlineInstructions(effectiveMode, cp)}
 ${buildCaptionVoiceRules(cp, effectiveMode)}
+${modeSequenceBlock}
 
 JSON exato a retornar (sem mais nada):
 ${jsonShapeLine}`;

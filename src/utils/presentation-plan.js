@@ -1,6 +1,7 @@
 /** Intermediate editorial contract. Provenance checks establish traceability, not factual truth. */
 import { getPresentationPath } from './presentation.js';
 import { presentationPlanningForRoute } from './presentation-content.js';
+import { buildPresentationRoadmapPrompt } from './presentation-roadmap.js';
 export const PRESENTATION_PLAN_SCHEMA_VERSION = 1;
 export const PRESENTATION_PLAN_PROMPT_VERSION = 'presentation-plan-v1';
 // One ceiling shared by the request and prompt. Compact output, rather than a
@@ -18,15 +19,13 @@ export function buildPresentationPlanPrompt({ brief = '', userInstructions = '',
   const sourceBlock = safeSources(sources).map(source => ({ id: source.id, title: source.title || '', excerpts: Array.isArray(source.chunks) && source.chunks.length ? source.chunks.map(chunk => chunk.text) : [source.text] }));
   const briefText = typeof brief === 'string' ? brief : JSON.stringify(brief);
   const route = getPresentationPath(presentationPath);
-  const stages = route.stages.map(stage => `- ${stage.label}: ${stage.instruction}${stage.optionalWhenMissing ? ' Esta etapa depende de dados próprios: omita se não houver base.' : ''}`).join('\n');
   return `PLANEJAMENTO ESTRUTURADO DA APRESENTAÇÃO — ${PRESENTATION_PLAN_PROMPT_VERSION}
 Esta é uma etapa anterior à redação: construa o argumento completo e a função de cada posição. Não escreva os textos finais nem exponha raciocínio interno. O plano deve ser um artefato editorial objetivo.
 Caminho solicitado: ${String(presentationPath).slice(0, 80)}. Quantidade EXATA: ${count} slides, index de 1 até ${count}, em ordem.
 
 INTENÇÃO DE ${route.label.toUpperCase()}: ${route.intent}
 Uso: ${route.deliveryMode === 'live' ? 'apresentação ao vivo; preserve ritmo, exemplos e apoio à fala' : route.deliveryMode === 'leave-behind' ? 'leitura autônoma; o argumento precisa ser compreendido sem apresentador' : 'ajuste a profundidade ao uso informado no briefing'}.
-ETAPAS EDITORIAIS DESTE CAMINHO (funções a adaptar ao material, sem alocar por índice fixo nem exigir uma página para cada):
-${stages}
+${buildPresentationRoadmapPrompt(presentationPath, count)}
 
 ${presentationPlanningForRoute(route)}
 
