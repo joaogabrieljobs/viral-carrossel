@@ -13,7 +13,7 @@ import {
   resolvePresentationCompositionKind,
   resolvePresentationVisualRole,
 } from '../utils/presentation-composition.js';
-import { applyVisualPreset, getSlideOverridesForPreset } from './visual-presets.jsx';
+import { applyVisualPreset, getSlideOverridesForPreset, renderStyleThumbnail } from './visual-presets.jsx';
 import {
   GENERATED_PRESENTATION_COMPOSITIONS,
   GENERATED_PRESENTATION_PATTERNS,
@@ -872,6 +872,8 @@ export function renderPresentationPresetPreview(presetOrId, svgStyle = {}) {
   const p = presetOrId && typeof presetOrId === 'object'
     ? presetOrId
     : getPresentationVisualPreset(presetOrId);
+  const thumb = renderStyleThumbnail(p, svgStyle);
+  if (thumb) return thumb;
   const b = p?.brand || getPresentationVisualPreset().brand;
   const variant = p?.previewVariant || 'split';
   const title = b.titleColor || '#ffffff';

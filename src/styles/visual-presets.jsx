@@ -29,6 +29,7 @@
 
 import React from 'react';
 import { clampTitleWeight } from '../utils/slide-design-system.js';
+import { STYLE_THUMBNAILS } from './style-thumbnails.generated.js';
 import { SOCIAL_FAMILIES, SOCIAL_FAMILY_KEYS, LEGACY_SOCIAL_STYLE_FAMILY, socialCardLayout } from '../utils/social-families.js';
 
 // Índices em TITLE_FONTS e BODY_FONTS (referência rápida — ver ViralCarrossel.jsx)
@@ -78,7 +79,31 @@ function PreviewCard({ bg, children, style, gradId = 'vcPreviewWash' }) {
  * Gerador único de preview a partir dos campos do preset.
  * Mini-card 4:5 com assinatura visual (header, badge, título, pill…).
  */
+/**
+ * Miniatura fotografada do renderer real (scripts/build-style-thumbnails.mjs).
+ * Só para os estilos do catálogo: padrão personalizado tem cores próprias e
+ * continua com o desenho vetorial.
+ */
+export function renderStyleThumbnail(preset, style = {}) {
+  const src = preset && !preset.isCustom ? STYLE_THUMBNAILS[preset.id] : null;
+  if (!src) return null;
+  return (
+    <img
+      src={src}
+      alt=""
+      aria-hidden="true"
+      loading="lazy"
+      decoding="async"
+      draggable={false}
+      data-style-thumb={preset.id}
+      style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover', ...style }}
+    />
+  );
+}
+
 export function renderPresetPreview(preset, svgStyle = {}) {
+  const thumb = renderStyleThumbnail(preset, svgStyle);
+  if (thumb) return thumb;
   if (preset?.socialFamily && SOCIAL_FAMILIES[preset.socialFamily] && preset.id === SOCIAL_FAMILIES[preset.socialFamily].presetId) {
     return renderSocialFamilyPreview(preset, svgStyle);
   }

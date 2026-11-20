@@ -96,7 +96,9 @@ describe('padrões visuais de apresentação', () => {
   });
 
   it('renderiza preview SVG em viewBox 16:9', () => {
-    const preview = renderPresentationPresetPreview('pitch');
+    // Estilos do catálogo usam a miniatura fotografada (tests/unit/style-thumbnails.test.js);
+    // o desenho vetorial continua valendo para padrão personalizado.
+    const preview = renderPresentationPresetPreview({ ...getPresentationVisualPreset('pitch'), isCustom: true });
     expect(preview.type).toBe('svg');
     expect(preview.props.viewBox).toBe('0 0 160 90');
     expect(preview.props['aria-hidden']).toBe('true');

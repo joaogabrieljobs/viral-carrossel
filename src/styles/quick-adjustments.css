@@ -41,6 +41,9 @@
 .vc-quick-adjustments-preview svg { width: auto !important; max-width: 100%; height: 100% !important; }
 .vc-quick-adjustments-preview.is-presentation { height: 62px; padding: 0; }
 .vc-quick-adjustments-preview.is-presentation svg { width: 100% !important; }
+/* Miniatura fotografada do renderer real (scripts/build-style-thumbnails.mjs). */
+.vc-quick-adjustments-preview img[data-style-thumb] { width: auto !important; height: 100% !important; aspect-ratio: 4 / 5; border-radius: 4px; }
+.vc-quick-adjustments-preview.is-presentation img[data-style-thumb] { width: 100% !important; aspect-ratio: 16 / 9; border-radius: 0; }
 .vc-quick-adjustments-preset-name { display: grid; gap: 1px; min-height: 38px; padding: 7px 8px; font-size: 12px; line-height: 1.25; font-weight: 550; overflow-wrap: anywhere; }
 .vc-quick-adjustments-preset-name small { font-size: 10px; color: var(--text-muted); font-weight: 400; }
 .vc-quick-adjustments-selected { position: absolute; top: 5px; right: 5px; background: var(--accent, #8b7cff); color: var(--accent-text, #101018); border-radius: 50%; padding: 2px; width: 19px; height: 19px; }
