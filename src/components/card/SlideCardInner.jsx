@@ -2183,8 +2183,18 @@ const SlideCardInner = React.forwardRef(({
   // Tinta automática acompanha o fundo. Cor marcada neste card continua a escolha da pessoa.
   const titleFallback = photoInk ? '#ffffff' : readableInks.titleInk;
   const bodyFallback = photoInk ? '#f5f5f7' : readableInks.bodyInk;
-  displayTitleInk = slide.titleColor || inkIfReadable(displayTitleInk, inkSurface, titleFallback, 3);
-  const displaySubtitleInk = slide.subtitleColor || inkIfReadable(
+  // Composição da biblioteca que pôs texto claro esperando uma foto atrás: sem
+  // a foto (texto primeiro, imagem falhou ou removida), o título claro sumia no
+  // fundo creme (MF-15). Sem foto à vista, a cor gravada só vale se ler bem.
+  const composedForPhoto = (slide.presentationArtDirectionVersion === 2 || slide.socialCompositionVersion >= 4)
+    && (!slide.bgImage || imgErr) && !photoInk;
+  const surfaceRgb = vcHexToRgb(vcNormalizeHex(inkSurface) || '#fafafc');
+  const plainInk = surfaceRgb && vcRelLuminance01(surfaceRgb) > 0.18 ? '#141414' : '#f7f5f0';
+  const savedInk = (color, fallback) => (color && composedForPhoto
+    ? inkIfReadable(color, inkSurface, inkIfReadable(fallback, inkSurface, plainInk, 4.5), 4.5)
+    : color);
+  displayTitleInk = savedInk(slide.titleColor, readableInks.titleInk) || inkIfReadable(displayTitleInk, inkSurface, titleFallback, 3);
+  const displaySubtitleInk = savedInk(slide.subtitleColor, readableInks.subtitleInk) || inkIfReadable(
     displayBodyInk,
     inkSurface,
     photoInk ? '#f5f5f7' : readableInks.subtitleInk,
