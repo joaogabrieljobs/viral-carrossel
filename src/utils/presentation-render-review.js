@@ -158,3 +158,31 @@ Cada edição exige slideIndex e reason, e só pode incluir os campos alterados:
     return unavailable();
   }
 }
+
+/**
+ * Último passo determinístico quando o slide renderizado ainda excede a área
+ * (lote B 21/11: capas do Cinemático e do Fotográfico barravam o PDF depois
+ * de o reparo por IA não responder). Nada é apagado: a linha de apoio e, num
+ * segundo passo, a última frase do subtítulo vão para as notas do
+ * apresentador (`caption` no slide). Título, números e blocos não mudam.
+ */
+export function overflowFallbackPatches(slides, issues, step = 0) {
+  const ids = new Set((issues || []).filter(issue => issue?.code === 'render-overflow').map(issue => issue.slideId));
+  const notes = (moved, current) => [moved, String(current || '').trim()].filter(Boolean).join('\n\n');
+  return (slides || []).flatMap(slide => {
+    if (!slide || !ids.has(slide.id)) return [];
+    const body = String(slide.bodyAfterImage || '').trim();
+    const subtitle = String(slide.subtitle || '').trim();
+    if (step === 0 && body) {
+      return [{ slideId: slide.id, before: { bodyAfterImage: slide.bodyAfterImage || '', caption: slide.caption || '' },
+        patch: { bodyAfterImage: '', caption: notes(body, slide.caption) } }];
+    }
+    const sentences = subtitle.split(/(?<=[.!?…])\s+/u).filter(Boolean);
+    if (step >= 1 && sentences.length > 1) {
+      const last = sentences.pop();
+      return [{ slideId: slide.id, before: { subtitle: slide.subtitle || '', caption: slide.caption || '' },
+        patch: { subtitle: sentences.join(' '), caption: notes(last, slide.caption) } }];
+    }
+    return [];
+  });
+}

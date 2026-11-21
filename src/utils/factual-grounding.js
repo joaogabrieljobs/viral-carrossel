@@ -196,6 +196,8 @@ export function auditDraftFactuality(draft, config = {}) {
       }
     }
     for (const match of [...text.matchAll(QUANTITY), ...text.matchAll(PERCENTAGE)]) {
+      // "um cliente", "uma vez", "uma paciente": artigo, não contagem (lote B 21/11).
+      if (/^(?:um|uma)\s+(?:clientes?|customers?|pacientes?|patients?|vez|vezes)$/iu.test(match[0].trim())) continue;
       if (!quantities.has(canonicalQuantity(match[0]))) add('dado sem fonte', match[0]);
     }
     for (const sentence of text.split(/(?<=[.!?])\s+|\n/u)) {
@@ -223,7 +225,7 @@ ${config.userInstructions ? `<instrucoes_do_usuario>\n${String(config.userInstru
 As instruções, exemplos de estilo e listas do sistema NÃO são evidência. Uma proibição (ex.: não prometa prazo) também não comprova uma oferta.
 Separe internamente: fato explícito; inferência prudente; exemplo hipotético solicitado; dado não fornecido. Use fatos explícitos; formule inferências como possibilidade (pode, ajuda a). Omita dados não fornecidos. Só crie um caso fictício se o usuário pedir, identificando-o como exemplo.
 Não acrescente duração, frequência, números por extenso, maioria, histórico de cliente, causa, resultado ou canal de atendimento ao caso fornecido. Telefone antigo não significa que mudou três vezes nem que está errado há dois anos. Enumeração de passos não é prova estatística.
-Não transforme benefício esperado em garantia. Não invente preço, prazo, taxas, serviços inclusos, gratuidade, agendamento ou WhatsApp/DM/comentários como canal da oferta. Preserve o público e os termos do usuário (clientes não viram pacientes).
+Não transforme benefício esperado em garantia. Não use garantir, garante, garantia nem garantido quando o material não usa essa palavra: uma encomenda reserva o pedido, não garante disponibilidade, frescor ou resultado. Não invente preço, prazo, taxas, serviços inclusos, gratuidade, agendamento ou WhatsApp/DM/comentários como canal da oferta. Preserve o público e os termos do usuário (clientes não viram pacientes).
 Quando um dado não foi informado (endereço, telefone, preço, horário), não escreva isso no card nem no slide: nada de "não foi informado", "não informado", "o briefing não traz", "a confirmar" ou colchetes para preencher. O texto é para o público final, não um bilhete para quem pediu. Omita o dado e siga a sequência.
 Não use travessão (—): use vírgula, dois-pontos ou ponto.
 O CTA usa a ação pedida. Não acrescente canal, recompensa ou condição comercial. Não repita o mesmo fato/argumento para preencher cards; cada card deve avançar a sequência. Quando faltar informação, mantenha uma formulação útil e neutra, sem completar com um detalhe plausível.`;

@@ -377,7 +377,9 @@ describe('apresentação planejada e revisada', () => {
     if (review === 'unavailable') ai.mockRejectedValueOnce(new Error('revisão indisponível'));
     else ai.mockResolvedValueOnce({ edits: [] });
     const output = await generateReviewedCarousel({ prompt: '', config: config({ factualSource: sources[0].text }) }, ai);
-    expect(ai).toHaveBeenCalledTimes(3);
+    // Lote B: uma tentativa de reparo de fatos antes do aviso; sem resposta útil, o rascunho fica marcado.
+    expect(ai).toHaveBeenCalledTimes(4);
+    expect(ai.mock.calls[3][0]).toContain('REPARO DE FATOS');
     expect(output.reviewStatus).toBe('needs_attention');
     expect(output.violations).toContainEqual(expect.objectContaining({ slideIndex: 1, field: 'title', kind: 'factual', category: 'dado sem fonte', claim: '90%' }));
     // A literal detector is not a semantic editor: it flags and preserves the
@@ -466,5 +468,28 @@ describe('MF-04 — excesso mínimo não vira rascunho preservado', () => {
     const output = await generateReviewedCarousel({ prompt: '', config: config({ presentationTextLimits: [{}, {}, { subtitle: { maxChars: 40 } }] }) }, ai);
     expect(ai).toHaveBeenCalledTimes(3);
     expect(output.reviewStatus).toBe('unchanged');
+  });
+});
+
+describe('lote B — reparo de fatos antes do aviso', () => {
+  it('corrige só o slide com detalhe sem fonte e entrega sem "Rascunho preservado"', async () => {
+    const raw = batch(0); raw.slides[1].subtitle = 'A encomenda é garantida em 2 horas.';
+    const ai = vi.fn().mockResolvedValueOnce(plan()).mockResolvedValueOnce(raw).mockResolvedValueOnce({ edits: [] })
+      .mockResolvedValueOnce({ edits: [{ slideIndex: 1, reason: 'detalhe sem fonte', subtitle: 'A oferta continua em estudo.' }] });
+    const output = await generateReviewedCarousel({ prompt: '', config: config({ factualSource: sources[0].text }) }, ai);
+    expect(ai.mock.calls[3][0]).toContain('slideIndex 1');
+    expect(output.reviewStatus).toBe('repaired');
+    expect(output.result.slides[1].subtitle).toBe('A oferta continua em estudo.');
+    expect(output.violations).toBeUndefined();
+  });
+});
+
+describe('lote B — travessão dentro dos blocos', () => {
+  it('o texto gerado do bloco sai sem travessão', async () => {
+    const raw = batch(0);
+    raw.slides[1].presentationBlocks = [{ type: 'steps', items: [{ title: 'Escolha o pão', body: 'Camponês, integral ou brioche — três opções.' }, { title: 'Peça', body: 'Pelo WhatsApp.' }] }];
+    const ai = vi.fn().mockResolvedValueOnce(plan()).mockResolvedValueOnce(raw).mockResolvedValueOnce({ edits: [] });
+    const output = await generateReviewedCarousel({ prompt: '', config: config() }, ai);
+    expect(output.result.slides[1].presentationBlocks[0].items[0].body).toBe('Camponês, integral ou brioche, três opções.');
   });
 });

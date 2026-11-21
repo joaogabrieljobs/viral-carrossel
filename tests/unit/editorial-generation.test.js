@@ -491,3 +491,16 @@ describe('revisão de carrossel aproveita as edições válidas', () => {
     expect(out.result.slides[0].bodyAfterImage ?? '').toBe('');
   });
 });
+
+describe('lote B — apoio que repete o título', () => {
+  it('detecta o eco e pede correção na revisão, sem marcar apoio que acrescenta informação', async () => {
+    const { supportEchoesTitleIndexes, buildEditorialReviewPrompt } = await import('../../src/utils/editorial-review.js');
+    const slides = [
+      { title: 'Marta pede um dia de antecedência', subtitle: 'MARTA PEDE UM DIA DE ANTECEDÊNCIA PELO WHATSAPP' },
+      { title: 'Foram 41.200 pães em 2025', subtitle: 'EM 2025, A PADARIA VENDEU 41.200 PÃES' },
+      { title: 'Três pães saem do forno', subtitle: 'Camponês, integral e brioche, cada um com seu preço.' },
+    ];
+    expect(supportEchoesTitleIndexes(slides)).toEqual([0, 1]);
+    expect(buildEditorialReviewPrompt('', { slides }, { presetId: 'livre', densityId: '1_1', count: 3 })).toContain('APOIO QUE REPETE O TÍTULO — correção obrigatória nos slideIndex 0, 1');
+  });
+});

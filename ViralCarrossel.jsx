@@ -22,7 +22,7 @@ import {
 } from './src/utils/editorial-review.js';
 import { buildFactualGroundingPrompt, auditDraftFactuality } from './src/utils/factual-grounding.js';
 import { normalizePresentationBlocks, repairPresentationLayouts, auditRenderedPresentationLayout } from './src/utils/presentation-quality.js';
-import { repairRenderedPresentation } from './src/utils/presentation-render-review.js';
+import { repairRenderedPresentation, overflowFallbackPatches } from './src/utils/presentation-render-review.js';
 import { presentationPhotoAspectRatio } from './src/utils/presentation-composition.js';
 import { buildPerformanceGuidance, savePublicationResult, removePublicationResult } from './src/utils/publication-results.js';
 import { PublicationResultsModal } from './src/components/panels/PublicationResultsModal.jsx';
@@ -6253,6 +6253,26 @@ ${jsonShapeLine}`;
               checkActive();
               rendered = auditRenderedPresentationLayout(repairedRoots);
             }
+          }
+          // Lote B (21/11): capas que ainda não cabiam barravam o PDF quando o
+          // reparo por IA não respondia. Passo final sem apagar nada: linha de
+          // apoio e, se preciso, a última frase do subtítulo vão para as notas.
+          for (let step = 0; step < 2 && rendered.issues.some(issue => issue.code === 'render-overflow'); step += 1) {
+            const fallback = overflowFallbackPatches(slidesLiveRef.current, rendered.issues, step);
+            if (!fallback.length) continue;
+            history.set(d => ({ ...d, slides: d.slides.map(current => {
+              const candidate = fallback.find(item => item.slideId === current.id);
+              if (!candidate) return current;
+              const unchanged = Object.entries(candidate.before).every(([key, value]) => String(current[key] || '') === String(value || ''));
+              return unchanged ? { ...current, ...candidate.patch } : current;
+            }) }));
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            checkActive();
+            const fallbackRoots = newSlides.map(slide => slideRefs.current[slide.id]).filter(Boolean);
+            await runAIJob(() => waitForExportReadiness({ slides: newSlides, roots: fallbackRoots }), job.signal);
+            checkActive();
+            rendered = auditRenderedPresentationLayout(fallbackRoots);
+            if (!rendered.issues.some(issue => issue.code === 'render-overflow')) renderRepairStatus = 'moved_to_notes';
           }
           history.set(d => ({ ...d, presentationQuality: {
             ...d.presentationQuality,

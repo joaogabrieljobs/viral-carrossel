@@ -325,3 +325,14 @@ describe('MOO-12 — só ano de verdade sustenta duração', () => {
     expect(audit('Pães vendidos\n41.200\nAno\n2025', 'Em um ano, a padaria vendeu esse volume.')).toEqual([]);
   });
 });
+
+describe('lote B (21/11) — artigo não é contagem', () => {
+  const cfg = { count: 1, presetId: 'livre', densityId: '1_1', factualSource: 'Padaria de bairro.' };
+  it.each(['Um cliente retira na padaria.', 'Uma vez por semana a padaria fecha.'])('não marca: %s', text => {
+    expect(auditDraftFactuality({ slides: [{ title: 'x', subtitle: text, bodyAfterImage: '' }] }, cfg)).toEqual([]);
+  });
+  it('continua marcando contagem real de clientes', () => {
+    expect(auditDraftFactuality({ slides: [{ title: 'x', subtitle: 'Atendemos 300 clientes.', bodyAfterImage: '' }] }, cfg))
+      .toContainEqual(expect.objectContaining({ claim: '300 clientes' }));
+  });
+});

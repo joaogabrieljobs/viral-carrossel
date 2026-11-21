@@ -7,7 +7,7 @@ import { buildPresentationPlanBlock, attachPresentationPlan } from './presentati
 import { generatePresentationPlan, parsePresentationPlanResponse, presentationResponseMetadata } from './presentation-planning.js';
 import { buildPresentationBlocksPrompt, normalizePresentationBlocks } from './presentation-quality.js';
 import { requiresSocialTitles, recoverSocialTitle, recoverSocialTitleForEditing, missingSocialTitleIndexes, auditSocialTextDensity, buildSocialTextLimitsPrompt } from './social-generation.js';
-import { auditDraftFactuality, auditUnsupportedCommercialClaims, buildFactualGroundingPrompt, buildReviewFactCheckPrompt } from './factual-grounding.js';
+import { auditDraftFactuality, auditUnsupportedCommercialClaims, buildFactualGroundingPrompt, buildReviewFactCheckPrompt, replaceEmDashes } from './factual-grounding.js';
 export { auditUnsupportedCommercialClaims } from './factual-grounding.js';
 
 const isObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -250,6 +250,13 @@ export function normalizeCarouselDraftInput(rawDraft, { count, presetId, density
   };
 }
 
+function mapBlockText(blocks, fn) {
+  const map = value => (typeof value === 'string' ? fn(value) : value);
+  return blocks.map(block => block.type === 'comparison'
+    ? { ...block, headers: block.headers.map(map), rows: block.rows.map(row => row.map(map)) }
+    : { ...block, items: block.items.map(item => Object.fromEntries(Object.entries(item).map(([key, value]) => [key, map(value)]))) });
+}
+
 export function validateCarouselDraft(rawDraft, { count, presetId, densityId, presentationPath, nativeBlocks = true, narrativeMode, allowMissingSocialTitles = false, allowLongSocialSupport = false, allowIncompleteDraft = false }) {
   const normalized = normalizeCarouselDraftInput(rawDraft, { count, presetId, densityId });
   const draft = normalized.draft;
@@ -277,7 +284,9 @@ export function validateCarouselDraft(rawDraft, { count, presetId, densityId, pr
       throw Object.assign(new Error(`O slide ${index + 1} precisa de um título específico.`), { code: 'presentation_title_missing', field: 'title', slideIndex: index });
     }
     if (presetId === 'apresentacao' && draft.presentationPlan) {
-      slide.presentationBlocks = normalizePresentationBlocks(s.presentationBlocks);
+      // Lote B (21/11): o travessão voltava dentro dos blocos ("brioche — três
+      // opções"); a limpeza do texto gerado só passava por título e apoio.
+      slide.presentationBlocks = mapBlockText(normalizePresentationBlocks(s.presentationBlocks), replaceEmDashes);
       if (!nativeBlocks && slide.presentationBlocks.length) throw Object.assign(new Error('Este padrão personalizado não permite quadros automáticos.'), { code: 'presentation_blocks_not_allowed', field: 'presentationBlocks', slideIndex: index });
       if (s.presentationBlocks != null && (!Array.isArray(s.presentationBlocks) || (s.presentationBlocks.length && !slide.presentationBlocks.length))) {
         throw Object.assign(new Error('A IA retornou uma tabela ou sequência inválida. Seu projeto foi preservado.'), { code: 'presentation_blocks_invalid', field: 'presentationBlocks', slideIndex: index });
@@ -319,6 +328,25 @@ export function validateCarouselDraft(rawDraft, { count, presetId, densityId, pr
   };
 }
 
+/**
+ * Apoio que só repete o título (lote B 21/11, Editorial Magazine: "Marta pede
+ * um dia de antecedência" + "MARTA PEDE UM DIA DE ANTECEDÊNCIA PELO
+ * WHATSAPP"). Três quartos das palavras de conteúdo do título reaparecem no
+ * apoio, e o apoio acrescenta no máximo quatro palavras.
+ */
+export function supportEchoesTitleIndexes(slides) {
+  const words = text => String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/[*_]/g, '').match(/[\p{L}\d]+(?:[.,]\d+)*/gu) || [];
+  return (Array.isArray(slides) ? slides : []).flatMap((slide, index) => {
+    const title = words(slide?.title).filter(word => word.length > 2);
+    const support = words(slide?.subtitle);
+    if (title.length < 2 || !support.length) return [];
+    const set = new Set(support);
+    const shared = title.filter(word => set.has(word)).length / title.length;
+    return shared >= 0.75 && support.length <= words(slide?.title).length + 4 ? [index] : [];
+  });
+}
+
 export function buildEditorialReviewPrompt(prompt, draft, config = {}) {
   if (config.presetId === 'apresentacao') {
     const limitsBlock = buildPresentationLimitsBlock(config, draft?.slides?.length || config.count || 0);
@@ -350,12 +378,16 @@ Cada edição exige slideIndex e reason; inclua somente os campos que mudam: ${e
   }
   const missingTitles = missingSocialTitleIndexes(draft?.slides, config);
   const longSupport = [...new Set(auditSocialTextDensity(draft?.slides, config).map(item => item.slideIndex))];
+  const echoes = supportEchoesTitleIndexes(draft?.slides);
   const unsupportedClaims = auditDraftFactuality(draft, config);
   const titleRule = requiresSocialTitles(config)
     ? `\nTODOS os cards, em qualquer modo narrativo, exigem title curto e específico, nunca vazio nem "Seu título aqui". Separe a ideia principal de subtitle sem apagar o desenvolvimento. ${buildSocialTextLimitsPrompt(config)}${missingTitles.length ? ` Correção obrigatória: preencha title nos slideIndex ${missingTitles.join(', ')} usando apenas o argumento já escrito.` : ''}${longSupport.length ? ` Correção obrigatória: condense o texto nos slideIndex ${longSupport.join(', ')} sem perder fatos ou condições. Não transfira excesso de subtitle para bodyAfterImage: a soma também tem limite.` : ''}`
     : '';
   const claimsRule = unsupportedClaims.length
     ? `\nALEGAÇÕES COMERCIAIS SUGERIDAS SEM APOIO E OUTROS DADOS NÃO SUSTENTADOS — correção obrigatória: ${unsupportedClaims.map(item => `${item.slideIndex == null ? 'caption' : `slideIndex ${item.slideIndex}, ${item.field}`}: ${item.claim}`).join('; ')}. Remova o detalhe sem apoio; não substitua por outra promessa. Qualificar um número inventado como possibilidade não o transforma em fato.`
+    : '';
+  const echoRule = echoes.length
+    ? `\nAPOIO QUE REPETE O TÍTULO — correção obrigatória nos slideIndex ${echoes.join(', ')}: o subtitle diz de novo o que o title já diz. Reescreva o subtitle com uma informação nova do material ou deixe-o vazio.`
     : '';
   const explicitScriptRule = config?.explicitCardScript?.count
     ? `\nROTEIRO EXPLÍCITO DO USUÁRIO — preserve a correspondência entre cada bloco e o slideIndex equivalente. Não funda, reordene, mova para outro card nem omita um bloco. A revisão pode melhorar clareza e encaixe dentro do próprio card, sem trocar sua função, fatos ou intenção.`
@@ -366,7 +398,7 @@ O briefing abaixo é referência, não um pedido para gerar o carrossel novament
 <rascunho>\n${JSON.stringify(draft)}\n</rascunho>
 ${buildFactualGroundingPrompt(config)}
 ${buildReviewFactCheckPrompt()}
-Verifique também: promessa da capa entregue pelo miolo; slide 2 útil; progressão sem repetição; exemplos concretos; afirmações sustentadas pelo material; voz e densidade; legenda complementar; um CTA coerente com o objetivo; linguagem idiomática e natural. Corrija traduções literais, provérbios inventados, ditados combinados e metáforas ambíguas ou sem sentido.${titleRule}${claimsRule}${explicitScriptRule}
+Verifique também: promessa da capa entregue pelo miolo; slide 2 útil; progressão sem repetição; exemplos concretos; afirmações sustentadas pelo material; voz e densidade; legenda complementar; um CTA coerente com o objetivo; linguagem idiomática e natural. Corrija traduções literais, provérbios inventados, ditados combinados e metáforas ambíguas ou sem sentido.${titleRule}${claimsRule}${echoRule}${explicitScriptRule}
 Corrija apenas problemas identificados. Preserve ordem, quantidade, assunto, arco, números e fatos sustentados. Remova ou qualifique alegações sem apoio; não acrescente fontes ou fatos. Não altere imageQuery, cultureTone, layout nem qualquer configuração visual.
 Use slideIndex começando em zero. Não envie edições para slides que já estejam bons. Cada índice aparece no máximo uma vez. Nunca preencha bodyAfterImage onde o layout exige vazio.
 Resposta: um único objeto JSON {"edits":[{"slideIndex":0,"reason":"problema concreto","title":"texto corrigido"}],"caption":"legenda corrigida apenas se necessário"}.
@@ -799,15 +831,16 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
     aiOptions: textOptions, onStage, onPlan,
   }, callAI);
   let writingDiagnostics = [];
+  // Visible native blocks and speaker notes carry factual claims as well.
+  // This conservative check flags calculations/paraphrases for review; it
+  // never deletes them or presents a literal matcher as a truth verifier.
+  const collectText = value => typeof value === 'string' ? value : Array.isArray(value)
+    ? value.map(collectText).join('\n') : isObject(value) ? Object.values(value).map(collectText).join('\n') : '';
+  const factsOf = result => auditDraftFactuality({ ...result, slides: result.slides.map(slide => ({ ...slide,
+    bodyAfterImage: [slide.bodyAfterImage, slide.speakerNotes, collectText(slide.presentationBlocks)].filter(Boolean).join('\n'),
+  })) }, factualConfig).map(issue => ({ ...issue, kind: 'factual' }));
   const finish = (result, reviewStatus, extra = {}) => {
-    // Visible native blocks and speaker notes carry factual claims as well.
-    // This conservative check flags calculations/paraphrases for review; it
-    // never deletes them or presents a literal matcher as a truth verifier.
-    const collectText = value => typeof value === 'string' ? value : Array.isArray(value)
-      ? value.map(collectText).join('\n') : isObject(value) ? Object.values(value).map(collectText).join('\n') : '';
-    const facts = auditDraftFactuality({ ...result, slides: result.slides.map(slide => ({ ...slide,
-      bodyAfterImage: [slide.bodyAfterImage, slide.speakerNotes, collectText(slide.presentationBlocks)].filter(Boolean).join('\n'),
-    })) }, factualConfig).map(issue => ({ ...issue, kind: 'factual' }));
+    const facts = factsOf(result);
     return { result, plan, planningDiagnostics, writingDiagnostics, reviewStatus: facts.length ? 'needs_attention' : reviewStatus, ...extra,
       ...((facts.length || extra.violations?.length) ? { violations: [...(extra.violations || []), ...facts] } : {}) };
   };
@@ -842,12 +875,38 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
   const reviewPrompt = buildEditorialReviewPrompt(briefing, draft, plannedConfig);
   const limitsFor = slides => (typeof config.presentationLimitsForPlan === 'function'
     ? config.presentationLimitsForPlan(plan, slides) : plannedConfig.presentationTextLimits);
+  // Excesso de até 10% cabe pelo autoajuste do layout; a exportação ainda mede
+  // a página real (presentation-quality). Só o excesso maior pede reparo.
+  const overLimits = slides => auditPresentationTextLimits(slides, limitsFor(slides))
+    .filter(item => item.rule !== 'maxChars' || !(item.max > 0) || item.actual > item.max * 1.1);
+  // Lote B (21/11): 5 de 7 apresentações nasciam como "Rascunho preservado",
+  // quase todas por "garante"/"garantido" que a revisão não tirou. Antes de
+  // entregar com aviso, uma chamada corrige só os slides com detalhe sem fonte.
+  const settle = async (result, reviewStatus, extra = {}) => {
+    const facts = factsOf(result);
+    const indexes = [...new Set(facts.map(item => item.slideIndex).filter(Number.isInteger))];
+    if (!indexes.length) return finish(result, reviewStatus, extra);
+    onStage?.('repairing');
+    try {
+      const repair = await callAI(`${buildEditorialReviewPrompt(briefing, result, plannedConfig)}
+REPARO DE FATOS: edite somente os slides com slideIndex ${indexes.join(', ')}. Estes trechos não estão no material: ${facts.filter(item => Number.isInteger(item.slideIndex)).map(item => `slideIndex ${item.slideIndex}, ${item.field === 'bodyAfterImage' ? 'apoio, notas ou bloco' : item.field}: "${item.claim}"`).join('; ')}. Reescreva cada frase sem o detalhe, com o que o material sustenta (uma encomenda reserva, não garante). Não acrescente fatos; preserve números, unidades e condições do material.`, reviewOptions);
+      throwIfGenerationCancelled(aiOptions?.signal);
+      if (!Array.isArray(repair?.edits) || repair.edits.some(edit => !indexes.includes(edit?.slideIndex))) throw new Error('Reparo fora do escopo');
+      const repaired = applyEditorialReview(result, repair, plannedConfig, { deferQualityChecks: true });
+      if (factsOf(repaired).length < facts.length && overLimits(repaired.slides).length <= overLimits(result.slides).length) {
+        return finish(repaired, 'repaired', extra);
+      }
+    } catch (error) {
+      if (isGenerationCancelled(error) || aiOptions?.signal?.aborted) throw error;
+    }
+    return finish(result, reviewStatus, extra);
+  };
   let review;
   try {
     review = await callAI(reviewPrompt, reviewOptions);
     throwIfGenerationCancelled(aiOptions?.signal);
     const result = applyEditorialReview(draft, review, plannedConfig);
-    return finish(result, JSON.stringify(result) === JSON.stringify(draft) ? 'unchanged' : 'revised');
+    return settle(result, JSON.stringify(result) === JSON.stringify(draft) ? 'unchanged' : 'revised');
   } catch (error) {
     if (isGenerationCancelled(error) || aiOptions?.signal?.aborted) throw error;
   }
@@ -863,15 +922,11 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
     if (auditUnsupportedCommercialClaims(reviewed.slides, claimSource).some(item => !before.has(item.claim))) return draft;
     return reviewed;
   }, draft);
-  // Excesso de até 10% cabe pelo autoajuste do layout; a exportação ainda mede
-  // a página real (presentation-quality). Só o excesso maior pede reparo.
-  const overLimits = slides => auditPresentationTextLimits(slides, limitsFor(slides))
-    .filter(item => item.rule !== 'maxChars' || !(item.max > 0) || item.actual > item.max * 1.1);
   let current = base;
   let remaining = overLimits(current.slides);
   if (!remaining.length) {
     const same = JSON.stringify(current) === JSON.stringify(draft);
-    return finish(current, current === draft ? 'unavailable' : same ? 'unchanged' : 'revised');
+    return settle(current, current === draft ? 'unavailable' : same ? 'unchanged' : 'revised');
   }
   // Never cut the end of a sentence to fit: it may contain a condition or risk.
   // One semantic repair is limited to fields/slides known to exceed the layout.
@@ -884,7 +939,7 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
     const repaired = applyEditorialReview(current, repair, plannedConfig, { deferQualityChecks: true });
     const left = overLimits(repaired.slides);
     if (left.length < remaining.length) { current = repaired; remaining = left; }
-    if (!remaining.length) return finish(current, 'repaired');
+    if (!remaining.length) return settle(current, 'repaired');
   } catch (repairError) {
     if (isGenerationCancelled(repairError) || aiOptions?.signal?.aborted) throw repairError;
   }
@@ -892,8 +947,8 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
   // vão para as notas do apresentador. Título e frase única não são cortados.
   const moved = moveOverflowToSpeakerNotes(current.slides, limitsFor(current.slides));
   const afterMove = overLimits(moved.slides);
-  if (!afterMove.length) return finish({ ...current, slides: moved.slides }, 'fitted', { fits: moved.fits });
-  return finish(current, 'needs_attention', { violations: remaining });
+  if (!afterMove.length) return settle({ ...current, slides: moved.slides }, 'fitted', { fits: moved.fits });
+  return settle(current, 'needs_attention', { violations: remaining });
 }
 
 function leniently(task, fallback) {

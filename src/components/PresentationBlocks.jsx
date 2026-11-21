@@ -61,8 +61,11 @@ export function measureMetricText(text, fontFamily, weight = 600) {
   try {
     const ctx = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
     if (ctx) {
-      ctx.font = `${weight} 100px ${fontFamily || 'sans-serif'}`;
-      const measured = ctx.measureText(value).width / 100;
+      // Medida em tamanho pequeno: fontes com eixo óptico (Fraunces, no
+      // Editorial) ficam mais estreitas em corpo grande; medir a 100 px
+      // subestimava a largura real a ~50 px e "Terça a domingo" era cortado.
+      ctx.font = `${weight} 32px ${fontFamily || 'sans-serif'}`;
+      const measured = ctx.measureText(value).width / 32;
       if (measured > 0) perPx = measured;
     }
   } catch { /* estimativa acima */ }
@@ -79,7 +82,7 @@ export function metricValueFit({ value, columnPx, unit, count, fontFamily, weigh
   const max = (count > 3 ? 72 : 96) * unit;
   const min = 30 * unit;
   const perPx = measureMetricText(value, fontFamily, weight);
-  const fits = perPx > 0 ? (columnPx * 0.96) / perPx : max;
+  const fits = perPx > 0 ? (columnPx * 0.92) / perPx : max;
   if (fits >= min) return { fontSize: Math.min(max, fits), wrap: false };
   return { fontSize: min, wrap: true };
 }
@@ -97,7 +100,7 @@ export function metricRowFit({ values, columnPx, unit, fontFamily, weight }) {
   const size = Math.min(max, Math.max(floor, Math.min(...fits.map(fit => (fit.wrap ? 0 : fit.fontSize)))));
   return values.map(value => {
     const perPx = measureMetricText(value, fontFamily, weight);
-    return { fontSize: size, wrap: perPx * size > columnPx * 0.96 };
+    return { fontSize: size, wrap: perPx * size > columnPx * 0.92 };
   });
 }
 
@@ -107,11 +110,22 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, back
   // Mede de novo quando as fontes terminam de carregar (a exportação espera
   // por elas; a primeira medida pode usar a fonte de reserva).
   const [, setFontsReady] = useState(0);
+  const metricFont = (() => {
+    const k = normalizeFamilyKey(family);
+    return { family: numericTypography?.fontFamily || familyFont(k, 'numeric').css || fontFamily, weight: numericTypography?.weight || familyFont(k, 'numeric').weight || 600 };
+  })();
   useEffect(() => {
     let alive = true;
-    document.fonts?.ready?.then(() => { if (alive) { widthCache.clear(); setFontsReady(n => n + 1); } });
-    return () => { alive = false; };
-  }, []);
+    const remeasure = () => { if (alive) { widthCache.clear(); setFontsReady(n => n + 1); } };
+    // Lote B (21/11): a fonte serifada do Editorial só começa a carregar
+    // quando é usada; fonts.ready já estava resolvido e a medida ficava com a
+    // fonte de reserva, mais estreita ("Terça a domingo" cortado). Carrega a
+    // fonte do valor explicitamente e mede de novo a cada carga concluída.
+    document.fonts?.load?.(`${metricFont.weight} 100px ${metricFont.family}`).then(remeasure, () => {});
+    document.fonts?.ready?.then(remeasure);
+    document.fonts?.addEventListener?.('loadingdone', remeasure);
+    return () => { alive = false; document.fonts?.removeEventListener?.('loadingdone', remeasure); };
+  }, [metricFont.family, metricFont.weight]);
   if (artDirectionVersion !== 2) return <LegacyPresentationBlocks blocks={raw} rect={rect} frame={frame} ink={ink} background={background} fontFamily={fontFamily} family={family} accent={accent} numericTypography={numericTypography} onChange={onChange} forExport={forExport} />;
   const blocks = normalizePresentationBlocks(raw);
   if (!blocks.length || !rect) return null;
