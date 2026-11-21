@@ -9,6 +9,7 @@ import {
   createRefreshToken,
   oauthResource,
   revokeRefreshToken,
+  revokeSupersededRefreshTokens,
   rotateRefreshToken,
 } from '../lib/oauth-store.js';
 import { consumeRateLimit } from '../lib/rate-limit.js';
@@ -101,6 +102,7 @@ export default async function handler(req, res) {
         });
       }
       await revokeSupersededOAuthTokens(grant.ownerId, p.client_id, issued.credential.id);
+      await revokeSupersededRefreshTokens(grant.ownerId, p.client_id, refresh);
     } catch (cause) {
       if (!cause?.credentialsCleaned) {
         await Promise.allSettled([

@@ -52,10 +52,14 @@ describe('achado 2: imagem cobrada precisa continuar existindo', () => {
     expect(first.body.quota.used).toBe(1);
   });
 
-  it.fails('resposta perdida: repetir o mesmo operationId devolve a mesma imagem, sem cobrar de novo', async () => {
+  // Corrigido em 21/11 (MOO-10): o servidor guarda o endereço do resultado
+  // por operationId e, na repetição, baixa a mesma imagem sem gerar nem cobrar.
+  it('resposta perdida: repetir o mesmo operationId devolve a mesma imagem, sem cobrar de novo', async () => {
     // A rede cai depois de o servidor gerar e cobrar; o cliente repete com o mesmo operationId.
     await gerar('op-resposta-perdida');
+    fetch.mockResolvedValueOnce(image());
     const retry = await gerar('op-resposta-perdida');
+    expect(fetch).toHaveBeenLastCalledWith('https://cdn.exemplo/img.png', expect.anything());
     // Hoje: 409 image_operation_replayed, sem imagem, e o crédito segue consumido.
     expect(retry.statusCode).toBe(200);
     expect(retry.body.b64_json).toBe(PNG.toString('base64'));

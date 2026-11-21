@@ -1,3 +1,4 @@
+import { consumeTextCredit } from '../lib/text-quota.js';
 const PROVIDERS = {
   zai: {
     chat: 'https://api.z.ai/api/paas/v4/chat/completions',
@@ -115,6 +116,18 @@ export default async function handler(req, res) {
     payload.max_tokens = Number.isFinite(requested) && requested > 0
       ? Math.min(requested, PLATFORM_MAX_TOKENS)
       : Math.min(4096, PLATFORM_MAX_TOKENS);
+    // Cota diária por conta do texto incluso (MOO-11). Falha do banco não
+    // derruba a geração: o limite por IP continua valendo.
+    if (process.env.LIBRARY_SYNC_BACKEND === 'postgres') {
+      try {
+        const quota = await consumeTextCredit({ customerId: access.customerId });
+        if (!quota.allowed) {
+          return res.status(429).json({ error: { message: `Você atingiu o limite diário de ${quota.limit} pedidos de texto incluídos no plano. Ele volta à meia-noite, ou use sua própria chave em Configurar IA.` } });
+        }
+      } catch (error) {
+        console.error('[compatible] text_quota_unavailable', error?.message || error);
+      }
+    }
   }
 
   const deadline = Date.now() + TOTAL_BUDGET_MS;

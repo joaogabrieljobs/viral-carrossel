@@ -15,6 +15,7 @@ import { isUpstashDisabled } from './upstash-config.js';
 
 const memory = new Map();
 const imageOps = new Map();
+const imageResults = new Map();
 
 /** Tecto por instância no último recurso (não-prod / testes). Em prod falha fechado. */
 export const DEGRADED_FALLBACK_CAP = 25;
@@ -350,10 +351,33 @@ export async function settleImageCredit({ customerId, periodStartSec, operationI
   return settleImageCreditPostgres({ customerId, periodStartSec, operationId, metadata });
 }
 
+/** Guarda o endereço da imagem gerada por operação (MOO-10). */
+export async function rememberImageResult({ customerId, periodStartSec, operationId, url }) {
+  if (usesPostgresQuota()) {
+    const { rememberImageResultPostgres } = await import('./image-quota-postgres.js');
+    return rememberImageResultPostgres({ customerId, periodStartSec, operationId, url });
+  }
+  const opKey = imageOperationKey(customerId, periodStartSec, operationId);
+  if (!opKey || !/^https:\/\/\S{1,2000}$/.test(String(url || ''))) return false;
+  imageResults.set(opKey, url);
+  return true;
+}
+
+/** Endereço da imagem já paga desta operação, se houver (MOO-10). */
+export async function recallImageResult({ customerId, periodStartSec, operationId }) {
+  if (usesPostgresQuota()) {
+    const { recallImageResultPostgres } = await import('./image-quota-postgres.js');
+    return recallImageResultPostgres({ customerId, periodStartSec, operationId });
+  }
+  const opKey = imageOperationKey(customerId, periodStartSec, operationId);
+  return (opKey && imageOps.get(opKey) !== 'refunded' && imageResults.get(opKey)) || null;
+}
+
 /** Só testes. */
 export function resetMemoryQuotas() {
   memory.clear();
   imageOps.clear();
+  imageResults.clear();
 }
 
 export function isUpstashConfigured() {

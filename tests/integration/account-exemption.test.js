@@ -19,6 +19,7 @@ vi.mock('../../api/lib/password-auth.js', async original => ({
 vi.mock('../../api/lib/image-quota.js', () => ({
   getQuotaUsage: deps.usage, getImageQuotaActivity: deps.activity,
   consumeImageCredit: deps.consume, settleImageCredit: deps.settle, refundImageCredit: deps.refund,
+  rememberImageResult: async () => true, recallImageResult: async () => null,
 }));
 vi.mock('../../api/lib/sjinn.js', () => ({
   isSjinnConfigured: () => true, createGptImage2Task: deps.generate,

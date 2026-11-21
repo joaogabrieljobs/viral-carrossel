@@ -232,6 +232,32 @@ export function createImageQuotaPostgres({ sql: injectedSql, readLegacyUsage = d
     });
   }
 
+  // Endereço do resultado guardado por operação (MOO-10): a repetição com o
+  // mesmo operationId recebe a mesma imagem em vez de 409 sem imagem.
+  async function rememberImageResult({ customerId, periodStartSec, operationId: rawId, url }) {
+    const owner = ownerId(customerId);
+    const start = period(periodStartSec);
+    const id = operationId(rawId);
+    if (!/^https:\/\/\S{1,2000}$/.test(String(url || ''))) return false;
+    return guardStorage(async () => {
+      const sql = await connection();
+      await run(sql, 'mergeOperationMetadata', [owner, start, id, JSON.stringify({ resultUrl: url })]);
+      return true;
+    });
+  }
+
+  async function recallImageResult({ customerId, periodStartSec, operationId: rawId }) {
+    const owner = ownerId(customerId);
+    const start = period(periodStartSec);
+    const id = operationId(rawId);
+    return guardStorage(async () => {
+      const sql = await connection();
+      const op = (await run(sql, 'operation', [owner, start, id]))[0];
+      const url = op?.status === 'consumed' || op?.status === 'reserved' ? op?.metadata?.resultUrl : null;
+      return typeof url === 'string' && url.startsWith('https://') ? url : null;
+    });
+  }
+
   async function consumeImageCredit({ customerId, periodStartSec, periodEndSec, limit, operationId: rawId, metadata }) {
     const cap = capValue(limit);
     if (cap <= 0) {
@@ -310,7 +336,8 @@ export function createImageQuotaPostgres({ sql: injectedSql, readLegacyUsage = d
     });
   }
 
-  return { getQuotaUsage, getImageQuotaActivity, consumeImageCredit, settleImageCredit, refundImageCredit };
+  return { getQuotaUsage, getImageQuotaActivity, consumeImageCredit, settleImageCredit, refundImageCredit,
+    rememberImageResult, recallImageResult };
 }
 
 const production = createImageQuotaPostgres();
@@ -319,3 +346,5 @@ export const getImageQuotaActivityPostgres = production.getImageQuotaActivity;
 export const consumeImageCreditPostgres = production.consumeImageCredit;
 export const settleImageCreditPostgres = production.settleImageCredit;
 export const refundImageCreditPostgres = production.refundImageCredit;
+export const rememberImageResultPostgres = production.rememberImageResult;
+export const recallImageResultPostgres = production.recallImageResult;

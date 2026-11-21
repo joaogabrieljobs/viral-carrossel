@@ -164,6 +164,27 @@ export async function revokeRefreshToken({ token, ownerId, revokeFamily = false,
   return rows.length > 0;
 }
 
+const REFRESH_REUSE_GRACE_MS = 10_000;
+
+async function revokeOAuthConnection(sql, ownerId, clientId) {
+  await sql.unsafe(
+    `UPDATE moont.oauth_refresh_tokens SET revoked_at = now()
+     WHERE owner_id = $1 AND client_id = $2::uuid AND revoked_at IS NULL`, [ownerId, clientId]);
+  await sql.unsafe(
+    `UPDATE moont.agent_tokens SET revoked_at = now()
+     WHERE owner_id = $1 AND oauth_client_id = $2::uuid AND revoked_at IS NULL`, [ownerId, clientId]);
+}
+
+/** Nova autorização do mesmo cliente encerra os refresh anteriores (MOO-04). */
+export async function revokeSupersededRefreshTokens(ownerId, clientId, keepToken) {
+  if (typeof ownerId !== 'string' || !ownerId || !UUID.test(String(clientId || ''))) return 0;
+  const rows = await getPostgresConnection().unsafe(
+    `UPDATE moont.oauth_refresh_tokens SET revoked_at = now()
+     WHERE owner_id = $1 AND client_id = $2::uuid AND token_hash <> $3 AND revoked_at IS NULL
+     RETURNING token_hash`, [ownerId, clientId, hash(keepToken)]);
+  return rows.length;
+}
+
 export async function rotateRefreshToken({ token, clientId, resource, issue = null }) {
   normalizeOAuthResource(resource);
   if (!UUID.test(String(clientId || ''))) fail('invalid_grant', 'Renovação inválida.');
@@ -172,11 +193,20 @@ export async function rotateRefreshToken({ token, clientId, resource, issue = nu
   // identidade também usa o pool Postgres; executá-la com a linha de refresh
   // bloqueada pode esgotar um pool pequeno quando duas renovações concorrem.
   const ownerRows = await sql.unsafe(
-    `SELECT owner_id FROM moont.oauth_refresh_tokens
+    `SELECT owner_id, revoked_at FROM moont.oauth_refresh_tokens
      WHERE token_hash = $1 AND client_id = $2::uuid AND resource = $3
-       AND revoked_at IS NULL AND expires_at > now()`,
+       AND expires_at > now()`,
     [hash(token), clientId, RESOURCE],
   );
+  const reused = ownerRows[0]?.revoked_at ? ownerRows[0] : null;
+  if (reused) {
+    // Refresh já usado e reapresentado (MOO-04): alguém tem uma cópia. Fora
+    // de uma janela curta (cliente que repetiu porque a resposta se perdeu),
+    // derruba refresh e acesso da conexão inteira (conta + cliente).
+    const revokedAgoMs = Date.now() - Date.parse(reused.revoked_at);
+    if (revokedAgoMs > REFRESH_REUSE_GRACE_MS) await revokeOAuthConnection(sql, reused.owner_id, clientId);
+    fail('invalid_grant', 'Renovação inválida ou expirada.');
+  }
   const ownerId = ownerRows[0]?.owner_id;
   if (!ownerId) fail('invalid_grant', 'Renovação inválida ou expirada.');
   const identity = await getCurrentAgentSecurityContext(ownerId);

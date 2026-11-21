@@ -16,6 +16,8 @@ import {
   refundImageCredit,
   settleImageCredit,
   getQuotaUsage,
+  rememberImageResult,
+  recallImageResult,
 } from '../lib/image-quota.js';
 import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
 import { parseImageReferences, assertReferenceStorageConfigured, stageImageReferences } from '../lib/image-references.js';
@@ -177,6 +179,21 @@ export default async function handler(req, res) {
 
   if (!consumed.allowed) {
     if (consumed.replayed) {
+      // Mesma operação já paga (resposta perdida): devolve a mesma imagem,
+      // sem gerar nem cobrar de novo (MOO-10).
+      const previousUrl = await recallImageResult({ customerId, periodStartSec, operationId }).catch(() => null);
+      if (previousUrl) {
+        try {
+          const { b64_json, mime } = await downloadImageAsBase64(previousUrl);
+          return res.status(200).json({
+            b64_json, mime, operationId, tier, replayed: true,
+            quota: { used: consumed.used, limit: consumed.limit, remaining: consumed.remaining,
+              tier, status: 'available', available: true, allowed: consumed.remaining > 0 },
+          });
+        } catch (error) {
+          console.error('[sjinn-image] replay download', error?.message || error);
+        }
+      }
       return res.status(409).json({
         error: consumed.reason === 'already_reserved'
           ? 'Esta imagem já está sendo gerada. Aguarde o resultado da primeira tentativa.'
@@ -214,6 +231,8 @@ export default async function handler(req, res) {
     const url = extractSjinnOutputUrl(data);
     if (!url) throw new Error('A geração de imagem não devolveu resultado.');
     const { b64_json, mime } = await downloadImageAsBase64(url);
+    await rememberImageResult({ customerId, periodStartSec, operationId, url })
+      .catch((error) => console.error('[sjinn-image] remember', error?.message || error));
 
     // A reserva já descontou o crédito. Se apenas esta anotação falhar, a
     // imagem e o débito permanecem válidos; não refazer a geração nem devolver.

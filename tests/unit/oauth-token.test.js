@@ -8,6 +8,7 @@ const deps = vi.hoisted(() => ({
   consumeAuthorizationCode: vi.fn(),
   createRefreshToken: vi.fn(),
   revokeRefreshToken: vi.fn(),
+  revokeSupersededRefreshTokens: vi.fn(),
   rotateRefreshToken: vi.fn(),
   consumeRateLimit: vi.fn(),
 }));
@@ -23,6 +24,7 @@ vi.mock('../../api/lib/oauth-store.js', () => ({
   consumeAuthorizationCode: deps.consumeAuthorizationCode,
   createRefreshToken: deps.createRefreshToken,
   revokeRefreshToken: deps.revokeRefreshToken,
+  revokeSupersededRefreshTokens: deps.revokeSupersededRefreshTokens,
   rotateRefreshToken: deps.rotateRefreshToken,
 }));
 vi.mock('../../api/lib/rate-limit.js', () => ({
@@ -55,6 +57,7 @@ describe('token OAuth do MCP', () => {
     deps.revokeIssuedAgentToken.mockResolvedValue(true);
     deps.revokeSupersededOAuthTokens.mockResolvedValue(1);
     deps.revokeRefreshToken.mockResolvedValue(true);
+    deps.revokeSupersededRefreshTokens.mockResolvedValue(0);
   });
 
   it('responde falha fechada no formato OAuth', async () => {
@@ -81,6 +84,8 @@ describe('token OAuth do MCP', () => {
       label: 'MCP OAuth — Claude', scopes: ['projects:read', 'projects:write'],
       oauthClientId:'client-1',
     }));
+    // MOO-04: a nova autorização encerra os refresh anteriores da mesma conexão.
+    expect(deps.revokeSupersededRefreshTokens).toHaveBeenCalledWith(expect.any(String), expect.any(String), 'moont_refresh_next');
     expect(deps.revokeSupersededOAuthTokens).toHaveBeenCalledWith(
       'owner-1', 'client-1', '11111111-1111-4111-8111-111111111111',
     );
