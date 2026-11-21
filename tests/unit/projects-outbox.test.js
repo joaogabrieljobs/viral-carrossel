@@ -278,10 +278,51 @@ describe('outbox durável por projeto', () => {
     }] });
     expect(fetch.mock.calls.some(([url]) => url === '/api/projects')).toBe(false);
     expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({ opId: op.opId, kind: 'review_put_failed', entry, assets: [[assetId, photo]] });
-    fetch.mockClear();
-    fetch.mockResolvedValueOnce(session());
-    expect(await flushProjectOutbox(ALICE)).toMatchObject({ pending: 1, needsReview: [{ kind: 'sync_failed' }] });
-    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  // MOO-01 (auditoria 20/11): a falha de upload era tratada como definitiva.
+  // A edição ficava só neste navegador e as seguintes do mesmo projeto também.
+  it('falha passageira de upload é reenviada no próximo envio quando a rede volta', async () => {
+    const photo = 'data:image/png;base64,cmV0cnktdXBsb2Fk';
+    const assetId = await originalImageAssetId(photo);
+    const entry = { id: 'janine', doc: { slides: [{ id: 's1', bgImageAssetId: assetId }] } };
+    await queueProjectPut(ALICE, entry, { baseVersion: 2, assets: new Map([[assetId, photo]]) });
+    fetch.mockImplementation(async (url) => url === '/api/auth/session'
+      ? session() : json({ error: 'Upload indisponível.' }, 503));
+    expect(await flushProjectOutbox(ALICE)).toMatchObject({ pending: 1, needsReview: [{ code: 'project_asset_upload_failed' }] });
+
+    fetch.mockReset();
+    fetch.mockImplementation(async (url, request) => {
+      if (url === '/api/auth/session') return session();
+      if (url === '/api/library-sync') return json({ ok: true, assetId: JSON.parse(request.body).assetId });
+      return json({ ok: true, project: { id: 'janine', entry, version: 3 } });
+    });
+    expect(await flushProjectOutbox(ALICE)).toEqual({ sent: 1, pending: 0 });
+    expect(await getPendingProjectOp(ALICE, 'janine')).toBeNull();
+  });
+
+  it('edição feita depois de uma falha de upload volta à fila de envio e leva o texto mais novo', async () => {
+    const photo = 'data:image/png;base64,c2VndW5kYS1lZGljYW8=';
+    const assetId = await originalImageAssetId(photo);
+    const first = { id: 'janine', doc: { slides: [{ id: 's1', title: 'Antes', bgImageAssetId: assetId }] } };
+    await queueProjectPut(ALICE, first, { baseVersion: 2, assets: new Map([[assetId, photo]]) });
+    fetch.mockImplementation(async (url) => url === '/api/auth/session'
+      ? session() : json({ error: 'Upload indisponível.' }, 503));
+    await flushProjectOutbox(ALICE);
+
+    const latest = { id: 'janine', doc: { slides: [{ id: 's1', title: 'Depois', bgImageAssetId: assetId }] } };
+    expect(await queueProjectPut(ALICE, latest, { baseVersion: 2 })).toMatchObject({ kind: 'put', assets: [[assetId, photo]] });
+
+    fetch.mockReset();
+    const puts = [];
+    fetch.mockImplementation(async (url, request) => {
+      if (url === '/api/auth/session') return session();
+      if (url === '/api/library-sync') return json({ ok: true, assetId: JSON.parse(request.body).assetId });
+      puts.push(JSON.parse(request.body));
+      return json({ ok: true, project: { id: 'janine', entry: latest, version: 3 } });
+    });
+    expect(await flushProjectOutbox(ALICE)).toEqual({ sent: 1, pending: 0 });
+    expect(puts.map((body) => body.entry.doc.slides[0].title)).toEqual(['Depois']);
   });
 
   it.each([401, 408, 425, 429])('mantém a edição reenviável após erro temporário %s', async (status) => {

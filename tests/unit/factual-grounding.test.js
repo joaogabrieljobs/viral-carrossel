@@ -302,3 +302,26 @@ describe('MF-04 (reteste 20/11) — anos informados', () => {
     expect(auditDraftFactuality(um('Em três anos dobrou as vendas.'), cfg)).toContainEqual(expect.objectContaining({ claim: 'três anos' }));
   });
 });
+
+// MOO-12 (auditoria 20/11): no 694fb09 qualquer número de 4 dígitos virava
+// ano e sustentava "um ano" e qualquer diferença entre eles virava duração.
+describe('MOO-12 — só ano de verdade sustenta duração', () => {
+  const um = text => ({ slides: [{ title: 'Volume', subtitle: text, bodyAfterImage: '' }] });
+  const audit = (source, text) => auditDraftFactuality(um(text), { count: 1, presetId: 'livre', densityId: '1_1', factualSource: source });
+
+  it('quantidade de 4 dígitos não é ano: "2010 clientes em 2024" não sustenta "14 anos"', () => {
+    expect(audit('Atendemos 2010 clientes em 2024.', 'Há 14 anos no mercado.')).toContainEqual(expect.objectContaining({ claim: '14 anos' }));
+  });
+
+  it('dois números de 4 dígitos sem ano não sustentam "quinze anos"', () => {
+    expect(audit('Vendemos 2000 pães e 2015 bolos.', 'Há quinze anos no bairro.')).toContainEqual(expect.objectContaining({ claim: 'quinze anos' }));
+  });
+
+  it('ano sem resultado no mesmo período não sustenta "em um ano"', () => {
+    expect(audit('Pesquisa de 2023 com moradores do bairro.', 'Dobrou o faturamento em um ano.')).toContainEqual(expect.objectContaining({ claim: 'um ano' }));
+  });
+
+  it('ano numa célula de tabela ("Ano 2025") com o volume ao lado continua sustentando "em um ano"', () => {
+    expect(audit('Pães vendidos\n41.200\nAno\n2025', 'Em um ano, a padaria vendeu esse volume.')).toEqual([]);
+  });
+});

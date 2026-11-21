@@ -36,6 +36,18 @@ export function pdfCanvasScale({
   return viewportWidth <= 760 || (Number.isFinite(deviceMemory) && deviceMemory <= 4) ? 2 : 3;
 }
 
+// Safari no iPhone e no iPad não desenha canvas acima de 16.777.216 px de área;
+// o export de Stories/Apresentação a 3× (18,66 Mpx) saía vazio (MOO-02). A
+// mesma escala vale em todo aparelho, para o arquivo sair igual em qualquer um.
+const CANVAS_MAX_AREA = 16_000_000;
+
+/** Maior escala ≤ `requested` cujo canvas cabe no teto de área do iOS. */
+export function canvasScaleWithinArea(width, height, requested = 3) {
+  const area = Math.max(1, width) * Math.max(1, height);
+  const fit = Math.floor(Math.sqrt(CANVAS_MAX_AREA / area) * 100) / 100;
+  return Math.min(requested, fit);
+}
+
 /** Extrai todas as URLs de `background-image`, inclusive em camadas múltiplas. */
 export function extractCssBackgroundUrls(backgroundImage) {
   const source = String(backgroundImage || '');
@@ -295,7 +307,7 @@ export function useExport({
     const w = Math.max(1, Math.round(el.offsetWidth || el.scrollWidth || f.w));
     const h = Math.max(1, Math.round(el.offsetHeight || el.scrollHeight || f.h));
     return html2canvas(el, {
-      scale,
+      scale: canvasScaleWithinArea(w, h, scale),
       useCORS: true,
       allowTaint: true,
       logging: false,

@@ -159,7 +159,7 @@ function persistOperation(ownerId, projectId, kind, entry, baseVersion, projectN
         // atualiza a cópia durável, mas não a retira da revisão.
         const effectiveKind = previous?.kind === 'review_put_deleted' && kind === 'put'
           ? 'review_put_deleted'
-          : previous?.kind === 'review_put_failed' && kind === 'put'
+          : previous?.kind === 'review_put_failed' && kind === 'put' && !isRetryableReview(previous)
             ? 'review_put_failed' : kind;
         const keepsEntry = effectiveKind === 'put'
           || effectiveKind === 'review_put_deleted'
@@ -367,7 +367,8 @@ function markOperationForFailure(ownerId, sentOp, error) {
         assertActiveOwner(ownerId);
         const current = read.result;
         if (!current || current.opId !== sentOp.opId) { setResult(false); return; }
-        const isPut = current.kind === 'put' || current.kind === 'review_put_billing';
+        const isPut = current.kind === 'put' || current.kind === 'review_put_billing'
+          || current.kind === 'review_put_failed';
         store.put({
           ...current,
           kind: isPut ? 'review_put_failed' : 'review_delete_failed',
@@ -380,6 +381,14 @@ function markOperationForFailure(ownerId, sentOp, error) {
       } catch (cause) { fail(cause); }
     };
   });
+}
+
+// Falha de upload de foto é passageira (rede, 503, timeout): fica visível
+// como revisão para não travar o boot, mas cada envio tenta de novo e uma
+// edição nova volta a ser envio comum (MOO-01).
+const RETRYABLE_REVIEW_CODES = new Set(['project_asset_upload_failed']);
+function isRetryableReview(op) {
+  return op?.kind === 'review_put_failed' && RETRYABLE_REVIEW_CODES.has(op.reviewCode);
 }
 
 function isPermanentOperationFailure(error) {
@@ -528,7 +537,7 @@ export async function verifyProjectOutboxOwner(ownerId, { signal } = {}) {
 
 async function sendOperation(ownerId, op, { signal, expectedOwnerId }) {
   assertActiveOwner(ownerId);
-  const isPut = op.kind === 'put' || op.kind === 'review_put_billing';
+  const isPut = op.kind === 'put' || op.kind === 'review_put_billing' || isRetryableReview(op);
   if (isPut && op.assets?.length) {
     const uploaded = await uploadAssetsBestEffort(new Map(op.assets), {
       owner: ownerId, signal, assertCurrent: () => assertActiveOwner(ownerId),
@@ -605,8 +614,9 @@ async function flushProjectOutboxSerial(ownerId, { signal, maxOperations = 100, 
   let sent = 0;
   const recoveries = [];
   const heldForReview = new Set(['review_delete', 'review_put_deleted', 'review_put_failed', 'review_delete_failed']);
+  const held = (op) => heldForReview.has(op.kind) && !isRetryableReview(op);
   let queue = (await listPendingProjectOps(ownerId))
-    .filter((op) => !heldForReview.has(op.kind));
+    .filter((op) => !held(op));
   for (let round = 0; round < 20 && queue.length; round += 1) {
     const operations = queue.slice(0, maxOperations);
     queue = queue.slice(maxOperations);
@@ -615,7 +625,7 @@ async function flushProjectOutboxSerial(ownerId, { signal, maxOperations = 100, 
       assertActiveOwner(ownerId);
       const op = await getPendingProjectOp(ownerId, snapshot.projectId);
       if (!op || op.opId !== snapshot.opId) continue;
-      if (heldForReview.has(op.kind)) continue;
+      if (held(op)) continue;
       let result;
       try {
         result = await sendOperation(ownerId, op, { signal, expectedOwnerId });

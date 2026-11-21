@@ -18,11 +18,14 @@ const COMMERCIAL_RULES = [
   { category: 'item incluso', regex: /\b(?:inclui|inclus[oa]s?|vem com|acompanha|includes?)\b[^.!?\n]{1,100}/giu },
 ];
 
-const NUMBERS = { um: '1', uma: '1', one: '1', dois: '2', duas: '2', two: '2', tres: '3', three: '3', quatro: '4', four: '4', cinco: '5', five: '5', seis: '6', six: '6', sete: '7', seven: '7', oito: '8', eight: '8', nove: '9', nine: '9', dez: '10', ten: '10', vinte: '20', trinta: '30', cem: '100', hundred: '100' };
+const NUMBERS = { um: '1', uma: '1', one: '1', dois: '2', duas: '2', two: '2', tres: '3', three: '3', quatro: '4', four: '4', cinco: '5', five: '5', seis: '6', six: '6', sete: '7', seven: '7', oito: '8', eight: '8', nove: '9', nine: '9', dez: '10', ten: '10', vinte: '20', trinta: '30', cem: '100', hundred: '100',
+  onze: '11', doze: '12', treze: '13', catorze: '14', quatorze: '14', quinze: '15', dezesseis: '16', dezessete: '17', dezoito: '18', dezenove: '19',
+  eleven: '11', twelve: '12', thirteen: '13', fourteen: '14', fifteen: '15', sixteen: '16', seventeen: '17', eighteen: '18', nineteen: '19' };
+const TEENS = 'onze|doze|treze|quatorze|catorze|quinze|dezesseis|dezessete|dezoito|dezenove|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen';
 const TENS = { vinte: 20, trinta: 30, quarenta: 40, cinquenta: 50, sessenta: 60, setenta: 70, oitenta: 80, noventa: 90, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
 const SINGLE = 'um|uma|dois|duas|tr[eê]s|quatro|cinco|seis|sete|oito|nove|one|two|three|four|five|six|seven|eight|nine';
 const COMPOUND = `(?:${Object.keys(TENS).join('|')})(?:\\s+e\\s+|[ -])(?:${SINGLE})`;
-const COUNT = `(?:\\d+(?:[.,]\\d+)?|${COMPOUND}|${SINGLE}|dez|vinte|trinta|cem|ten|hundred)`;
+const COUNT = `(?:\\d+(?:[.,]\\d+)?|${COMPOUND}|${TEENS}|${SINGLE}|dez|vinte|trinta|cem|ten|hundred)`;
 // Quantidade e unidade na mesma linha: numa tabela, "41.200" seguido da
 // célula "Ano" não é a alegação "41.200 anos" (MF-04).
 const QUANTITY = new RegExp(`\\b${COUNT}[^\\S\\n]*(?:%|por cento|percent|vezes|vez|times?|anos?|years?|meses|m[eê]s|months?|semanas?|weeks?|dias?|days?|horas?|hours?|minutos?|minutes?|segundos?|seconds?|cliques?|clicks?|toques?|taps?|clientes?|customers?|patients?|pacientes?)\\b`, 'giu');
@@ -73,11 +76,22 @@ function derivedQuantityKeys(text) {
   }
   // "Em 2025 vendeu 41.200" sustenta "em um ano"; "fundada em 2019" e "em
   // 2025" sustentam "seis anos" entre as duas datas (reteste 20/11, Caso).
-  const years = [...new Set([...t.matchAll(/\b(19|20)\d{2}\b/g)].map(match => Number(match[0])))];
-  if (years.length) keys.push('1years');
+  // Só conta como ano o número introduzido como data ("em 2025", "desde
+  // 2019", "Ano 2025"); "2010 clientes" e "2000 pães" são quantidades
+  // (MOO-12). "Um ano" exige um resultado no mesmo trecho do ano.
+  const years = new Set();
+  let annualResult = false;
+  for (const clause of String(text).split(/[.!?;](?=\s|$)/u)) {
+    const c = normalize(clause);
+    const found = [...c.matchAll(YEAR_IN_CONTEXT)].map(match => match[1]);
+    found.forEach(year => years.add(Number(year)));
+    if (found.length && /\d/.test(found.reduce((rest, year) => rest.replace(year, ' '), c))) annualResult = true;
+  }
+  if (annualResult) keys.push('1years');
   for (const a of years) for (const b of years) if (b > a) keys.push(`${b - a}years`);
   return keys;
 }
+const YEAR_IN_CONTEXT = /\b(?:em|de|desde|ate|no|na|do|da|a|ano|in|since|from|to|until|year)\s+((?:19|20)\d{2})\b/g;
 const quantityKeys = text => new Set([
   ...[...String(text).matchAll(QUANTITY), ...String(text).matchAll(PERCENTAGE)].map(match => canonicalQuantity(match[0])),
   ...derivedQuantityKeys(text),
