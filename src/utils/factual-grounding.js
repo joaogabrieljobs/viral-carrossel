@@ -109,7 +109,8 @@ const ROUTINES = /\b(?:feit[oa]s? a mao|a mao|todos os dias|todo dia|toda manha|
 // pão", "no horário que você escolher", "nenhuma prensa industrial consegue
 // imitar"). Não usa a exceção do condicional: a escassez vem justamente com
 // "pode".
-const AVAILABILITY = /\b(?:pode(?:m)?\s+(?:ficar|sair)\s+sem|pode(?:m)?\s+nao\s+encontrar|quem\s+chega\s+(?:cedo|tarde|primeiro|sem)|acaba(?:m)?\s+(?:cedo|rapido|logo)|esgota(?:m|do|dos|da|das)?|estoque\s+limitado|ultimas\s+unidades|antes\s+que\s+acabe|vagas?\s+limitadas?|no\s+horario\s+que\s+(?:voce|preferir|quiser|escolher)|quando\s+(?:voce\s+)?quiser|a\s+qualquer\s+hora|(?:ja\s+)?reserva(?:m)?\s+o\s+seu|nenhum[a]?\s+(?:\S+\s+){0,3}(?:consegue|pode)\s+(?:imitar|copiar|igualar)|pouca\s+gente\s+(?:imagina|sabe|conhece))\b/gu;
+// Reteste 0b1cb62 (D07): "depende do que sobra na vitrine", "o que restou na vitrine".
+const AVAILABILITY = /\b(?:pode(?:m)?\s+(?:ficar|sair)\s+sem|pode(?:m)?\s+nao\s+encontrar|quem\s+chega\s+(?:cedo|tarde|primeiro|sem)|acaba(?:m)?\s+(?:cedo|rapido|logo)|esgota(?:m|do|dos|da|das)?|estoque\s+limitado|ultimas\s+unidades|antes\s+que\s+acabe|vagas?\s+limitadas?|no\s+horario\s+que\s+(?:voce|preferir|quiser|escolher)|quando\s+(?:voce\s+)?quiser|a\s+qualquer\s+hora|(?:ja\s+)?reserva(?:m)?\s+o\s+seu|nenhum[a]?\s+(?:\S+\s+){0,3}(?:consegue|pode)\s+(?:imitar|copiar|igualar)|pouca\s+gente\s+(?:imagina|sabe|conhece)|o\s+que\s+(?:sobra|sobrar|sobrou|sobrarem|resta|restar|restou)|vitrines?|(?:pode|podem|vai|vao|antes\s+de|ate)\s+acabar)\b/gu;
 // Reteste 21/11 (T02, T06): regra geral e atributo sensorial do produto que o
 // material não traz ("costuma levar", "crosta firme e miolo que rende").
 const GENERALIZATION = /\b(?:costuma(?:m)?|geralmente|normalmente|em geral|a maioria d[oa]s?|quase sempre|tipicamente)\b/gu;

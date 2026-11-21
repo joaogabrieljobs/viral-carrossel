@@ -396,3 +396,23 @@ describe('generalização e atributo sensorial sem fonte', () => {
     expect(audit('Crosta firme e miolo aerado.', `${padaria} O camponês tem crosta firme e miolo aerado.`)).toEqual([]);
   });
 });
+
+// Reteste 0b1cb62 (D07 Palestra, slide 8): "Sem reserva, depende do que sobra
+// na vitrine." e, na tabela, "O que restou na vitrine". O material não fala de
+// vitrine nem de sobra; o projeto saiu sem aviso.
+describe('escassez por sobra ou vitrine (D07)', () => {
+  const padaria = 'Padaria Fermento Lento no Rio Vermelho. Três pães: camponês R$ 24, integral R$ 26, brioche R$ 18. Encomendas pelo WhatsApp com 1 dia de antecedência. Retirada na padaria de terça a domingo, das 7h às 13h.';
+  const audit = text => auditDraftFactuality({ slides: [{ title: 'Chegar ou reservar', subtitle: text, bodyAfterImage: '' }] }, { count: 1, presetId: 'apresentacao', factualSource: padaria });
+  it.each([
+    'Sem reserva, depende do que sobra na vitrine.',
+    'O que restou na vitrine',
+    'Quem não reserva leva o que sobrar.',
+    'O pão pode acabar antes do meio-dia.',
+  ])('marca "%s"', (frase) => {
+    expect(audit(frase).map(item => item.category)).toContain('disponibilidade ou escassez sem fonte');
+  });
+  it('a vitrine que está no material não é marcada', () => {
+    expect(auditDraftFactuality({ slides: [{ title: 'Pão', subtitle: 'Os pães ficam na vitrine.', bodyAfterImage: '' }] },
+      { count: 1, presetId: 'apresentacao', factualSource: `${padaria} Os pães ficam expostos na vitrine.` })).toEqual([]);
+  });
+});

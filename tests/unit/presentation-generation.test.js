@@ -142,12 +142,14 @@ describe('apresentação planejada e revisada', () => {
     { edits: [], slides: [{ title: 'Outro deck' }] },
     { edits: [{ slideIndex: 0, reason: 'Trocar imagem', imageQuery: 'another image' }] },
   ])('rejeita resposta de revisão que mistura patches e campos de geração (%j)', async review => {
-    const ai = vi.fn().mockResolvedValueOnce(plan()).mockResolvedValueOnce(draft()).mockResolvedValueOnce(review);
+    // Reteste 0b1cb62 (D06): resposta fora do formato ganha uma segunda tentativa.
+    const ai = vi.fn().mockResolvedValueOnce(plan()).mockResolvedValueOnce(draft()).mockResolvedValueOnce(review).mockResolvedValueOnce(structuredClone(review));
     const output = await generateReviewedCarousel({ prompt: '', config: config() }, ai);
     expect(output.reviewStatus).toBe('unavailable');
     expect(output.result.slides[0].title).toBe(draft().slides[0].title);
     expect(output.result.slides[0].imageQuery).toBe(draft().slides[0].imageQuery);
-    expect(ai).toHaveBeenCalledTimes(3);
+    expect(ai).toHaveBeenCalledTimes(4);
+    expect(output.reviewDiagnostics.map(item => item.outcome)).toEqual(['invalid_response', 'invalid_response']);
   });
 
   it('cancelamento entre plano e redação impede a próxima chamada', async () => {
@@ -501,5 +503,61 @@ describe('lote B — frase única longa', () => {
     const { slides: [out] } = moveOverflowToSpeakerNotes(slides, [{ subtitle: { maxChars: 50 } }]);
     expect(out.subtitle).toBe('A padaria vendeu 41.200 pães em 2025.');
     expect(out.speakerNotes).toBe('Volume que reforça a importância da antecedência.');
+  });
+});
+
+// Reteste 0b1cb62 (D02 Pitch): "1 dia de antecedência" em 6 subtítulos e em
+// vários blocos; a regra ia no prompt da revisão e o modelo ignorou.
+describe('repetição de fato na apresentação planejada', () => {
+  const comFonte = () => config({ planningContext: { brief: 'Criar apresentação.', sources: [{ id: 'brief', text: 'O software está construído. A assinatura ainda está em estudo. O piloto pago será a próxima validação. Encomendas pelo WhatsApp com 1 dia de antecedência; retire no horário.' }] } });
+  const repetido = () => ({
+    slides: [
+      { title: 'Um histórico contínuo', subtitle: 'Peça com 1 dia de antecedência.', bodyAfterImage: '', imageQuery: '', speakerNotes: '' },
+      { title: 'Validar a assinatura', subtitle: 'O pedido sai com um dia de antecedência.', bodyAfterImage: '', imageQuery: '', speakerNotes: '',
+        presentationBlocks: [{ type: 'steps', items: [{ title: 'Pedir', body: 'Encomende com 1 dia de antecedência.' }, { title: 'Retirar', body: 'Retire no horário.' }] }] },
+      { title: 'Preparar o piloto pago', subtitle: 'Encomende com 1 dia de antecedência.', bodyAfterImage: '', imageQuery: '', speakerNotes: '' },
+    ], caption: 'Próximos passos.',
+  });
+
+  it('conta blocos e "um dia" como o mesmo fato', async () => {
+    const { repeatedFactSlides } = await import('../../src/utils/editorial-review.js');
+    expect(repeatedFactSlides(repetido().slides)).toEqual([{ fact: '1 dia', slideIndexes: [0, 1, 2] }]);
+  });
+
+  it('a revisão que deixa a repetição ganha um reparo dirigido', async () => {
+    const reparo = { edits: [{ slideIndex: 1, reason: 'Repetição', subtitle: 'Uma oferta em estudo.', presentationBlocks: [{ type: 'steps', items: [{ title: 'Pedir', body: 'Encomende pelo WhatsApp.' }, { title: 'Retirar', body: 'Retire no horário.' }] }] }] };
+    const ai = vi.fn().mockResolvedValueOnce(plan()).mockResolvedValueOnce(repetido()).mockResolvedValueOnce({ edits: [] }).mockResolvedValueOnce(reparo);
+    const output = await generateReviewedCarousel({ prompt: 'Material.', config: comFonte() }, ai);
+    expect(ai).toHaveBeenCalledTimes(4);
+    expect(ai.mock.calls[3][0]).toContain('REPARO DE REPETIÇÃO');
+    expect(ai.mock.calls[3][0]).toContain('"1 dia"');
+    expect(output.result.slides[1].subtitle).toBe('Uma oferta em estudo.');
+    expect(output.reviewStatus).toBe('repaired');
+  });
+
+  it('reparo de repetição que falha não vira rascunho preservado', async () => {
+    const ai = vi.fn().mockResolvedValueOnce(plan()).mockResolvedValueOnce(repetido()).mockResolvedValueOnce({ edits: [] }).mockRejectedValueOnce(new Error('503'));
+    const output = await generateReviewedCarousel({ prompt: 'Material.', config: comFonte() }, ai);
+    expect(output.reviewStatus).toBe('unchanged');
+  });
+});
+
+// Reteste 0b1cb62 (D06 Caso): a revisão da apresentação não rodou e não ficou
+// registrado por quê. A segunda tentativa só existia no carrossel.
+describe('revisão da apresentação planejada que falha', () => {
+  it('resposta fora do formato ganha uma segunda tentativa, com o motivo registrado', async () => {
+    const ai = vi.fn().mockResolvedValueOnce(plan()).mockResolvedValueOnce(draft()).mockResolvedValueOnce({ foo: 'x' }).mockResolvedValueOnce({ edits: [] });
+    const output = await generateReviewedCarousel({ prompt: 'Material.', config: config() }, ai);
+    expect(ai).toHaveBeenCalledTimes(4);
+    expect(output.reviewStatus).toBe('unchanged');
+    expect(output.reviewDiagnostics).toEqual([expect.objectContaining({ attempt: 1, outcome: 'invalid_response' }), expect.objectContaining({ attempt: 2, outcome: 'applied' })]);
+  });
+
+  it('queda do serviço não repete e fica registrada', async () => {
+    const ai = vi.fn().mockResolvedValueOnce(plan()).mockResolvedValueOnce(draft()).mockRejectedValueOnce(Object.assign(new Error('Serviço indisponível'), { status: 503 }));
+    const output = await generateReviewedCarousel({ prompt: 'Material.', config: config() }, ai);
+    expect(ai).toHaveBeenCalledTimes(3);
+    expect(output.reviewStatus).toBe('unavailable');
+    expect(output.reviewDiagnostics).toEqual([expect.objectContaining({ attempt: 1, outcome: 'request_failed', status: 503 })]);
   });
 });

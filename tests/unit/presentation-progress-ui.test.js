@@ -13,6 +13,14 @@ const plan = {
 const slides = [{ title: 'Decida com critérios', subtitle: 'Organize as informações antes de escolher.' }];
 
 describe('acompanhamento de apresentações', () => {
+  // Reteste 0b1cb62 (D06): o aviso do Caso sem "antes" era um toast que some
+  // e não aparecia quando a revisão falhava. Fica fixo, com ou sem revisão.
+  it.each(['unavailable', 'revised', 'reviewed_by_user'])('aviso de material do Caso aparece com status %s', (status) => {
+    const html = renderToStaticMarkup(React.createElement(EditorialReviewNotice, { status, isPresentation:true,
+      materialNotice:'Seu material não traz um ponto de partida (o "antes").' }));
+    expect(html).toContain('ponto de partida');
+    expect(html).toContain('aria-label="Aviso sobre o material"');
+  });
   it('título repetido tem explicação própria no aviso (reteste 21/11, T05)', () => {
     const html = renderToStaticMarkup(React.createElement(EditorialReviewNotice, { status:'needs_attention', issues:[
       { kind:'repeated_title', slideIndex:3, field:'title', code:'social_title_repeated' },

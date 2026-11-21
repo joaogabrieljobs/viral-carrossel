@@ -30,7 +30,23 @@ function issueDescription(issue) {
   return 'confira este ponto do rascunho antes de exportar.';
 }
 
-export default function EditorialReviewNotice({ status, issues = [], isPresentation = false, onReviewed }) {
+/** MF-11: aviso sobre o material (ex.: Caso sem "antes"), fora do slide e independente da revisão. */
+function MaterialNotice({ text, onDismiss }) {
+  if (!text) return null;
+  return <section className="vc-editor-review-notice" aria-label="Aviso sobre o material">
+    <strong>Sobre o material</strong>
+    <p>{text}</p>
+    {onDismiss && <button type="button" className="vc-btn vc-btn-ghost" onClick={onDismiss}>Entendi</button>}
+  </section>;
+}
+
+export default function EditorialReviewNotice({ materialNotice = '', onDismissMaterialNotice, ...props }) {
+  const material = <MaterialNotice text={materialNotice} onDismiss={onDismissMaterialNotice} />;
+  const review = <ReviewNotice {...props} />;
+  return materialNotice ? <>{material}{review}</> : review;
+}
+
+function ReviewNotice({ status, issues = [], isPresentation = false, onReviewed }) {
   if (!['needs_attention', 'unavailable'].includes(status)) return null;
   const items = Array.isArray(issues) ? issues : [];
   const incomplete = items.find(issue => issue.code === 'presentation_incomplete');

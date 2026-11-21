@@ -37,9 +37,12 @@ describe('âncora em todas as imagens do projeto com pessoa na ficha', () => {
   ] };
   const anchor = 'data:image/png;base64,AAAA';
 
-  it('cena sem palavra de pessoa recebe a âncora condicional', async () => {
+  it('cena com outras pessoas, sem citar a padeira, recebe a âncora condicional', async () => {
     const { planPersonAnchor } = await import('../../src/utils/visual-bible.js');
-    for (const q of ['small neighborhood bakery storefront morning light Salvador Brazil', 'small bakery team working together flour dusted aprons morning', 'customer picking up bread order from bakery counter warm tone']) {
+    // Reteste 0b1cb62 (E04): cena sem pessoa nenhuma (fachada) não recebe mais
+    // a âncora; ela fazia a padeira aparecer em toda foto.
+    expect(planPersonAnchor({ visualBible: t04, imageQuery: 'small neighborhood bakery storefront morning light Salvador Brazil', anchorUrl: anchor, refCount: 0 }).refImages).toEqual([]);
+    for (const q of ['small bakery team working together flour dusted aprons morning', 'customer picking up bread order from bakery counter warm tone']) {
       const plan = planPersonAnchor({ visualBible: t04, imageQuery: q, anchorUrl: anchor, refCount: 0 });
       expect(plan.refImages).toEqual([anchor]);
       expect(plan.direction).toMatch(/marta/);
@@ -68,8 +71,8 @@ describe('âncora em todas as imagens do projeto com pessoa na ficha', () => {
   it('sem pessoa na ficha, sem âncora ou com 4 referências, nada muda', async () => {
     const { planPersonAnchor } = await import('../../src/utils/visual-bible.js');
     expect(planPersonAnchor({ visualBible: { entities: [t04.entities[0]] }, imageQuery: 'bread', anchorUrl: anchor, refCount: 0 })).toMatchObject({ refImages: [], direction: '', canBecomeAnchor: false });
-    expect(planPersonAnchor({ visualBible: t04, imageQuery: 'storefront', anchorUrl: anchor, refCount: 4 })).toMatchObject({ refImages: [], direction: '' });
-    expect(planPersonAnchor({ visualBible: t04, imageQuery: 'storefront', anchorUrl: null, refCount: 0 })).toMatchObject({ refImages: [], direction: '', canBecomeAnchor: false });
+    expect(planPersonAnchor({ visualBible: t04, imageQuery: 'bakery team at work', anchorUrl: anchor, refCount: 4 })).toMatchObject({ refImages: [], direction: '' });
+    expect(planPersonAnchor({ visualBible: t04, imageQuery: 'bakery team at work', anchorUrl: null, refCount: 0 })).toMatchObject({ refImages: [], direction: '', canBecomeAnchor: false });
   });
 });
 
@@ -86,5 +89,46 @@ describe('âncora ao refazer uma imagem só', () => {
     expect(pickPersonAnchorSlide(slides, t04, 'd')?.id).toBe('b');
     expect(pickPersonAnchorSlide(slides, t04, 'b')).toBe(null);
     expect(pickPersonAnchorSlide(slides, { entities: [{ id: 'bread', en: 'Artisan sourdough loaves with rustic golden crust on boards', never: '' }] }, 'd')).toBe(null);
+  });
+});
+
+// Reteste 0b1cb62 (E04, jvq0rbj): a ficha da padeira trazia ação e lugar
+// ("kneading dough on floured wooden table") e seguia em todo pedido com a
+// âncora. As 6 fotos repetiram a mesma cena; o card 3, "Três pães saem do
+// forno" ("three types of rustic bread loaves on dark wooden bakery counter"),
+// mostrou massa crua.
+describe('âncora fixa só a identidade, não a cena', () => {
+  const e04 = { entities: [
+    { id: 'marta', en: 'woman baker wearing apron, kneading dough on floured wooden table in small artisan bakery', never: '' },
+    { id: 'bread-loaves', en: 'rustic sourdough bread loaves, golden crust, round and oval shapes, resting on wooden proofing baskets', never: '' },
+  ] };
+  const anchor = 'data:image/png;base64,AAAA';
+
+  it('cena sem pessoa não recebe âncora e tira a pessoa da ficha', async () => {
+    const { planPersonAnchor, composeSceneDirection } = await import('../../src/utils/visual-bible.js');
+    for (const q of ['three types of rustic bread loaves on dark wooden bakery counter', 'small bakery storefront morning light open sign wooden door']) {
+      const plan = planPersonAnchor({ visualBible: e04, imageQuery: q, anchorUrl: anchor, refCount: 0 });
+      expect(plan.refImages).toEqual([]);
+      expect(plan.excludeEntityIds).toEqual(['marta']);
+      const scene = composeSceneDirection({ visualBible: e04, slide: {}, excludeEntityIds: plan.excludeEntityIds });
+      expect(scene).not.toMatch(/kneading|marta/);
+      expect(scene).toMatch(/bread-loaves/);
+    }
+  });
+
+  it('cena com outras pessoas recebe a âncora condicional', async () => {
+    const { planPersonAnchor } = await import('../../src/utils/visual-bible.js');
+    const plan = planPersonAnchor({ visualBible: e04, imageQuery: 'bakery staff handing bread loaf to customer across counter', anchorUrl: anchor, refCount: 0 });
+    expect(plan.refImages).toEqual([anchor]);
+    expect(plan.direction).toMatch(/If "marta" appears/);
+    expect(plan.excludeEntityIds).toEqual([]);
+  });
+
+  it('a ficha vale só para a aparência; ação, pose e lugar vêm do tema do card', async () => {
+    const { composeSubjectsDirection, PERSON_IDENTITY_DIRECTION, buildVisualBiblePromptRules } = await import('../../src/utils/visual-bible.js');
+    expect(composeSubjectsDirection(e04)).toMatch(/appearance only/i);
+    expect(composeSubjectsDirection(e04)).toMatch(/THEME OF THIS CARD decides/);
+    expect(PERSON_IDENTITY_DIRECTION).toMatch(/only from THEME OF THIS CARD/);
+    expect(buildVisualBiblePromptRules()).toMatch(/sem ação, pose ou lugar/);
   });
 });

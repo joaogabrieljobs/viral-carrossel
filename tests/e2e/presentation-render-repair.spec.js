@@ -52,6 +52,10 @@ for (const fontsAvailable of [true, false]) test(fontsAvailable
               purpose: index === 0 ? 'introduction' : index === 5 ? 'decision' : index === 1 ? 'comparison' : 'learning',
               question: 'Qual critério precisa ser definido?', keyMessage: 'As ofertas permanecem em estudo até definir escopo e condições.', evidenceIds: [], imageBrief: '',
             })) };
+        } else if (user.startsWith('REVISÃO DE APRESENTAÇÃO') && user.includes('REPARO DE REPETIÇÃO')) {
+          // Reteste 0b1cb62: títulos iguais ("Definir antes de oferecer") pedem
+          // um reparo de repetição depois da revisão. Sem edição, o deck segue.
+          stages.push('repetition-repair'); data = { edits: [] };
         } else if (user.startsWith('REVISÃO DE APRESENTAÇÃO')) {
           stages.push('editorial-review'); data = { edits: [] };
         } else if (user.startsWith('REPARO VISUAL MEDIDO')) {
@@ -109,7 +113,7 @@ for (const fontsAvailable of [true, false]) test(fontsAvailable
     expect(preserved.presentationQuality.renderRepairStatus).toBe('unavailable');
     expect(preserved.presentationQuality.renderedIssues).toEqual([expect.objectContaining({ code: 'render-assets-unavailable', severity: 'warning' })]);
     await expect(page.getByText('Apresentação criada e preservada. A conferência visual ficou pendente porque uma fonte ou imagem não carregou. Confira antes de exportar.', { exact: true })).toBeVisible();
-    expect(stages).toEqual(['plan', 'write', 'write', 'editorial-review']);
+    expect(stages).toEqual(['plan', 'write', 'write', 'editorial-review', 'repetition-repair']);
     return;
   }
   try {
@@ -129,5 +133,5 @@ for (const fontsAvailable of [true, false]) test(fontsAvailable
   await expect(exportedBlock.locator('thead th')).toHaveCount(4);
   await expect(exportedBlock.locator('tbody td').first()).toHaveText('Em estudo: oferta.');
   expect(await exportedBlock.evaluate(node => node.scrollHeight <= node.clientHeight + 3)).toBe(true);
-  expect(stages).toEqual(['plan', 'write', 'write', 'editorial-review', 'render-repair']);
+  expect(stages).toEqual(['plan', 'write', 'write', 'editorial-review', 'repetition-repair', 'render-repair']);
 });

@@ -375,11 +375,18 @@ export function repeatedTitleIndexes(slides) {
  * antecedência") aparecia em 5 a 9 slides. Número com unidade presente no
  * texto visível de 3 ou mais slides.
  */
+const blockText = value => typeof value === 'string' ? value : Array.isArray(value)
+  ? value.map(blockText).join(' ') : isObject(value) ? Object.values(value).map(blockText).join(' ') : '';
+const NUMBER_WORDS = { um: 1, uma: 1, dois: 2, duas: 2, tres: 3, 'três': 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10 };
+
 export function repeatedFactSlides(slides) {
   const seen = new Map();
   (Array.isArray(slides) ? slides : []).forEach((slide, index) => {
-    const text = ['title', 'subtitle', 'bodyAfterImage'].map(field => String(slide?.[field] || '')).join(' ')
-      .replace(/[*_]/g, '').toLowerCase();
+    // Reteste 0b1cb62 (D02): o fato repetia também nos blocos e como "um dia".
+    const text = [...['title', 'subtitle', 'bodyAfterImage'].map(field => String(slide?.[field] || '')), blockText(slide?.presentationBlocks)].join(' ')
+      .replace(/[*_]/g, '').toLowerCase()
+      .replace(/\b(um|uma|dois|duas|tr[eê]s|quatro|cinco|seis|sete|oito|nove|dez)\s+(dias?|horas?|semanas?|m[eê]s|meses|anos?)\b/gu,
+        (_, word, unit) => `${NUMBER_WORDS[word] ?? NUMBER_WORDS[word.normalize('NFD').replace(/\p{M}/gu, '')]} ${unit}`);
     const facts = new Set((text.match(/r\$\s?\d[\d.,]*|\d[\d.,]*\s*(?:%|\p{L}{2,})/gu) || [])
       .map(fact => fact.replace(/\s+/g, ' ').replace(/[.,]$/, '').trim()));
     facts.forEach(fact => seen.set(fact, [...(seen.get(fact) || []), index]));
@@ -894,6 +901,8 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
     aiOptions: textOptions, onStage, onPlan,
   }, callAI);
   let writingDiagnostics = [];
+  // Reteste 0b1cb62 (D06): a revisão não rodou e não ficou registrado por quê.
+  const reviewDiagnostics = [];
   // Visible native blocks and speaker notes carry factual claims as well.
   // This conservative check flags calculations/paraphrases for review; it
   // never deletes them or presents a literal matcher as a truth verifier.
@@ -904,7 +913,7 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
   })) }, factualConfig).map(issue => ({ ...issue, kind: 'factual' }));
   const finish = (result, reviewStatus, extra = {}) => {
     const facts = factsOf(result);
-    return { result, plan, planningDiagnostics, writingDiagnostics, reviewStatus: facts.length ? 'needs_attention' : reviewStatus, ...extra,
+    return { result, plan, planningDiagnostics, writingDiagnostics, reviewDiagnostics, reviewStatus: facts.length ? 'needs_attention' : reviewStatus, ...extra,
       ...((facts.length || extra.violations?.length) ? { violations: [...(extra.violations || []), ...facts] } : {}) };
   };
   const plannedConfig = {
@@ -945,10 +954,39 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
   // Lote B (21/11): 5 de 7 apresentações nasciam como "Rascunho preservado",
   // quase todas por "garante"/"garantido" que a revisão não tirou. Antes de
   // entregar com aviso, uma chamada corrige só os slides com detalhe sem fonte.
+  // Reteste 0b1cb62 (D02): a regra de repetição ia no prompt da revisão e o
+  // modelo a ignorava. Sobrando título repetido ou fato em 3+ slides, um reparo
+  // dirigido; se falhar ou não melhorar, o deck segue como estava (repetição
+  // é qualidade, não fato sem fonte).
+  const repetitionOf = slides => {
+    const facts = repeatedFactSlides(slides);
+    const titles = repeatedTitleIndexes(slides);
+    return { facts, titles, size: facts.reduce((sum, item) => sum + item.slideIndexes.length - 2, 0) + titles.length };
+  };
+  const settleRepetition = async (result, reviewStatus, extra) => {
+    const repetition = repetitionOf(result.slides);
+    if (!repetition.size) return finish(result, reviewStatus, extra);
+    const targets = [...new Set([...repetition.facts.flatMap(item => item.slideIndexes), ...repetition.titles])].sort((a, b) => a - b);
+    onStage?.('repairing');
+    try {
+      const repair = await callAI(`${buildEditorialReviewPrompt(briefing, result, plannedConfig)}
+REPARO DE REPETIÇÃO: edite somente os slides com slideIndex ${targets.join(', ')}.${repetition.facts.length ? ` Fatos que se repetem: ${repetition.facts.map(item => `"${item.fact}" nos slideIndex ${item.slideIndexes.join(', ')}`).join('; ')}. Mantenha cada fato só nos slides em que ele é o assunto; nos outros, troque por outra informação do material ou condense.` : ''}${repetition.titles.length ? ` Títulos que repetem um anterior: slideIndex ${repetition.titles.join(', ')}; reescreva com a ideia própria do slide.` : ''} Inclua presentationBlocks quando a repetição estiver no bloco. Não acrescente fatos, não mude quantidade nem ordem.`, reviewOptions);
+      throwIfGenerationCancelled(aiOptions?.signal);
+      if (!Array.isArray(repair?.edits) || repair.edits.some(edit => !targets.includes(edit?.slideIndex))) throw new Error('Reparo fora do escopo');
+      const repaired = applyEditorialReview(result, repair, plannedConfig, { deferQualityChecks: true });
+      if (repetitionOf(repaired.slides).size < repetition.size && factsOf(repaired).length <= factsOf(result).length
+        && overLimits(repaired.slides).length <= overLimits(result.slides).length) {
+        return finish(repaired, 'repaired', extra);
+      }
+    } catch (error) {
+      if (isGenerationCancelled(error) || aiOptions?.signal?.aborted) throw error;
+    }
+    return finish(result, reviewStatus, extra);
+  };
   const settle = async (result, reviewStatus, extra = {}) => {
     const facts = factsOf(result);
     const indexes = [...new Set(facts.map(item => item.slideIndex).filter(Number.isInteger))];
-    if (!indexes.length) return finish(result, reviewStatus, extra);
+    if (!indexes.length) return settleRepetition(result, reviewStatus, extra);
     onStage?.('repairing');
     try {
       const repair = await callAI(`${buildEditorialReviewPrompt(briefing, result, plannedConfig)}
@@ -965,13 +1003,31 @@ REPARO DE FATOS: edite somente os slides com slideIndex ${indexes.join(', ')}. E
     return finish(result, reviewStatus, extra);
   };
   let review;
-  try {
-    review = await callAI(reviewPrompt, reviewOptions);
-    throwIfGenerationCancelled(aiOptions?.signal);
-    const result = applyEditorialReview(draft, review, plannedConfig);
-    return settle(result, JSON.stringify(result) === JSON.stringify(draft) ? 'unchanged' : 'revised');
-  } catch (error) {
-    if (isGenerationCancelled(error) || aiOptions?.signal?.aborted) throw error;
+  // Resposta fora do formato ganha uma segunda tentativa; erro da chamada
+  // (serviço fora) não repete. Cada tentativa fica registrada.
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    let responded = false;
+    try {
+      const response = await callAI(reviewPrompt, reviewOptions);
+      throwIfGenerationCancelled(aiOptions?.signal);
+      responded = true;
+      review = response;
+      const result = applyEditorialReview(draft, response, plannedConfig);
+      reviewDiagnostics.push({ attempt, outcome: 'applied' });
+      return settle(result, JSON.stringify(result) === JSON.stringify(draft) ? 'unchanged' : 'revised');
+    } catch (error) {
+      if (isGenerationCancelled(error) || aiOptions?.signal?.aborted) throw error;
+      // Revisão válida que só passou do limite segue para o reparo de excesso
+      // abaixo (MF-04), sem nova tentativa.
+      const validButLong = responded && leniently(() => { applyEditorialReview(draft, review, plannedConfig, { deferQualityChecks: true }); return true; }, false);
+      if (validButLong) { reviewDiagnostics.push({ attempt, outcome: 'over_limits' }); break; }
+      reviewDiagnostics.push({
+        attempt, outcome: responded ? 'invalid_response' : 'request_failed',
+        ...(Number.isInteger(error?.status) ? { status: error.status } : {}),
+        message: String(error?.message || '').slice(0, 160),
+      });
+      if (!responded) break;
+    }
   }
   // MF-04: a revisão era tudo-ou-nada. Se o texto revisado ainda passava do
   // limite, as correções de fato da mesma resposta iam embora, o reparo

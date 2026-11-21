@@ -5020,12 +5020,14 @@ export default function App() {
       const baseRefs = await runAIJob(() => resolveImageReferences(styleKit, generationSnap.refImage, generationSnap.refImageId || generationSnap.refImageAssetId, generationSnap.imageReferences), job.signal);
       // MF-03: refazer uma imagem só também segura o rosto da pessoa da ficha,
       // usando a foto já gerada de um card em que ela aparece.
-      let anchorPlan = { refImages: [], direction: '' };
-      const anchorSlide = fmt !== 'apresentacao' ? pickPersonAnchorSlide(liveSlides, doc.visualBible, slideId) : null;
-      if (anchorSlide) {
-        const anchorEntry = await imageGet(anchorSlide.bgImageId).catch(() => null);
+      // Reteste 0b1cb62 (E04): cena sem pessoa tira a pessoa da ficha e não
+      // recebe a âncora; o plano é calculado mesmo sem foto de referência.
+      let anchorPlan = { refImages: [], direction: '', excludeEntityIds: [] };
+      if (fmt !== 'apresentacao') {
+        const anchorSlide = pickPersonAnchorSlide(liveSlides, doc.visualBible, slideId);
+        const anchorEntry = anchorSlide ? await imageGet(anchorSlide.bgImageId).catch(() => null) : null;
         const anchorUrl = anchorEntry?.blob ? await blobParaDataUrl(anchorEntry.blob).catch(() => null) : null;
-        if (anchorUrl) anchorPlan = planPersonAnchor({ visualBible: doc.visualBible, imageQuery: imageState.query, anchorUrl, refCount: baseRefs.length });
+        anchorPlan = planPersonAnchor({ visualBible: doc.visualBible, imageQuery: imageState.query, anchorUrl, refCount: baseRefs.length });
       }
       const url = await generateDALLEWithRetry(imageState.query, openaiKey, imgParams, {
         signal: job.signal,
@@ -5033,7 +5035,7 @@ export default function App() {
         imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(generationSnap, [imageState.extraPrompt, anchorPlan.direction].filter(Boolean).join('\n'))),
         // Ficha visual do projeto + enquadramento do painel, junto do tema; a
         // proporção acompanha a zona real da foto, não o formato do card.
-        sceneDirection: composeSceneDirection({ visualBible: doc.visualBible, slide: generationSnap, fmt }),
+        sceneDirection: composeSceneDirection({ visualBible: doc.visualBible, slide: generationSnap, fmt, excludeEntityIds: anchorPlan.excludeEntityIds }),
         aspectRatio: imageAspectRatioForSlide(generationSnap, fmt),
         usageContext: {
           projectId: generationProjectId,
@@ -5667,7 +5669,7 @@ ${jsonShapeLine}`;
       brandBlock,
       styleKitTextHint,
     ].filter(Boolean).join('\n');
-    const { result, reviewStatus, plan: generationPlan, incomplete: generationIncomplete = false, interruptionReason: generationInterruptionReason, writingDiagnostics: generationWritingDiagnostics = [], completedCount: generatedCount, totalCount: requestedCount, violations: editorialViolations = [], issues: editorialIssues = [] } = await generateReviewedCarousel({
+    const { result, reviewStatus, plan: generationPlan, incomplete: generationIncomplete = false, interruptionReason: generationInterruptionReason, writingDiagnostics: generationWritingDiagnostics = [], reviewDiagnostics: generationReviewDiagnostics = [], completedCount: generatedCount, totalCount: requestedCount, violations: editorialViolations = [], issues: editorialIssues = [] } = await generateReviewedCarousel({
       prompt,
       config: {
         count: Number(count),
@@ -5786,7 +5788,6 @@ ${jsonShapeLine}`;
     const pathMaterialNotice = isPresentationGeneration && !remix
       ? presentationPathMaterialNotice(presentationPathId, [topic, materialFactualSource].filter(Boolean).join('\n'))
       : '';
-    if (pathMaterialNotice) toast(pathMaterialNotice, 'info', 9000);
     if (reviewStatus === 'needs_attention') {
       toast(generationIncomplete
         ? `Preservei ${generatedCount} de ${requestedCount} slides. ${presentationInterruptionMessage(generationInterruptionReason) || 'A geração parou antes de completar a apresentação.'} Confira o rascunho no editor.`
@@ -6084,12 +6085,17 @@ ${jsonShapeLine}`;
         : [],
       ...(generationPlan ? {
         presentationPlan: generationPlan,
+        // MF-11: aviso do Caso sem ponto de partida, gravado no projeto para
+        // aparecer fixo (o toast sumia e saía junto com o aviso da revisão).
+        presentationMaterialNotice: pathMaterialNotice || '',
         presentationQuality: {
           version: 1,
           reviewStatus,
           ...(generationIncomplete ? { incomplete: true, completedCount: generatedCount, totalCount: requestedCount } : {}),
           ...(presentationInterruptionMessage(generationInterruptionReason) ? { interruptionReason: generationInterruptionReason } : {}),
           writingDiagnostics: generationWritingDiagnostics,
+          // Reteste 0b1cb62 (D06): motivo de cada tentativa da revisão.
+          reviewDiagnostics: generationReviewDiagnostics,
           repairs: visualQuality?.repairs || [],
           issues: visualQuality?.issues || [],
           checkedAt: new Date().toISOString(),
@@ -6169,11 +6175,11 @@ ${jsonShapeLine}`;
           try {
             checkActive();
             const baseRefs = await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId, newSlides[i]?.imageReferences);
-            // Reteste T04: a âncora vai em toda imagem do projeto com pessoa
-            // na ficha (a ficha segue em todo pedido), não só quando a cena a cita.
+            // Reteste T04: a âncora vai em toda imagem com pessoa na cena. Reteste
+            // 0b1cb62 (E04): cena sem pessoa não recebe a âncora nem a pessoa da ficha.
             const anchorPlan = anchorPerson
               ? planPersonAnchor({ visualBible: generationVisualBible, imageQuery: q, anchorUrl: personAnchor.url, refCount: baseRefs.length })
-              : { refImages: [], direction: '', canBecomeAnchor: false };
+              : { refImages: [], direction: '', canBecomeAnchor: false, excludeEntityIds: [] };
             const url = await generateDALLEWithRetry(q, openaiKey, effectiveAxes, {
               signal: job.signal,
               refImages: [...baseRefs, ...anchorPlan.refImages],
@@ -6185,6 +6191,7 @@ ${jsonShapeLine}`;
                 visualBible: isPresentationGeneration ? null : generationVisualBible,
                 slide: newSlides[i],
                 fmt: isPresentationGeneration ? 'apresentacao' : (fmt && fmt !== 'apresentacao' ? fmt : 'carrossel'),
+                excludeEntityIds: anchorPlan.excludeEntityIds,
               }),
               aspectRatio: generationPlan
                 ? presentationPhotoAspectRatio(newSlides[i])
@@ -7237,12 +7244,12 @@ Retorne APENAS JSON: ${refineAllWantsBody
             const baseRefs = await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId, newSlides[i]?.imageReferences);
             const anchorPlan = fmt !== 'apresentacao'
               ? planPersonAnchor({ visualBible: doc.visualBible, imageQuery: q, anchorUrl: templateAnchor.url, refCount: baseRefs.length })
-              : { refImages: [], direction: '', canBecomeAnchor: false };
+              : { refImages: [], direction: '', canBecomeAnchor: false, excludeEntityIds: [] };
             const url = await generateDALLEWithRetry(q, openaiKey, imgParams, {
               signal: templateJob.signal,
               refImages: [...baseRefs, ...anchorPlan.refImages],
               imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(newSlides[i], [newSlides[i]?.imgExtraPrompt, anchorPlan.direction].filter(Boolean).join('\n'))),
-              sceneDirection: composeSceneDirection({ visualBible: doc.visualBible, slide: newSlides[i], fmt: fmt === 'apresentacao' ? 'carrossel' : fmt }),
+              sceneDirection: composeSceneDirection({ visualBible: doc.visualBible, slide: newSlides[i], fmt: fmt === 'apresentacao' ? 'carrossel' : fmt, excludeEntityIds: anchorPlan.excludeEntityIds }),
               aspectRatio: imageAspectRatioForSlide(newSlides[i], fmt === 'apresentacao' ? 'carrossel' : fmt),
               usageContext: {
                 projectId,
@@ -8203,7 +8210,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
               <GenerationPreview active={!!generationRef.current && !!genProgress} startedAt={generationPreviewContext.startedAt} progress={genProgress} slides={creationPreviewSlides} phase={creationPreviewPhase} isPresentation={generationPreviewContext.isPresentation} plan={creationPreviewPlan} completedCount={creationPreviewCompletedCount} totalCount={creationPreviewTotalCount}/>
               {!genProgress && <button type="button" className="vc-btn vc-btn-ghost" onClick={() => { setCreationPreviewSlides([]); setGenerationPreviewContext(null); }}>Fechar prévia da geração</button>}
             </div>}
-            <EditorialReviewNotice status={doc.editorialReviewStatus} issues={doc.editorialReviewIssues} isPresentation={isPresentationProject} onReviewed={() => history.set(current => ({ ...current, editorialReviewStatus:'reviewed_by_user', editorialReviewIssues:[] }))}/>
+            <EditorialReviewNotice status={doc.editorialReviewStatus} issues={doc.editorialReviewIssues} isPresentation={isPresentationProject} onReviewed={() => history.set(current => ({ ...current, editorialReviewStatus:'reviewed_by_user', editorialReviewIssues:[] }))}
+              materialNotice={isPresentationProject ? doc.presentationMaterialNotice || '' : ''}
+              onDismissMaterialNotice={() => history.set(current => ({ ...current, presentationMaterialNotice: '' }))}/>
             {empty ? (
               // Empty state
               <div className="empty-grid" style={{

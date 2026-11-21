@@ -57,7 +57,7 @@ export function buildVisualBiblePromptRules() {
 • Preencha quando o material descreve pessoas, objetos ou lugares concretos que aparecem nas imagens. Até ${VISUAL_BIBLE_MAX_ENTITIES} entidades, uma por pessoa, objeto ou lugar; a mesma entidade vale para todas as imagens em que ela aparece.
 • Cada entidade: "id" curto em minúsculas; "en" em INGLÊS, 12–40 palavras, com TODOS os atributos visíveis que o material informa — cor, material, forma, quantidade, posição, roupa; "never" em INGLÊS com o que o material nega ou exclui para essa entidade ("" se nada).
 • Copie os atributos do material. Não invente idade, etnia, marca, estampa ou detalhe ausente; o que o material não informa fica de fora da ficha.
-• A ficha guarda o que NÃO muda. A imageQuery de cada card descreve só a cena: ação, estado do objeto naquele momento, ângulo e enquadramento.
+• A ficha guarda o que NÃO muda: aparência, sem ação, pose ou lugar ("kneading dough on a table" fica na imageQuery, não na ficha). A imageQuery de cada card descreve só a cena: ação, estado do objeto naquele momento, ângulo e enquadramento. Card sem a pessoa não cita a pessoa na imageQuery.
 • Material sem elementos visuais concretos: "visualBible": {"entities": []}.`;
 }
 
@@ -66,20 +66,25 @@ export function buildVisualBiblePromptRules() {
  * na "direção da marca": acrescentar a ficha não pode trocar a linguagem
  * visual que o projeto já recebia.
  */
-export function composeSubjectsDirection(visualBible) {
+export function composeSubjectsDirection(visualBible, { excludeEntityIds = [] } = {}) {
   const bible = normalizeVisualBible(visualBible);
   if (!bible) return '';
-  const linhas = bible.entities.map((e) => `- ${e.id}: ${e.en}${e.never ? ` NEVER: ${e.never}.` : ''}`);
-  return (`PROJECT SUBJECTS — whenever one of these appears in the scene it must match this description exactly, and look the same in every image of this project:\n${linhas.join('\n')}\nDo not add attributes, accessories or objects that contradict these descriptions.`).slice(0, SUBJECTS_MAX);
+  const excluded = new Set(excludeEntityIds);
+  const entities = bible.entities.filter((e) => !excluded.has(e.id));
+  if (!entities.length) return '';
+  const linhas = entities.map((e) => `- ${e.id}: ${e.en}${e.never ? ` NEVER: ${e.never}.` : ''}`);
+  // Reteste 0b1cb62 (E04): a ficha trazia ação e lugar ("kneading dough on a
+  // wooden table") e toda foto repetia essa cena.
+  return (`PROJECT SUBJECTS — whenever one of these appears in the scene it must match this description exactly, and look the same in every image of this project:\n${linhas.join('\n')}\nThese descriptions fix appearance only (face, hair, clothing, color, material, shape). Any action, pose or place written in them does not apply here: THEME OF THIS CARD decides action, pose, setting and which subjects appear. Do not add a subject the theme does not call for. Do not add attributes, accessories or objects that contradict these descriptions.`).slice(0, SUBJECTS_MAX);
 }
 
 /** Ficha + enquadramento do painel: tudo que descreve a cena deste card. */
-export function composeSceneDirection({ visualBible = null, slide = null, fmt = 'carrossel' } = {}) {
+export function composeSceneDirection({ visualBible = null, slide = null, fmt = 'carrossel', excludeEntityIds = [] } = {}) {
   // Carrossel da biblioteca v4: a linguagem fotográfica da família chega ao
   // pedido real de imagem. Fica na cena (não na direção de marca), então uma
   // direção de marca ou referência enviada pela pessoa continua prevalecendo.
   const family = slide?.socialCompositionVersion >= 4 ? socialPhotoDirection(slide.socialFamily, 'en') : '';
-  return [composeSubjectsDirection(visualBible), family ? `PHOTOGRAPHIC LANGUAGE: ${family}` : '', `FRAMING: ${imageFramingDirection(slide || {}, fmt)}`]
+  return [composeSubjectsDirection(visualBible, { excludeEntityIds }), family ? `PHOTOGRAPHIC LANGUAGE: ${family}` : '', `FRAMING: ${imageFramingDirection(slide || {}, fmt)}`]
     .filter(Boolean).join('\n\n');
 }
 
@@ -113,7 +118,7 @@ export function sceneShowsPerson(imageQuery, visualBible) {
   });
 }
 
-export const PERSON_IDENTITY_DIRECTION = 'IDENTITY REFERENCE (explicitly requested): the LAST attached reference image shows the same person who appears in this scene. Reproduce exactly that person: same face, hair, skin tone, apparent age and build. Use that image ONLY for the person\'s identity. Do NOT copy its pose, action, camera angle, framing, objects or background: this image must show a clearly different moment, exactly as described in THEME OF THIS CARD.';
+export const PERSON_IDENTITY_DIRECTION = 'IDENTITY REFERENCE (explicitly requested): the LAST attached reference image shows the same person who appears in this scene. Reproduce exactly that person: same face, hair, skin tone, apparent age and build. Use that image ONLY for the person\'s identity. Do NOT copy its pose, action, camera angle, framing, objects or background: this image must show a clearly different moment, exactly as described in THEME OF THIS CARD. The scene, action, pose, setting and objects come only from THEME OF THIS CARD; if the reference shows the person doing something else, do not repeat it.';
 
 /** Primeira pessoa da ficha: é dela o rosto que a âncora segura. */
 function firstPersonId(visualBible) {
@@ -128,16 +133,24 @@ function firstPersonId(visualBible) {
  * Toda imagem do projeto com pessoa na ficha recebe a âncora: pedido direto
  * quando a cena cita a pessoa, condicional quando não cita.
  */
+// Reteste 0b1cb62 (E04): a âncora em cena sem pessoa nenhuma fazia a padeira
+// aparecer em toda foto, na mesma pose. Cena sem pessoa (pães, fachada, mãos
+// com celular) não recebe a âncora e tira a pessoa da ficha deste pedido.
+const SCENE_PEOPLE = /\b(?:staff|team|teams|people|person|persons|customer|customers|client|clients|worker|workers|employee|employees|woman|women|man|men|baker|bakers|chef|chefs|cook|cooks|vendor|seller|owner|crowd|family|friends|group|girl|boy|lady|guy|she|he|her|him|face|portrait)\b/i;
+
 export function planPersonAnchor({ visualBible = null, imageQuery = '', anchorUrl = null, refCount = 0 } = {}) {
   const id = firstPersonId(visualBible);
   const showsPerson = !!id && sceneShowsPerson(imageQuery, visualBible);
-  const none = { refImages: [], direction: '', canBecomeAnchor: showsPerson && !anchorUrl };
+  if (id && !showsPerson && !SCENE_PEOPLE.test(String(imageQuery || ''))) {
+    return { refImages: [], direction: '', canBecomeAnchor: false, excludeEntityIds: [id] };
+  }
+  const none = { refImages: [], direction: '', canBecomeAnchor: showsPerson && !anchorUrl, excludeEntityIds: [] };
   if (!id || !anchorUrl || refCount >= 4) return none;
   const others = 'Other people in the scene (customers, team members) are different people with their own faces; never give them this face.';
   const direction = showsPerson
     ? `${PERSON_IDENTITY_DIRECTION.replace('the same person who appears in this scene', `the same person "${id}" (see PROJECT SUBJECTS) who appears in this scene`)} ${others}`
     : `IDENTITY REFERENCE (explicitly requested): the LAST attached reference image shows the person "${id}" from PROJECT SUBJECTS. If "${id}" appears in this scene, reproduce exactly that person: same face, hair, skin tone, apparent age and build. Use that image ONLY for identity; do NOT copy its pose, camera angle, framing, objects or background. Do not add "${id}" or any person the THEME OF THIS CARD does not call for. ${others}`;
-  return { refImages: [anchorUrl], direction, canBecomeAnchor: false };
+  return { refImages: [anchorUrl], direction, canBecomeAnchor: false, excludeEntityIds: [] };
 }
 
 /**
