@@ -56,6 +56,43 @@ purpose permitido: ${PRESENTATION_SLIDE_PURPOSES.join(', ')}.
 Limites de redação do plano: objective/audience/thesis até ${compactRepair ? 120 : 180} caracteres cada; no máximo ${compactRepair ? 4 : 6} gaps de até 120; question até 80, keyMessage até ${compactRepair ? 120 : 160}, imageBrief até 100 por posição; no máximo 4 evidenceIds por posição. Seja conciso: o limite da resposta é ${PRESENTATION_PLAN_MAX_TOKENS} tokens; use preferencialmente menos da metade, deixando espaço para fechar todos os arrays e o objeto. A profundidade vem da contribuição de cada página, sem redigir o slide inteiro aqui. Use imageBrief vazio quando imagem não contribuir. Capa na primeira posição; fecho na última quando houver mais de uma. Não inclua campos extras. Confira versões, índices, enums e IDs antes de devolver o JSON. ${compactRepair ? 'Nesta recuperação, encurte a linguagem de planejamento, nunca fatos, condições essenciais ou a quantidade solicitada.' : ''}`;
 }
 
+/**
+ * Normaliza só a FORMA das posições do roteiro, nunca as evidências (lote B
+ * 21/11: 1 em 16 gerações falhou com "o roteiro saiu fora do formato
+ * esperado"). Campos extras numa posição saem; função semântica ou visual
+ * fora da lista vira "other"/"content"; capa e fecho são marcados pela
+ * posição; textos internos longos são encurtados no limite de palavra. O
+ * roteiro é interno: nada disso aparece no slide.
+ */
+export function coercePresentationPlanShape(raw, { count } = {}) {
+  let value = raw;
+  if (typeof raw === 'string') { try { value = JSON.parse(raw.trim()); } catch { return raw; } }
+  if (!isObject(value) || !Array.isArray(value.slides)) return raw;
+  const clip = (text, limit) => {
+    const str = String(text ?? '').replace(/\s+/g, ' ').trim();
+    if (str.length <= limit) return str;
+    const cut = str.slice(0, limit);
+    return (cut.lastIndexOf(' ') > limit * 0.6 ? cut.slice(0, cut.lastIndexOf(' ')) : cut).trim();
+  };
+  const total = Number(count) || value.slides.length;
+  const slides = value.slides.map((slide, position) => {
+    if (!isObject(slide)) return slide;
+    const role = position === 0 ? 'cover' : position === total - 1 && total > 1 ? 'closing'
+      : PRESENTATION_VISUAL_ROLES.includes(slide.visualRole) && !['cover', 'closing'].includes(slide.visualRole) ? slide.visualRole : 'content';
+    return {
+      index: Number.isInteger(slide.index) ? slide.index : position + 1,
+      visualRole: role,
+      purpose: PRESENTATION_SLIDE_PURPOSES.includes(slide.purpose) ? slide.purpose : 'other',
+      question: clip(slide.question, 180),
+      keyMessage: clip(slide.keyMessage, 400),
+      evidenceIds: Array.isArray(slide.evidenceIds) ? slide.evidenceIds : [],
+      imageBrief: clip(slide.imageBrief, 220),
+    };
+  });
+  const gaps = Array.isArray(value.gaps) ? value.gaps.filter(gap => typeof gap === 'string' && gap.trim()).map(gap => clip(gap, 240)).slice(0, 16) : value.gaps;
+  return { ...value, slides, gaps };
+}
+
 /** Reject an invalid plan as a whole; never normalize fabricated evidence into a valid one. */
 export function validatePresentationPlan(raw, { count, sources = [] } = {}) {
   const errors = [];

@@ -968,7 +968,14 @@ export function moveOverflowToSpeakerNotes(slides, limits) {
       const max = normalized[slideIndex]?.[field]?.maxChars;
       const text = String(copy[field] || '').trim();
       if (!max || text.length <= max) continue;
-      const sentences = text.split(/(?<=[.!?…])\s+/u);
+      let sentences = text.split(/(?<=[.!?…])\s+/u);
+      // Frase única longa: a oração depois de travessão ou ponto e vírgula
+      // também pode ir para as notas (lote B 21/11, Aula).
+      if (sentences[0].length > max) {
+        const [first, ...rest] = sentences;
+        const clauses = first.split(/\s+[—–]\s+|;\s+/u);
+        if (clauses.length > 1) sentences = [`${clauses[0].trim().replace(/[,;:]$/, '')}.`, `${clauses.slice(1).join('; ').replace(/^./, c => c.toUpperCase())}`, ...rest];
+      }
       const keep = [];
       for (const sentence of sentences) {
         if ([...keep, sentence].join(' ').length > max) break;

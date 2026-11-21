@@ -493,3 +493,13 @@ describe('lote B — travessão dentro dos blocos', () => {
     expect(output.result.slides[1].presentationBlocks[0].items[0].body).toBe('Camponês, integral ou brioche, três opções.');
   });
 });
+
+describe('lote B — frase única longa', () => {
+  it('a oração depois do travessão vai para as notas', async () => {
+    const { moveOverflowToSpeakerNotes } = await import('../../src/utils/editorial-review.js');
+    const slides = [{ title: 'Volume', subtitle: 'A padaria vendeu 41.200 pães em 2025 — volume que reforça a importância da antecedência.', speakerNotes: '' }];
+    const { slides: [out] } = moveOverflowToSpeakerNotes(slides, [{ subtitle: { maxChars: 50 } }]);
+    expect(out.subtitle).toBe('A padaria vendeu 41.200 pães em 2025.');
+    expect(out.speakerNotes).toBe('Volume que reforça a importância da antecedência.');
+  });
+});

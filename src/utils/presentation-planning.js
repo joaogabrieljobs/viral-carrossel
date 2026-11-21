@@ -1,4 +1,4 @@
-import {
+import { coercePresentationPlanShape,
   buildPresentationPlanPrompt, validatePresentationPlan,
   PRESENTATION_PLAN_MAX_TOKENS, PRESENTATION_PLAN_SYSTEM_PROMPT,
 } from './presentation-plan.js';
@@ -86,7 +86,7 @@ export async function generatePresentationPlan({ brief = '', userInstructions = 
       continue;
     }
     throwIfGenerationCancelled(aiOptions.signal);
-    const validation = validatePresentationPlan(raw, { count, sources });
+    const validation = validatePresentationPlan(coercePresentationPlanShape(raw, { count }), { count, sources });
     if (validation.valid) {
       diagnostics.push({ stage: 'planning', attempt, outcome: 'validated', issues: [], ...(response ? { response } : {}) });
       const metadata = { attempts: attempt, diagnostics };

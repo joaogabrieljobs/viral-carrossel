@@ -98,7 +98,7 @@ import { buildNarrativeModeSequence } from './src/utils/narrative-sequence.js';
 import { socialFamilyFor } from './src/utils/social-families.js';
 import { propagateBrandTypography } from './src/utils/brand-typography.js';
 import { imageAspectRatioForSlide } from './shared/image-aspect.js';
-import { composeSceneDirection, normalizeVisualBible } from './src/utils/visual-bible.js';
+import { composeSceneDirection, normalizeVisualBible, visualBibleHasPerson, sceneShowsPerson, PERSON_IDENTITY_DIRECTION } from './src/utils/visual-bible.js';
 import {
   PRESENTATION_VISUAL_PRESETS,
   PRESENTATION_VISUAL_PRESET_CATALOG,
@@ -6102,6 +6102,10 @@ ${jsonShapeLine}`;
         const totalImgs = slidesWithImage.length;
         let doneImgs = 0;
         const attemptedImageSlideIds = new Set();
+        // MF-03: a primeira imagem gerada com a pessoa da ficha vira referência
+        // de identidade para os cards seguintes em que ela aparece.
+        const personAnchor = { url: null };
+        const anchorPerson = !isPresentationGeneration && visualBibleHasPerson(generationVisualBible);
         setGenProgress({ phase: 'images', current: 0, total: totalImgs, label: `Gerando imagens (0/${totalImgs})…` });
         for (const { slideId, i, q, expectedImageIdentity } of slidesWithImage) {
           if (abort.cancelled || activeProjectRef.current !== generationProjectId) break;
@@ -6114,10 +6118,14 @@ ${jsonShapeLine}`;
           });
           try {
             checkActive();
+            const baseRefs = await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId, newSlides[i]?.imageReferences);
+            const showsPerson = anchorPerson && sceneShowsPerson(q, generationVisualBible);
+            const useAnchor = showsPerson && !!personAnchor.url && baseRefs.length < 4;
             const url = await generateDALLEWithRetry(q, openaiKey, effectiveAxes, {
               signal: job.signal,
-              refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId, newSlides[i]?.imageReferences),
+              refImages: useAnchor ? [...baseRefs, personAnchor.url] : baseRefs,
               imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(newSlides[i], [newSlides[i]?.imgExtraPrompt,
+                useAnchor ? PERSON_IDENTITY_DIRECTION : '',
                 generationPlan ? 'PRESENTATION IMAGE PANEL: keep the main subject complete within the frame, with breathing room around faces, hands and products. This is an illustration, never a fabricated screenshot, chart, testimonial or proof. Editable text is composed separately.' : '',
               ].filter(Boolean).join('\n'))),
               sceneDirection: composeSceneDirection({
@@ -6137,6 +6145,7 @@ ${jsonShapeLine}`;
               },
             });
             checkActive();
+            if (showsPerson && !personAnchor.url && typeof url === 'string' && url.startsWith('data:image/')) personAnchor.url = url;
             const patchImg = await guardarImagemDoSlide(url);
             checkActive();
             const liveTarget = activeProjectRef.current === generationProjectId

@@ -82,3 +82,35 @@ export function composeSceneDirection({ visualBible = null, slide = null, fmt = 
   return [composeSubjectsDirection(visualBible), family ? `PHOTOGRAPHIC LANGUAGE: ${family}` : '', `FRAMING: ${imageFramingDirection(slide || {}, fmt)}`]
     .filter(Boolean).join('\n\n');
 }
+
+/**
+ * MF-03 (lote B 21/11): a mesma pessoa mudava de rosto entre os cards. A
+ * ficha em texto não segura identidade; uma imagem segura. A primeira imagem
+ * gerada com a pessoa vira referência de identidade para os cards seguintes
+ * em que ela aparece.
+ */
+const PERSON_WORDS = /\b(?:woman|women|man|men|person|people|baker|chef|cook|girl|boy|owner|founder|customer|client|worker|employee|teacher|doctor|nurse|lady|guy|female|male|she|he|her|him|his|face|portrait|mother|father|vendor|barista|seller)\b/i;
+
+export function visualBibleHasPerson(visualBible) {
+  const bible = normalizeVisualBible(visualBible);
+  return !!bible?.entities.some(entity => PERSON_WORDS.test(`${entity.id} ${entity.en}`));
+}
+
+/** A cena deste card mostra a pessoa (não só mãos ou o produto). */
+export function sceneShowsPerson(imageQuery, visualBible) {
+  const bible = normalizeVisualBible(visualBible);
+  const query = String(imageQuery || '');
+  if (!bible || !query.trim()) return false;
+  // Só a pessoa da ficha: "person holding a phone" pode ser um cliente e não
+  // deve herdar o rosto da padeira. Vale o id da entidade ou as palavras de
+  // pessoa da própria descrição (ex.: "woman", "baker").
+  return bible.entities.some(entity => {
+    if (!PERSON_WORDS.test(`${entity.id} ${entity.en}`)) return false;
+    const own = new Set((`${entity.en}`.match(new RegExp(PERSON_WORDS.source, 'gi')) || []).map(word => word.toLowerCase())
+      .filter(word => !['she', 'he', 'her', 'him', 'his', 'face', 'portrait', 'person', 'people', 'team'].includes(word)));
+    const idHit = new RegExp(`\\b${entity.id.replace(/-/g, '[ -]')}\\b`, 'i').test(query);
+    return idHit || [...own].some(word => new RegExp(`\\b${word}\\b`, 'i').test(query));
+  });
+}
+
+export const PERSON_IDENTITY_DIRECTION = 'IDENTITY REFERENCE (explicitly requested): the LAST attached reference image shows the same person who appears in this scene. Reproduce exactly that person: same face, hair, skin tone, apparent age and build. Use that image ONLY for the person\'s identity. Do NOT copy its pose, action, camera angle, framing, objects or background: this image must show a clearly different moment, exactly as described in THEME OF THIS CARD.';

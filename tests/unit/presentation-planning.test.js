@@ -58,13 +58,13 @@ describe('planejamento limitado com recuperação', () => {
   });
 
   it('devolve os caminhos inválidos para reparo e revalida toda a resposta', async () => {
-    const invalid = plan(); invalid.slides[1].purpose = 'inventado';
+    const invalid = plan(); invalid.slides[1].evidenceIds = ['e99'];
     const callAI = vi.fn().mockResolvedValueOnce(invalid).mockResolvedValueOnce(plan());
     const onPlan = vi.fn();
     const result = await generatePresentationPlan({ ...config, onPlan }, callAI);
-    expect(result.diagnostics[0].issues).toContainEqual({ code: 'slide_purpose', path: 'slides[1].purpose' });
+    expect(result.diagnostics[0].issues).toContainEqual({ code: 'evidence_reference', path: 'slides[1].evidenceIds' });
     expect(callAI.mock.calls[1][0]).toContain('RESPOSTA ANTERIOR NÃO VALIDADA');
-    expect(callAI.mock.calls[1][0]).toContain('slides[1].purpose');
+    expect(callAI.mock.calls[1][0]).toContain('slides[1].evidenceIds');
     expect(onPlan).toHaveBeenCalledTimes(1);
     expect(onPlan.mock.calls[0][0].slides[1].purpose).toBe('evidence');
   });
@@ -196,9 +196,23 @@ describe('recuperação com trechos reais e motivo legível', () => {
   });
 
   it('sem citação reprovada o pedido de recuperação não ganha o bloco', async () => {
-    const invalido = plan(); invalido.slides[1].purpose = 'finalidade_inexistente';
+    const invalido = plan(); invalido.slides[1].evidenceIds = ['e99'];
     const callAI = vi.fn().mockResolvedValueOnce(invalido).mockResolvedValueOnce(plan());
     await generatePresentationPlan({ ...config }, callAI);
     expect(callAI.mock.calls[1][0]).not.toContain('TRECHOS REAIS DAS FONTES');
+  });
+
+  // Lote B (21/11): "o roteiro saiu fora do formato esperado" em 1 de 16.
+  it('forma das posições é normalizada sem nova chamada; evidência continua rígida', async () => {
+    const shape = plan();
+    shape.slides[1].purpose = 'inventado'; shape.slides[1].stage = 'ATIVIDADE'; shape.slides[1].visualRole = 'hero';
+    shape.slides[0].visualRole = 'content'; shape.slides[1].question = 'Por que '.repeat(40);
+    const callAI = vi.fn().mockResolvedValueOnce(shape);
+    const result = await generatePresentationPlan({ ...config }, callAI);
+    expect(callAI).toHaveBeenCalledTimes(1);
+    expect(result.plan.slides[1]).toMatchObject({ purpose: 'other', visualRole: 'content' });
+    expect(result.plan.slides[1].stage).toBeUndefined();
+    expect(result.plan.slides[1].question.length).toBeLessThanOrEqual(180);
+    expect(result.plan.slides[0].visualRole).toBe('cover');
   });
 });
