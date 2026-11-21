@@ -2,7 +2,7 @@
  * Fila durável de alterações por projeto e por conta. localStorage é apenas
  * cache de UI; a confirmação desta transação IndexedDB é o recibo local.
  */
-import { dataOwnerAliases, readDataOwner } from './account-data-owner.js';
+import { sessionDataOwnerAliases, readDataOwner } from './account-data-owner.js';
 import { isAccountDataWriteOwnerCurrent } from './storage.js';
 import { CLOUD_IMAGE_MAX_CHARS, imageContentType } from './cloud-image-assets.js';
 import { uploadAssetsBestEffort } from './library-sync.js';
@@ -522,7 +522,8 @@ export async function verifyProjectOutboxOwner(ownerId, { signal } = {}) {
   if (!response.ok || session?.active !== true) {
     throw outboxError('Entre na conta antes de sincronizar projetos.', 'project_owner_unverified');
   }
-  const aliases = dataOwnerAliases(session.email, session.customerId);
+  // MOO-21: e-mail ligado a outro cliente neste navegador não autoriza a fila.
+  const aliases = sessionDataOwnerAliases(session.email, session.customerId);
   const billingDisabled = session.billingDisabled === true && ownerId === 'billing-disabled';
   if (!aliases.has(ownerId) && !billingDisabled) {
     throw outboxError('A sessão pertence a outra conta. Nada foi enviado.', 'project_owner_changed');

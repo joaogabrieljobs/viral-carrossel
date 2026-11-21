@@ -23,7 +23,8 @@
  *   POST { action:'moderate', id, decision: 'keep' | 'hide' | 'remove' | 'restore' }
  */
 import { applyCors } from './lib/cors.js';
-import { readCurrentAccessCookie } from './lib/access.js';
+import { readCurrentAccessCookie, billingDisabled } from './lib/access.js';
+import { resolveAccountEntitlement } from './lib/account-entitlements.js';
 import { consumeRateLimit, rateLimitResponse } from './lib/rate-limit.js';
 import { resolveLibraryOwnerId } from './lib/library-sync-store.js';
 import defaultStore from './lib/published-templates-store.js';
@@ -57,7 +58,22 @@ function send(res, cause) {
   });
 }
 
-export function createTemplatesHandler({ store = defaultStore, readAccess = readCurrentAccessCookie } = {}) {
+/**
+ * MOO-31: só denúncia de conta com assinatura ativa ou isenção soma para
+ * ocultar. Falha ao consultar o plano não autoriza ocultar: a denúncia fica
+ * registrada para a moderação, sem contar.
+ */
+async function reportCountsTowardHide(access, resolveEntitlement) {
+  if (billingDisabled()) return true;
+  try { return (await resolveEntitlement(access.customerId))?.active === true; }
+  catch { return false; }
+}
+
+export function createTemplatesHandler({
+  store = defaultStore,
+  readAccess = readCurrentAccessCookie,
+  resolveEntitlement = resolveAccountEntitlement,
+} = {}) {
   return async function handler(req, res) {
     applyCors(req, res, { credentials: true });
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -119,11 +135,12 @@ export function createTemplatesHandler({ store = defaultStore, readAccess = read
         case 'delete':
           return res.status(200).json({ ok: true, ...await store.deleteMine(owner, body.id) });
         case 'use':
-          return res.status(200).json({ ok: true, ...await store.recordUse(body.id) });
+          return res.status(200).json({ ok: true, ...await store.recordUse(body.id, owner) });
         case 'report': {
           const reportLimited = await consumeRateLimit(req, { limit: 20, windowMs: 60 * 60_000, keyPrefix: 'templates-report', subject: owner });
           if (reportLimited) return rateLimitResponse(res, reportLimited.retryAfterSec);
-          return res.status(200).json({ ok: true, ...await store.report(owner, body.id, body.reason) });
+          const countsTowardHide = await reportCountsTowardHide(access, resolveEntitlement);
+          return res.status(200).json({ ok: true, ...await store.report(owner, body.id, body.reason, { countsTowardHide }) });
         }
         case 'moderate':
           return res.status(200).json({ ok: true, ...await store.moderate(owner, body.id, body.decision) });

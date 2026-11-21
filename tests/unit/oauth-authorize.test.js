@@ -54,7 +54,9 @@ describe('autorização OAuth do MCP', () => {
     await authorize(request(), res);
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.send.mock.calls[0][0]).toContain('pessoa@empresa.com');
-    expect(res.send.mock.calls[0][0]).toContain('Conectar ChatGPT');
+    // Título pelo host verificado; o nome vem rotulado como informado pelo app (MOO-17).
+    expect(res.send.mock.calls[0][0]).toContain('Conectar chatgpt.com');
+    expect(res.send.mock.calls[0][0]).toContain('Nome informado pelo aplicativo<strong>ChatGPT</strong>');
     expect(res.send.mock.calls[0][0]).toContain('chatgpt.com');
     expect(res.send.mock.calls[0][0]).not.toContain('Aplicativo não verificado');
   });
@@ -83,7 +85,8 @@ describe('autorização OAuth do MCP', () => {
     const res = response();
     await authorize(req, res);
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.send.mock.calls[0][0]).toContain('Conectar Claude');
+    expect(res.send.mock.calls[0][0]).toContain('Conectar claude.ai');
+    expect(res.send.mock.calls[0][0]).toContain('Nome informado pelo aplicativo<strong>Claude</strong>');
     expect(deps.validateOAuthRequest).toHaveBeenCalledWith(expect.objectContaining({
       resource: 'https://moont.ai/mcp',
       redirectUri: 'https://claude.ai/api/mcp/auth_callback',

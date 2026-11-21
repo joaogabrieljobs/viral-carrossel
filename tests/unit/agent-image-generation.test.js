@@ -4,7 +4,7 @@ const mocked = vi.hoisted(() => ({
   subscription: vi.fn(), usage: vi.fn(), consume: vi.fn(), refund: vi.fn(), settle: vi.fn(),
   create: vi.fn(), wait: vi.fn(), download: vi.fn(), put: vi.fn(), putChunk: vi.fn(),
   project: vi.fn(), job: vi.fn(), createJob: vi.fn(), finishJob: vi.fn(), expireJob: vi.fn(),
-  listSettlement: vi.fn(), markSettled: vi.fn(),
+  listSettlement: vi.fn(), markSettled: vi.fn(), closeOrphan: vi.fn(),
   waitUntil: vi.fn(),
 }));
 vi.mock('@vercel/functions', () => ({ waitUntil: mocked.waitUntil }));
@@ -36,6 +36,7 @@ vi.mock('../../api/lib/agent-visual-batch.js', async importOriginal => {
     finishAgentImageJob: mocked.finishJob, expireAgentImageJob: mocked.expireJob,
     listAgentImageJobsForSettlement: mocked.listSettlement,
     markAgentImageJobCreditsSettled: mocked.markSettled,
+    closeAgentImageJobWithoutProject: mocked.closeOrphan,
   };
 });
 
@@ -364,6 +365,35 @@ describe('runAgentImageJob', () => {
     expect(mocked.finishJob.mock.calls[0][2].every(outcome => !outcome.assetId)).toBe(true);
     expect(mocked.settle).not.toHaveBeenCalled();
     expect(mocked.refund.mock.calls.map(call => call[0].operationId).sort()).toEqual([op('s1'), op('s2')].sort());
+  });
+
+  // MOO-29 (c): projeto apagado durante a geração. Antes o fechamento falhava
+  // com 404, o job expirava e tudo era estornado, embora as imagens já
+  // estivessem pagas ao provedor e gravadas na biblioteca da conta.
+  it('projeto apagado no meio: fecha o job e consome o crédito de cada imagem gravada', async () => {
+    mocked.wait.mockResolvedValueOnce({ url: 'https://images.example/a.png' })
+      .mockRejectedValueOnce(Object.assign(new Error('demorou'), { code: 'sjinn_timeout' }));
+    mocked.finishJob.mockRejectedValue(Object.assign(new Error('Projeto não encontrado.'), { code: 'visual_project_not_found', status: 404 }));
+    mocked.closeOrphan.mockImplementation(async (_owner, _request, outcomes) => ({
+      finished: true, job: { requestId, status: 'failed' },
+      slides: outcomes.map(outcome => ({
+        ...outcome, status: 'failed', errorCode: outcome.errorCode || 'visual_project_not_found', operationId: op(outcome.slideId),
+      })),
+      meta: { kind: 'image', periodStartSec: 100 },
+    }));
+    const job = await runAgentImageJob(ctx());
+    expect(mocked.closeOrphan).toHaveBeenCalledWith(owner, requestId, mocked.finishJob.mock.calls[0][2]);
+    expect(mocked.settle).toHaveBeenCalledTimes(1);
+    expect(mocked.settle.mock.calls[0][0]).toMatchObject({ operationId: op('s1'),
+      metadata: { assetId: expect.stringMatching(/^original_/), rejected: 'visual_project_not_found' } });
+    expect(mocked.refund.mock.calls.map(call => call[0].operationId)).toEqual([op('s2')]);
+    expect(job).toMatchObject({ status: 'failed' });
+  });
+
+  it('outra falha no fechamento continua sem liquidar (o leitor expira depois)', async () => {
+    mocked.finishJob.mockRejectedValue(Object.assign(new Error('db down'), { code: 'ECONNRESET' }));
+    expect(await runAgentImageJob(ctx())).toBeNull();
+    expect(mocked.closeOrphan).not.toHaveBeenCalled();
   });
 
   it('não liquida nada quando o fechamento do job falha; o leitor expira depois', async () => {

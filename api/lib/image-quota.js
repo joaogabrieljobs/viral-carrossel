@@ -363,6 +363,13 @@ export async function rememberImageResult({ customerId, periodStartSec, operatio
   return true;
 }
 
+/** Tarefa SJinn criada para a operação (MOO-29). Só Postgres guarda. */
+export async function rememberImageTask({ customerId, periodStartSec, operationId, taskId }) {
+  if (!usesPostgresQuota()) return false;
+  const { rememberImageTaskPostgres } = await import('./image-quota-postgres.js');
+  return rememberImageTaskPostgres({ customerId, periodStartSec, operationId, taskId });
+}
+
 /** Endereço da imagem já paga desta operação, se houver (MOO-10). */
 export async function recallImageResult({ customerId, periodStartSec, operationId }) {
   if (usesPostgresQuota()) {
@@ -371,6 +378,19 @@ export async function recallImageResult({ customerId, periodStartSec, operationI
   }
   const opKey = imageOperationKey(customerId, periodStartSec, operationId);
   return (opKey && imageOps.get(opKey) !== 'refunded' && imageResults.get(opKey)) || null;
+}
+
+/**
+ * MOO-28: liquida reservas do editor abandonadas (sem job MCP). Só o backend
+ * Postgres guarda a data da reserva; Upstash/Stripe/memória não têm como
+ * saber a idade de uma operação, então ali é um no-op explícito.
+ */
+export async function reconcileStaleImageReservations({ limit = 100, olderThanMinutes = 15 } = {}) {
+  if (!usesPostgresQuota()) {
+    return { scanned: 0, refunded: 0, consumed: 0, skipped: 0, failed: 0, backend: 'legacy' };
+  }
+  const { reconcileStaleEditorReservationsPostgres } = await import('./image-quota-postgres.js');
+  return reconcileStaleEditorReservationsPostgres({ limit, olderThanMinutes });
 }
 
 /** Só testes. */

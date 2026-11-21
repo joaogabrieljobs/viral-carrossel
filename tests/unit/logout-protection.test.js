@@ -23,6 +23,9 @@ vi.mock('../../src/utils/account-data-owner.js', () => ({
   ensureAccountDataOwner: vi.fn(), readDataOwner: () => mocks.state.owner,
   normalizeDataOwnerId: (email, customerId) => email ? `email:${email}` : `id:${customerId}`,
   dataOwnerAliases: (email, customerId) => new Set([email && `email:${email}`, customerId && `id:${customerId}`].filter(Boolean)),
+  // MOO-21: sem e-mail ligado a outro cliente, iguais às funções acima.
+  sessionDataOwnerId: (email, customerId) => email ? `email:${email}` : `id:${customerId}`,
+  sessionDataOwnerAliases: (email, customerId) => new Set([email && `email:${email}`, customerId && `id:${customerId}`].filter(Boolean)),
 }));
 vi.mock('../../src/utils/landing-gate.js', () => ({ shouldShowOnboardingLanding: () => false, dismissOnboardingLanding: vi.fn() }));
 vi.mock('../../src/utils/project-share.js', () => ({ PENDING_SHARE_KEY: 'vc_pending_share', captureShareInviteFromLocation: vi.fn() }));
@@ -95,6 +98,16 @@ describe('logout protege a edição atual antes de limpar a conta', () => {
     expect(assign).toHaveBeenCalledWith('/');
     expect(toast).not.toHaveBeenCalled();
     expect(mocks.state.locked).toBe(true);
+  });
+
+  // MOO-21: a ligação e-mail → cliente fica no navegador depois de sair; não
+  // pode ser lida como resíduo de limpeza (o logout ia para ?landing=1).
+  it('a ligação de e-mail do MOO-21 não conta como resíduo no logout', async () => {
+    const keys = ['vc_owner_email_bindings'];
+    vi.stubGlobal('localStorage', { getItem: (k) => keys.includes(k) ? '{}' : null, get length() { return keys.length; }, key: (i) => keys[i] ?? null });
+    mocks.vault.mockReturnValue(true);
+    expect(await run()).toBe(true);
+    expect(assign).toHaveBeenCalledWith('/');
   });
 
   it('cache recusado usa snapshot fresco no cofre, sem depender da nuvem', async () => {

@@ -89,6 +89,22 @@ export async function sendPasswordReset(email) {
   });
 }
 
+/**
+ * Cadastro com e-mail que já tem conta (MOO-16): a resposta HTTP é neutra e a
+ * orientação vai só para a caixa do próprio endereço. Uma mensagem por e-mail
+ * a cada janela de 3 minutos; repetições dentro dela são descartadas.
+ */
+export async function sendExistingAccountNotice(email) {
+  const to = normalizeEmail(email);
+  const app = new URL('/?app=1', process.env.APP_URL || 'https://moont.ai').href;
+  return sendMail({
+    to, subject: 'Você já tem conta na Moont',
+    text: `Recebemos um pedido para criar uma conta na Moont com este e-mail, mas ele já tem uma conta.\n\nPara entrar, abra ${app} e use sua senha ou o Google. Se não lembra a senha, toque em "Esqueci minha senha" na tela de entrada.\n\nSe você não fez este pedido, ignore este e-mail. Nada mudou na sua conta.`,
+    idempotencyKey: `account-exists-mail-${digest(to)}-${Math.floor(Date.now() / MAIL_WINDOW_MS)}`,
+    allowDuplicate: true,
+  });
+}
+
 export async function resetPassword(token, password) {
   const data = readPasswordResetToken(token);
   const invalid = () => Object.assign(new Error(INVALID_LINK), { code: 'invalid_reset_link' });

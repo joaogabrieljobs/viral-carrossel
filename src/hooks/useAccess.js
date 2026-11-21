@@ -19,7 +19,7 @@ import { trackEvent } from '../utils/telemetry.js';
 import { SK, areAccountDataWritesLocked, lockAccountDataWrites, unlockAccountDataWrites } from '../utils/storage.js';
 import { clearAccountLocalData } from '../utils/clear-account-data.js';
 import {
-  ensureAccountDataOwner, readDataOwner, normalizeDataOwnerId, dataOwnerAliases,
+  ensureAccountDataOwner, readDataOwner, sessionDataOwnerId, sessionDataOwnerAliases,
 } from '../utils/account-data-owner.js';
 import { ACCOUNT_VAULT_KEY, snapshotAccountVaultForOwners } from '../utils/account-vault.js';
 import { PENDING_SHARE_KEY, captureShareInviteFromLocation } from '../utils/project-share.js';
@@ -41,8 +41,11 @@ const LOGOUT_CLEANUP_WARNING = 'Você saiu da conta, mas ainda há dados locais 
 const OUTBOX_BOOT_WARNING = 'A biblioteca abriu, mas não foi possível verificar as alterações pendentes neste navegador. Edições ainda não enviadas podem não aparecer; mantenha este navegador e tente salvar novamente antes de sair.';
 const ACCESS_UNCONFIRMED_HINT = 'A consulta não confirmou o acesso à assinatura. Seus projetos não foram apagados. Confira a assinatura no portal do cliente.';
 const ACCESS_SESSION_REQUIRED_HINT = 'Sua sessão não foi confirmada. Seus projetos não foram apagados. Entre novamente para verificar sua conta.';
+// MOO-21: 'vc_owner_email_bindings' (OWNER_EMAIL_BINDINGS_KEY em
+// clear-account-data.js) liga cada e-mail ao cliente Stripe e sobrevive à saída.
+const OWNER_EMAIL_BINDINGS_STORAGE_KEY = 'vc_owner_email_bindings';
 const LOGOUT_PRESERVED_KEYS = new Set([
-  ACCOUNT_VAULT_KEY, PENDING_SHARE_KEY,
+  ACCOUNT_VAULT_KEY, PENDING_SHARE_KEY, OWNER_EMAIL_BINDINGS_STORAGE_KEY,
   'vc_account_write_lock', 'vc_account_write_lock_token',
   'vc_logout_warning', LOGOUT_CLEANUP_PENDING_KEY,
 ]);
@@ -116,12 +119,12 @@ function hasAccountDataResidue({ wipeDevice = false } = {}) {
     return stores.some((store) => {
       if (!store) return false;
       if (knownKeys.some((key) => key && (!LOGOUT_PRESERVED_KEYS.has(key)
-        || (wipeDevice && key === ACCOUNT_VAULT_KEY)) && store.getItem(key) != null)) return true;
+        || (wipeDevice && (key === ACCOUNT_VAULT_KEY || key === OWNER_EMAIL_BINDINGS_STORAGE_KEY))) && store.getItem(key) != null)) return true;
       if (typeof store.length !== 'number' || typeof store.key !== 'function') return false;
       for (let i = 0; i < store.length; i += 1) {
         const key = store.key(i);
         if (key?.startsWith('vc_') && (!LOGOUT_PRESERVED_KEYS.has(key)
-          || (wipeDevice && key === ACCOUNT_VAULT_KEY))) return true;
+          || (wipeDevice && (key === ACCOUNT_VAULT_KEY || key === OWNER_EMAIL_BINDINGS_STORAGE_KEY)))) return true;
       }
       return false;
     });
@@ -219,8 +222,8 @@ export async function logoutWithProtectedLibrary({
     if (!Array.isArray(prepared?.snapshot?.library) || typeof prepared?.isCurrent !== 'function') {
       throw new Error('Não foi possível confirmar as últimas alterações. Você continua na conta; salve ou sincronize antes de sair.');
     }
-    const owner = readDataOwner() || normalizeDataOwnerId(access.email, access.customerId);
-    const aliases = [...dataOwnerAliases(access.email, access.customerId)];
+    const owner = readDataOwner() || sessionDataOwnerId(access.email, access.customerId);
+    const aliases = [...sessionDataOwnerAliases(access.email, access.customerId)];
     if (owner && !aliases.includes(owner)) {
       throw new Error('A conta mudou durante a operação. Suas alterações foram mantidas; tente novamente.');
     }
@@ -484,7 +487,7 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
         || loginStatus === 'password'
         || billing === 'restored'
         || billing === 'success';
-      const sessionOwners = dataOwnerAliases(session?.email, session?.customerId);
+      const sessionOwners = sessionDataOwnerAliases(session?.email, session?.customerId);
       const sessionFree = isFreeSession(session);
       const sessionSignedIn = !!session?.active || sessionFree;
       const sessionStillOwnsData = () => !cancelled && !bootExpired

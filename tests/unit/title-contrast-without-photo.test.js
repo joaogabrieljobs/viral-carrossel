@@ -72,3 +72,23 @@ describe('todo texto legível no fundo real da página (com fundo da família)',
   }
 });
 
+
+// Reteste 21/11 (A01, slide 10): o destaque azul "1 dia de antecedência" ficava
+// a ~3,2:1 sobre o marinho do fechamento. Destaque no apoio é texto de corpo.
+describe('destaque dentro do apoio legível no fundo da família (>= 4,5)', () => {
+  for (const preset of PRESENTATION_VISUAL_PRESETS) {
+    it(preset.id, () => {
+      const brand = applyPresentationVisualPreset({ ...DEFAULT_BRAND, showHandle: false, logo: null }, preset.id);
+      for (const [index, role] of [[3, 'divider'], [9, 'closing']]) {
+        const base = { ...mkSlide(index + 1, brand), title: 'Encomende seu pão', subtitle: 'Peça com **1 dia de antecedência** pelo WhatsApp.', presentationPlan: { visualRole: role } };
+        const slide = { ...base, ...getPresentationCompositionOverrides(preset.id, { slide: base, stage: {}, index, count: 10 }), presentationQualityVersion: 1 };
+        if (!(slide.presentationChrome?.ground && slide.presentationChrome.ground !== 'bg')) continue;
+        const html = renderToStaticMarkup(React.createElement(SlideCardInner, { slide, brand, fmt: 'apresentacao', num: index + 1, total: 10, forExport: true }));
+        if (!html.includes('1 dia de antecedência')) continue;
+        const ground = groundInks(slide.presentationChrome.family, slide.presentationChrome.ground).bg;
+        const ink = colorBefore(html, '1 dia de antecedência');
+        expect(wcagContrast(ink, ground), `${role}: ${ink} sobre ${ground}`).toBeGreaterThanOrEqual(4.5);
+      }
+    });
+  }
+});

@@ -7,6 +7,8 @@ const quota = vi.hoisted(() => ({
   consumeImageCreditPostgres: vi.fn(),
   settleImageCreditPostgres: vi.fn(),
   refundImageCreditPostgres: vi.fn(),
+  // MOO-29: a tarefa SJinn criada é registrada na operação.
+  rememberImageTaskPostgres: vi.fn(async () => true),
 }));
 const sjinn = vi.hoisted(() => ({
   createGptImage2Task: vi.fn(), waitForSjinnTask: vi.fn(),
@@ -112,5 +114,9 @@ describe('geração com quota Postgres', () => {
       metadata: undefined,
     });
     expect(quota.settleImageCreditPostgres).not.toHaveBeenCalled();
+    // MOO-29: a tarefa criada no SJinn fica registrada na operação.
+    expect(quota.rememberImageTaskPostgres).toHaveBeenCalledWith({
+      customerId, periodStartSec, operationId: 'failed-generation-1', taskId: 'task-1',
+    });
   });
 });

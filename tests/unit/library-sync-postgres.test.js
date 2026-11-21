@@ -61,6 +61,7 @@ function fakeDatabase() {
             .sort((a, b) => a.sort_order - b.sort_order || a.project_id.localeCompare(b.project_id));
         }
         if (operation === 'moont_delete_agent_visual_jobs') return [];
+        if (operation === 'moont_scrub_pending_agent_jobs') return [];
         if (operation === 'moont_account_project_usage') {
           const targetId = params[1];
           const live = [...currentProjects.entries()]
@@ -409,5 +410,58 @@ describe('biblioteca Postgres por conta', () => {
     await expect(adapter.putAccountLibraryMeta('cus_a', { userProfile: {} }, { baseRevision: -1 }))
       .rejects.toMatchObject({ code: 'account_meta_bad_revision' });
     expect(db.snapshot().states).toEqual([]);
+  });
+});
+
+// MOO-25: toda conta nova lia o Blob/Redis legado no primeiro acesso e uma
+// falha transitória virava 503. Conta cujo cliente Stripe nasceu depois da
+// virada para o Postgres (15/10/2026) não pode ter manifesto legado: a falha
+// vira biblioteca vazia. Conta antiga, ou sem sinal confiável, continua 503.
+describe('MOO-25: primeiro acesso sem depender do legado para conta nova', () => {
+  const indisponivel = () => vi.fn().mockRejectedValue(Object.assign(
+    new Error('Não foi possível confirmar a biblioteca'), { code: 'library_storage_unavailable' },
+  ));
+
+  it('cliente criado depois da virada: falha do legado vira biblioteca vazia', async () => {
+    const db = fakeDatabase();
+    const legacy = indisponivel();
+    const createdAt = vi.fn(async () => Date.parse('2026-11-01T12:00:00Z') / 1000);
+    const adapter = store(db, legacy, { customerCreatedAtSec: createdAt });
+    expect(await adapter.getLibrarySyncMeta('cus_novo')).toBeNull();
+    expect(createdAt).toHaveBeenCalledWith('cus_novo');
+    expect(db.snapshot().states).toHaveLength(1);
+    expect(db.snapshot().states[0][1]).toMatchObject({ revision: 0, migrated_from_blob: false });
+  });
+
+  it('cliente criado antes da virada: falha transitória continua 503 e nada é criado', async () => {
+    const db = fakeDatabase();
+    const adapter = store(db, indisponivel(), {
+      customerCreatedAtSec: async () => Date.parse('2026-08-01T12:00:00Z') / 1000,
+    });
+    await expect(adapter.getLibrarySyncMeta('cus_antigo'))
+      .rejects.toMatchObject({ code: 'library_storage_unavailable' });
+    expect(db.snapshot().states).toEqual([]);
+  });
+
+  it('sem sinal confiável (Stripe falha, dono sem cus_ ou erro não transitório) continua 503', async () => {
+    for (const [owner, createdAt, legacy] of [
+      ['cus_x', async () => { throw new Error('stripe fora'); }, indisponivel()],
+      ['em_pessoa_exemplo_com', async () => Date.parse('2026-11-01T00:00:00Z') / 1000, indisponivel()],
+      ['cus_y', async () => Date.parse('2026-11-01T00:00:00Z') / 1000,
+        vi.fn().mockRejectedValue(Object.assign(new Error('sem blob'), { code: 'library_storage_unconfigured' }))],
+    ]) {
+      const db = fakeDatabase();
+      const adapter = store(db, legacy, { customerCreatedAtSec: createdAt });
+      await expect(adapter.getLibrarySyncMeta(owner)).rejects.toBeTruthy();
+      expect(db.snapshot().states).toEqual([]);
+    }
+  });
+
+  it('conta nova com legado respondendo normalmente não consulta o Stripe', async () => {
+    const db = fakeDatabase();
+    const createdAt = vi.fn();
+    const adapter = store(db, vi.fn(async () => null), { customerCreatedAtSec: createdAt });
+    expect(await adapter.getLibrarySyncMeta('cus_tranquilo')).toBeNull();
+    expect(createdAt).not.toHaveBeenCalled();
   });
 });

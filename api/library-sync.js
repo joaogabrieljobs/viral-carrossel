@@ -162,6 +162,18 @@ export default async function handler(req, res) {
     }
 
     if (action === 'push') {
+      if (process.env.LIBRARY_SYNC_BACKEND === 'postgres') {
+        // MOO-22: com Postgres a interface V2 grava cada projeto por
+        // /api/projects, com versão por linha. O push legado aceitava force e
+        // ausência de baseRevision e decidia pelo relógio do cliente, então um
+        // bundle antigo podia desfazer uma edição mais nova de outro aparelho.
+        // Recusar sem gravar: o bundle antigo mostra a mensagem e os dados
+        // continuam no navegador até a página ser atualizada.
+        return res.status(410).json({
+          error: 'Esta versão do Moont está desatualizada. Atualize a página para salvar seus projetos na nuvem.',
+          code: 'library_push_retired',
+        });
+      }
       const { manifest, meta } = await putLibraryManifest(
         customerId,
         {
@@ -171,13 +183,8 @@ export default async function handler(req, res) {
         {
           baseRevision: body.baseRevision,
           force: body.force === true,
-          // replace=true só quando o cliente pede encolher de propósito
-          // Um bundle antigo no telemóvel ainda pode enviar um manifesto
-          // incompleto com allowShrink. No banco, exclusões passam pela rota
-          // versionada por ID; nunca permita que esse push varra outros projetos.
-          replace: process.env.LIBRARY_SYNC_BACKEND === 'postgres'
-            ? false : (body.replace === true || body.allowShrink === true),
-          preserveAccountMetadata: process.env.LIBRARY_SYNC_BACKEND === 'postgres',
+          // replace=true só quando o cliente pede encolher de propósito.
+          replace: body.replace === true || body.allowShrink === true,
         },
       );
       return res.status(200).json({

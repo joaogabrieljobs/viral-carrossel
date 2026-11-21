@@ -11,7 +11,7 @@ export default function PasswordField({ label = 'Senha', value, onChange, autoCo
         <button type="button" disabled={disabled} aria-controls={id} aria-pressed={visible}
           aria-label={`${visible ? 'Ocultar' : 'Mostrar'} ${label.toLowerCase()}`}
           onClick={() => setVisible(v => !v)}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 36, padding: '4px 10px', border: '1px solid #66616e', borderRadius: 8, background: '#211d2b', color: '#fff', cursor: 'pointer', fontSize: 12 }}>
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 44, padding: '4px 12px', border: '1px solid #66616e', borderRadius: 8, background: '#211d2b', color: '#fff', cursor: 'pointer', fontSize: 12 }}>
           {visible ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
           {visible ? 'Ocultar' : 'Mostrar'}
         </button>

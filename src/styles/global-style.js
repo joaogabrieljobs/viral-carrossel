@@ -1300,4 +1300,40 @@ export const GLOBAL_STYLE = `
   .vc-fold .vc-fold {
     background: var(--bg-pearl);
   }
+
+  /* MOO-41 — alvo de toque mínimo de 44px em telas de toque. O :where() de fora
+     zera a especificidade: classe ou estilo que já dimensiona o controle vence
+     (ex.: abas da biblioteca com min-width: 0). Ficam de fora o link/botão no
+     meio do texto e os controles de desenho fixo — pontos de navegação e
+     [data-touch-compact] —, que ganham área de toque invisível no ::after. */
+  @media (pointer: coarse) {
+    :where(:is(button, a[href], [role="button"], [role="tab"]):not(:where(p, li, small, label, figcaption, blockquote, td) a):not(:where(p, small) button):not([data-touch-compact]):not([aria-label^="Ir para slide"])) {
+      min-height: 44px;
+      min-width: 44px;
+    }
+    [data-touch-compact],
+    [aria-label^="Ir para slide"] {
+      position: relative;
+    }
+    [data-touch-compact]::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: max(100%, 44px);
+      height: max(100%, 44px);
+      transform: translate(-50%, -50%);
+    }
+    /* Pontos ficam a ~6px um do outro: só cresce na vertical para o toque não
+       cair no ponto vizinho. */
+    [aria-label^="Ir para slide"]::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: -3px;
+      right: -3px;
+      height: 44px;
+      transform: translateY(-50%);
+    }
+  }
 `;

@@ -31,6 +31,11 @@ const MARK_REFUNDED = `
     AND status = 'reserved'
   RETURNING operation_id
 `;
+// MOO-29: estornos já feitos hoje pela conta (a linha diária está travada).
+const COUNT_REFUNDED = `
+  SELECT count(*)::int AS n FROM moont.ocr_daily_operations
+  WHERE owner_id = $1 AND quota_day = $2::date AND status = 'refunded'
+`;
 const DECREMENT = `
   UPDATE moont.ocr_daily_quotas
   SET used = GREATEST(0, used - 1), updated_at = now()
@@ -90,12 +95,17 @@ export async function consumePostgresOcrCredit({ customerId, now, limit, operati
   return result;
 }
 
-export async function refundPostgresOcrCredit({ customerId, now, operationId }) {
+export async function refundPostgresOcrCredit({ customerId, now, operationId, maxRefunds = null }) {
   const key = [ownerId(customerId), day(now)];
   const operation = validOperationId(operationId);
   return getPostgresConnection().begin(async (tx) => {
     const [quota] = await tx.unsafe(LOCK_DAY, key);
     if (!quota) return 0;
+    if (maxRefunds != null) {
+      const [refunded] = await tx.unsafe(COUNT_REFUNDED, key);
+      // Acima do teto a reserva fica como uso (status `reserved`).
+      if (Number(refunded?.n) >= maxRefunds) return Number(quota.used);
+    }
     const [changed] = await tx.unsafe(MARK_REFUNDED, [...key, operation]);
     if (!changed) return Number(quota.used);
     const [updated] = await tx.unsafe(DECREMENT, key);

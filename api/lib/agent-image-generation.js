@@ -22,7 +22,7 @@ import {
 import { putLibraryAsset, putLibraryAssetChunk, ASSET_CHUNK_CHARS } from './library-sync-store.js';
 import { getAccountProject } from './library-sync-postgres.js';
 import {
-  createAgentImageJob, expireAgentImageJob, finishAgentImageJob, getAgentVisualJobInternal,
+  closeAgentImageJobWithoutProject, createAgentImageJob, expireAgentImageJob, finishAgentImageJob, getAgentVisualJobInternal,
   imageJobHash, isImageJobStale, listAgentImageJobsForSettlement,
   markAgentImageJobCreditsSettled, selectImageSlides,
 } from './agent-visual-batch.js';
@@ -279,9 +279,19 @@ export async function runAgentImageJob({ ownerId, requestId, slides, aspectRatio
   try {
     finished = await finishAgentImageJob(ownerId, requestId, outcomes);
   } catch (error) {
-    // O job fica `pending` até o leitor marcá-lo expirado e devolver os créditos.
     console.error('[agent-image] finish', requestId, error?.code || '', error?.message || error);
-    return null;
+    // MOO-29: projeto apagado durante a geração. As imagens gravadas já foram
+    // pagas ao provedor; fecha o job registrando-as para consumir o crédito.
+    if (error?.code !== 'visual_project_not_found') {
+      // O job fica `pending` até o leitor marcá-lo expirado e devolver os créditos.
+      return null;
+    }
+    try {
+      finished = await closeAgentImageJobWithoutProject(ownerId, requestId, outcomes);
+    } catch (closeError) {
+      console.error('[agent-image] close orphan', requestId, closeError?.code || '', closeError?.message || closeError);
+      return null;
+    }
   }
   if (finished.finished) {
     const settled = await settleTerminalState(ownerId, requestId, finished, periodStartSec);

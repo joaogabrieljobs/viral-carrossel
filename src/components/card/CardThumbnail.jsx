@@ -4,8 +4,9 @@ import { sanitizeCustomVisualPresetBrand } from '../../utils/custom-visual-prese
 import { brandForFormatDisplay, slideForFormatDisplay } from '../../utils/format-view.js';
 import { groundInks } from '../../utils/presentation-families.js';
 import { wcagContrast } from '../../utils/wcag.js';
+import { stripAccentMarkers } from '../../utils/text-spans.js';
 
-const cleanText = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+const cleanText = (value) => stripAccentMarkers(value || '').replace(/\s+/g, ' ').trim();
 
 /**
  * Modelo compartilhado pela faixa do editor e pela Biblioteca.

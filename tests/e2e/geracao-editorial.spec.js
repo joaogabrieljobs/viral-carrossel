@@ -63,7 +63,10 @@ for (const fails of [false, true]) {
     expect(doc.slides[2].subtitle).toBe(fails ? generated.slides[2].subtitle : 'A tarefa saiu da reunião com dono e prazo.');
     expect(doc.slides[2].imageQuery).toBe(generated.slides[2].imageQuery);
     expect(doc.caption).not.toContain('#extra');
-    expect(prompts).toHaveLength(2);
+    // Reteste 21/11 (T09): revisão com resposta fora do formato ganha uma
+    // segunda tentativa antes de o rascunho seguir sem revisão.
+    expect(prompts).toHaveLength(fails ? 3 : 2);
+    if (fails) expect(prompts[2].startsWith('REVISÃO EDITORIAL')).toBe(true);
     expect(prompts[0]).toContain('OBJETIVO DO CONTEÚDO: Gerar salvamentos');
     if (fails) await expect(page.getByText(/revisão automática não foi concluída/i)).toBeVisible();
     await page.reload();

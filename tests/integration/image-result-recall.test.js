@@ -43,3 +43,18 @@ describe('MOO-10 — resultado da imagem guardado por operação', () => {
     expect(await quota.rememberImageResult({ ...base, operationId: 'op-recall-1', url: 'http://interno/x.png' })).toBe(false);
   });
 });
+
+// MOO-29 (b): a tarefa SJinn criada fica registrada na operação, para
+// suporte e auditoria de custo; a atividade da conta não a expõe.
+describe('MOO-29 — tarefa SJinn registrada na operação', () => {
+  it('guarda o taskId na metadata sem expor na atividade nem mudar o estorno', async () => {
+    const op = { ...base, operationId: 'op-task-1', limit: 50, periodEndSec: base.periodStartSec + 2_592_000 };
+    await quota.consumeImageCredit(op);
+    expect(await quota.rememberImageTask({ ...base, operationId: 'op-task-1', taskId: 'task_abc123' })).toBe(true);
+    const [linha] = await db.query(`SELECT status, metadata FROM moont.image_quota_operations WHERE operation_id = 'op-task-1'`).then((r) => r.rows);
+    expect(linha).toMatchObject({ status: 'reserved', metadata: { sjinnTaskId: 'task_abc123' } });
+    const activity = await quota.getImageQuotaActivity({ ...base });
+    expect(activity.find((a) => a.status === 'reserved')).not.toHaveProperty('sjinnTaskId');
+    expect(await quota.rememberImageTask({ ...base, operationId: 'op-task-1', taskId: 'x y' })).toBe(false);
+  });
+});

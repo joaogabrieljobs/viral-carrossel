@@ -56,7 +56,7 @@ test('Perfil confirma active=false do servidor sem manter plano ativo nem apagar
   await expect(subscription).toContainText('período atual até 01/12/2026');
   state.mode = 'inactive';
   await subscription.getByRole('button', { name:'Atualizar acesso', exact:true }).click();
-  await expect(page.getByRole('heading', { name:'Studio completo. Imagens inclusas nos planos pagos.', exact:true })).toBeVisible();
+  await expect(page.getByRole('heading', { name:'Studio completo. Imagens inclusas a partir do Plano Criador.', exact:true })).toBeVisible();
   await expect(page.getByText('A consulta não confirmou o acesso à assinatura. Seus projetos não foram apagados. Confira a assinatura no portal do cliente.', { exact:true })).toBeVisible();
   await expect(page.getByText('Plano individual ativo', { exact:true })).toHaveCount(0);
   await expect(subscription).toHaveCount(0);
@@ -97,7 +97,7 @@ test('isenção confirmada abre Perfil e uso, mas falha de consulta não mantém
   await expect(subscription).toContainText('Conta isenta de cobrança');
   state.mode = 'inactive';
   await subscription.getByRole('button', { name:'Atualizar acesso', exact:true }).click();
-  await expect(page.getByRole('heading', { name:'Studio completo. Imagens inclusas nos planos pagos.', exact:true })).toBeVisible();
+  await expect(page.getByRole('heading', { name:'Studio completo. Imagens inclusas a partir do Plano Criador.', exact:true })).toBeVisible();
   await expect(page.getByText('Conta isenta de cobrança', { exact:true })).toHaveCount(0);
   await expectDraftPreserved(page);
   expect(state.checkoutRequests).toBe(0);

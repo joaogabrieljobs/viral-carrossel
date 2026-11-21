@@ -257,9 +257,10 @@ export async function handleCheckout(req, res) {
         if (!startingAfter || page === 9) throw new Error('Muitos clientes para o mesmo e-mail');
       }
       if (existingCustomer) {
+        // Mensagem neutra (MOO-16): orienta a entrar sem afirmar que o e-mail tem conta.
         return res.status(200).json({
           requireLogin: true,
-          message: 'Este e-mail já tem conta. Entre com Google ou sua senha antes de escolher o plano.',
+          message: 'Para assinar com este e-mail, entre na sua conta primeiro (senha ou Google). Se ainda não tem conta, crie uma grátis e escolha o plano em seguida.',
         });
       }
       customer = await stripe.customers.create({

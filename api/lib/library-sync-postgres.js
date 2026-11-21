@@ -71,8 +71,14 @@ const SQL = {
     SET entry = EXCLUDED.entry, version = EXCLUDED.version,
       updated_at = EXCLUDED.updated_at, deleted_at = EXCLUDED.deleted_at,
       sort_order = EXCLUDED.sort_order`,
+  // MOO-29: job de imagem ainda `pending` não é apagado com o projeto; o
+  // worker precisa fechá-lo e liquidar as reservas `mcp_` (imagem gravada é
+  // cobrada, falha é estornada). O snapshot do projeto sai na hora.
   deleteAgentVisualJobs: `/* moont_delete_agent_visual_jobs */
-    DELETE FROM moont.agent_visual_jobs WHERE owner_id = $1 AND project_id = $2`,
+    DELETE FROM moont.agent_visual_jobs WHERE owner_id = $1 AND project_id = $2 AND status <> 'pending'`,
+  scrubPendingAgentJobs: `/* moont_scrub_pending_agent_jobs */
+    UPDATE moont.agent_visual_jobs SET before_entry = '{}'::jsonb
+    WHERE owner_id = $1 AND project_id = $2 AND status = 'pending'`,
   accountProjectUsage: `/* moont_account_project_usage */
     SELECT count(*) FILTER (WHERE deleted_at IS NULL)::bigint AS project_count,
       COALESCE(sum(octet_length(entry::text)) FILTER (WHERE deleted_at IS NULL), 0)::bigint AS total_bytes,
@@ -332,6 +338,28 @@ async function defaultLegacyReader(owner) {
   return module.readLegacyLibraryManifest(owner);
 }
 
+/**
+ * MOO-25: data de criação do cliente Stripe (segundos). Fonte confiável de
+ * "conta nova": o customer só existe depois de criado no Stripe, e a linha
+ * em moont.accounts nasce também no primeiro login de cliente antigo.
+ */
+async function defaultCustomerCreatedAtSec(owner) {
+  const { getStripe } = await import('./stripe.js');
+  const customer = await getStripe().customers.retrieve(owner);
+  const created = Number(customer?.created);
+  if (customer?.deleted || !Number.isSafeInteger(created) || created <= 0) throw new Error('customer_unknown');
+  return created;
+}
+
+// Virada para o Postgres em produção: 15/10/2026 (docs/moont-architecture.md).
+// Margem de um dia; LIBRARY_LEGACY_CUTOVER_AT (ISO) permite ajustar.
+const DEFAULT_LEGACY_CUTOVER_AT = '2026-10-16T03:00:00Z';
+
+function legacyCutoverSec() {
+  const parsed = Date.parse(process.env.LIBRARY_LEGACY_CUTOVER_AT || DEFAULT_LEGACY_CUTOVER_AT);
+  return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : null;
+}
+
 async function guardStorage(work) {
   try { return await work(); } catch (error) {
     if (typeof error?.code === 'string'
@@ -377,6 +405,7 @@ function deletedConflict(row, state) {
 export function createLibraryPostgresStore({
   sql: injectedSql,
   readLegacyManifest = defaultLegacyReader,
+  customerCreatedAtSec = defaultCustomerCreatedAtSec,
   now = Date.now,
   maxProjects = positiveLimit(process.env.PROJECTS_MAX_PER_ACCOUNT, DEFAULT_MAX_PROJECTS_PER_ACCOUNT),
   maxAccountBytes = positiveLimit(process.env.PROJECT_BYTES_MAX_PER_ACCOUNT, DEFAULT_MAX_ACCOUNT_PROJECT_BYTES),
@@ -389,7 +418,14 @@ export function createLibraryPostgresStore({
 
     // A leitura é feita antes de criar a conta no banco. Se o Blob falhar, não
     // há linha vazia que pudesse esconder projetos existentes.
-    const legacy = await readLegacyManifest(owner);
+    let legacy;
+    try {
+      legacy = await readLegacyManifest(owner);
+    } catch (error) {
+      if (!(await createdAfterCutover(owner, error))) throw error;
+      // MOO-25: cliente criado depois da virada nunca gravou no legado.
+      legacy = null;
+    }
     if (legacy && !Array.isArray(legacy.docs)) {
       throw fail('Manifesto anterior da biblioteca inválido.', 'library_storage_unavailable');
     }
@@ -409,6 +445,32 @@ export function createLibraryPostgresStore({
       }
       return (await run(tx, 'state', [owner]))[0];
     });
+  }
+
+  /**
+   * Só uma falha de leitura (Blob/Redis fora ou lento) de um cliente Stripe
+   * criado depois da virada vira biblioteca vazia. Sem sinal confiável (dono
+   * sem `cus_`, Stripe indisponível, erro de configuração), continua 503:
+   * melhor recusar do que esconder projetos de uma conta antiga.
+   */
+  async function createdAfterCutover(owner, error) {
+    if (error?.code !== 'library_storage_unavailable') return false;
+    if (!/^cus_[A-Za-z0-9]+$/.test(owner)) return false;
+    const cutover = legacyCutoverSec();
+    if (!cutover) return false;
+    let timer;
+    try {
+      // O Stripe só é consultado neste caminho de falha; não pode prender a rota.
+      const created = await Promise.race([
+        customerCreatedAtSec(owner),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('timeout')), 5_000); }),
+      ]);
+      return Number(created) >= cutover;
+    } catch {
+      return false;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async function getLibrarySyncMeta(ownerValue) {
@@ -656,6 +718,7 @@ export function createLibraryPostgresStore({
         };
         await run(tx, 'upsertProjects', [owner, JSON.stringify([row])]);
         await run(tx, 'deleteAgentVisualJobs', [owner, id]);
+        await run(tx, 'scrubPendingAgentJobs', [owner, id]);
         await run(tx, 'updateState', [
           owner, integer(state.revision) + 1, timestamp,
           integer(state.project_count) - (previous ? 1 : 0), nextOrder,

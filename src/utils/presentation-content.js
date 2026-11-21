@@ -1,3 +1,4 @@
+import { NO_GAP_NOTE_RULE } from './factual-grounding.js';
 /**
  * Critérios editoriais dos decks além do Pitch.
  * Recebe o caminho já normalizado pelo domínio de apresentações.
@@ -147,7 +148,7 @@ export function presentationFieldsForRoute(route) {
 
 export function presentationStrategyForRoute(route) {
   return `PREPARAÇÃO EDITORIAL — ${route.label.toUpperCase()}:
-Antes de redigir, identifique objetivo, público, estágio e uso; inventarie fatos, exemplos, hipóteses, restrições e lacunas. Planeje a pergunta, contribuição e sustentação de cada posição, sem expor notas de análise. Adapte a sequência ao total solicitado: combine etapas próximas, elimine redundância e desenvolva pontos distintos. Não preencha páginas com generalidades para atingir a quantidade.
+Antes de redigir, identifique objetivo, público, estágio e uso; inventarie fatos, exemplos, hipóteses, restrições e lacunas. Planeje a pergunta, contribuição e sustentação de cada posição, sem expor notas de análise. ${NO_GAP_NOTE_RULE} Adapte a sequência ao total solicitado: combine etapas próximas, elimine redundância e desenvolva pontos distintos. Não preencha páginas com generalidades para atingir a quantidade.
 Em conteúdo analítico, use AFIRMAÇÃO → EVIDÊNCIA → IMPLICAÇÃO; a evidência pode ser textual e precisa estar disponível.
 ${profileFor(route).strategy}
 
@@ -158,10 +159,17 @@ ${PRESENTATION_PROVENANCE_RULE}
 TESTE DE QUALIDADE: a abertura orienta, cada slide acrescenta informação sustentada, a sequência cumpre o objetivo e o fecho explicita uma aprendizagem, decisão ou ação. Reescreva páginas rasas com os detalhes disponíveis; não invente conteúdo para atingir um tamanho mínimo.`;
 }
 
+// Reteste 21/11, MF-11: Proposta (A04) terminou sem decisão comercial e Caso
+// (A06) virou lista de fatos. A função do caminho é conferida na revisão.
+const PATH_DEPTH_REVIEW = Object.freeze({
+  proposta_comercial: '\nDECISÃO COMERCIAL — um dos dois últimos slides diz o que o cliente aprova (opção, preço e condições quando fornecidos) e o próximo passo concreto que o material permite (como pedir, contratar ou confirmar). Se nenhum slide faz isso, use uma posição redundante para incluí-la, sem mudar quantidade ou ordem. Não invente prazo, desconto ou responsável.',
+  estudo_de_caso: '\nANTES E DEPOIS — se o material traz o ponto de partida e o resultado, um slide compara os dois em condições equivalentes, com período e fonte; um caso não é uma lista de fatos soltos. Sem ponto de partida no material, não invente o antes nem atribua causa; mostre o que mudou só com o que foi informado.',
+});
+
 export function presentationReviewForRoute(route) {
   return `REVISÃO DE PROFUNDIDADE — ${route.label.toUpperCase()}:
 ${profileFor(route).review}
-Compare os slides entre si e com o briefing.${route?.id === 'aula_workshop' ? ' Procure o par tarefa → correção antes de aprovar: se faltar a correção da mesma entrega, use uma posição redundante ou comercial sem função pedagógica para incluí-la, preservando quantidade e ordem física. A intenção do caminho prevalece sobre uma escolha inadequada do roteiro.' : ''} Recupere explicações, critérios e condições omitidos, somente com apoio disponível e dentro dos limites. Elimine repetição entre páginas e entre título, apoio e bloco de dados. Um slide curto e completo não precisa ser ampliado; altere apenas defeitos concretos.
+Compare os slides entre si e com o briefing.${route?.id === 'aula_workshop' ? ' Procure o par tarefa → correção antes de aprovar: se faltar a correção da mesma entrega, use uma posição redundante ou comercial sem função pedagógica para incluí-la, preservando quantidade e ordem física. A intenção do caminho prevalece sobre uma escolha inadequada do roteiro.' : ''}${PATH_DEPTH_REVIEW[route?.id] || ''} Recupere explicações, critérios e condições omitidos, somente com apoio disponível e dentro dos limites. Elimine repetição entre páginas e entre título, apoio e bloco de dados. Um slide curto e completo não precisa ser ampliado; altere apenas defeitos concretos.
 Audite o JSON inteiro, inclusive presentationBlocks, speakerNotes e caption quando presentes. Procure especialmente decisão pendente tratada como tomada, condição contratual deduzida e contexto de indicador ou exclusão que só apareceu nas notas. Corrija o campo que contém o problema, respeitando os campos editáveis do contrato.
 subtitle e bodyAfterImage são editáveis; title, speakerNotes e caption também podem mudar quando previstos no contrato. Corrija os campos relacionados juntos para não manter título, tarefa e resposta contraditórios. Amplie ou condense onde necessário sem alterar fatos, quantidade, ordem ou imagem. Não acrescente fatos para atingir um mínimo.
 ${PRESENTATION_EVIDENCE_RULES}

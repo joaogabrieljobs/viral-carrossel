@@ -160,7 +160,19 @@ function remapDestaqueSpansOnEdit(prevText, nextText, spansIn) {
   return normalizeDestaqueSpansForLen(adjusted, next.length);
 }
 
+/**
+ * Texto puro para lugares que não pintam destaque (miniatura, nome, lista):
+ * tira os marcadores `**…**`, `__…__` e `*…*` sem mexer em asterisco solto.
+ */
+function stripAccentMarkers(value) {
+  return String(value ?? '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_\n]+)__/g, '$1')
+    .replace(/(^|[^*\w])\*([^*\s][^*\n]*?[^*\s]|[^*\s])\*(?![*\w])/g, '$1$2');
+}
+
 export {
+  stripAccentMarkers,
   mergeUtf16AccentIntervals,
   normalizeDestaqueSpansForLen,
   markdownBoldAccentIntervalsUtf16,

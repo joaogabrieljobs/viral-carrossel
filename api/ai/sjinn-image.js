@@ -18,6 +18,7 @@ import {
   getQuotaUsage,
   rememberImageResult,
   recallImageResult,
+  rememberImageTask,
 } from '../lib/image-quota.js';
 import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
 import { parseImageReferences, assertReferenceStorageConfigured, stageImageReferences } from '../lib/image-references.js';
@@ -226,6 +227,11 @@ export default async function handler(req, res) {
     cleanupReferences = staged.cleanup;
     const imageList = staged.imageList;
     const taskId = await createGptImage2Task({ prompt, aspectRatio, resolution, imageList });
+    // MOO-29: registra a tarefa paga na operação antes do polling. Falha aqui
+    // não interrompe a geração.
+    await Promise.resolve()
+      .then(() => rememberImageTask({ customerId, periodStartSec, operationId, taskId }))
+      .catch((error) => console.error('[sjinn-image] remember task', error?.message || error));
     // Upload e autenticação usam o mesmo orçamento; sobram download, reembolso e limpeza.
     const data = await waitForSjinnTask(taskId, { deadlineMs: Math.max(1, SJINN_DEADLINE_MS - (Date.now() - startedAt)) });
     const url = extractSjinnOutputUrl(data);

@@ -124,11 +124,13 @@ describe('geração com uma revisão editorial', () => {
     ['campo não textual', { edits: [{ slideIndex: 1, reason: 'x', subtitle: null }] }, 'unavailable'],
     ['índices duplicados', { edits: [{ slideIndex: 1, reason: 'x', subtitle: 'A' }, { slideIndex: 1, reason: 'x', subtitle: 'B' }] }, 'unavailable'],
     ['legenda inválida', { edits: [], caption: [] }, 'unavailable'],
-  ])('mantém a primeira versão quando houver %s, sem tentar novamente', async (_, review, expectedStatus) => {
+  ])('mantém a primeira versão quando houver %s (resposta inválida: uma segunda tentativa; rede: nenhuma)', async (_, review, expectedStatus) => {
     const ai = vi.fn().mockResolvedValueOnce(draft());
-    if (review instanceof Error) ai.mockRejectedValueOnce(review); else ai.mockResolvedValueOnce(review);
+    if (review instanceof Error) ai.mockRejectedValueOnce(review); else ai.mockResolvedValueOnce(review).mockResolvedValueOnce(structuredClone(review));
     const output = await generateReviewedCarousel({ prompt: '', config }, ai);
-    expect(ai).toHaveBeenCalledTimes(2);
+    // Reteste 21/11 (T09): resposta fora do formato ganha uma segunda tentativa.
+    const invalidShape = !(review instanceof Error) && expectedStatus === 'unavailable';
+    expect(ai).toHaveBeenCalledTimes(invalidShape ? 3 : 2);
     expect(output.reviewStatus).toBe(expectedStatus);
     expect(output.result).toEqual(validateCarouselDraft(draft(), config));
   });
@@ -502,5 +504,103 @@ describe('lote B — apoio que repete o título', () => {
     ];
     expect(supportEchoesTitleIndexes(slides)).toEqual([0, 1]);
     expect(buildEditorialReviewPrompt('', { slides }, { presetId: 'livre', densityId: '1_1', count: 3 })).toContain('APOIO QUE REPETE O TÍTULO — correção obrigatória nos slideIndex 0, 1');
+  });
+});
+
+// Reteste 21/11 (T09): a revisão não concluiu e o rascunho com escassez
+// inventada chegou ao editor como se estivesse conferido (só um aviso genérico).
+describe('MF-16 — revisão que falha não esconde escassez inventada', () => {
+  it('rascunho com "pode ficar sem" fica como precisa de atenção, com o trecho marcado', async () => {
+    const cfg = { count: 3, presetId: 'livre', densityId: '1_2',
+      factualSource: 'Padaria Fermento Lento. Três pães: camponês a R$ 24, integral a R$ 26 e brioche a R$ 18. Encomendas pelo WhatsApp com 1 dia de antecedência.' };
+    const rascunho = { slides: [
+      { title: 'Três pães', subtitle: 'Camponês a R$ 24, integral a R$ 26 e brioche a R$ 18.', imageQuery: '', bodyAfterImage: '' },
+      { title: 'Nada de vitrine cheia', subtitle: 'Quem chega cedo leva; quem pede no dia pode ficar sem.', imageQuery: '', bodyAfterImage: '' },
+      { title: 'Encomende', subtitle: 'Peça pelo WhatsApp com 1 dia de antecedência.', imageQuery: '', bodyAfterImage: '' },
+    ], caption: 'Encomende.' };
+    let call = 0;
+    const ai = vi.fn(async () => { call += 1; if (call === 1) return structuredClone(rascunho); throw new Error('resposta fora do formato'); });
+    const output = await generateReviewedCarousel({ prompt: 'briefing', config: cfg }, ai);
+    expect(output.reviewStatus).toBe('needs_attention');
+    expect(output.violations).toEqual(expect.arrayContaining([expect.objectContaining({ slideIndex: 1, category: 'disponibilidade ou escassez sem fonte' })]));
+  });
+});
+
+// Reteste 21/11 (T09): "A revisão automática não foi concluída; mantive a
+// primeira versão". Resposta da revisão fora do formato não é queda do
+// serviço: vale uma segunda tentativa antes de entregar o rascunho sem revisão.
+describe('revisão com resposta fora do formato', () => {
+  const cfg = { count: 3, presetId: 'livre', densityId: '1_2', factualSource: 'Padaria Fermento Lento. Encomendas pelo WhatsApp com 1 dia de antecedência.' };
+  const rascunho = { slides: [
+    { title: 'Padaria Fermento Lento', subtitle: 'Pão de fermentação natural.', imageQuery: '', bodyAfterImage: '' },
+    { title: 'Como pedir', subtitle: 'Pelo WhatsApp, com 1 dia de antecedência.', imageQuery: '', bodyAfterImage: '' },
+    { title: 'Encomende', subtitle: 'Mande sua mensagem hoje.', imageQuery: '', bodyAfterImage: '' },
+  ], caption: 'Encomende.' };
+
+  it('tenta a revisão de novo uma vez', async () => {
+    const respostas = [structuredClone(rascunho), { foo: 'fora do formato' }, { edits: [] }];
+    const ai = vi.fn(async () => respostas.shift());
+    const output = await generateReviewedCarousel({ prompt: 'briefing', config: cfg }, ai);
+    expect(ai).toHaveBeenCalledTimes(3);
+    expect(output.reviewStatus).toBe('unchanged');
+  });
+
+  it('queda do serviço não gera outra chamada', async () => {
+    let call = 0;
+    const ai = vi.fn(async () => { call += 1; if (call === 1) return structuredClone(rascunho); throw new Error('503'); });
+    const output = await generateReviewedCarousel({ prompt: 'briefing', config: cfg }, ai);
+    expect(ai).toHaveBeenCalledTimes(2);
+    expect(output.reviewStatus).toBe('unavailable');
+  });
+});
+
+// Reteste 21/11: títulos iguais ou quase iguais em slides diferentes (T05,
+// A02, A04, A05) passavam pela revisão.
+describe('repetição de título entre slides', () => {
+  const t = titles => titles.map(title => ({ title, subtitle: 'x' }));
+  it.each([
+    [['36 horas por pão', 'Tempo é ingrediente, não detalhe', 'Tempo é ingrediente, não detalhe'], [2]],
+    [['Capa', '41.200 pães vendidos em 2025', 'Equipe', '41.200 pães vendidos em 2025'], [3]],
+    [['Três pães, preços definidos, retirada na padaria', 'Pedido', 'Três pães, preços definidos, pedido pelo WhatsApp'], [2]],
+    [['Sem entrega fora do bairro; reserva antecipada assegura o pedido', 'Sem entrega fora do bairro; reserva antecipada separa o pedido'], [1]],
+  ])('%j → slides repetidos %j', async (titles, expected) => {
+    const { repeatedTitleIndexes } = await import('../../src/utils/editorial-review.js');
+    expect(repeatedTitleIndexes(t(titles))).toEqual(expected);
+  });
+
+  it('títulos distintos que compartilham uma palavra não contam', async () => {
+    const { repeatedTitleIndexes } = await import('../../src/utils/editorial-review.js');
+    expect(repeatedTitleIndexes(t(['Três pães, três escolhas', 'Pão de 36 horas', 'Encomende seu pão pelo WhatsApp']))).toEqual([]);
+  });
+
+  it('número diferente distingue títulos de mesma forma (Passo 1, Passo 2)', async () => {
+    const { repeatedTitleIndexes } = await import('../../src/utils/editorial-review.js');
+    expect(repeatedTitleIndexes(t(['Passo específico 1', 'Passo específico 2', 'Passo específico 3']))).toEqual([]);
+    expect(repeatedTitleIndexes(t(['', '', '']))).toEqual([]);
+  });
+
+  it('o mesmo número em 3 ou mais slides vira pedido de não repetir (A01–A06: "36 horas" em 5 a 9 slides)', async () => {
+    const { repeatedFactSlides } = await import('../../src/utils/editorial-review.js');
+    const slides = [
+      { title: 'Pão de 36 horas', subtitle: 'Fermentação longa.' },
+      { title: 'Processo', subtitle: 'Cada massa descansa 36 horas.' },
+      { title: 'Preços', subtitle: 'Camponês a R$ 24.' },
+      { title: 'Paciência', subtitle: 'São 36 horas até o forno.', bodyAfterImage: 'R$ 24 o camponês.' },
+    ];
+    expect(repeatedFactSlides(slides)).toEqual([{ fact: '36 horas', slideIndexes: [0, 1, 3] }]);
+    const prompt = buildEditorialReviewPrompt('', { slides }, { presetId: 'apresentacao', count: 4 });
+    expect(prompt).toContain('FATO REPETIDO');
+    expect(prompt).toContain('"36 horas" aparece nos slideIndex 0, 1, 3');
+    expect(repeatedFactSlides(slides.slice(0, 3))).toEqual([]);
+  });
+
+  it('a revisão de carrossel recebe a correção obrigatória', () => {
+    const slides = [{ title: 'Capa', subtitle: 'a' }, { title: 'Tempo é ingrediente, não detalhe', subtitle: 'b' }, { title: 'Tempo é ingrediente, não detalhe', subtitle: 'c' }];
+    expect(buildEditorialReviewPrompt('', { slides }, { presetId: 'livre', densityId: '1_1', count: 3 })).toContain('TÍTULO REPETIDO — correção obrigatória nos slideIndex 2');
+  });
+
+  it('a revisão de apresentação também', () => {
+    const slides = [{ title: 'Capa', subtitle: 'a' }, { title: '41.200 pães vendidos em 2025', subtitle: 'b' }, { title: '41.200 pães vendidos em 2025', subtitle: 'c' }];
+    expect(buildEditorialReviewPrompt('', { slides }, { presetId: 'apresentacao', count: 3 })).toContain('TÍTULO REPETIDO — correção obrigatória nos slideIndex 2');
   });
 });

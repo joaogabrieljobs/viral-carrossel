@@ -39,7 +39,7 @@ test.describe('Landing (RF-01)', () => {
       await expect(card).toContainText(plan.imageQuota ? `${plan.imageQuota} imagens por mês` : 'Sem imagens de IA inclusas');
     }
     await page.getByRole('button', { name: 'Escolher meu plano', exact: true }).click();
-    await expect(page.getByRole('heading', { name: /Studio completo. Imagens inclusas nos planos pagos/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Studio completo. Imagens inclusas a partir do Plano Criador/i })).toBeVisible();
   });
 
   for (const [device, width] of [['desktop', 1280], ['mobile', 375]]) {
@@ -78,7 +78,7 @@ test.describe('Landing (RF-01)', () => {
         await page.screenshot({ path: `/tmp/viral-landing-${name}-${device}.png` });
       }
       await page.getByRole('button', { name: 'Criar com minha marca', exact: true }).click();
-      await expect(page.getByRole('heading', { name: /Studio completo. Imagens inclusas nos planos pagos/i })).toBeVisible();
+      await expect(page.getByRole('heading', { name: /Studio completo. Imagens inclusas a partir do Plano Criador/i })).toBeVisible();
     });
   }
 

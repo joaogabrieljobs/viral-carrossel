@@ -104,6 +104,16 @@ const ABSOLUTES = /\b(?:a maioria d(?:e|as|os) [a-z]+|most (?:people|customers|v
 // todos os dias" e "pão fresco toda manhã" (MF-04). Só vale quando o material
 // não traz a expressão.
 const ROUTINES = /\b(?:feit[oa]s? a mao|a mao|todos os dias|todo dia|toda manha|todas as manhas|diariamente|producao diaria|quentinh[oa]s?|fresquinh[oa]s?|saindo do forno|recem-said[oa]s? do forno)\b/gu;
+// Escassez, disponibilidade e superioridade que o material não traz (MF-16,
+// reteste 21/11: "quem pede no dia pode ficar sem", "pode não encontrar o
+// pão", "no horário que você escolher", "nenhuma prensa industrial consegue
+// imitar"). Não usa a exceção do condicional: a escassez vem justamente com
+// "pode".
+const AVAILABILITY = /\b(?:pode(?:m)?\s+(?:ficar|sair)\s+sem|pode(?:m)?\s+nao\s+encontrar|quem\s+chega\s+(?:cedo|tarde|primeiro|sem)|acaba(?:m)?\s+(?:cedo|rapido|logo)|esgota(?:m|do|dos|da|das)?|estoque\s+limitado|ultimas\s+unidades|antes\s+que\s+acabe|vagas?\s+limitadas?|no\s+horario\s+que\s+(?:voce|preferir|quiser|escolher)|quando\s+(?:voce\s+)?quiser|a\s+qualquer\s+hora|(?:ja\s+)?reserva(?:m)?\s+o\s+seu|nenhum[a]?\s+(?:\S+\s+){0,3}(?:consegue|pode)\s+(?:imitar|copiar|igualar)|pouca\s+gente\s+(?:imagina|sabe|conhece))\b/gu;
+// Reteste 21/11 (T02, T06): regra geral e atributo sensorial do produto que o
+// material não traz ("costuma levar", "crosta firme e miolo que rende").
+const GENERALIZATION = /\b(?:costuma(?:m)?|geralmente|normalmente|em geral|a maioria d[oa]s?|quase sempre|tipicamente)\b/gu;
+const SENSORY = /\b(?:crosta|casca|crocante|crocantes|miolo|macio|macia|aerad[oa]|umid[oa]|sabor|sabores|aroma|perfumad[oa]|textura|derrete(?:m)?)\b/gu;
 const CHANNELS = /\b(?:whatsapp|DM|direct|coment[aá]rios|agendamento|agende (?:uma )?consulta|patients?|pacientes?)\b/giu;
 const CONDITIONAL = /\b(?:pode|podem|poderia|talvez|se (?:voce|sua|seu|ja)|por exemplo|uma opcao|may|might|could|if (?:you|your)|for example|an option)\b/;
 const negatedGuarantee = (text, index) => /\b(?:nao|nem|no|not|never|without)\b(?:\s+[\p{L}]+){0,4}\s*$/u.test(normalize(text.slice(0, index).split(/[.!?;\n]/u).pop()));
@@ -208,6 +218,15 @@ export function auditDraftFactuality(draft, config = {}) {
       for (const match of normalized.matchAll(ROUTINES)) {
         if (!sourceText.includes(match[0]) && !CONDITIONAL.test(normalized)) add('rotina ou feitura sem fonte', match[0]);
       }
+      for (const match of normalized.matchAll(AVAILABILITY)) {
+        if (!sourceText.includes(match[0])) add('disponibilidade ou escassez sem fonte', match[0]);
+      }
+      for (const match of normalized.matchAll(GENERALIZATION)) {
+        if (!sourceText.includes(match[0])) add('generalização sem fonte', match[0]);
+      }
+      for (const match of normalized.matchAll(SENSORY)) {
+        if (!sourceText.includes(match[0])) add('atributo sensorial sem fonte', match[0]);
+      }
       for (const match of sentence.matchAll(CHANNELS)) {
         if (!channels.has(normalize(match[0])) && !CONDITIONAL.test(normalized)) add('canal ou serviço não informado', match[0]);
       }
@@ -215,6 +234,12 @@ export function auditDraftFactuality(draft, config = {}) {
   }
   return violations;
 }
+
+/**
+ * Lacuna do material é bastidor (MF-12, reteste 21/11: "Não há dados de
+ * concorrentes…", "…não foram documentados", "Faltam combinar o endereço…").
+ */
+export const NO_GAP_NOTE_RULE = 'Nunca escreva no card ou slide que um dado falta, não foi informado, não foi documentado ou não existe (ex.: "não há dados de…", "não foram documentados", "faltam definir o endereço"). Mostre o que o material traz; o que falta fica fora do texto visível.';
 
 export function buildFactualGroundingPrompt(config = {}) {
   const source = config.factualSource ?? config.commercialClaimSource;
@@ -228,7 +253,8 @@ Não acrescente duração, frequência, números por extenso, maioria, históric
 Não transforme benefício esperado em garantia. Não use garantir, garante, garantia nem garantido quando o material não usa essa palavra: uma encomenda reserva o pedido, não garante disponibilidade, frescor ou resultado. Não invente preço, prazo, taxas, serviços inclusos, gratuidade, agendamento ou WhatsApp/DM/comentários como canal da oferta. Preserve o público e os termos do usuário (clientes não viram pacientes).
 Quando um dado não foi informado (endereço, telefone, preço, horário), não escreva isso no card nem no slide: nada de "não foi informado", "não informado", "o briefing não traz", "a confirmar" ou colchetes para preencher. O texto é para o público final, não um bilhete para quem pediu. Omita o dado e siga a sequência.
 Não use travessão (—): use vírgula, dois-pontos ou ponto.
-O CTA usa a ação pedida. Não acrescente canal, recompensa ou condição comercial. Não repita o mesmo fato/argumento para preencher cards; cada card deve avançar a sequência. Quando faltar informação, mantenha uma formulação útil e neutra, sem completar com um detalhe plausível.`;
+O CTA usa a ação pedida. Não acrescente canal, recompensa ou condição comercial. Não repita o mesmo fato/argumento para preencher cards; cada card deve avançar a sequência. Quando faltar informação, mantenha uma formulação útil e neutra, sem completar com um detalhe plausível.
+${NO_GAP_NOTE_RULE}`;
 }
 
 /**
@@ -248,6 +274,8 @@ Leia cada frase do rascunho, inclusive títulos, blocos e legenda, e confira no 
 - reação, sensação ou benefício do cliente apresentado como fato;
 - conveniência que contradiz um fato (ex.: "na volta do trabalho" para loja que fecha às 13h; "retire quando quiser" com horário definido);
 - número reinterpretado ("seis mãos" para 6 funcionários).
+- escassez, disponibilidade ou superioridade: "pode ficar sem", "quem chega cedo leva", "esgota", "no horário que você escolher", "nenhum concorrente consegue imitar".
+- generalização apresentada como regra: "costuma levar", "geralmente", "a maioria das padarias".
 Corrija também erros de digitação e palavras inexistentes. Uma frase verdadeira e simples vale mais que um detalhe específico inventado. Ao corrigir, mantenha a função do card no arco.`;
 }
 
@@ -257,9 +285,14 @@ Corrija também erros de digitação e palavras inexistentes. Uma frase verdadei
  * bastidor: nunca pode sair no card ou slide do cliente (MF-12).
  */
 const BRIEFING_NOTE = /\b(?:n[ãa]o\s+(?:foi|foram|est[áa]|est[ãa]o|ser[áa]|consta(?:m)?)\s+(?:informad|fornecid|especificad|indicad|mencionad|dispon[ií]vel|dispon[ií]veis)\w*|n[ãa]o\s+(?:informad|fornecid|especificad|mencionad)[oa]s?\b|sem\s+(?:informa[çc][ãa]o|dado)s?\s+(?:sobre|de)\b|(?:o|no|pelo|do)\s+briefing\b|(?:o|no|do)\s+material\s+(?:fornecido|enviado)\b|informa[çc][ãa]o\s+ausente|dados?\s+ausentes?|a\s+confirmar\b)|\[(?:inserir|preencher|a\s+definir)[^\]]*\]/iu;
+// Reteste 21/11 (A02, A04): a mesma nota em outras redações. "Não há dados
+// de…", "…não foram documentados", "Faltam definir o endereço…". Fatos do
+// tipo "não há entrega fora do bairro" continuam no card.
+const BRIEFING_NOTE_MORE = /\b(?:n[ãa]o\s+h[áa]\s+(?:dados?|informa[çc](?:[ãa]o|[õo]es)|registros?|n[úu]meros?)\s+(?:de|sobre|do|da|dos|das)\b|n[ãa]o\s+(?:foi|foram|est[áa]|est[ãa]o)?\s*documentad[oa]s?\b|^\s*faltam?\s+\p{L}+\s+(?:o|a|os|as)?\s*(?:n[úu]mero|endere[çc]o|contato|telefone|forma\s+de\s+pagamento|dados|informa[çc])|\bfalta(?:m)?\s+(?:o|a|os|as)?\s*(?:n[úu]mero\s+de\s+(?:contato|telefone|whatsapp)|endere[çc]o|forma\s+de\s+pagamento))/iu;
 
 export function isBriefingNote(sentence) {
-  return BRIEFING_NOTE.test(String(sentence || ''));
+  const text = String(sentence || '');
+  return BRIEFING_NOTE.test(text) || BRIEFING_NOTE_MORE.test(text);
 }
 
 /** Remove frases inteiras que comentam o briefing. Preserva o resto do texto. */

@@ -685,8 +685,9 @@ describe('identidade para renovar assinatura por senha', () => {
     stripeMock.subscriptions.list.mockResolvedValue({ data: [subAtiva('cus_vitima')] });
     const res = makeRes();
     await registerHandler(makeReq({ method: 'POST', body: { email: 'vitima@teste.exemplo', password: 'SenhaAtacante123!' } }), res);
-    expect(res.statusCode).toBe(409);
-    expect(res.body.requireLogin).toBe(true);
+    // Resposta neutra (MOO-16): não revela que o e-mail já tem conta.
+    expect(res.statusCode).toBe(200);
+    expect(res.body.checkEmail).toBe(true);
     expect(stripeMock.customers.update).not.toHaveBeenCalled();
     expect(stripeMock.customers.create).not.toHaveBeenCalled();
     expect(cookieValue(res, COOKIE_NAME)).toBeNull();
@@ -731,7 +732,7 @@ describe('identidade para renovar assinatura por senha', () => {
     expect(stripeMock.customers.create).toHaveBeenCalledTimes(1);
   });
 
-  it('dois cadastros simultâneos convergem no mesmo customer e o segundo recebe 409', async () => {
+  it('dois cadastros simultâneos convergem no mesmo customer e o segundo recebe a resposta neutra', async () => {
     stripeMock.customers.list.mockResolvedValue({ data: [], has_more: false });
     stripeMock.customers.create.mockResolvedValue({
       id: 'cus_concorrente', email: 'concorrente@teste.exemplo', metadata: { product: 'viral-carrossel' },
@@ -753,7 +754,9 @@ describe('identidade para renovar assinatura por senha', () => {
       } }), second),
     ]);
 
-    expect([first.statusCode, second.statusCode].sort()).toEqual([200, 409]);
+    expect([first.statusCode, second.statusCode]).toEqual([200, 200]);
+    expect([first.body.checkEmail, second.body.checkEmail].filter(Boolean)).toHaveLength(1);
+    expect([first, second].filter((r) => cookieValue(r, COOKIE_NAME))).toHaveLength(1);
     expect(stripeMock.customers.create).toHaveBeenCalledTimes(2);
     expect(new Set(stripeMock.customers.create.mock.calls.map((call) => call[1].idempotencyKey)).size).toBe(1);
     expect(stripeMock.customers.update).toHaveBeenCalledTimes(2);

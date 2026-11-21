@@ -52,17 +52,22 @@ function inkIfReadable(candidate, bgHex, fallback, minRatio = 3) {
  * Segunda cor do brief (rose, acento) no fundo real do card.
  * Clareia ou escurece o mesmo tom até passar contraste. Não troca por outro matiz.
  */
-function accentInkOnSurface(accentHex, bgHex) {
+function accentInkOnSurface(accentHex, bgHex, minRatio = 3) {
   const accent = vcNormalizeHex(accentHex) || '#000000';
   const bg = vcNormalizeHex(bgHex) || '#ffffff';
-  if (wcagContrast(accent, bg) >= 3) return accent;
+  if (wcagContrast(accent, bg) >= minRatio) return accent;
   const rgb = vcHexToRgb(bg);
-  const toward = rgb && vcRelLuminance01(rgb) <= 0.45 ? '#ffffff' : '#000000';
+  const preferred = rgb && vcRelLuminance01(rgb) <= 0.45 ? '#ffffff' : '#000000';
+  // Fundo de luminância média (laranja, vermelho): o lado preferido pode não
+  // alcançar o mínimo nem no extremo; então tenta o outro lado.
+  const sides = wcagContrast(preferred, bg) >= minRatio ? [preferred] : [preferred === '#ffffff' ? '#000000' : '#ffffff', preferred];
   let best = accent;
-  for (let i = 1; i <= 10; i += 1) {
-    const next = mixHex(accent, toward, i / 10);
-    best = next;
-    if (wcagContrast(next, bg) >= 3) return next;
+  for (const toward of sides) {
+    for (let i = 1; i <= 10; i += 1) {
+      const next = mixHex(accent, toward, i / 10);
+      if (wcagContrast(next, bg) >= minRatio) return next;
+      if (wcagContrast(next, bg) > wcagContrast(best, bg)) best = next;
+    }
   }
   return best;
 }

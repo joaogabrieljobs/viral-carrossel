@@ -551,6 +551,12 @@ describe('POST /api/project-share', () => {
       keepRevision: true,
     });
 
+    // MOO-33: a autoria só é registrada se a foto estiver na biblioteca do membro.
+    const spy = vi.spyOn(librarySyncStore, 'getLibraryAsset').mockImplementation(async (ownerId, assetId) => (
+      ownerId === 'cus_member' && assetId === 'member-photo'
+        ? { dataUrl: 'data:image/jpeg;base64,MEMBER' }
+        : null
+    ));
     const published = makeRes();
     await handler(post({
       action: 'push',
@@ -562,11 +568,6 @@ describe('POST /api/project-share', () => {
     }, 'cus_member', 'membro@teste.exemplo'), published);
     expect(published.statusCode).toBe(200);
 
-    const spy = vi.spyOn(librarySyncStore, 'getLibraryAsset').mockImplementation(async (ownerId, assetId) => (
-      ownerId === 'cus_member' && assetId === 'member-photo'
-        ? { dataUrl: 'data:image/jpeg;base64,MEMBER' }
-        : null
-    ));
     const result = makeRes();
     const req = makeReq({ cookie: cookieFor('cus_guest', 'guest@teste.exemplo') });
     req.query = { code: 'MEMBER01', asset: 'member-photo' };
@@ -598,6 +599,150 @@ describe('POST /api/project-share', () => {
     expect(result.statusCode).toBe(200);
     expect(spy.mock.calls.map(([ownerId]) => ownerId)).toEqual(['cus_owner', 'cus_member']);
     expect(spy.mock.calls.some(([ownerId]) => ownerId.includes('@'))).toBe(false);
+    spy.mockRestore();
+  });
+});
+
+// MOO-33: qualquer membro grava o documento e `assetOwners`. Antes, citar um
+// assetId bastava para a leitura procurar a foto no dono e em todos os
+// membros. Agora a autoria só vem de quem tem a foto na própria biblioteca
+// (ou é herdada da revisão anterior) e a leitura usa somente essa autoria.
+describe('MOO-33: autoria das fotos da partilha', () => {
+  // Bibliotecas simuladas: quem tem qual foto.
+  function libraries(map) {
+    return vi.spyOn(librarySyncStore, 'getLibraryAsset').mockImplementation(async (ownerId, assetId) => (
+      map[ownerId]?.includes(assetId) ? { dataUrl: `data:image/jpeg;base64,${ownerId}-${assetId}` } : null
+    ));
+  }
+
+  async function readAsset(code, assetId, customerId = 'cus_guest') {
+    const res = makeRes();
+    const req = makeReq({ cookie: cookieFor(customerId, `${customerId}@teste.exemplo`) });
+    req.query = { code, asset: assetId };
+    await handler(req, res);
+    return res;
+  }
+
+  async function shareWithMember(doc) {
+    const created = makeRes();
+    await handler(post({ action: 'create', name: 'Equipa', doc }, 'cus_owner', 'dona@teste.exemplo'), created);
+    expect(created.statusCode).toBe(201);
+    bindingByCode.set(created.body.code, created.body.projectId);
+    const joined = makeRes();
+    await handler(post({ action: 'join', code: created.body.code }, 'cus_member', 'membro@teste.exemplo'), joined);
+    expect(joined.statusCode).toBe(200);
+    return created.body.code;
+  }
+
+  it('membro que cita a foto privada do dono no push não consegue lê-la pela partilha', async () => {
+    const spy = libraries({ cus_owner: ['owner-private'] });
+    const code = await shareWithMember({ slides: [{ id: 's1', title: 'Sem foto' }] });
+    const pushed = makeRes();
+    await handler(post({
+      action: 'push', code,
+      doc: boundDoc(code, { id: 's1', title: 'Roubo', bgImageAssetId: 'owner-private' }, 1),
+    }, 'cus_member', 'membro@teste.exemplo'), pushed);
+    expect(pushed.statusCode).toBe(200);
+    expect((await getSharedProject(code)).assetOwners).toEqual({});
+
+    spy.mockClear();
+    const res = await readAsset(code, 'owner-private', 'cus_member');
+    expect(res.statusCode).toBe(404);
+    expect(spy.mock.calls.some(([ownerId]) => ownerId === 'cus_owner')).toBe(false);
+    spy.mockRestore();
+  });
+
+  it('push de membro mantém a autoria das fotos herdadas e registra só as que ele tem', async () => {
+    const spy = libraries({ cus_owner: ['owner-photo'], cus_member: ['member-photo'] });
+    const code = await shareWithMember({ slides: [{ id: 's1', bgImageAssetId: 'owner-photo' }] });
+    expect((await getSharedProject(code)).assetOwners).toEqual({ 'owner-photo': 'cus_owner' });
+
+    const pushed = makeRes();
+    await handler(post({
+      action: 'push', code,
+      doc: { ...boundDoc(code, { id: 's1', bgImageAssetId: 'owner-photo' }, 1),
+        slides: [
+          { id: 's1', bgImageAssetId: 'owner-photo', title: 'Texto do membro' },
+          { id: 's2', bgImageAssetId: 'member-photo' },
+          { id: 's3', bgImageAssetId: 'foto-de-ninguem' },
+        ] },
+    }, 'cus_member', 'membro@teste.exemplo'), pushed);
+    expect(pushed.statusCode).toBe(200);
+    expect((await getSharedProject(code)).assetOwners).toEqual({
+      'owner-photo': 'cus_owner', 'member-photo': 'cus_member',
+    });
+
+    expect((await readAsset(code, 'owner-photo')).body.asset.dataUrl).toContain('cus_owner-owner-photo');
+    expect((await readAsset(code, 'member-photo')).body.asset.dataUrl).toContain('cus_member-member-photo');
+    expect((await readAsset(code, 'foto-de-ninguem')).statusCode).toBe(404);
+    spy.mockRestore();
+  });
+
+  it('leitura em partilha com autoria verificada não procura no dono nem nos membros', async () => {
+    await putSharedProject({
+      code: 'STRICT01',
+      ownerId: 'cus_owner',
+      members: ['cus_owner', 'cus_member'],
+      doc: { slides: [{ id: 's1', bgImageAssetId: 'x-photo' }] },
+      assetOwners: { 'x-photo': 'cus_member' },
+      assetOwnersVersion: 2,
+      revision: 2,
+      keepRevision: true,
+    });
+    const spy = libraries({ cus_owner: ['x-photo'] });
+    const res = await readAsset('STRICT01', 'x-photo');
+    expect(res.statusCode).toBe(404);
+    expect(spy.mock.calls.map(([ownerId]) => ownerId)).toEqual(['cus_member']);
+    spy.mockRestore();
+  });
+
+  it('partilha gravada antes da correção mantém o fallback até o próximo push', async () => {
+    // Antes da correção, o push gravava todas as fotos com o autor do push.
+    await putSharedProject({
+      code: 'PREFIX01',
+      ownerId: 'cus_owner',
+      ownerEmail: 'dona@teste.exemplo',
+      shareProjectId: 'sp_PREFIX01PREFIX01',
+      members: ['cus_owner', 'cus_member'],
+      doc: { slides: [{ id: 's1', bgImageAssetId: 'owner-photo' }] },
+      assetOwners: { 'owner-photo': 'cus_member' },
+      revision: 2,
+      keepRevision: true,
+    });
+    bindingByCode.set('PREFIX01', 'sp_PREFIX01PREFIX01');
+    const spy = libraries({ cus_owner: ['owner-photo', 'owner-private'] });
+    expect((await readAsset('PREFIX01', 'owner-photo')).statusCode).toBe(200);
+
+    // O push seguinte resolve a autoria só das fotos que já estavam na partilha;
+    // uma foto nova do dono citada pelo membro não entra.
+    const pushed = makeRes();
+    await handler(post({
+      action: 'push', code: 'PREFIX01',
+      doc: { ...boundDoc('PREFIX01', {}, 2), slides: [
+        { id: 's1', bgImageAssetId: 'owner-photo' },
+        { id: 's2', bgImageAssetId: 'owner-private' },
+      ] },
+    }, 'cus_member', 'membro@teste.exemplo'), pushed);
+    expect(pushed.statusCode).toBe(200);
+    const saved = await getSharedProject('PREFIX01');
+    expect(saved.assetOwners).toEqual({ 'owner-photo': 'cus_owner' });
+    expect(saved.assetOwnersVersion).toBe(2);
+    expect((await readAsset('PREFIX01', 'owner-photo')).statusCode).toBe(200);
+    expect((await readAsset('PREFIX01', 'owner-private')).statusCode).toBe(404);
+    spy.mockRestore();
+  });
+
+  it('criação registra só as fotos que o criador tem na própria biblioteca', async () => {
+    const spy = libraries({ cus_owner: ['mine'], cus_other: ['alheia'] });
+    const created = makeRes();
+    await handler(post({ action: 'create', name: 'X', doc: { slides: [
+      { id: 's1', bgImageAssetId: 'mine' }, { id: 's2', bgImageAssetId: 'alheia' },
+    ] } }, 'cus_owner', 'dona@teste.exemplo'), created);
+    expect(created.statusCode).toBe(201);
+    const saved = await getSharedProject(created.body.code);
+    expect(saved.assetOwners).toEqual({ mine: 'cus_owner' });
+    expect(saved.assetOwnersVersion).toBe(2);
+    expect((await readAsset(created.body.code, 'alheia')).statusCode).toBe(404);
     spy.mockRestore();
   });
 });

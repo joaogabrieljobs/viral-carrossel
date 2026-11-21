@@ -69,6 +69,13 @@ export default function LoginModal({
         setCheckoutReady(true);
         return;
       }
+      // Cadastro com resposta neutra (MOO-16): sem sessão; a orientação vai por
+      // e-mail e a aba "Entrar" continua disponível.
+      if (data.checkEmail) {
+        setPassword('');
+        setNotice(data.message || 'Confira seu e-mail para continuar.');
+        return;
+      }
       // Conta sem assinatura entra no plano grátis: mesmo caminho de quem pagou.
       if (data.active || data.free) {
         dismissOnboardingLanding();
@@ -168,7 +175,7 @@ export default function LoginModal({
                 disabled={loading}
                 onClick={() => changeMode(tab.id)}
                 style={{
-                  height: 36,
+                  minHeight: 44,
                   borderRadius: 10,
                   border: 'none',
                   background: mode === tab.id ? 'var(--bg-base, #fff)' : 'transparent',
@@ -214,7 +221,7 @@ export default function LoginModal({
             {mode !== 'forgot' && <PasswordField key={mode} value={password} onChange={e => setPassword(e.target.value)}
               disabled={loading} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} />}
             {mode === 'login' && <button type="button" disabled={loading} onClick={() => changeMode('forgot')}
-              style={{ justifySelf: 'end', background: 'transparent', border: 0, padding: '6px 0', color: '#ff87bb', textDecoration: 'underline', fontSize: 13, cursor: 'pointer' }}>
+              style={{ justifySelf: 'end', minHeight: 44, background: 'transparent', border: 0, padding: '0 4px', color: '#ff87bb', textDecoration: 'underline', fontSize: 13, cursor: 'pointer' }}>
               Esqueci minha senha
             </button>}
 

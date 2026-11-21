@@ -23,7 +23,7 @@ const C = 'cus_terceira';
 beforeAll(async () => {
   db = new PGlite();
   await db.exec('CREATE SCHEMA moont;');
-  for (const arquivo of ['015_published_templates.sql', '016_template_moderation.sql']) {
+  for (const arquivo of ['015_published_templates.sql', '016_template_moderation.sql', '021_published_template_uses.sql', '023_template_report_dismissal.sql']) {
     await db.exec(readFileSync(new URL(`../../db/migrations/${arquivo}`, import.meta.url), 'utf8'));
   }
   sql = {
@@ -37,12 +37,14 @@ beforeAll(async () => {
   handler = createTemplatesHandler({
     store,
     readAccess: async (req) => (req.headers['x-test-owner'] ? { customerId: req.headers['x-test-owner'], email: 'x@teste.exemplo' } : null),
+    // Aqui toda conta tem assinatura ativa; contas grátis em template-report-dismiss.test.js (MOO-31).
+    resolveEntitlement: async () => ({ active: true }),
   });
 }, 60_000);
 
 afterAll(async () => { await db?.close(); });
 beforeEach(async () => {
-  await db.exec('DELETE FROM moont.published_template_reports; DELETE FROM moont.published_templates; DELETE FROM moont.template_moderators; DELETE FROM moont.template_moderation_events;');
+  await db.exec('DELETE FROM moont.published_template_uses; DELETE FROM moont.published_template_reports; DELETE FROM moont.published_templates; DELETE FROM moont.template_moderators; DELETE FROM moont.template_moderation_events;');
 });
 
 async function call(ownerId, { method = 'POST', url = '/api/templates', body } = {}) {
@@ -261,12 +263,12 @@ describe('moderação da galeria', () => {
     const fila = await call(MOD, { method: 'GET', url: '/api/templates?moderation=1' });
     expect(fila.statusCode).toBe(200);
     expect(fila.body.templates.map((t) => [t.id, t.status, t.reportCount])).toEqual([[oculto, 'hidden', 3], [leve, 'published', 1]]);
-    expect(fila.body.templates[1].reports).toEqual([{ reason: 'motivo 1', createdAt: expect.any(String) }]);
+    expect(fila.body.templates[1].reports).toEqual([{ reason: 'motivo 1', createdAt: expect.any(String), countsTowardHide: true }]);
     const json = JSON.stringify(fila.body);
     for (const segredo of [A, B, 'cus_d1', 'cus_x1', 'owner']) expect(json).not.toContain(segredo);
   });
 
-  it('manter devolve à galeria e zera as denúncias; ocultar tira sem apagar; remover guarda e restaurar devolve; tudo vai para o histórico', async () => {
+  it('manter devolve à galeria e dispensa as denúncias; ocultar tira sem apagar; remover guarda e restaurar devolve; tudo vai para o histórico', async () => {
     await tornarModerador(MOD);
     const id = await denunciado(3);
     expect((await call(B, { method: 'GET' })).body.templates).toHaveLength(0);
@@ -274,8 +276,12 @@ describe('moderação da galeria', () => {
     expect(manter.body).toMatchObject({ decision: 'keep', status: 'published' });
     expect((await call(B, { method: 'GET' })).body.templates).toHaveLength(1);
     expect((await call(MOD, { method: 'GET', url: '/api/templates?moderation=1' })).body.templates).toEqual([]);
-    // As mesmas contas podem denunciar de novo: a contagem recomeça.
-    expect((await call('cus_d1', { body: { action: 'report', id } })).body).toMatchObject({ duplicate: false });
+    // MOO-31: antes este teste fixava que as mesmas contas podiam denunciar de
+    // novo depois de Manter — era exatamente o defeito (3 contas ocultavam o
+    // modelo sem fim). Agora a denúncia dispensada fica guardada e a mesma
+    // conta recebe duplicate: true; o modelo continua publicado.
+    expect((await call('cus_d1', { body: { action: 'report', id } })).body).toMatchObject({ duplicate: true });
+    expect((await sql.unsafe('SELECT status FROM moont.published_templates WHERE id = $1', [id]))[0].status).toBe('published');
 
     expect((await call(MOD, { body: { action: 'moderate', id, decision: 'hide' } })).body.status).toBe('hidden');
     expect((await call(B, { method: 'GET' })).body.templates).toHaveLength(0);

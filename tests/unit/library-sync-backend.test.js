@@ -66,16 +66,41 @@ describe('roteamento gradual da biblioteca', () => {
     vi.stubEnv('LIBRARY_SYNC_BACKEND', 'postgres');
     const status = await request('GET');
     const full = await request('GET', { query: { full: '1' } });
-    const push = await request('POST', { body: {
-      action: 'push', allowShrink: true, manifest: { docs: [{ id: 'new' }] },
-    } });
     const asset = await request('GET', { query: { asset: 'photo' } });
     expect(status.body.meta.projectCount).toBe(2);
     expect(full.body.manifest.docs[0].id).toBe('new');
-    expect(push.body.projectCount).toBe(2);
     expect(asset.body.asset.assetId).toBe('photo');
-    expect(stores.pgPut).toHaveBeenCalledWith('cus_test', expect.objectContaining({ docs: [{ id: 'new' }] }),
-      expect.objectContaining({ preserveAccountMetadata: true, replace: false }));
     expect(stores.legacyPut).not.toHaveBeenCalled();
+  });
+
+  // MOO-22: o push legado gravava projetos pelo relógio do cliente, com
+  // force/baseRevision opcionais e sem limite por projeto. A interface V2
+  // grava por /api/projects com versão; o push só vem de bundle antigo.
+  it.each([
+    ['push comum', { action: 'push', manifest: { docs: [{ id: 'new' }] }, baseRevision: 2 }],
+    ['push com force', { action: 'push', force: true, manifest: { docs: [{ id: 'new', updatedAt: 9e15 }] } }],
+    ['push sem baseRevision', { action: 'push', allowShrink: true, manifest: { docs: [{ id: 'new' }] } }],
+  ])('com Postgres recusa %s com 410 e não grava nada', async (_nome, body) => {
+    vi.stubEnv('LIBRARY_SYNC_BACKEND', 'postgres');
+    const push = await request('POST', { body });
+    expect(push.status).toBe(410);
+    expect(push.body.code).toBe('library_push_retired');
+    expect(push.body.error).toMatch(/atualize a página/i);
+    expect(stores.pgPut).not.toHaveBeenCalled();
+    expect(stores.legacyPut).not.toHaveBeenCalled();
+  });
+
+  it('com Postgres mantém status e envio de fotos usados pela interface V2', async () => {
+    vi.stubEnv('LIBRARY_SYNC_BACKEND', 'postgres');
+    const status = await request('POST', { body: { action: 'status' } });
+    expect(status.status).toBe(200);
+    expect(status.body.meta.projectCount).toBe(2);
+  });
+
+  it('sem Postgres o push legado continua aceito', async () => {
+    const push = await request('POST', { body: { action: 'push', manifest: { docs: [{ id: 'old' }] } } });
+    expect(push.status).toBe(200);
+    expect(push.body.projectCount).toBe(1);
+    expect(stores.legacyPut).toHaveBeenCalled();
   });
 });

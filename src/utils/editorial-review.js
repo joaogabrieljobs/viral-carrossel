@@ -347,6 +347,60 @@ export function supportEchoesTitleIndexes(slides) {
   });
 }
 
+/**
+ * Títulos iguais ou quase iguais em slides diferentes (reteste 21/11: T05 com
+ * "Tempo é ingrediente, não detalhe" duas vezes; A02 "41.200 pães vendidos em
+ * 2025" nos slides 6 e 11; A04 e A05 com pares quase idênticos). Devolve o
+ * índice da repetição (o segundo do par). Mesma regra para carrossel e deck.
+ */
+export function repeatedTitleIndexes(slides) {
+  const words = text => new Set((String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/[*_]/g, '').match(/[\p{L}\d]+(?:[.,]\d+)*/gu) || []).filter(word => word.length > 2 || /\d/.test(word)));
+  const list = (Array.isArray(slides) ? slides : []).map(slide => words(slide?.title));
+  const repeated = [];
+  list.forEach((current, index) => {
+    if (current.size < 2) return;
+    const hit = list.slice(0, index).some(previous => {
+      if (previous.size < 2) return false;
+      const shared = [...current].filter(word => previous.has(word)).length;
+      return shared >= 3 ? shared / Math.min(current.size, previous.size) >= 0.6 : shared === current.size && shared === previous.size;
+    });
+    if (hit) repeated.push(index);
+  });
+  return repeated;
+}
+
+/**
+ * Reteste 21/11 (A01–A06): o mesmo fato ("36 horas", "1 dia de
+ * antecedência") aparecia em 5 a 9 slides. Número com unidade presente no
+ * texto visível de 3 ou mais slides.
+ */
+export function repeatedFactSlides(slides) {
+  const seen = new Map();
+  (Array.isArray(slides) ? slides : []).forEach((slide, index) => {
+    const text = ['title', 'subtitle', 'bodyAfterImage'].map(field => String(slide?.[field] || '')).join(' ')
+      .replace(/[*_]/g, '').toLowerCase();
+    const facts = new Set((text.match(/r\$\s?\d[\d.,]*|\d[\d.,]*\s*(?:%|\p{L}{2,})/gu) || [])
+      .map(fact => fact.replace(/\s+/g, ' ').replace(/[.,]$/, '').trim()));
+    facts.forEach(fact => seen.set(fact, [...(seen.get(fact) || []), index]));
+  });
+  return [...seen].filter(([, indexes]) => indexes.length >= 3).map(([fact, slideIndexes]) => ({ fact, slideIndexes }));
+}
+
+function repeatedFactRule(slides) {
+  const repeated = repeatedFactSlides(slides);
+  return repeated.length
+    ? `\nFATO REPETIDO — ${repeated.map(item => `"${item.fact}" aparece nos slideIndex ${item.slideIndexes.join(', ')}`).join('; ')}. Mantenha cada fato no slide em que ele é o assunto (no máximo 2 slides); nos outros, troque por outra informação do material ou condense, sem inventar e sem mudar a quantidade de slides.`
+    : '';
+}
+
+function repeatedTitleRule(slides) {
+  const repeated = repeatedTitleIndexes(slides);
+  return repeated.length
+    ? `\nTÍTULO REPETIDO — correção obrigatória nos slideIndex ${repeated.join(', ')}: o title repete (ou quase) o de um slide anterior. Reescreva com a ideia própria deste slide, sem repetir o mesmo fato; se o slide não tem ideia nova, condense o conteúdo com o anterior sem mudar a quantidade.`
+    : '';
+}
+
 export function buildEditorialReviewPrompt(prompt, draft, config = {}) {
   if (config.presetId === 'apresentacao') {
     const limitsBlock = buildPresentationLimitsBlock(config, draft?.slides?.length || config.count || 0);
@@ -372,7 +426,7 @@ ${buildReviewFactCheckPrompt()}
 Verifique também: promessa da capa entregue; caminho escolhido respeitado; uma ideia por slide; progressão sem repetição; títulos legíveis a distância; argumentos e exemplos sustentados pelo material; síntese e próximo passo coerentes.${limitsBlock}
 Leia todos os campos do rascunho, inclusive blocos nativos, speakerNotes e caption. Verifique fatos, estágio e condições em cada campo, não apenas no texto principal. Decisão pendente permanece pendente; aceite não autoriza deduzir encerramento contratual. Base, período e condições essenciais de indicadores e escopo devem estar visíveis no slide correspondente, não somente nas notas.
 Corrija apenas problemas identificados. Preserve ordem, quantidade, assunto, arco, números e fatos sustentados.${lessonRepair} Remova ou qualifique alegações sem apoio; não acrescente fontes ou fatos. Não altere imageQuery nem configuração visual.
-Use slideIndex começando em zero. Não envie edições para slides que já estejam bons. Cada índice aparece no máximo uma vez. ${buildPresentationReviewRules(config.presentationPath)}
+Use slideIndex começando em zero. Não envie edições para slides que já estejam bons. Cada índice aparece no máximo uma vez. ${buildPresentationReviewRules(config.presentationPath)}${repeatedTitleRule(draft?.slides)}${repeatedFactRule(draft?.slides)}
 Resposta: um único objeto JSON {"edits":[{"slideIndex":0,"reason":"problema concreto","title":"texto corrigido"}],"caption":"resumo geral corrigido apenas se necessário"}.
 Cada edição exige slideIndex e reason; inclua somente os campos que mudam: ${editableFields}. caption é opcional. Se estiver adequado, retorne {"edits":[]}. Sem texto fora do JSON ou campos adicionais.${plannedRules}`;
   }
@@ -389,6 +443,7 @@ Cada edição exige slideIndex e reason; inclua somente os campos que mudam: ${e
   const echoRule = echoes.length
     ? `\nAPOIO QUE REPETE O TÍTULO — correção obrigatória nos slideIndex ${echoes.join(', ')}: o subtitle diz de novo o que o title já diz. Reescreva o subtitle com uma informação nova do material ou deixe-o vazio.`
     : '';
+  const repeatRule = repeatedTitleRule(draft?.slides) + repeatedFactRule(draft?.slides);
   const explicitScriptRule = config?.explicitCardScript?.count
     ? `\nROTEIRO EXPLÍCITO DO USUÁRIO — preserve a correspondência entre cada bloco e o slideIndex equivalente. Não funda, reordene, mova para outro card nem omita um bloco. A revisão pode melhorar clareza e encaixe dentro do próprio card, sem trocar sua função, fatos ou intenção.`
     : '';
@@ -398,7 +453,7 @@ O briefing abaixo é referência, não um pedido para gerar o carrossel novament
 <rascunho>\n${JSON.stringify(draft)}\n</rascunho>
 ${buildFactualGroundingPrompt(config)}
 ${buildReviewFactCheckPrompt()}
-Verifique também: promessa da capa entregue pelo miolo; slide 2 útil; progressão sem repetição; exemplos concretos; afirmações sustentadas pelo material; voz e densidade; legenda complementar; um CTA coerente com o objetivo; linguagem idiomática e natural. Corrija traduções literais, provérbios inventados, ditados combinados e metáforas ambíguas ou sem sentido.${titleRule}${claimsRule}${echoRule}${explicitScriptRule}
+Verifique também: promessa da capa entregue pelo miolo; slide 2 útil; progressão sem repetição; exemplos concretos; afirmações sustentadas pelo material; voz e densidade; legenda complementar; um CTA coerente com o objetivo; linguagem idiomática e natural. Corrija traduções literais, provérbios inventados, ditados combinados e metáforas ambíguas ou sem sentido.${titleRule}${claimsRule}${echoRule}${repeatRule}${explicitScriptRule}
 Corrija apenas problemas identificados. Preserve ordem, quantidade, assunto, arco, números e fatos sustentados. Remova ou qualifique alegações sem apoio; não acrescente fontes ou fatos. Não altere imageQuery, cultureTone, layout nem qualquer configuração visual.
 Use slideIndex começando em zero. Não envie edições para slides que já estejam bons. Cada índice aparece no máximo uma vez. Nunca preencha bodyAfterImage onde o layout exige vazio.
 Resposta: um único objeto JSON {"edits":[{"slideIndex":0,"reason":"problema concreto","title":"texto corrigido"}],"caption":"legenda corrigida apenas se necessário"}.
@@ -472,6 +527,7 @@ export function auditSocialDraft(draft, config) {
   return [
     ...missingSocialTitleIndexes(draft.slides, config).map(slideIndex => ({ kind: 'missing_title', slideIndex, field: 'title' })),
     ...auditSocialTextDensity(draft.slides, config).map(item => ({ kind: 'density', ...item })),
+    ...repeatedTitleIndexes(draft.slides).map(slideIndex => ({ kind: 'repeated_title', slideIndex, field: 'title', code: 'social_title_repeated' })),
     ...auditDraftFactuality(draft, config).map(item => ({ kind: 'factual', ...item })),
   ];
 }
@@ -611,19 +667,26 @@ async function reviewSocialDraft({ prompt, draft, config, textOptions, onStage }
   let candidate = draft;
   let reviewResponded = false;
   let reviewApplied = false;
-  try {
-    const review = await callAI(buildEditorialReviewPrompt(prompt, draft, config), textOptions);
-    throwIfGenerationCancelled(textOptions.signal);
-    reviewResponded = true;
-    const proposed = applyEditorialReview(draft, salvageSocialReview(draft, review, config), config, { deferQualityChecks: true });
-    const accepted = retainGroundedFields(proposed, draft, config);
-    candidate = accepted.result;
-    // MF-04: uma revisão válida cujas edições foram todas recusadas por
-    // acrescentar fato sem fonte ainda conferiu o rascunho. Não é "revisão não
-    // concluída"; o rascunho segue para as auditorias como conferido.
-    reviewApplied = true;
-  } catch (error) {
-    if (isGenerationCancelled(error) || textOptions.signal?.aborted) throw error;
+  // Reteste 21/11 (T09): resposta fora do formato não é queda do serviço.
+  // Ela ganha uma segunda tentativa antes de o rascunho seguir sem revisão;
+  // erro da chamada (serviço fora) continua sem nova chamada.
+  for (let attempt = 0; attempt < 2 && !reviewApplied; attempt += 1) {
+    let responded = false;
+    try {
+      const review = await callAI(buildEditorialReviewPrompt(prompt, draft, config), textOptions);
+      throwIfGenerationCancelled(textOptions.signal);
+      reviewResponded = responded = true;
+      const proposed = applyEditorialReview(draft, salvageSocialReview(draft, review, config), config, { deferQualityChecks: true });
+      const accepted = retainGroundedFields(proposed, draft, config);
+      candidate = accepted.result;
+      // MF-04: uma revisão válida cujas edições foram todas recusadas por
+      // acrescentar fato sem fonte ainda conferiu o rascunho. Não é "revisão não
+      // concluída"; o rascunho segue para as auditorias como conferido.
+      reviewApplied = true;
+    } catch (error) {
+      if (isGenerationCancelled(error) || textOptions.signal?.aborted) throw error;
+      if (!responded) break;
+    }
   }
   let violations = auditSocialDraft(candidate, config);
   if (!violations.length) {

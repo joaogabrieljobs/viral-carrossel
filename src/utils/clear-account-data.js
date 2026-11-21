@@ -18,7 +18,11 @@ const EXTRA_KEYS = [USER_PROFILE_KEY, CUSTOM_VISUAL_PRESETS_KEY];
  * Meta de sync NÃO fica órfã sem biblioteca (causava pull/push errado).
  * Tour/modesIntro e meta vão no cofre por owner.
  */
+/** MOO-21: qual cliente Stripe ocupa o slot local de cada e-mail. Sobrevive à troca de conta. */
+export const OWNER_EMAIL_BINDINGS_KEY = 'vc_owner_email_bindings';
+
 const PRESERVE_KEYS = new Set([
+  OWNER_EMAIL_BINDINGS_KEY,
   PENDING_SHARE_KEY,
   ACCOUNT_VAULT_KEY,
   'vc_account_write_lock',
@@ -66,6 +70,7 @@ export async function clearAccountLocalData({ timeoutMs = 3_000, wipeMedia = fal
     // O cofre legado é preservado na limpeza normal, mas a opção destrutiva
     // precisa remover tanto a cópia pequena quanto a transação durável.
     try { localStorage.removeItem(ACCOUNT_VAULT_KEY); } catch { /* */ }
+    try { localStorage.removeItem(OWNER_EMAIL_BINDINGS_KEY); } catch { /* */ }
     const wipe = Promise.all([
       imageWipeDatabase({ strict: true }),
       videoWipeDatabase({ strict: true }),
@@ -88,6 +93,7 @@ export async function clearAccountLocalData({ timeoutMs = 3_000, wipeMedia = fal
   try { removeKnownKeys(typeof localStorage !== 'undefined' ? localStorage : null); } catch { /* */ }
   if (wipeMedia) {
     try { localStorage.removeItem(ACCOUNT_VAULT_KEY); } catch { /* */ }
+    try { localStorage.removeItem(OWNER_EMAIL_BINDINGS_KEY); } catch { /* */ }
   }
   if (wipeError) throw wipeError;
 }

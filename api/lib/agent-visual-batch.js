@@ -682,6 +682,38 @@ export async function finishAgentImageJob(ownerValue, requestIdValue, outcomes) 
   });
 }
 
+/**
+ * MOO-29: fecha um job de imagem cujo projeto foi apagado durante a geração.
+ * Nada é aplicado; o card com imagem gravada fica `failed` COM o assetId, e
+ * a liquidação consome o crédito dele (a imagem foi paga ao provedor e está
+ * na biblioteca da conta). Card sem imagem é estornado como antes.
+ */
+export async function closeAgentImageJobWithoutProject(ownerValue, requestIdValue, outcomes) {
+  const owner = ownerId(ownerValue);
+  const rid = requestId(requestIdValue);
+  return getPostgresConnection().begin(async tx => {
+    const jobs = await tx.unsafe(
+      `SELECT * FROM moont.agent_visual_jobs WHERE owner_id = $1 AND request_id = $2 FOR UPDATE`, [owner, rid],
+    );
+    const job = jobs[0];
+    if (!job) fail(404, 'visual_job_not_found', 'Alteração não encontrada.');
+    if (job.status !== 'pending') return { ...internalJob(job), finished: false };
+    const projects = await tx.unsafe(
+      `SELECT deleted_at, entry FROM moont.account_projects WHERE owner_id = $1 AND project_id = $2`,
+      [owner, job.project_id],
+    );
+    if (projects[0] && projects[0].deleted_at == null && projects[0].entry) {
+      fail(409, 'visual_project_exists', 'O projeto ainda existe; feche o job pelo caminho normal.');
+    }
+    const slides = mergeOutcomes(Array.isArray(job.slides) ? job.slides : [], outcomes, 'image_generation_failed')
+      .map(slide => (slide.status === 'done'
+        ? { ...slide, status: 'failed', errorCode: 'visual_project_not_found' } : slide));
+    return { ...await settleImageJob(tx, owner, rid, {
+      status: 'failed', afterVersion: Number(job.before_version), slides, errorCode: 'visual_project_not_found',
+    }), finished: true };
+  });
+}
+
 export function isImageJobStale(job, now = Date.now()) {
   if (job?.status !== 'pending') return false;
   const createdAt = new Date(job.createdAt).getTime();

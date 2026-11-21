@@ -512,7 +512,7 @@ export default function OnboardingLandingProduct({ onEnter, onLogin, onRegister 
           <div className="moont-lp-responsive__copy">
             <p className="moont-lp-kicker">Tudo continua editável</p>
             <h2 id="moont-responsive-title">Revise a sequência inteira e ajuste um detalhe por vez.</h2>
-            <p>Veja o conjunto, abra qualquer card e mude texto, imagem, layout ou logo. No desktop ou no celular, a versão mais recente continua no mesmo projeto.</p>
+            <p>Veja o conjunto, abra qualquer card e mude texto, imagem, layout ou logo. Nos planos pagos, a versão mais recente continua no mesmo projeto, no desktop ou no celular.</p>
             <div className="moont-lp-responsive__features">
               <span><Layers3 aria-hidden="true" /> Veja todos os cards lado a lado</span>
               <span><ImageIcon aria-hidden="true" /> Edite texto e imagem separadamente</span>

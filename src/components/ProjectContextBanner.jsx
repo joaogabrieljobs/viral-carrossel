@@ -13,6 +13,9 @@ export function ProjectContextBanner({ styleKit, projectName, onUndo, canUndo = 
         <strong style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{projectContextLabel(styleKit, projectName)} — Contexto ON</strong>
         {refs > 0 && <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>· {refs} ref.</span>}
         <button type="button" onClick={onUndo} disabled={!canUndo} aria-label="Desfazer última alteração" title="Desfazer última alteração"
+          // Faixa de uma linha no celular: o botão mantém 36 px de altura e ganha a
+          // área de toque de 44 px pelo ::after (MOO-41).
+          data-touch-compact
           style={{ marginLeft: 'auto', flexShrink: 0, width: 44, height: 36, borderRadius: 999, border: 'none', background: 'transparent', color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: canUndo ? 'pointer' : 'not-allowed', opacity: canUndo ? 1 : 0.42 }}>
           <Undo2 size={16} aria-hidden="true" />
         </button>

@@ -155,18 +155,32 @@ export async function getPasswordRecoveryRecord(email) {
   return withPassword.length === 1 ? authRecord(withPassword[0], email) : null;
 }
 
+// Sal fixo só para o scrypt fictício: o resultado é descartado.
+const DUMMY_SALT = 'moont-login-sem-candidato-v1';
+
+/**
+ * Sem nenhum candidato com senha, o login faria zero scrypt e responderia mais
+ * rápido que "senha errada", revelando pelo tempo se o e-mail tem conta
+ * (MOO-16). Um scrypt fictício iguala o trabalho; o resultado é descartado.
+ */
+function matchPasswordCandidates(records, password) {
+  const withPassword = records.filter((record) => record.salt && record.hash);
+  if (!withPassword.length) {
+    scryptHash(password, DUMMY_SALT);
+    return [];
+  }
+  return withPassword.filter((record) => verifyPassword(password, record));
+}
+
 /** A senha deve conferir no customer exato; e-mail igual não prova que sejam a mesma conta. */
 export async function getAuthRecordsMatchingPassword(email, password) {
   if (accountIdentityBackendEnabled()) {
     await importStripeIdentitiesForEmail(email);
-    return (await findPasswordCandidatesByEmail(email))
-      .filter((record) => record.salt && record.hash && verifyPassword(password, record))
+    return matchPasswordCandidates(await findPasswordCandidatesByEmail(email), password)
       .map(dbAuthRecord);
   }
   const customers = await customersByEmail(email);
-  return customers
-    .map((customer) => authRecord(customer, email))
-    .filter((record) => record.salt && record.hash && verifyPassword(password, record));
+  return matchPasswordCandidates(customers.map((customer) => authRecord(customer, email)), password);
 }
 
 export async function setAuthRecord(email, record) {

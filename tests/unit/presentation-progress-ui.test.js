@@ -13,6 +13,13 @@ const plan = {
 const slides = [{ title: 'Decida com critérios', subtitle: 'Organize as informações antes de escolher.' }];
 
 describe('acompanhamento de apresentações', () => {
+  it('título repetido tem explicação própria no aviso (reteste 21/11, T05)', () => {
+    const html = renderToStaticMarkup(React.createElement(EditorialReviewNotice, { status:'needs_attention', issues:[
+      { kind:'repeated_title', slideIndex:3, field:'title', code:'social_title_repeated' },
+    ] }));
+    expect(html).toContain('Card 4');
+    expect(html).toContain('repete o de outro card');
+  });
   it('mostra o roteiro validado antes de existir redação sem tratá-lo como slide concluído', () => {
     const html = renderToStaticMarkup(React.createElement(GenerationPreview, { active:true, isPresentation:true, plan, phase:'writing', totalCount:6 }));
     expect(html).toContain('Roteiro organizado · 6 slides');

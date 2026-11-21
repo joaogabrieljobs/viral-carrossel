@@ -336,3 +336,63 @@ describe('lote B (21/11) — artigo não é contagem', () => {
       .toContainEqual(expect.objectContaining({ claim: '300 clientes' }));
   });
 });
+
+// Reteste 21/11 (T09 Criar alto impacto, A07 Palestra): escassez e
+// disponibilidade inventadas passavam porque "pode" contava como condicional.
+describe('MF-16 — escassez, disponibilidade e superioridade sem fonte', () => {
+  const padaria = 'Padaria Fermento Lento no Rio Vermelho. Cada massa descansa 36 horas. Funciona de terça a domingo, das 7h às 13h. Encomendas pelo WhatsApp com 1 dia de antecedência. Retirada na padaria.';
+  const um = text => ({ slides: [{ title: 'Pão', subtitle: text, bodyAfterImage: '' }] });
+  const audit = text => auditDraftFactuality(um(text), { count: 1, presetId: 'livre', densityId: '1_1', factualSource: padaria });
+
+  it.each([
+    'Quem chega cedo leva; quem pede no dia pode ficar sem.',
+    'Quem chega sem encomendar pode não encontrar o pão que quer.',
+    'Em 2025 vendeu muito, um sinal de que o bairro já reserva o seu.',
+    'O pão já está separado na padaria, no horário que você escolher.',
+    'O tempo faz o trabalho que nenhuma prensa industrial consegue imitar.',
+    'Os pães esgotam antes do meio-dia.',
+  ])('marca "%s"', (frase) => {
+    expect(audit(frase).length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    'Encomende pelo WhatsApp com 1 dia de antecedência e retire na padaria.',
+    'Funciona de terça a domingo, das 7h às 13h.',
+    'Você pode encomendar pelo WhatsApp.',
+  ])('não marca o fato "%s"', (frase) => {
+    expect(audit(frase)).toEqual([]);
+  });
+
+  it('a mesma frase passa quando o material a traz', () => {
+    const comEscassez = `${padaria} Os pães esgotam antes do meio-dia.`;
+    expect(auditDraftFactuality(um('Os pães esgotam antes do meio-dia.'), { count: 1, presetId: 'livre', densityId: '1_1', factualSource: comEscassez })).toEqual([]);
+  });
+});
+
+// Reteste 21/11: T02 "costuma levar" e T06 "crosta firme e miolo que rende"
+// passaram pela revisão sem estar no briefing.
+describe('generalização e atributo sensorial sem fonte', () => {
+  const padaria = 'Padaria Fermento Lento no Rio Vermelho. Cada massa descansa 36 horas. Três pães: camponês R$ 24, integral R$ 26, brioche R$ 18. Encomendas pelo WhatsApp com 1 dia de antecedência.';
+  const audit = (text, source = padaria) => auditDraftFactuality({ slides: [{ title: 'Pão', subtitle: text, bodyAfterImage: '' }] }, { count: 1, presetId: 'livre', densityId: '1_1', factualSource: source });
+
+  it.each([
+    'Um pão assim costuma levar mais de um dia.',
+    'Geralmente o cliente prefere o camponês.',
+    'A maioria das padarias usa fermento industrial.',
+    'Crosta firme e miolo que rende.',
+    'Casca crocante e miolo macio.',
+  ])('marca "%s"', (frase) => {
+    expect(audit(frase).map(item => item.category)).toEqual(expect.arrayContaining([expect.stringMatching(/generalização|atributo/)]));
+  });
+
+  it.each([
+    'Cada massa descansa 36 horas antes do forno.',
+    'Três pães: camponês, integral e brioche.',
+  ])('não marca o fato "%s"', (frase) => {
+    expect(audit(frase)).toEqual([]);
+  });
+
+  it('passa quando o material traz o atributo', () => {
+    expect(audit('Crosta firme e miolo aerado.', `${padaria} O camponês tem crosta firme e miolo aerado.`)).toEqual([]);
+  });
+});

@@ -30,6 +30,10 @@ test.beforeAll(async () => {
   handler = createTemplatesHandler({
     store: createPublishedTemplatesStore({ sql }),
     readAccess: async (req) => (req.headers['x-e2e-owner'] ? { customerId: req.headers['x-e2e-owner'], email: `${req.headers['x-e2e-owner']}@teste.exemplo` } : null),
+    // MOO-31: só denúncia de conta com assinatura ativa soma para ocultar. As
+    // contas deste roteiro são assinantes; a regra da conta grátis está nos
+    // testes de integração (template-report-dismiss).
+    resolveEntitlement: async () => ({ active: true }),
   });
 });
 test.afterAll(async () => { await db?.close(); });

@@ -51,6 +51,7 @@ import {
   guardarImagemDoSlide,
   applyPersistedImagePatches,
   applySlidePatchIfImageCurrent,
+  applySlideImageToStoredProject,
   slideImageIdentity,
   imageGet,
   imageDelete,
@@ -60,8 +61,10 @@ import {
   semLogosDeRuntimeDasMarcas,
   idsDeImagemEmUso,
   dataUrlParaBlob,
+  blobParaDataUrl,
 } from './src/utils/image-store.js';
 import { projectCacheFingerprint, projectContentSnapshot } from './src/utils/project-content-snapshot.js';
+import { advanceReceiptAfterHydration } from './src/utils/cloud-receipts.js';
 import {
   MAX_SLIDE_IMAGE_REFERENCES,
   normalizeSlideImageReferences,
@@ -75,7 +78,7 @@ import {
 import { makeTextOverlay, addOverlayToSlide, updateOverlayOnSlide, normalizeOverlays, MAX_CARD_OVERLAYS } from './src/utils/card-overlays.js';
 import { cardElementEditorTarget } from './src/utils/card-editor-target.js';
 import { getAccountVaultImageIds, snapshotAccountVaultForOwners } from './src/utils/account-vault.js';
-import { readDataOwner, dataOwnerAliases } from './src/utils/account-data-owner.js';
+import { readDataOwner, sessionDataOwnerAliases } from './src/utils/account-data-owner.js';
 import { USER_PROFILE_KEY } from './src/utils/user-profile.js';
 import AutoFitText from './src/components/AutoFitText.jsx';
 import WcagBadge from './src/components/WcagBadge.jsx';
@@ -98,7 +101,7 @@ import { buildNarrativeModeSequence } from './src/utils/narrative-sequence.js';
 import { socialFamilyFor } from './src/utils/social-families.js';
 import { propagateBrandTypography } from './src/utils/brand-typography.js';
 import { imageAspectRatioForSlide } from './shared/image-aspect.js';
-import { composeSceneDirection, normalizeVisualBible, visualBibleHasPerson, sceneShowsPerson, PERSON_IDENTITY_DIRECTION } from './src/utils/visual-bible.js';
+import { composeSceneDirection, normalizeVisualBible, visualBibleHasPerson, planPersonAnchor, pickPersonAnchorSlide } from './src/utils/visual-bible.js';
 import {
   PRESENTATION_VISUAL_PRESETS,
   PRESENTATION_VISUAL_PRESET_CATALOG,
@@ -121,7 +124,7 @@ import { vcCustomTitleFace, hydrateBrandTextColors, effectiveTitleFontFamily } f
 import { SectionLabel as S } from './src/components/ui/SectionLabel.jsx';
 import PromptDialog, { ConfirmDialog } from './src/components/PromptDialog.jsx';
 import { resolveSlideBrandBg } from './src/utils/brand-helpers.js';
-import { STATUS_DEFS, STATUS_BY_ID, fmtDate, isDefault } from './src/utils/library-helpers.js';
+import { STATUS_DEFS, STATUS_BY_ID, fmtDate, isDefault, repairedActiveDocId } from './src/utils/library-helpers.js';
 import { normalizeLibraryEntry, normalizeLibraryFolders } from './src/utils/library-organizer.js';
 import { clearReplacedSlideAssets, mergeConfirmedAssetIds, mergeHydratedBrandMedia, mergeHydratedProjectMedia } from './src/utils/cloud-media-merge.js';
 // Persistência precisa estar disponível desde a abertura do editor. Chunks lazy
@@ -220,6 +223,7 @@ import {
   normalizePresentationPath,
   getPresentationPath,
   clampPresentationSlideCount,
+  presentationPathMaterialNotice,
 } from './src/utils/presentation.js';
 import {
   applyBatchPhotosToSlides,
@@ -1170,6 +1174,16 @@ export default function App() {
     if (!activeDocId && library[0]?.id) setActiveDocId(library[0].id);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // MOO-26: id ativo fora da lista fazia `activeEntry` cair em library[0] só
+  // na leitura. O editor mantinha o documento anterior, a barra lateral mostrava
+  // outro projeto e o autosave não achava onde gravar. Depois do commit (as
+  // trocas legítimas atualizam lista e id juntas), troca o id de verdade, o que
+  // roda o reset do histórico e volta a casar o autosave.
+  useEffect(() => {
+    const repaired = repairedActiveDocId(activeDocId, library);
+    if (repaired) setActiveDocId(repaired);
+  }, [activeDocId, library]);
+
   // Doc ativo da biblioteca + ponteiro pro index dele (pra updates eficientes)
   const activeEntry = library.find(e => e.id === activeDocId) || library[0];
   const activeProjectRef = useRef(activeEntry?.id);
@@ -1951,7 +1965,10 @@ export default function App() {
       // Bytes que terminaram de chegar não são uma nova edição. Só mover a
       // baseline quando o usuário ainda não alterou este projeto.
       if (unchanged && merged !== before) {
-        v2BaselinesRef.current.set(entry.id, projectCacheFingerprint(merged));
+        const beforeFingerprint = projectCacheFingerprint(before);
+        const mergedFingerprint = projectCacheFingerprint(merged);
+        v2BaselinesRef.current.set(entry.id, mergedFingerprint);
+        setCloudReceipts(current => advanceReceiptAfterHydration(current, entry.id, beforeFingerprint, mergedFingerprint));
       }
       setLibrary((current) => current.map((project) => mergeHydratedProjectMedia(project, entry)));
       if (editorSyncStateRef.current.activeDocId === entry.id) {
@@ -2529,7 +2546,7 @@ export default function App() {
       localSaved = pending.localPersisted;
       const owner = readDataOwner();
       const session = accessSessionRef.current;
-      const owners = [...new Set([owner, ...dataOwnerAliases(session?.email, session?.customerId)].filter(Boolean))];
+      const owners = [...new Set([owner, ...sessionDataOwnerAliases(session?.email, session?.customerId)].filter(Boolean))];
       await snapshotAccountVaultForOwners(owners, { snapshot: pending.snapshot });
 
       const { pushLibraryToCloud } = librarySync;
@@ -5000,10 +5017,20 @@ export default function App() {
     setSlideImgGenBusy(prev => ({ ...prev, [slideId]: true }));
     const job = startAIJob(parentSignal);
     try {
+      const baseRefs = await runAIJob(() => resolveImageReferences(styleKit, generationSnap.refImage, generationSnap.refImageId || generationSnap.refImageAssetId, generationSnap.imageReferences), job.signal);
+      // MF-03: refazer uma imagem só também segura o rosto da pessoa da ficha,
+      // usando a foto já gerada de um card em que ela aparece.
+      let anchorPlan = { refImages: [], direction: '' };
+      const anchorSlide = fmt !== 'apresentacao' ? pickPersonAnchorSlide(liveSlides, doc.visualBible, slideId) : null;
+      if (anchorSlide) {
+        const anchorEntry = await imageGet(anchorSlide.bgImageId).catch(() => null);
+        const anchorUrl = anchorEntry?.blob ? await blobParaDataUrl(anchorEntry.blob).catch(() => null) : null;
+        if (anchorUrl) anchorPlan = planPersonAnchor({ visualBible: doc.visualBible, imageQuery: imageState.query, anchorUrl, refCount: baseRefs.length });
+      }
       const url = await generateDALLEWithRetry(imageState.query, openaiKey, imgParams, {
         signal: job.signal,
-        refImages: await runAIJob(() => resolveImageReferences(styleKit, generationSnap.refImage, generationSnap.refImageId || generationSnap.refImageAssetId, generationSnap.imageReferences), job.signal),
-        imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(generationSnap, imageState.extraPrompt)),
+        refImages: [...baseRefs, ...anchorPlan.refImages],
+        imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(generationSnap, [imageState.extraPrompt, anchorPlan.direction].filter(Boolean).join('\n'))),
         // Ficha visual do projeto + enquadramento do painel, junto do tema; a
         // proporção acompanha a zona real da foto, não o formato do card.
         sceneDirection: composeSceneDirection({ visualBible: doc.visualBible, slide: generationSnap, fmt }),
@@ -5022,6 +5049,23 @@ export default function App() {
         ? slidesLiveRef.current?.find((slide) => slide.id === slideId)
         : null;
       if (!liveTarget || slideImageIdentity(liveTarget) !== expectedImageIdentity) {
+        // MOO-06: a pessoa trocou de projeto durante a geração. A imagem já foi
+        // paga; vai para o card de origem no projeto de origem se a foto dele
+        // não mudou, em vez de ser apagada. O autosave envia esse projeto.
+        if (activeProjectRef.current !== generationProjectId && patchImg.bgImageId) {
+          const storedTarget = (libraryPersistRef.current || []).find(item => item.id === generationProjectId)
+            ?.doc?.slides?.find(slide => slide.id === slideId);
+          const storedPatch = storedTarget && slideImageIdentity(storedTarget) === expectedImageIdentity
+            ? { id: slideId, expectedImageIdentity, patch: automaticPhotoFramingPatch({
+              ...patchImg, imageQuery: imageState.query, imgMode: 'dalle', bgImageFailed: false, bgImageError: null, bgImageSource: 'ai',
+            }, storedTarget) }
+            : null;
+          if (storedPatch && applySlideImageToStoredProject(libraryPersistRef.current, generationProjectId, storedPatch).applied) {
+            setLibrary(current => applySlideImageToStoredProject(current, generationProjectId, storedPatch).library);
+            toast(`A imagem do ${itemLabel} ${idx + 1} foi guardada no projeto de origem.`, 'info', 4500);
+            return { ok: true, slideId, appliedToOriginProject: true };
+          }
+        }
         if (patchImg.bgImageId) imageDelete(patchImg.bgImageId).catch(() => {});
         return { ok: false, reason: 'stale_target', slideId };
       }
@@ -5737,6 +5781,12 @@ ${jsonShapeLine}`;
     checkActive();
     if (reviewStatus === 'unavailable') toast('Texto gerado. A revisão automática não foi concluída; mantive a primeira versão.', 'warning', 6500);
     if (reviewStatus === 'fitted') toast('Encurtei o texto que não cabia no layout da apresentação.', 'warning', 6500);
+    // MF-11: Estudo de caso sem ponto de partida no material vira lista de
+    // fatos; o aviso fica fora do slide.
+    const pathMaterialNotice = isPresentationGeneration && !remix
+      ? presentationPathMaterialNotice(presentationPathId, [topic, materialFactualSource].filter(Boolean).join('\n'))
+      : '';
+    if (pathMaterialNotice) toast(pathMaterialNotice, 'info', 9000);
     if (reviewStatus === 'needs_attention') {
       toast(generationIncomplete
         ? `Preservei ${generatedCount} de ${requestedCount} slides. ${presentationInterruptionMessage(generationInterruptionReason) || 'A geração parou antes de completar a apresentação.'} Confira o rascunho no editor.`
@@ -6119,13 +6169,16 @@ ${jsonShapeLine}`;
           try {
             checkActive();
             const baseRefs = await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId, newSlides[i]?.imageReferences);
-            const showsPerson = anchorPerson && sceneShowsPerson(q, generationVisualBible);
-            const useAnchor = showsPerson && !!personAnchor.url && baseRefs.length < 4;
+            // Reteste T04: a âncora vai em toda imagem do projeto com pessoa
+            // na ficha (a ficha segue em todo pedido), não só quando a cena a cita.
+            const anchorPlan = anchorPerson
+              ? planPersonAnchor({ visualBible: generationVisualBible, imageQuery: q, anchorUrl: personAnchor.url, refCount: baseRefs.length })
+              : { refImages: [], direction: '', canBecomeAnchor: false };
             const url = await generateDALLEWithRetry(q, openaiKey, effectiveAxes, {
               signal: job.signal,
-              refImages: useAnchor ? [...baseRefs, personAnchor.url] : baseRefs,
+              refImages: [...baseRefs, ...anchorPlan.refImages],
               imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(newSlides[i], [newSlides[i]?.imgExtraPrompt,
-                useAnchor ? PERSON_IDENTITY_DIRECTION : '',
+                anchorPlan.direction,
                 generationPlan ? 'PRESENTATION IMAGE PANEL: keep the main subject complete within the frame, with breathing room around faces, hands and products. This is an illustration, never a fabricated screenshot, chart, testimonial or proof. Editable text is composed separately.' : '',
               ].filter(Boolean).join('\n'))),
               sceneDirection: composeSceneDirection({
@@ -6145,7 +6198,7 @@ ${jsonShapeLine}`;
               },
             });
             checkActive();
-            if (showsPerson && !personAnchor.url && typeof url === 'string' && url.startsWith('data:image/')) personAnchor.url = url;
+            if (anchorPlan.canBecomeAnchor && !personAnchor.url && typeof url === 'string' && url.startsWith('data:image/')) personAnchor.url = url;
             const patchImg = await guardarImagemDoSlide(url);
             checkActive();
             const liveTarget = activeProjectRef.current === generationProjectId
@@ -7172,6 +7225,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         expectedImageIdentity:slideImageIdentity(newSlides[index]),
       })).filter(item => item.q && item.slideId);
       let completed = 0;
+      const templateAnchor = { url: null };
       setGenProgress({ phase:'template_images', current:0, total:targets.length, label:`Gerando imagens do template (0/${targets.length})…` });
       try {
         for (const { index:i, q, slideId, expectedImageIdentity } of targets) {
@@ -7180,10 +7234,14 @@ Retorne APENAS JSON: ${refineAllWantsBody
           setSlideImgGenBusy(prev => ({ ...prev, [slideId]:true }));
           setGenProgress({ phase:'template_images', current:completed, total:targets.length, label:`Gerando imagem do card ${i + 1} (${completed + 1}/${targets.length})…` });
           try {
+            const baseRefs = await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId, newSlides[i]?.imageReferences);
+            const anchorPlan = fmt !== 'apresentacao'
+              ? planPersonAnchor({ visualBible: doc.visualBible, imageQuery: q, anchorUrl: templateAnchor.url, refCount: baseRefs.length })
+              : { refImages: [], direction: '', canBecomeAnchor: false };
             const url = await generateDALLEWithRetry(q, openaiKey, imgParams, {
               signal: templateJob.signal,
-              refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId, newSlides[i]?.imageReferences),
-              imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(newSlides[i], newSlides[i]?.imgExtraPrompt)),
+              refImages: [...baseRefs, ...anchorPlan.refImages],
+              imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(newSlides[i], [newSlides[i]?.imgExtraPrompt, anchorPlan.direction].filter(Boolean).join('\n'))),
               sceneDirection: composeSceneDirection({ visualBible: doc.visualBible, slide: newSlides[i], fmt: fmt === 'apresentacao' ? 'carrossel' : fmt }),
               aspectRatio: imageAspectRatioForSlide(newSlides[i], fmt === 'apresentacao' ? 'carrossel' : fmt),
               usageContext: {
@@ -7193,6 +7251,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                 cardNumber: i + 1,
               },
             });
+            if (anchorPlan.canBecomeAnchor && !templateAnchor.url && typeof url === 'string' && url.startsWith('data:image/')) templateAnchor.url = url;
             const patchImg = await guardarImagemDoSlide(url);
             const liveTarget = activeProjectRef.current === projectId
               ? slidesLiveRef.current?.find((slide) => slide.id === slideId)

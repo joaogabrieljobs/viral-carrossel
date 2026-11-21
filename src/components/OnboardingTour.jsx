@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
+import { useModalDialog } from '../hooks/useModalDialog.js';
 
 function sameRect(a, b) {
   if (a === b) return true;
@@ -53,6 +54,9 @@ export default function OnboardingTour({ open, onDismiss, isMobile, empty, setTa
   const [idx, setIdx] = useState(0);
   const [hole, setHole] = useState(null);
   const [bubble, setBubble] = useState({ left: 24, top: 80, maxW: 360 });
+  // MOO-43: foco inicial em Avançar, Tab preso no cartão e fundo inerte.
+  const advanceRef = useRef(null);
+  const { overlayRef, dialogRef, onDialogKeyDown } = useModalDialog({ open, onClose: onDismiss, initialFocusRef: advanceRef });
 
   /**
    * As callbacks chegam como arrow functions inline do monólito, logo mudam de
@@ -140,8 +144,10 @@ export default function OnboardingTour({ open, onDismiss, isMobile, empty, setTa
 
   useEffect(() => {
     if (!open) return undefined;
+    // Rede de segurança se o foco não estiver no cartão; o diálogo já trata
+    // Escape (preventDefault) quando o foco está dentro dele.
     const esc = (e) => {
-      if (e.key === 'Escape') onDismiss();
+      if (e.key === 'Escape' && !e.defaultPrevented) onDismiss();
     };
     window.addEventListener('keydown', esc);
     return () => window.removeEventListener('keydown', esc);
@@ -161,9 +167,7 @@ export default function OnboardingTour({ open, onDismiss, isMobile, empty, setTa
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="vc-tour-title"
+      ref={overlayRef}
       style={{
         position: 'fixed',
         inset: 0,
@@ -202,7 +206,13 @@ export default function OnboardingTour({ open, onDismiss, isMobile, empty, setTa
 
       {/* Card */}
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="vc-tour-title"
+        tabIndex={-1}
         data-vc-tour-card=""
+        onKeyDown={onDialogKeyDown}
         onClick={(e) => e.stopPropagation()}
         style={{
           position: 'fixed',
@@ -253,6 +263,7 @@ export default function OnboardingTour({ open, onDismiss, isMobile, empty, setTa
               Voltar
             </button>
             <button
+              ref={advanceRef}
               type="button"
               className={idx === 0 ? 'vc-btn vc-btn-ghost' : 'vc-btn vc-btn-primary'}
               style={{

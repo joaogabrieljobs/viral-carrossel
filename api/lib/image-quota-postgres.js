@@ -41,6 +41,17 @@ const SQL = {
     UPDATE moont.image_quota_operations
     SET metadata = metadata || $4::jsonb, updated_at = now()
     WHERE owner_id = $1 AND period_start_sec = $2 AND operation_id = $3`,
+  // MOO-28: reservas do editor que nenhum processo liquidou. O prefixo
+  // `mcp_` pertence aos jobs do agente, liquidados pelo reconciliador deles.
+  // Usa o índice parcial image_quota_operations_pending_idx (status reserved).
+  staleReservations: `/* moont_image_quota_stale_reservations */
+    SELECT owner_id, period_start_sec, operation_id, metadata, created_at
+    FROM moont.image_quota_operations
+    WHERE status = 'reserved'
+      AND created_at < now() - ($1::integer * interval '1 minute')
+      AND lower(left(operation_id, 4)) <> 'mcp_'
+    ORDER BY created_at ASC
+    LIMIT $2`,
   changeUsed: `/* moont_image_quota_change_used */
     UPDATE moont.image_quota_periods
     SET used = used + $3, updated_at = now()
@@ -246,6 +257,20 @@ export function createImageQuotaPostgres({ sql: injectedSql, readLegacyUsage = d
     });
   }
 
+  // MOO-29: a tarefa criada no SJinn fica na operação (suporte e auditoria de
+  // custo). Não muda cobrança nem estorno; a atividade não expõe o campo.
+  async function rememberImageTask({ customerId, periodStartSec, operationId: rawId, taskId }) {
+    const owner = ownerId(customerId);
+    const start = period(periodStartSec);
+    const id = operationId(rawId);
+    if (!/^[A-Za-z0-9._:-]{1,200}$/.test(String(taskId || ''))) return false;
+    return guardStorage(async () => {
+      const sql = await connection();
+      await run(sql, 'mergeOperationMetadata', [owner, start, id, JSON.stringify({ sjinnTaskId: String(taskId) })]);
+      return true;
+    });
+  }
+
   async function recallImageResult({ customerId, periodStartSec, operationId: rawId }) {
     const owner = ownerId(customerId);
     const start = period(periodStartSec);
@@ -336,8 +361,56 @@ export function createImageQuotaPostgres({ sql: injectedSql, readLegacyUsage = d
     });
   }
 
+  /**
+   * MOO-28: liquida reservas do editor abandonadas (função morta entre a
+   * reserva e o settle/refund). A função da imagem tem teto de 300 s; 15 min
+   * garante que nenhuma requisição viva ainda é dona da reserva.
+   * Com `resultUrl` guardado (MOO-10) a imagem foi gerada e pode ser
+   * reentregue na repetição: confirma. Sem ele, devolve o crédito.
+   * Cada linha é revista sob o lock do período, igual a settle/refund, então
+   * rodar em paralelo ou repetir não devolve o mesmo crédito duas vezes.
+   */
+  async function reconcileStaleEditorReservations({ limit = 100, olderThanMinutes = 15 } = {}) {
+    const rowLimit = Number.isSafeInteger(limit) ? Math.min(500, Math.max(1, limit)) : 100;
+    const minutes = Number.isSafeInteger(olderThanMinutes) && olderThanMinutes >= 15 ? olderThanMinutes : 15;
+    const candidates = await guardStorage(async () => {
+      const sql = await connection();
+      return run(sql, 'staleReservations', [minutes, rowLimit]);
+    });
+    const result = { scanned: candidates.length, refunded: 0, consumed: 0, skipped: 0, failed: 0 };
+    for (const candidate of candidates) {
+      try {
+        const owner = ownerId(candidate.owner_id);
+        const start = period(candidate.period_start_sec);
+        const id = operationId(candidate.operation_id);
+        // eslint-disable-next-line no-await-in-loop
+        const outcome = await guardStorage(async () => {
+          const sql = await connection();
+          return sql.begin(async (tx) => {
+            await locked(tx, owner, start);
+            const op = (await run(tx, 'operation', [owner, start, id]))[0];
+            if (op?.status !== 'reserved') return 'skipped';
+            const url = op.metadata?.resultUrl;
+            if (typeof url === 'string' && url.startsWith('https://')) {
+              await run(tx, 'updateOperation', [owner, start, id, 'consumed', '{}']);
+              return 'consumed';
+            }
+            await run(tx, 'updateOperation', [owner, start, id, 'refunded', '{}']);
+            await run(tx, 'changeUsed', [owner, start, -1]);
+            return 'refunded';
+          });
+        });
+        result[outcome] += 1;
+      } catch (error) {
+        result.failed += 1;
+        console.error('[image-quota] editor_reconciliation', error?.code || error?.message || error);
+      }
+    }
+    return result;
+  }
+
   return { getQuotaUsage, getImageQuotaActivity, consumeImageCredit, settleImageCredit, refundImageCredit,
-    rememberImageResult, recallImageResult };
+    rememberImageResult, recallImageResult, rememberImageTask, reconcileStaleEditorReservations };
 }
 
 const production = createImageQuotaPostgres();
@@ -348,3 +421,5 @@ export const settleImageCreditPostgres = production.settleImageCredit;
 export const refundImageCreditPostgres = production.refundImageCredit;
 export const rememberImageResultPostgres = production.rememberImageResult;
 export const recallImageResultPostgres = production.recallImageResult;
+export const rememberImageTaskPostgres = production.rememberImageTask;
+export const reconcileStaleEditorReservationsPostgres = production.reconcileStaleEditorReservations;

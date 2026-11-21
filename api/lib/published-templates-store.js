@@ -85,6 +85,20 @@ async function guard(work) {
 export function createPublishedTemplatesStore({ sql: injectedSql } = {}) {
   const connection = () => injectedSql || getPostgresConnection();
 
+  // MOO-31: a migração 023 acrescenta `dismissed_at` e `counts_toward_hide`.
+  // O código precisa funcionar antes dela; só o resultado positivo fica em
+  // cache, então a função quente percebe a migração aplicada depois.
+  let reportDismissalReady = false;
+  async function hasReportDismissal(db = connection()) {
+    if (reportDismissalReady) return true;
+    const rows = await db.unsafe(`/* templates_report_columns */
+      SELECT count(*)::int AS n FROM information_schema.columns
+      WHERE table_schema = 'moont' AND table_name = 'published_template_reports'
+        AND column_name IN ('dismissed_at', 'counts_toward_hide')`);
+    reportDismissalReady = Number(rows[0]?.n) === 2;
+    return reportDismissalReady;
+  }
+
   async function listGallery({ viewer, cursor, format } = {}) {
     const after = decodeCursor(cursor);
     const fmt = format == null || format === '' ? null : String(format);
@@ -176,9 +190,35 @@ export function createPublishedTemplatesStore({ sql: injectedSql } = {}) {
     });
   }
 
-  async function recordUse(idValue) {
+  /**
+   * MOO-32: conta no máximo um uso por conta, modelo e dia de Brasília. A
+   * marca em `published_template_uses` (migração 021) decide se o contador
+   * sobe. Sem a tabela (migração ainda não aplicada), mantém o comportamento
+   * anterior em vez de derrubar a galeria. A marca roda fora de transação:
+   * um erro 42P01 dentro dela abortaria o resto.
+   */
+  async function recordUse(idValue, viewerValue) {
     const tpl = templateId(idValue);
+    const viewer = owner(viewerValue);
     return guard(async () => {
+      let firstUse = true;
+      try {
+        const marked = await connection().unsafe(`/* templates_use_mark */
+          INSERT INTO moont.published_template_uses (template_id, owner_id, day)
+          SELECT id, $2, (now() AT TIME ZONE 'America/Sao_Paulo')::date
+          FROM moont.published_templates WHERE id = $1 AND status = 'published'
+          ON CONFLICT (template_id, owner_id, day) DO NOTHING
+          RETURNING template_id`, [tpl, viewer]);
+        firstUse = marked.length > 0;
+      } catch (error) {
+        if (error?.code !== '42P01') throw error;
+      }
+      if (!firstUse) {
+        const rows = await connection().unsafe(`/* templates_use_count */
+          SELECT use_count FROM moont.published_templates WHERE id = $1 AND status = 'published'`, [tpl]);
+        if (!rows[0]) throw fail('template_not_found', 'Modelo não encontrado.', 404);
+        return { useCount: Number(rows[0].use_count) };
+      }
       const rows = await connection().unsafe(`/* templates_use */
         UPDATE moont.published_templates SET use_count = use_count + 1
         WHERE id = $1 AND status = 'published' RETURNING use_count`, [tpl]);
@@ -188,29 +228,56 @@ export function createPublishedTemplatesStore({ sql: injectedSql } = {}) {
   }
 
   /**
-   * Denúncia: uma por conta e modelo. Com REPORTS_TO_HIDE contas diferentes, o
-   * modelo sai da galeria até o João rever. Ninguém denuncia o próprio modelo.
+   * Denúncia: uma por conta e modelo, para sempre (MOO-31: depois de
+   * dispensada pela moderação, a mesma conta não denuncia de novo). Só
+   * denúncia que conta (`countsTowardHide`: assinatura ativa ou isenção)
+   * soma para ocultar; com REPORTS_TO_HIDE dessas, o modelo sai da galeria
+   * até a moderação rever. Denúncia de conta grátis fica registrada para a
+   * fila. Ninguém denuncia o próprio modelo.
    */
-  async function report(ownerValue, idValue, reason = '') {
+  async function report(ownerValue, idValue, reason = '', { countsTowardHide = true } = {}) {
     const id = owner(ownerValue);
     const tpl = templateId(idValue);
     const why = String(reason || '').replace(/\s+/g, ' ').trim().slice(0, 300);
-    return guard(() => connection().begin(async (tx) => {
-      const found = await tx.unsafe(`/* templates_report_target */
-        SELECT owner_id FROM moont.published_templates WHERE id = $1 AND status = 'published' FOR UPDATE`, [tpl]);
-      if (!found[0]) throw fail('template_not_found', 'Modelo não encontrado.', 404);
-      if (found[0].owner_id === id) throw fail('template_report_own', 'Você não pode denunciar o próprio modelo.', 400);
-      const inserted = await tx.unsafe(`/* templates_report_insert */
-        INSERT INTO moont.published_template_reports (template_id, reporter_id, reason)
-        VALUES ($1, $2, $3) ON CONFLICT (template_id, reporter_id) DO NOTHING RETURNING template_id`, [tpl, id, why]);
-      if (!inserted[0]) return { reported: true, duplicate: true };
-      await tx.unsafe(`/* templates_report_count */
-        UPDATE moont.published_templates
-        SET report_count = report_count + 1,
-            status = CASE WHEN report_count + 1 >= $2 THEN 'hidden' ELSE status END
-        WHERE id = $1`, [tpl, REPORTS_TO_HIDE]);
-      return { reported: true, duplicate: false };
-    }));
+    const counts = countsTowardHide === true;
+    return guard(async () => {
+      const dismissal = await hasReportDismissal();
+      return connection().begin(async (tx) => {
+        const found = await tx.unsafe(`/* templates_report_target */
+          SELECT owner_id FROM moont.published_templates WHERE id = $1 AND status = 'published' FOR UPDATE`, [tpl]);
+        if (!found[0]) throw fail('template_not_found', 'Modelo não encontrado.', 404);
+        if (found[0].owner_id === id) throw fail('template_report_own', 'Você não pode denunciar o próprio modelo.', 400);
+        const inserted = dismissal
+          ? await tx.unsafe(`/* templates_report_insert */
+            INSERT INTO moont.published_template_reports (template_id, reporter_id, reason, counts_toward_hide)
+            VALUES ($1, $2, $3, $4) ON CONFLICT (template_id, reporter_id) DO NOTHING RETURNING template_id`, [tpl, id, why, counts])
+          : await tx.unsafe(`/* templates_report_insert */
+            INSERT INTO moont.published_template_reports (template_id, reporter_id, reason)
+            VALUES ($1, $2, $3) ON CONFLICT (template_id, reporter_id) DO NOTHING RETURNING template_id`, [tpl, id, why]);
+        if (!inserted[0]) return { reported: true, duplicate: true };
+        if (dismissal) {
+          // report_count = denúncias pendentes (todas, para a fila); a
+          // ocultação olha só as pendentes que contam.
+          await tx.unsafe(`/* templates_report_count */
+            UPDATE moont.published_templates t
+            SET report_count = c.pending,
+                status = CASE WHEN c.counted >= $2 THEN 'hidden' ELSE t.status END
+            FROM (SELECT count(*)::int AS pending,
+                    count(*) FILTER (WHERE counts_toward_hide)::int AS counted
+                  FROM moont.published_template_reports
+                  WHERE template_id = $1 AND dismissed_at IS NULL) c
+            WHERE t.id = $1`, [tpl, REPORTS_TO_HIDE]);
+        } else if (counts) {
+          // Sem a migração, denúncia de conta grátis fica guardada mas não soma.
+          await tx.unsafe(`/* templates_report_count */
+            UPDATE moont.published_templates
+            SET report_count = report_count + 1,
+                status = CASE WHEN report_count + 1 >= $2 THEN 'hidden' ELSE status END
+            WHERE id = $1`, [tpl, REPORTS_TO_HIDE]);
+        }
+        return { reported: true, duplicate: false };
+      });
+    });
   }
 
   /** Moderador é uma conta listada em `moont.template_moderators`. */
@@ -240,10 +307,17 @@ export function createPublishedTemplatesStore({ sql: injectedSql } = {}) {
     await requireModerator(ownerValue);
     const removed = view === 'removed';
     return guard(async () => {
+      const dismissal = await hasReportDismissal();
+      // Com a migração 023, a fila mostra só denúncias pendentes e diz se
+      // cada uma conta para ocultar (conta paga) ou só ficou registrada.
+      const reportsSql = dismissal
+        ? `json_agg(json_build_object('reason', r.reason, 'createdAt', r.created_at, 'countsTowardHide', r.counts_toward_hide) ORDER BY r.created_at DESC)
+            FROM moont.published_template_reports r WHERE r.template_id = t.id AND r.dismissed_at IS NULL`
+        : `json_agg(json_build_object('reason', r.reason, 'createdAt', r.created_at) ORDER BY r.created_at DESC)
+            FROM moont.published_template_reports r WHERE r.template_id = t.id`;
       const rows = await connection().unsafe(`/* templates_moderation_queue */
         SELECT t.*,
-          COALESCE((SELECT json_agg(json_build_object('reason', r.reason, 'createdAt', r.created_at) ORDER BY r.created_at DESC)
-            FROM moont.published_template_reports r WHERE r.template_id = t.id), '[]'::json) AS reports,
+          COALESCE((SELECT ${reportsSql}), '[]'::json) AS reports,
           (SELECT count(*)::int FROM moont.published_templates o WHERE o.owner_id = t.owner_id AND o.status <> 'removed') AS author_template_count,
           (SELECT count(*)::int FROM moont.template_moderation_events e
              WHERE e.template_owner_id = t.owner_id AND e.decision IN ('hide', 'remove')) AS author_strikes
@@ -257,7 +331,10 @@ export function createPublishedTemplatesStore({ sql: injectedSql } = {}) {
         status: row.status,
         reportCount: Number(row.report_count || 0),
         removedAt: row.removed_at ? new Date(row.removed_at).toISOString() : null,
-        reports: Array.isArray(row.reports) ? row.reports.map((r) => ({ reason: r.reason || '', createdAt: new Date(r.createdAt).toISOString() })) : [],
+        reports: Array.isArray(row.reports) ? row.reports.map((r) => ({
+          reason: r.reason || '', createdAt: new Date(r.createdAt).toISOString(),
+          ...(typeof r.countsTowardHide === 'boolean' ? { countsTowardHide: r.countsTowardHide } : {}),
+        })) : [],
         // Contexto do autor sem identificá-lo: quantos modelos tem e quantos já saíram por moderação.
         authorTemplateCount: Number(row.author_template_count || 0),
         authorStrikes: Number(row.author_strikes || 0),
@@ -266,8 +343,9 @@ export function createPublishedTemplatesStore({ sql: injectedSql } = {}) {
   }
 
   /**
-   * Decide um modelo: `keep` devolve à galeria e zera as denúncias (novas
-   * denúncias recomeçam a contagem), `hide` tira da galeria sem apagar,
+   * Decide um modelo: `keep` devolve à galeria e dispensa as denúncias
+   * (MOO-31: ficam guardadas e quem já denunciou não denuncia de novo; sem a
+   * migração 023, são apagadas como antes), `hide` tira da galeria sem apagar,
    * `remove` tira da galeria e dos modelos da autora mas guarda (João, 19/11),
    * e `restore` devolve um removido à galeria. Toda decisão vai para o histórico.
    */
@@ -275,31 +353,37 @@ export function createPublishedTemplatesStore({ sql: injectedSql } = {}) {
     await requireModerator(ownerValue);
     const tpl = templateId(idValue);
     if (!['keep', 'hide', 'remove', 'restore'].includes(decision)) throw fail('template_bad_decision', 'Decisão inválida.');
-    return guard(() => connection().begin(async (tx) => {
-      const found = (await tx.unsafe(`/* templates_moderate_target */
-        SELECT * FROM moont.published_templates WHERE id = $1 FOR UPDATE`, [tpl]))[0];
-      if (!found) throw fail('template_not_found', 'Modelo não encontrado.', 404);
-      // Removido só volta por "restaurar"; restaurar só vale para removido.
-      if ((found.status === 'removed') !== (decision === 'restore')) {
-        throw fail('template_bad_state', decision === 'restore' ? 'Este modelo não está removido.' : 'Este modelo foi removido. Restaure antes de decidir de novo.', 409);
-      }
-      await tx.unsafe(`/* templates_moderation_event */
-        INSERT INTO moont.template_moderation_events
-          (template_id, template_name, template_owner_id, moderator_id, decision, report_count)
-        VALUES ($1, $2, $3, $4, $5, $6)`, [tpl, found.name, found.owner_id, ownerValue, decision, Number(found.report_count || 0)]);
-      const nextStatus = { keep: 'published', restore: 'published', hide: 'hidden', remove: 'removed' }[decision];
-      if (nextStatus === 'published') {
-        await tx.unsafe('/* templates_moderation_clear */ DELETE FROM moont.published_template_reports WHERE template_id = $1', [tpl]);
-      }
-      const rows = await tx.unsafe(`/* templates_moderation_update */
-        UPDATE moont.published_templates
-        SET status = $2,
-            report_count = CASE WHEN $2 = 'published' THEN 0 ELSE report_count END,
-            removed_at = CASE WHEN $2 = 'removed' THEN now() ELSE NULL END,
-            reviewed_at = now()
-        WHERE id = $1 RETURNING status`, [tpl, nextStatus]);
-      return { id: tpl, decision, status: rows[0].status };
-    }));
+    return guard(async () => {
+      const dismissal = await hasReportDismissal();
+      return connection().begin(async (tx) => {
+        const found = (await tx.unsafe(`/* templates_moderate_target */
+          SELECT * FROM moont.published_templates WHERE id = $1 FOR UPDATE`, [tpl]))[0];
+        if (!found) throw fail('template_not_found', 'Modelo não encontrado.', 404);
+        // Removido só volta por "restaurar"; restaurar só vale para removido.
+        if ((found.status === 'removed') !== (decision === 'restore')) {
+          throw fail('template_bad_state', decision === 'restore' ? 'Este modelo não está removido.' : 'Este modelo foi removido. Restaure antes de decidir de novo.', 409);
+        }
+        await tx.unsafe(`/* templates_moderation_event */
+          INSERT INTO moont.template_moderation_events
+            (template_id, template_name, template_owner_id, moderator_id, decision, report_count)
+          VALUES ($1, $2, $3, $4, $5, $6)`, [tpl, found.name, found.owner_id, ownerValue, decision, Number(found.report_count || 0)]);
+        const nextStatus = { keep: 'published', restore: 'published', hide: 'hidden', remove: 'removed' }[decision];
+        if (nextStatus === 'published') {
+          await tx.unsafe(dismissal
+            ? `/* templates_moderation_dismiss */ UPDATE moont.published_template_reports
+                SET dismissed_at = now() WHERE template_id = $1 AND dismissed_at IS NULL`
+            : '/* templates_moderation_clear */ DELETE FROM moont.published_template_reports WHERE template_id = $1', [tpl]);
+        }
+        const rows = await tx.unsafe(`/* templates_moderation_update */
+          UPDATE moont.published_templates
+          SET status = $2,
+              report_count = CASE WHEN $2 = 'published' THEN 0 ELSE report_count END,
+              removed_at = CASE WHEN $2 = 'removed' THEN now() ELSE NULL END,
+              reviewed_at = now()
+          WHERE id = $1 RETURNING status`, [tpl, nextStatus]);
+        return { id: tpl, decision, status: rows[0].status };
+      });
+    });
   }
 
   return {

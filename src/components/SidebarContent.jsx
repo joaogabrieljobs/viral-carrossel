@@ -3906,6 +3906,7 @@ function SidebarContent({
                         type="button"
                         aria-label={isSelected ? `Desmarcar ${itemLabel} ${i + 1}` : `Selecionar ${itemLabel} ${i + 1}`}
                         aria-pressed={isSelected}
+                        data-touch-compact=""
                         onClick={(e) => toggleSlideSelect(s.id, e)}
                         style={{
                           width: 22, height: 22, borderRadius: 6, flexShrink: 0,

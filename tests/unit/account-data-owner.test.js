@@ -6,6 +6,7 @@ import {
   normalizeDataOwnerId,
   readDataOwner,
   writeDataOwner,
+  sessionDataOwnerAliases,
 } from '../../src/utils/account-data-owner.js';
 import { SK, areAccountDataWritesLocked, lsSet, unlockAccountDataWrites } from '../../src/utils/storage.js';
 import { ACCOUNT_VAULT_KEY, snapshotAccountVault } from '../../src/utils/account-vault.js';
@@ -96,6 +97,33 @@ describe('account-data-owner', () => {
     expect(await ensureAccountDataOwner({ active: true, email: 'novo@z.com' }, { onRestored })).toBe('restored');
     expect(onRestored).toHaveBeenCalledWith(expect.objectContaining({ library: [{ id: 'meus' }] }),
       { projectCount: 1, localPersisted: true });
+  });
+
+  // MOO-21: o slot local era o e-mail; duas contas Stripe com o mesmo e-mail
+  // no mesmo navegador dividiam cofre, imagens e fila de envio.
+  it('segunda conta com o mesmo e-mail ganha slot próprio e não herda o cofre da primeira', async () => {
+    writeDataOwner('email:a@x.com', ['id:cus_A']);
+    local.setItem(SK.library, JSON.stringify([{ id: 'secret-a' }]));
+    expect(await ensureAccountDataOwner({ active: true, email: 'a@x.com', customerId: 'cus_A' }, { explicitLogin: false })).toBe('ok');
+    const result = await ensureAccountDataOwner({ active: true, email: 'a@x.com', customerId: 'cus_B' }, { explicitLogin: false });
+    expect(result).toBe('reloading');
+    expect(readDataOwner()).toBe('id:cus_B');
+    expect(local.getItem(SK.library)).toBeNull();
+    const vault = JSON.parse(local.getItem(ACCOUNT_VAULT_KEY));
+    expect(JSON.parse(vault['email:a@x.com'].keys[SK.library])[0].id).toBe('secret-a');
+    // B volta outro dia: continua no próprio slot, nunca migra para o e-mail.
+    unlockAccountDataWrites();
+    await ensureAccountDataOwner({ active: true, email: 'a@x.com', customerId: 'cus_B' }, { explicitLogin: false });
+    expect(readDataOwner()).toBe('id:cus_B');
+    expect(JSON.parse(JSON.parse(local.getItem(ACCOUNT_VAULT_KEY))['email:a@x.com'].keys[SK.library])[0].id).toBe('secret-a');
+  });
+
+  it('os aliases da sessão de B não incluem o e-mail ligado a A (fila e imagens)', async () => {
+    writeDataOwner('email:a@x.com', ['id:cus_A']);
+    await ensureAccountDataOwner({ active: true, email: 'a@x.com', customerId: 'cus_A' }, { explicitLogin: false });
+    expect([...sessionDataOwnerAliases('a@x.com', 'cus_B')]).toEqual(['id:cus_B']);
+    expect(sessionDataOwnerAliases('a@x.com', 'cus_A').has('email:a@x.com')).toBe(true);
+    expect(sessionDataOwnerAliases('novo@x.com', 'cus_C').has('email:novo@x.com')).toBe(true);
   });
 
   it('troca de conta recarrega antes de restaurar B e descarta o estado React/BYOK de A', async () => {

@@ -144,7 +144,7 @@ test.describe('Jornadas de billing', () => {
       if (path === '/api/stripe/checkout') {
         return route.fulfill({ json: {
           requireLogin: true,
-          message: 'Este e-mail já tem conta. Entre antes de escolher o plano.',
+          message: 'Para assinar com este e-mail, entre na sua conta primeiro (senha ou Google). Se ainda não tem conta, crie uma grátis e escolha o plano em seguida.',
         } });
       }
       if (path === '/api/auth/login') {
@@ -161,7 +161,7 @@ test.describe('Jornadas de billing', () => {
     await expect(paywallEmail).toBeVisible();
     await paywallEmail.fill('dona@teste.exemplo');
     await paywallEmail.press('Enter');
-    await expect(page.getByText('Este e-mail já tem conta. Entre antes de escolher o plano.')).toBeVisible();
+    await expect(page.getByText('Para assinar com este e-mail, entre na sua conta primeiro (senha ou Google). Se ainda não tem conta, crie uma grátis e escolha o plano em seguida.')).toBeVisible();
 
     await page.getByRole('button', { name: 'Entrar com senha' }).click();
     await expect(page.getByRole('dialog', { name: 'Entrar no studio' })).toBeVisible();

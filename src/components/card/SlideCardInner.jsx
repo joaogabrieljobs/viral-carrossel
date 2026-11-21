@@ -2165,6 +2165,9 @@ const SlideCardInner = React.forwardRef(({
   const inkSurface = photoInk ? '#111111' : slideCardBg;
   const readableInks = cultureReadableInks(inkSurface, carouselTitleInk, carouselBodyInk, brandAccent);
   let cultureAccentCol = photoInk ? accentInkOnSurface(brandAccent, '#111111') : readableInks.accentInk;
+  // Reteste 21/11 (A01): no fundo próprio da família (marinho, acento) o
+  // destaque aparece dentro do apoio, que é texto de corpo: 4,5:1, não 3:1.
+  if (familyGround && !photoInk) cultureAccentCol = accentInkOnSurface(brandAccent, familyGround.bg, 4.5);
   let displayTitleInk = carouselTitleInk;
   let displayBodyInk = familyGround ? (slide.textColor || familyGround.muted || carouselBodyInk) : carouselBodyInk;
   if (culturePack || sandwichSkin) {
@@ -4080,6 +4083,7 @@ const SlideCardInner = React.forwardRef(({
               type="button"
               aria-label={label}
               title={label}
+              data-touch-compact=""
               onPointerDown={(ev) => { ev.stopPropagation(); }}
               onClick={(ev) => {
                 ev.stopPropagation();

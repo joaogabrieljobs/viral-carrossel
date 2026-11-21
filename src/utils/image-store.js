@@ -449,6 +449,22 @@ export function applySlidePatchIfImageCurrent(slides = [], {
   return changed ? next : slides;
 }
 
+/**
+ * MOO-06: imagem paga que chega depois de a pessoa trocar de projeto vai para
+ * o card de origem no projeto de origem, se a foto desse card não mudou.
+ */
+export function applySlideImageToStoredProject(library = [], projectId, { id, expectedImageIdentity, patch } = {}) {
+  let applied = false;
+  const next = (library || []).map((item) => {
+    if (item?.id !== projectId || !Array.isArray(item?.doc?.slides)) return item;
+    const slides = applySlidePatchIfImageCurrent(item.doc.slides, { id, expectedImageIdentity, patch });
+    if (slides === item.doc.slides) return item;
+    applied = true;
+    return { ...item, doc: { ...item.doc, slides } };
+  });
+  return { library: applied ? next : library, applied };
+}
+
 /** Para exportar backup: devolve a imagem embutida em data URL. */
 export async function imagemComoDataUrl(id) {
   const entry = await imageGet(id);

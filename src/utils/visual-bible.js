@@ -114,3 +114,38 @@ export function sceneShowsPerson(imageQuery, visualBible) {
 }
 
 export const PERSON_IDENTITY_DIRECTION = 'IDENTITY REFERENCE (explicitly requested): the LAST attached reference image shows the same person who appears in this scene. Reproduce exactly that person: same face, hair, skin tone, apparent age and build. Use that image ONLY for the person\'s identity. Do NOT copy its pose, action, camera angle, framing, objects or background: this image must show a clearly different moment, exactly as described in THEME OF THIS CARD.';
+
+/** Primeira pessoa da ficha: é dela o rosto que a âncora segura. */
+function firstPersonId(visualBible) {
+  const bible = normalizeVisualBible(visualBible);
+  return bible?.entities.find(entity => PERSON_WORDS.test(`${entity.id} ${entity.en}`))?.id || '';
+}
+
+/**
+ * Reteste 21/11 (T04): a ficha segue em todo pedido de imagem, então o modelo
+ * desenha a pessoa também em cenas cuja imageQuery não a cita ("storefront",
+ * "team", "customer at counter"). Sem a âncora nessas cenas, o rosto mudava.
+ * Toda imagem do projeto com pessoa na ficha recebe a âncora: pedido direto
+ * quando a cena cita a pessoa, condicional quando não cita.
+ */
+export function planPersonAnchor({ visualBible = null, imageQuery = '', anchorUrl = null, refCount = 0 } = {}) {
+  const id = firstPersonId(visualBible);
+  const showsPerson = !!id && sceneShowsPerson(imageQuery, visualBible);
+  const none = { refImages: [], direction: '', canBecomeAnchor: showsPerson && !anchorUrl };
+  if (!id || !anchorUrl || refCount >= 4) return none;
+  const others = 'Other people in the scene (customers, team members) are different people with their own faces; never give them this face.';
+  const direction = showsPerson
+    ? `${PERSON_IDENTITY_DIRECTION.replace('the same person who appears in this scene', `the same person "${id}" (see PROJECT SUBJECTS) who appears in this scene`)} ${others}`
+    : `IDENTITY REFERENCE (explicitly requested): the LAST attached reference image shows the person "${id}" from PROJECT SUBJECTS. If "${id}" appears in this scene, reproduce exactly that person: same face, hair, skin tone, apparent age and build. Use that image ONLY for identity; do NOT copy its pose, camera angle, framing, objects or background. Do not add "${id}" or any person the THEME OF THIS CARD does not call for. ${others}`;
+  return { refImages: [anchorUrl], direction, canBecomeAnchor: false };
+}
+
+/**
+ * Refazer uma imagem só: a âncora é a foto já gerada de um card cuja cena
+ * cita a pessoa (a mesma regra que escolhe a âncora na geração do projeto).
+ */
+export function pickPersonAnchorSlide(slides, visualBible, excludeSlideId = null) {
+  if (!firstPersonId(visualBible) || !Array.isArray(slides)) return null;
+  return slides.find(slide => slide && slide.id !== excludeSlideId && slide.bgImageId
+    && sceneShowsPerson(slide.imageQuery, visualBible)) || null;
+}

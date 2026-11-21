@@ -1,3 +1,4 @@
+import { waitUntil } from '@vercel/functions';
 import { applyCors, rejectCrossSiteRequest } from '../lib/cors.js';
 import { createAccessToken, setAccessCookie, setCheckoutIdentityCookie, setLoginHintCookie } from '../lib/access.js';
 import { FREE_PLAN } from '../../shared/plans.js';
@@ -12,6 +13,7 @@ import {
 import { getStripe } from '../lib/stripe.js';
 import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
 import { accountIdentityBackendEnabled, setAccountPassword } from '../lib/account-identity-postgres.js';
+import { passwordResetConfigured, sendExistingAccountNotice } from '../lib/password-reset.js';
 import { createHash } from 'node:crypto';
 
 function registrationIdempotencyKey(email, phase) {
@@ -24,6 +26,25 @@ function registrationConflict(error) {
     || error?.code === 'identity_provider_conflict'
     || error?.code === 'idempotency_key_in_use'
     || error?.type === 'StripeIdempotencyError';
+}
+
+// Mesma resposta para e-mail com conta e para cadastro que perdeu a corrida:
+// não confirma se o endereço existe (MOO-16). Quem é dono recebe a orientação
+// na própria caixa; quem não é não aprende nada sobre a base.
+const CHECK_EMAIL_MESSAGE = 'Confira seu e-mail para continuar. Se este endereço estiver ligado a uma conta, '
+  + 'enviamos instruções para entrar. Você também pode tocar em "Entrar" e usar sua senha, o Google '
+  + 'ou "Esqueci minha senha".';
+
+function respondCheckEmail(res, email) {
+  if (passwordResetConfigured()) {
+    // waitUntil: o envio não pesa no tempo de resposta nem some na Vercel.
+    waitUntil(sendExistingAccountNotice(email)
+      .then(delivery => console.info('[auth/register] aviso de conta existente', { delivery }))
+      .catch(error => console.error('[auth/register] aviso de conta existente falhou', {
+        code: /^email_http_\d{3}$/.test(error?.message) ? error.message : 'service_error',
+      })));
+  }
+  return res.status(200).json({ ok: true, checkEmail: true, message: CHECK_EMAIL_MESSAGE });
 }
 
 function readBody(req) {
@@ -39,6 +60,8 @@ function readBody(req) {
  * Cliente preexistente só pode ser associado após autenticação; o cadastro
  * público cria sempre uma identidade Stripe nova, que entra no plano grátis
  * (sessão sem assinatura: IA, nuvem e agentes continuam recusando).
+ * E-mail que já tem conta recebe a mesma resposta 200 neutra (`checkEmail`),
+ * sem sessão, e a orientação para entrar segue por e-mail (MOO-16).
  */
 export default async function handler(req, res) {
   applyCors(req, res, { credentials: true });
@@ -65,15 +88,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    const existing = await getAuthRecord(cleanEmail);
-    if (existing) {
-      return res.status(409).json({
-        error: 'Este e-mail já tem conta. Entre com Google ou sua senha para continuar.',
-        requireLogin: true,
-      });
-    }
-
+    // O hash vem antes da consulta: e-mail com e sem conta pagam o mesmo scrypt.
     const { salt, hash } = hashPassword(password);
+    const existing = await getAuthRecord(cleanEmail);
+    if (existing) return respondCheckEmail(res, cleanEmail);
+
     const dbIdentity = accountIdentityBackendEnabled();
     const stripe = getStripe();
     // A chave por email faz chamadas simultâneas convergirem no mesmo customer.
@@ -124,12 +143,7 @@ export default async function handler(req, res) {
       message: 'Conta criada. Você entrou no plano grátis.',
     });
   } catch (e) {
-    if (registrationConflict(e)) {
-      return res.status(409).json({
-        error: 'Este e-mail acabou de ser cadastrado. Entre com sua senha para continuar.',
-        requireLogin: true,
-      });
-    }
+    if (registrationConflict(e)) return respondCheckEmail(res, cleanEmail);
     console.error('[auth/register]', e?.message || e);
     return res.status(500).json({ error: 'Não foi possível criar a conta agora.' });
   }

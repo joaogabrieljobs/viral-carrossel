@@ -41,6 +41,19 @@ describe('plans resolve', () => {
       items: { data: [{ price: { id: 'price_sem_mapa' } }] },
     })).toBe('pro');
   });
+
+  // MOO-39: o contador do console admin não pode inflar o Essencial com
+  // assinaturas de preço desconhecido; o modo estrito devolve null.
+  it('modo estrito não cai em Essencial para preço sem mapa nem tier', () => {
+    const semMapa = { metadata: { product: 'viral-carrossel' }, items: { data: [{ price: { id: 'price_sem_mapa' } }] } };
+    expect(resolveTierFromSubscription(semMapa)).toBe('essential');
+    expect(resolveTierFromSubscription(semMapa, { strict: true })).toBeNull();
+    expect(resolveTierFromSubscription(null, { strict: true })).toBeNull();
+    expect(resolveTierFromSubscription({ items: { data: [{ price: { id: 'price_test_fake' } }] } }, { strict: true }))
+      .toBe('creator');
+    expect(resolveTierFromSubscription({ metadata: { tier: 'pro' }, items: { data: [{ price: { id: 'price_sem_mapa' } }] } }, { strict: true }))
+      .toBe('pro');
+  });
 });
 
 describe('image-quota memory', () => {

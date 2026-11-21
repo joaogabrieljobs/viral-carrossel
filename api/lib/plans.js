@@ -36,15 +36,20 @@ export function resolveTierFromPriceId(priceId) {
   return map.get(cleanEnv(priceId)) || 'essential';
 }
 
-export function resolveTierFromSubscription(sub) {
-  if (!sub) return 'creator';
+/**
+ * `strict: true` (MOO-39) devolve null quando nem o preço nem o metadado
+ * identificam o plano. Serve para contagens e relatórios, que não podem
+ * somar o desconhecido ao Essencial. A cobrança continua no modo padrão.
+ */
+export function resolveTierFromSubscription(sub, { strict = false } = {}) {
+  if (!sub) return strict ? null : 'creator';
   const item = sub.items?.data?.[0];
   const priceId = typeof item?.price === 'string' ? item.price : item?.price?.id;
   const mapped = priceId && buildPriceIdToTierMap().has(cleanEnv(priceId));
   if (mapped) return resolveTierFromPriceId(priceId);
   const fromMeta = sub.metadata?.tier || item?.price?.metadata?.tier;
   if (fromMeta && PLAN_TIERS[fromMeta]) return fromMeta;
-  return resolveTierFromPriceId(priceId);
+  return strict ? null : resolveTierFromPriceId(priceId);
 }
 
 export function getStripePriceIdForTier(tier) {

@@ -26,6 +26,8 @@ let sql;
 let clock;
 let emails;
 let subscriptions;
+let findSub;
+let prices;
 let handler;
 
 beforeAll(async () => {
@@ -46,7 +48,8 @@ beforeAll(async () => {
     revoke: (input, hooks) => entitlements.revokeAccess(input, hooks),
     sendCode: async (mail) => { emails.push(mail); },
     countSubscriptions: async () => subscriptions(),
-    findSubscription: async () => ({ status: 'none' }),
+    findSubscription: async (customerId) => findSub(customerId),
+    checkPrices: async () => prices(),
     now: () => clock,
   });
 }, 60_000);
@@ -58,6 +61,8 @@ beforeEach(async () => {
   clock = Date.parse('2026-11-19T12:00:00Z');
   emails = [];
   subscriptions = async () => ({ total: 4, byTier: { creator: 3, max: 1 } });
+  findSub = async () => ({ status: 'none' });
+  prices = async () => ({ checked: 4, ok: true, divergences: [], unconfigured: [] });
   // Trilha é imutável por trigger: cada teste recria só o que pode.
   await db.exec(`
     DROP TRIGGER IF EXISTS admin_actions_append_only ON moont.admin_actions;
@@ -146,11 +151,58 @@ describe('console admin — leitura', () => {
     expect((await call(ADMIN, { url: '/api/admin?view=account&id=nao-e-uuid' })).statusCode).toBe(400);
   });
 
+  // MOO-39: a ficha lia as 3 últimas linhas e a tela mostrava v[0] como
+  // "ciclo atual" mesmo quando era um ciclo já encerrado.
+  it('ficha mostra como ciclo atual só o ciclo vigente; ciclo encerrado fica no histórico', async () => {
+    await sql.unsafe('DELETE FROM moont.image_quota_periods');
+    const inicio = Math.floor(Date.parse('2026-09-10T00:00:00Z') / 1000);
+    const fim = Math.floor(Date.parse('2026-10-10T00:00:00Z') / 1000);
+    await sql.unsafe(`INSERT INTO moont.image_quota_periods (owner_id, period_start_sec, period_end_sec, used, legacy_used)
+      VALUES ($1, $2, $3, 30, 0)`, [CLIENTE, inicio, fim]);
+    const ficha = (await call(ADMIN, { url: `/api/admin?view=account&id=${CLIENTE_ID}` })).body.account;
+    expect(ficha.quota.value).toEqual([]);
+    expect(ficha.quota.history).toEqual([
+      expect.objectContaining({ used: 30, current: false, periodStart: '2026-09-10T00:00:00.000Z', periodEnd: '2026-10-10T00:00:00.000Z' }),
+    ]);
+  });
+
+  it('ciclo sem fim gravado só conta como atual se começou há menos de um mês', async () => {
+    await sql.unsafe('DELETE FROM moont.image_quota_periods');
+    const antigo = Math.floor(Date.parse('2026-08-01T00:00:00Z') / 1000);
+    await sql.unsafe(`INSERT INTO moont.image_quota_periods (owner_id, period_start_sec, used, legacy_used)
+      VALUES ($1, $2, 12, 0)`, [CLIENTE, antigo]);
+    const ficha = (await call(ADMIN, { url: `/api/admin?view=account&id=${CLIENTE_ID}` })).body.account;
+    expect(ficha.quota.value).toEqual([]);
+    expect(ficha.quota.history[0]).toMatchObject({ used: 12, current: false });
+  });
+
+  it('quando o Stripe informa o início do ciclo, ele decide qual linha é a atual', async () => {
+    findSub = async () => ({ status: 'active', tier: 'creator', periodStartSec: Math.floor(Date.parse('2026-11-15T00:00:00Z') / 1000) });
+    const ficha = (await call(ADMIN, { url: `/api/admin?view=account&id=${CLIENTE_ID}` })).body.account;
+    // A linha de 10/11 não é o ciclo que o Stripe diz estar vigente.
+    expect(ficha.quota.value).toEqual([]);
+    expect(ficha.quota.history[0]).toMatchObject({ used: 46, current: false });
+    findSub = async () => ({ status: 'active', tier: 'creator', periodStartSec: Math.floor(Date.parse('2026-11-10T00:00:00Z') / 1000) });
+    const atual = (await call(ADMIN, { url: `/api/admin?view=account&id=${CLIENTE_ID}` })).body.account;
+    expect(atual.quota.value).toEqual([expect.objectContaining({ used: 46, current: true })]);
+  });
+
   it('saúde e trilha respondem sem erro com o banco vazio', async () => {
     const saude = (await call(ADMIN, { url: '/api/admin?view=health' })).body;
     expect(saude.stuckReservations.value).toEqual({ count: 0, oldest: null });
     expect(saude.agentJobs.value).toEqual({ failedByCode: [], stuckPending: 0 });
     expect((await call(ADMIN, { url: '/api/admin?view=actions' })).body.actions).toEqual([]);
+  });
+
+  // MOO-38: a Saúde confere o preço da tela com o price do Stripe.
+  it('saúde mostra divergências de preço; Stripe fora vira "—" com motivo, sem derrubar a visão', async () => {
+    prices = async () => ({ checked: 1, ok: false, divergences: [{ tier: 'pro', priceId: 'price_pro', screen: 'R$ 197', issues: ['x'] }], unconfigured: [] });
+    const saude = (await call(ADMIN, { url: '/api/admin?view=health' })).body;
+    expect(saude.planPrices).toMatchObject({ source: 'Stripe: preços dos planos', value: { ok: false, divergences: [{ tier: 'pro' }] } });
+    prices = async () => { throw new Error('stripe fora'); };
+    const fora = (await call(ADMIN, { url: '/api/admin?view=health' })).body;
+    expect(fora.planPrices).toMatchObject({ value: null, reason: expect.any(String) });
+    expect(fora.stuckReservations.value).toEqual({ count: 0, oldest: null });
   });
 });
 

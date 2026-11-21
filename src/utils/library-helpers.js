@@ -22,3 +22,13 @@ export const isDefault = (slides) =>
   Array.isArray(slides) &&
   slides.length === 1 &&
   slides[0]?.title === 'Seu título aqui';
+
+/**
+ * MOO-26: id ativo que não existe na lista (projeto apagado em outro aparelho,
+ * armazenamento que gravou o id mas não a biblioteca). Devolve o id que deve
+ * passar a ser o ativo, ou null quando não há nada a corrigir.
+ */
+export function repairedActiveDocId(activeDocId, library) {
+  if (!activeDocId || !Array.isArray(library) || !library.length) return null;
+  return library.some(entry => entry?.id === activeDocId) ? null : (library[0]?.id || null);
+}

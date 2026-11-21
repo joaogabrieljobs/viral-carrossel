@@ -12,7 +12,7 @@ export const PLAN_TIERS = {
     priceLabel: 'R$ 19,90',
     imageQuota: 0,
     envPriceKey: 'STRIPE_PRICE_ID_ESSENTIAL',
-    blurb: 'Studio completo · texto incluso · imagens só por upload',
+    blurb: 'Studio completo · texto incluso · imagens por upload ou com sua chave',
   },
   creator: {
     id: 'creator',

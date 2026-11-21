@@ -93,13 +93,15 @@ export default async function handler(req, res) {
     }
     const text = String(payload?.md_results || '').trim().slice(0, OCR_TEXT_MAX);
     if (text.replace(/\s/g, '').length < 3) {
-      await refundOcrCredit(quotaContext);
+      // MOO-29: o provedor respondeu 200 e cobrou a leitura; conta como uso.
       quotaConsumed = false;
       return res.status(422).json({ error: 'Não encontrei texto legível nesta imagem.' });
     }
     return res.status(200).json({ ok: true, text });
   } catch (error) {
-    if (quotaConsumed) await refundOcrCredit(quotaContext);
+    // Timeout ou falha de rede: o provedor pode ter cobrado. Estorna só até o
+    // teto diário de estornos da conta (MOO-29).
+    if (quotaConsumed) await refundOcrCredit({ ...quotaContext, capped: true });
     if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
       return res.status(504).json({ error: 'A leitura demorou demais. Tente uma imagem menor.' });
     }

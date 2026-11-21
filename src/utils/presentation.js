@@ -412,3 +412,16 @@ export function buildPresentationSummaryRules(pathId) {
 ${route.id === 'pitch' ? buildPitchEvidenceRules() : PRESENTATION_EVIDENCE_RULES}
 ${route.id === 'pitch' ? PITCH_PROVENANCE_RULE : PRESENTATION_PROVENANCE_RULE}`;
 }
+
+/**
+ * Reteste 21/11, MF-11 (A06): o briefing não tinha "antes", o Estudo de caso
+ * virou lista de fatos e o app não avisou. Aviso fora do slide, para a pessoa
+ * completar o material ou escolher outro tipo.
+ */
+const CASE_BASELINE = /\b(?:antes|depois|passou|passaram|passamos|era|eram|aumentou|aumentaram|caiu|ca[íi]ram|cresceu|cresceram|reduziu|reduzimos|dobrou|subiu|baixou|melhorou|piorou|em rela[çc][ãa]o a|comparad[oa])\b|\bde\s+\S+\s+(?:\S+\s+)?para\s+\d/i;
+
+export function presentationPathMaterialNotice(pathId, sourceText) {
+  if (getPresentationPath(pathId)?.id !== 'estudo_de_caso') return '';
+  if (CASE_BASELINE.test(String(sourceText || ''))) return '';
+  return 'Seu material não traz um ponto de partida (o "antes"). O Estudo de caso mostra o que foi informado, sem comparação. Para um antes e depois, acrescente como era a situação inicial.';
+}

@@ -24,7 +24,8 @@ import { consumeRateLimit, rateLimitResponse } from './lib/rate-limit.js';
 import { resolveLibraryOwnerId } from './lib/library-sync-store.js';
 import { grantAccountAccess, revokeAccountAccess } from './lib/account-entitlements.js';
 import { getStripe, findActiveSubscription, isSubscriptionActive } from './lib/stripe.js';
-import { resolveTierFromSubscription, periodBoundsFromSubscription } from './lib/plans.js';
+import { resolveTierFromSubscription, periodBoundsFromSubscription, getStripePriceIdForTier } from './lib/plans.js';
+import { PLAN_TIERS, PLAN_ORDER } from '../shared/plans.js';
 import { createAdminStore, adminFail, cleanText, ADMIN_TIERS, CHALLENGE_TTL_MS } from './lib/admin-store.js';
 
 export const config = { maxDuration: 30 };
@@ -57,14 +58,15 @@ export function intentPayload(intent, body = {}) {
   throw adminFail('admin_bad_input', 'Ação inválida.');
 }
 
-async function defaultCountSubscriptions() {
+/** Exportada para teste. Plano não identificado conta como "desconhecido" (MOO-39). */
+export async function countActiveSubscriptionsByTier() {
   const stripe = getStripe();
   const byTier = {};
   let total = 0;
   for (const status of ['active', 'trialing']) {
     for await (const sub of stripe.subscriptions.list({ status, limit: 100 })) {
       if (!isSubscriptionActive(sub)) continue;
-      const tier = resolveTierFromSubscription(sub) || 'desconhecido';
+      const tier = resolveTierFromSubscription(sub, { strict: true }) || 'desconhecido';
       byTier[tier] = (byTier[tier] || 0) + 1;
       total += 1;
       if (total >= 5000) break;
@@ -73,11 +75,58 @@ async function defaultCountSubscriptions() {
   return { total, byTier };
 }
 
+const brl = (cents) => `R$ ${(cents / 100).toFixed(2).replace('.', ',')}`;
+
+/**
+ * MOO-38: o preço da tela vem de shared/plans.js; o cobrado vem do price
+ * Stripe configurado por env. Nada amarrava os dois. Confere, por plano,
+ * valor, moeda, intervalo mensal e se o price está ativo. Só leitura.
+ */
+export async function checkPlanPrices({ stripe = getStripe(), priceIdForTier = getStripePriceIdForTier } = {}) {
+  const divergences = [];
+  const unconfigured = [];
+  let checked = 0;
+  for (const tier of PLAN_ORDER) {
+    const plan = PLAN_TIERS[tier];
+    const priceId = priceIdForTier(tier);
+    if (!priceId) { unconfigured.push(tier); continue; }
+    checked += 1;
+    const issues = [];
+    let price = null;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      price = await stripe.prices.retrieve(priceId);
+    } catch {
+      issues.push('Não foi possível ler o preço no Stripe (price inexistente ou Stripe indisponível).');
+    }
+    if (price) {
+      const expectedCents = Math.round(plan.priceBRL * 100);
+      if (price.unit_amount !== expectedCents) {
+        issues.push(`Valor: tela mostra ${brl(expectedCents)}, Stripe cobra ${Number.isFinite(price.unit_amount) ? brl(price.unit_amount) : 'valor variável'}.`);
+      }
+      if (price.currency !== 'brl') issues.push(`Moeda: esperado brl, Stripe usa ${price.currency || '—'}.`);
+      const interval = price.recurring?.interval;
+      const count = price.recurring?.interval_count ?? 1;
+      if (interval !== 'month' || count !== 1) {
+        issues.push(`Intervalo: esperado mensal, Stripe usa ${interval ? `${count} ${interval}` : 'cobrança única'}.`);
+      }
+      if (price.active === false) issues.push('Price inativo no Stripe.');
+    }
+    if (issues.length) divergences.push({ tier, priceId, screen: plan.priceLabel, issues });
+  }
+  return { checked, ok: divergences.length === 0, divergences, unconfigured };
+}
+
 async function defaultFindSubscription(customerId) {
   const sub = await findActiveSubscription(customerId);
   if (!sub) return { status: 'none' };
   const bounds = periodBoundsFromSubscription(sub);
-  return { status: sub.status, tier: resolveTierFromSubscription(sub), periodEnd: bounds.periodEnd, cancelAtPeriodEnd: sub.cancel_at_period_end === true };
+  return {
+    status: sub.status, tier: resolveTierFromSubscription(sub), periodEnd: bounds.periodEnd,
+    // Início do ciclo vigente: decide qual linha da cota é a atual (MOO-39).
+    periodStartSec: bounds.periodStartSec || null,
+    cancelAtPeriodEnd: sub.cancel_at_period_end === true,
+  };
 }
 
 async function defaultSendCode({ to, code, intent }) {
@@ -111,8 +160,9 @@ export function createAdminHandler({
   grant = grantAccountAccess,
   revoke = revokeAccountAccess,
   sendCode = defaultSendCode,
-  countSubscriptions = defaultCountSubscriptions,
+  countSubscriptions = countActiveSubscriptionsByTier,
   findSubscription = defaultFindSubscription,
+  checkPrices = checkPlanPrices,
   now = () => Date.now(),
 } = {}) {
   return async function handler(req, res) {
@@ -150,9 +200,9 @@ export function createAdminHandler({
           case 'me': return res.status(200).json({ ok: true, role, email: actor.email });
           case 'overview': return res.status(200).json({ ok: true, ...(await store.overview({ countSubscriptions })) });
           case 'accounts': return res.status(200).json({ ok: true, ...(await store.searchAccounts({ query: url.searchParams.get('q'), page: url.searchParams.get('page') })) });
-          case 'account': return res.status(200).json({ ok: true, account: await store.getAccount(actor, url.searchParams.get('id'), { findSubscription }) });
+          case 'account': return res.status(200).json({ ok: true, account: await store.getAccount(actor, url.searchParams.get('id'), { findSubscription, now: now() }) });
           case 'grants': return res.status(200).json({ ok: true, grants: await store.listGrants({ includeRevoked: url.searchParams.get('all') === '1' }) });
-          case 'health': return res.status(200).json({ ok: true, ...(await store.health()) });
+          case 'health': return res.status(200).json({ ok: true, ...(await store.health({ checkPrices })) });
           case 'actions': return res.status(200).json({ ok: true, actions: await store.listActions({ target: url.searchParams.get('target') }) });
           default: return res.status(400).json({ error: 'Visão inválida.', code: 'admin_bad_view' });
         }

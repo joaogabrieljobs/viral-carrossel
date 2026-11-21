@@ -1,7 +1,8 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, SlidersHorizontal, AlignLeft } from 'lucide-react';
 import { useScrollLock } from '../../hooks/useScrollLock.js';
+import { useModalDialog } from '../../hooks/useModalDialog.js';
 import { FORMATS } from '../../utils/formats.js';
 import { slideForFormatDisplay } from '../../utils/format-view.js';
 import { FULLSCREEN_IMG_ADJ_ROWS, FullscreenImageAdjustBar } from './FullscreenImageAdjustBar.jsx';
@@ -89,6 +90,22 @@ function FullscreenViewer({
   /** Rascunho da tela cheia: apenas slides com entrada explícita; ausente = usar `slide.presentationImgAdjust`. */
   const [imgAdjBySlide, setImgAdjBySlide] = useState({});
 
+  // MOO-43: tela cheia é um diálogo modal de verdade — Tab preso, fundo inerte
+  // e foco devolvido ao gatilho. Escape fecha primeiro a legenda, depois os
+  // ajustes da foto e só então a tela cheia.
+  const visible = !!open && !!slides[activeIdx];
+  const closeLayer = useCallback(() => {
+    if (captionOpen) setCaptionOpen(false);
+    else if (photoAdjustOpen) setPhotoAdjustOpen(false);
+    else onClose();
+  }, [captionOpen, photoAdjustOpen, onClose]);
+  const { overlayRef, dialogRef, onDialogKeyDown } = useModalDialog({ open: visible, onClose: closeLayer });
+  // O mesmo elemento é o fundo e o diálogo.
+  const setDialogNode = useCallback((node) => {
+    overlayRef.current = node;
+    dialogRef.current = node;
+  }, [overlayRef, dialogRef]);
+
   useEffect(() => {
     if (!open) {
       setPhotoAdjustOpen(false);
@@ -104,18 +121,18 @@ function FullscreenViewer({
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => {
+      // Escape dentro do diálogo já foi tratado por onDialogKeyDown (preventDefault).
       if (e.key === 'Escape') {
+        if (e.defaultPrevented) return;
         e.preventDefault();
-        if (captionOpen) setCaptionOpen(false);
-        else if (photoAdjustOpen) setPhotoAdjustOpen(false);
-        else onClose();
+        closeLayer();
       }
       else if (e.key === 'ArrowLeft' && !captionOpen)  { e.preventDefault(); setActiveIdx(Math.max(0, activeIdx - 1)); }
       else if (e.key === 'ArrowRight' && !captionOpen) { e.preventDefault(); setActiveIdx(Math.min(slides.length - 1, activeIdx + 1)); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, activeIdx, slides.length, setActiveIdx, onClose, photoAdjustOpen, captionOpen]);
+  }, [open, activeIdx, slides.length, setActiveIdx, closeLayer, captionOpen]);
 
   if (!open || !slides[activeIdx]) return null;
 
@@ -211,7 +228,10 @@ function FullscreenViewer({
 
   return (
     <div
+      ref={setDialogNode}
       role="dialog" aria-modal="true" aria-label="Apresentação em tela cheia"
+      tabIndex={-1}
+      onKeyDown={onDialogKeyDown}
       style={{
         position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.96)',
         display:'flex', alignItems:'center', justifyContent:'center',

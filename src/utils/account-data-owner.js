@@ -3,7 +3,7 @@
  * Cada conta tem um slot no cofre (`account-vault`) — logout limpa as chaves
  * activas mas a mesma conta recupera os projetos ao reentrar neste browser.
  */
-import { clearAccountLocalData } from './clear-account-data.js';
+import { clearAccountLocalData, OWNER_EMAIL_BINDINGS_KEY } from './clear-account-data.js';
 import { SK, areAccountDataWritesLocked, bindAccountDataWriteOwner, isAccountDataWriteOwnerCurrent, isAccountWriteLockProbePending, lockAccountDataWrites, unlockAccountDataWrites, waitForAccountWriteLockProbe } from './storage.js';
 import { restoreAccountVault, snapshotAccountVault } from './account-vault.js';
 import { isFreeSession } from './free-plan.js';
@@ -40,10 +40,56 @@ export function dataOwnerAliases(email, customerId) {
   return aliases;
 }
 
+/**
+ * MOO-21: o slot local é o e-mail, mas o servidor separa contas pelo cliente
+ * Stripe e e-mails não são únicos. O primeiro cliente que usa um e-mail neste
+ * navegador fica ligado a ele; outro cliente com o mesmo e-mail usa o slot
+ * `id:<customerId>` e não recebe o e-mail como alias (cofre, imagens e fila).
+ */
+function readEmailBindings() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(OWNER_EMAIL_BINDINGS_KEY) || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function emailBoundToOtherCustomer(email, customerId) {
+  const emailN = String(email || '').trim().toLowerCase();
+  const id = String(customerId || '').trim();
+  if (!emailN || !id) return false;
+  const bound = readEmailBindings()[`email:${emailN}`];
+  return !!bound && bound !== id;
+}
+
+function bindEmailToCustomer(email, customerId) {
+  const emailN = String(email || '').trim().toLowerCase();
+  const id = String(customerId || '').trim();
+  if (!emailN || !id) return;
+  const bindings = readEmailBindings();
+  if (bindings[`email:${emailN}`]) return;
+  try { localStorage.setItem(OWNER_EMAIL_BINDINGS_KEY, JSON.stringify({ ...bindings, [`email:${emailN}`]: id })); } catch { /* quota */ }
+}
+
+/** Dono local da sessão, respeitando o e-mail já ligado a outro cliente. */
+export function sessionDataOwnerId(email, customerId) {
+  return emailBoundToOtherCustomer(email, customerId)
+    ? `id:${String(customerId).trim()}`
+    : normalizeDataOwnerId(email, customerId);
+}
+
+/** Aliases da sessão: sem o e-mail quando ele pertence a outro cliente. */
+export function sessionDataOwnerAliases(email, customerId) {
+  return emailBoundToOtherCustomer(email, customerId)
+    ? new Set([`id:${String(customerId).trim()}`])
+    : dataOwnerAliases(email, customerId);
+}
+
 export function isSameDataOwner(prev, next, session = {}) {
   if (!prev || !next) return false;
   if (prev === next) return true;
-  const aliases = dataOwnerAliases(session.email, session.customerId);
+  const aliases = sessionDataOwnerAliases(session.email, session.customerId);
   return aliases.has(prev) && aliases.has(next);
 }
 
@@ -127,8 +173,9 @@ export async function ensureAccountDataOwner(session, { explicitLogin = false, o
   // própria aba. Decidir o owner antes do probe deixaria a biblioteca vazia.
   if (isAccountWriteLockProbePending()) await waitForAccountWriteLockProbe();
 
-  const next = normalizeDataOwnerId(session.email, session.customerId);
+  const next = sessionDataOwnerId(session.email, session.customerId);
   if (!next) return 'ok';
+  if (next.startsWith('email:')) bindEmailToCustomer(session.email, session.customerId);
 
   const prev = readDataOwner();
   // A aba que iniciou com A não pode gravar a biblioteca de B depois de a
@@ -136,7 +183,7 @@ export async function ensureAccountDataOwner(session, { explicitLogin = false, o
   bindAccountDataWriteOwner(prev);
   if (!isAccountDataWriteOwnerCurrent()) return 'blocked';
 
-  const aliases = [...dataOwnerAliases(session.email, session.customerId)];
+  const aliases = [...sessionDataOwnerAliases(session.email, session.customerId)];
   const ownerUnchanged = (expected) => readDataOwner() === expected
     && (typeof isCurrent !== 'function' || isCurrent());
   const block = () => { lockAccountDataWrites(); return 'blocked'; };

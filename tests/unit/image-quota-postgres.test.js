@@ -14,6 +14,18 @@ function fakeDatabase() {
     return {
       async unsafe(query, params) {
         const operation = /\/\* (moont_image_quota_\w+) \*\//.exec(query)?.[1];
+        if (operation === 'moont_image_quota_stale_reservations') {
+          // $1 = minutos, $2 = limite. Espelha o filtro SQL: só `reserved`,
+          // mais velha que o corte e fora do namespace `mcp_` do agente.
+          const cutoff = clock - Number(params[0]) * 60_000;
+          return [...currentOperations.values()]
+            .filter((row) => row.status === 'reserved'
+              && Date.parse(row.created_at) < cutoff
+              && row.operation_id.slice(0, 4).toLowerCase() !== 'mcp_')
+            .sort((left, right) => String(left.created_at).localeCompare(String(right.created_at)))
+            .slice(0, Number(params[1]))
+            .map(copy);
+        }
         const [owner, start, id] = params;
         const key = periodKey(owner, start);
         if (operation === 'moont_image_quota_period' || operation === 'moont_image_quota_locked_period') {
@@ -106,6 +118,8 @@ function fakeDatabase() {
   return {
     sql: client(periods, operations),
     snapshot() { return { periods: copy([...periods]), operations: copy([...operations]) }; },
+    advance(ms) { clock += ms; },
+    operation(owner, start, id) { return copy(operations.get(opKey(owner, start, id))); },
   };
 }
 
@@ -242,5 +256,71 @@ describe('quota transacional de imagens', () => {
     expect((await adapter.consumeImageCredit({ ...args, periodStartSec: args.periodEndSec,
       periodEndSec: args.periodEndSec + 10, limit: 1, operationId: 'same' })).allowed).toBe(true);
     expect(db.snapshot().periods).toHaveLength(3);
+  });
+});
+
+// MOO-28: a reserva do editor só era devolvida no catch do mesmo processo.
+// Se a função da Vercel morre entre a reserva e o settle/refund, o crédito
+// fica contado para sempre. O cron passa a liquidar essas reservas antigas.
+describe('reconciliação de reservas do editor abandonadas', () => {
+  const owner = args.customerId;
+  const start = args.periodStartSec;
+
+  it('devolve reserva do editor sem imagem guardada depois de 15 minutos', async () => {
+    const db = fakeDatabase();
+    const adapter = quota(db);
+    await adapter.consumeImageCredit({ ...args, operationId: 'editor-op-morta' });
+    expect((await adapter.getQuotaUsage(args)).used).toBe(1);
+    db.advance(16 * 60_000);
+    const result = await adapter.reconcileStaleEditorReservations({ limit: 100 });
+    expect(result).toMatchObject({ scanned: 1, refunded: 1, consumed: 0, failed: 0 });
+    expect((await adapter.getQuotaUsage(args)).used).toBe(0);
+    expect(db.operation(owner, start, 'editor-op-morta').status).toBe('refunded');
+  });
+
+  it('confirma em vez de devolver quando a imagem já foi guardada para a repetição (MOO-10)', async () => {
+    const db = fakeDatabase();
+    const adapter = quota(db);
+    await adapter.consumeImageCredit({ ...args, operationId: 'editor-entregue' });
+    await adapter.rememberImageResult({ ...args, operationId: 'editor-entregue', url: 'https://cdn.example/img.png' });
+    db.advance(16 * 60_000);
+    const result = await adapter.reconcileStaleEditorReservations({ limit: 100 });
+    expect(result).toMatchObject({ scanned: 1, refunded: 0, consumed: 1 });
+    expect((await adapter.getQuotaUsage(args)).used).toBe(1);
+    expect(db.operation(owner, start, 'editor-entregue').status).toBe('consumed');
+    // A repetição com o mesmo operationId continua recebendo a mesma imagem.
+    expect(await adapter.recallImageResult({ ...args, operationId: 'editor-entregue' }))
+      .toBe('https://cdn.example/img.png');
+  });
+
+  it('não toca em reserva recente, em operação já liquidada nem em operação do agente (mcp_)', async () => {
+    const db = fakeDatabase();
+    const adapter = quota(db);
+    await adapter.consumeImageCredit({ ...args, operationId: 'mcp_job-1' });
+    await adapter.consumeImageCredit({ ...args, operationId: 'editor-ok' });
+    await adapter.settleImageCredit({ ...args, operationId: 'editor-ok' });
+    await adapter.consumeImageCredit({ ...args, operationId: 'editor-falhou' });
+    await adapter.refundImageCredit({ ...args, operationId: 'editor-falhou' });
+    db.advance(16 * 60_000);
+    await adapter.consumeImageCredit({ ...args, operationId: 'editor-em-andamento' });
+    const result = await adapter.reconcileStaleEditorReservations({ limit: 100 });
+    expect(result).toMatchObject({ scanned: 0, refunded: 0, consumed: 0, failed: 0 });
+    expect(db.operation(owner, start, 'mcp_job-1').status).toBe('reserved');
+    expect(db.operation(owner, start, 'editor-em-andamento').status).toBe('reserved');
+    expect((await adapter.getQuotaUsage(args)).used).toBe(3);
+  });
+
+  it('é idempotente: rodar duas vezes não devolve o mesmo crédito duas vezes', async () => {
+    const db = fakeDatabase();
+    const adapter = quota(db);
+    await adapter.consumeImageCredit({ ...args, operationId: 'editor-a' });
+    await adapter.consumeImageCredit({ ...args, operationId: 'editor-b' });
+    db.advance(16 * 60_000);
+    const [first, second] = await Promise.all([
+      adapter.reconcileStaleEditorReservations({ limit: 100 }),
+      adapter.reconcileStaleEditorReservations({ limit: 100 }),
+    ]);
+    expect(first.refunded + second.refunded).toBe(2);
+    expect((await adapter.getQuotaUsage(args)).used).toBe(0);
   });
 });

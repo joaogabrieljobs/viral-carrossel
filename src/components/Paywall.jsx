@@ -125,7 +125,7 @@ export default function Paywall({
           fontFamily: 'var(--font-display, Inter, sans-serif)',
           lineHeight: 1.15,
         }}>
-          {freeAccount ? 'Assine para criar com IA.' : 'Studio completo. Imagens inclusas nos planos pagos.'}
+          {freeAccount ? 'Assine para criar com IA.' : 'Studio completo. Imagens inclusas a partir do Plano Criador.'}
         </h1>
         <p style={{
           margin: '0 0 20px',
@@ -135,7 +135,7 @@ export default function Paywall({
         }}>
           {freeAccount
             ? 'Seu projeto continua aberto. Depois de assinar, você volta ao mesmo card.'
-            : 'Texto (Moont AI) e imagens inclusos no plano. No Essencial, imagens pedem chave própria em Configurações.'}
+            : 'Texto (Moont AI) incluso em todos os planos. No Essencial, as imagens vêm das suas fotos ou da sua chave em Configurar IA.'}
         </p>
 
         {freeAccount && upgradeReason && (

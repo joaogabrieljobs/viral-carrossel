@@ -334,6 +334,17 @@ function Grants({ wide, openAccount }) {
   );
 }
 
+/** MOO-38: divergência entre o preço da tela e o price do Stripe. */
+export function planPriceSummary(v) {
+  const divergences = Array.isArray(v?.divergences) ? v.divergences : [];
+  const unconfigured = Array.isArray(v?.unconfigured) ? v.unconfigured : [];
+  const parts = [
+    ...divergences.map((d) => `${d.tier}: ${(d.issues || []).join(' ')}`),
+    unconfigured.length ? `sem price: ${unconfigured.join(', ')}` : '',
+  ].filter(Boolean);
+  return { value: String(divergences.length), hint: parts.length ? parts.join(' · ') : `${v?.checked ?? 0} planos conferidos` };
+}
+
 function Health() {
   const [state, reload] = useLoad(adminHealth);
   return (
@@ -345,6 +356,7 @@ function Health() {
           <Metric label="Jobs do agente com falha (24 h)" metric={d.agentJobs} pick={(v) => fmt(v.failedByCode.reduce((s, r) => s + r.count, 0))}
             hint={d.agentJobs.value ? [`${fmt(d.agentJobs.value.stuckPending)} pendentes há 15 min+`, ...d.agentJobs.value.failedByCode.map((r) => `${r.code} ${r.count}`)].join(', ') : ''} />
           <Metric label="Avisos do Stripe (24 h)" metric={d.webhooks} pick={(v) => fmt(v.last24h)} hint={d.webhooks.value ? `último ${dataHora(d.webhooks.value.lastReceivedAt)}` : ''} />
+          <Metric label="Preço da tela × Stripe (divergências)" metric={d.planPrices} pick={(v) => planPriceSummary(v).value} hint={d.planPrices?.value ? planPriceSummary(d.planPrices.value).hint : ''} />
           <Metric label="Acessos de agente ativos" metric={d.tokens} pick={(v) => fmt(v.agentTokens + v.oauthSessions)} hint={d.tokens.value ? `${fmt(d.tokens.value.agentTokens)} chaves, ${fmt(d.tokens.value.oauthSessions)} conexões MCP` : ''} />
         </div>
       )}</Loading>

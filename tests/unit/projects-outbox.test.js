@@ -363,6 +363,18 @@ describe('outbox durável por projeto', () => {
     expect((await getPendingProjectOp(ALICE, 'janine')).assets).toBeUndefined();
   });
 
+  // MOO-21: outro cliente Stripe com o MESMO e-mail não pode enviar a fila
+  // guardada no slot do e-mail, que pertence ao primeiro cliente.
+  it('não transmite a fila do e-mail para outro cliente com o mesmo e-mail', async () => {
+    localStorage.setItem('vc_owner_email_bindings', JSON.stringify({ [ALICE]: 'cus_alice' }));
+    await queueProjectPut(ALICE, { id: 'janine', doc: { title: 'Privado' } });
+    fetch.mockImplementation(async (url) => url === '/api/auth/session'
+      ? json({ active: true, customerId: 'cus_outro', email: 'alice@example.test' })
+      : json({ ok: true }));
+    await expect(flushProjectOutbox(ALICE)).rejects.toMatchObject({ code: 'project_owner_changed' });
+    expect(fetch.mock.calls.filter(([url]) => url !== '/api/auth/session')).toEqual([]);
+  });
+
   it('não transmite dados de outra conta, mesmo quando o cookie mudou antes do flush', async () => {
     await queueProjectPut(ALICE, { id: 'janine', doc: { title: 'Privado' } });
     setOwner(BOB);

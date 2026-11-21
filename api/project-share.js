@@ -169,19 +169,30 @@ function referencedShareAssetIds(doc) {
   return ids;
 }
 
-function assetOwnersForRevision(doc, actor, fallbackOwnerId = '') {
-  const ownerId = String(actor?.customerId || fallbackOwnerId || '').trim();
-  if (!ownerId) return {};
-  return Object.fromEntries([...referencedShareAssetIds(doc)].map((assetId) => [assetId, ownerId]));
+/**
+ * MOO-33: `assetOwners` gravado por este código só contém autoria provada.
+ * Partilhas sem esta versão (sem `assetOwners`, ou gravadas antes da
+ * correção, quando o push atribuía toda foto a quem publicava) continuam com
+ * a busca antiga entre dono e membros até o próximo push.
+ */
+const ASSET_OWNERS_VERSION = 2;
+
+function hasVerifiedAssetOwners(share) {
+  return share?.assetOwnersVersion === ASSET_OWNERS_VERSION
+    && !!share.assetOwners && typeof share.assetOwners === 'object';
 }
 
-function assetOwnerCandidates(share, assetId) {
+function assetNamespace(value) {
+  const ownerId = String(value || '').trim();
+  // IDs Stripe/dev não contêm @. E-mails legados nunca viram namespace de assets.
+  return ownerId && !ownerId.includes('@') ? ownerId : '';
+}
+
+function legacyAssetOwnerCandidates(share, assetId) {
   const candidates = [];
   const add = (value) => {
-    const ownerId = String(value || '').trim();
-    // IDs Stripe/dev não contêm @. E-mails legados nunca viram namespace de assets.
-    if (!ownerId || ownerId.includes('@') || candidates.includes(ownerId)) return;
-    candidates.push(ownerId);
+    const ownerId = assetNamespace(value);
+    if (ownerId && !candidates.includes(ownerId)) candidates.push(ownerId);
   };
   add(share?.assetOwners?.[assetId]);
   add(share?.ownerId);
@@ -189,16 +200,83 @@ function assetOwnerCandidates(share, assetId) {
   return candidates;
 }
 
+function assetOwnerCandidates(share, assetId) {
+  if (hasVerifiedAssetOwners(share)) {
+    // Sem fallback: citar um assetId no documento não abre a biblioteca do
+    // dono nem dos membros. Só a conta que provou ter a foto é consultada.
+    const ownerId = Object.hasOwn(share.assetOwners, assetId)
+      ? assetNamespace(share.assetOwners[assetId]) : '';
+    return ownerId ? [ownerId] : [];
+  }
+  return legacyAssetOwnerCandidates(share, assetId);
+}
+
 async function getSharedAsset(share, assetId, options) {
   for (const ownerId of assetOwnerCandidates(share, assetId)) {
-    // Uma revisão antiga não guardava a origem por asset. Procurar apenas no
-    // dono e nos membros da própria partilha recupera essas fotos sem abrir
-    // acesso a bibliotecas arbitrárias.
     // eslint-disable-next-line no-await-in-loop
     const asset = await getLibraryAsset(ownerId, assetId, options);
     if (asset) return asset;
   }
   return null;
+}
+
+/**
+ * Existência de um asset numa biblioteca, memorizada por requisição: o
+ * mutateSharedProject pode repetir o callback após conflito de gravação.
+ */
+function assetPresenceChecker() {
+  const cache = new Map();
+  return (ownerId, assetId) => {
+    const key = `${ownerId}\0${assetId}`;
+    if (!cache.has(key)) {
+      cache.set(key, getLibraryAsset(ownerId, assetId).then(Boolean, () => false));
+    }
+    return cache.get(key);
+  };
+}
+
+async function mapWithLimit(items, limit, work) {
+  let next = 0;
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const item = items[next];
+      next += 1;
+      // eslint-disable-next-line no-await-in-loop
+      await work(item);
+    }
+  });
+  await Promise.all(runners);
+}
+
+/**
+ * Autoria de cada foto citada na nova revisão:
+ * 1. Foto que já estava na revisão anterior herda a autoria verificada dela.
+ *    Em partilha anterior à correção, procura entre dono e membros, os mesmos
+ *    lugares que a leitura já consultava; não amplia o acesso.
+ * 2. Foto nova só é registrada se estiver na biblioteca de quem publica.
+ * 3. O resto fica sem autoria e a leitura devolve 404.
+ */
+async function assetOwnersForRevision(doc, actor, previous, hasAsset) {
+  const actorOwnerId = assetNamespace(actor?.customerId);
+  const previousIds = referencedShareAssetIds(previous?.doc);
+  const verified = hasVerifiedAssetOwners(previous);
+  const owners = {};
+  await mapWithLimit([...referencedShareAssetIds(doc)], 4, async (assetId) => {
+    if (previousIds.has(assetId)) {
+      if (verified) {
+        const kept = Object.hasOwn(previous.assetOwners, assetId)
+          ? assetNamespace(previous.assetOwners[assetId]) : '';
+        if (kept) { owners[assetId] = kept; return; }
+      } else {
+        for (const ownerId of legacyAssetOwnerCandidates(previous, assetId)) {
+          // eslint-disable-next-line no-await-in-loop
+          if (await hasAsset(ownerId, assetId)) { owners[assetId] = ownerId; return; }
+        }
+      }
+    }
+    if (actorOwnerId && await hasAsset(actorOwnerId, assetId)) owners[assetId] = actorOwnerId;
+  });
+  return owners;
 }
 
 export default async function handler(req, res) {
@@ -316,6 +394,7 @@ export default async function handler(req, res) {
       if (!body.doc || typeof body.doc !== 'object') {
         return res.status(400).json({ error: 'Documento em falta.' });
       }
+      const hasAsset = assetPresenceChecker();
       const saved = await mutateSharedProject(body.code, async (existing) => {
         if (!(await callerCanWrite(existing, actor))) {
           throw Object.assign(new Error('Sem permissão para alterar este projeto.'), {
@@ -359,7 +438,8 @@ export default async function handler(req, res) {
             shareCode: requestedCode,
             shareProjectId: projectId,
           },
-          assetOwners: assetOwnersForRevision(body.doc, actor, existing.ownerId),
+          assetOwners: await assetOwnersForRevision(body.doc, actor, existing, hasAsset),
+          assetOwnersVersion: ASSET_OWNERS_VERSION,
           name: typeof body.name === 'string' && body.name.trim()
             ? body.name.trim().slice(0, 120)
             : existing.name,
@@ -399,7 +479,8 @@ export default async function handler(req, res) {
         : 'Projeto partilhado',
       ownerEmail: actor.email || null,
       ownerId: actor.customerId || (actor.billingDisabled && billingDisabled() ? 'dev:billing-disabled' : null),
-      assetOwners: assetOwnersForRevision(body.doc, actor),
+      assetOwners: await assetOwnersForRevision(body.doc, actor, null, assetPresenceChecker()),
+      assetOwnersVersion: ASSET_OWNERS_VERSION,
       members: writableIdentity(actor) ? [writableIdentity(actor)] : [],
       revision: 0,
     });

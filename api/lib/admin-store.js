@@ -138,7 +138,7 @@ export function createAdminStore({ sql: injectedSql, env = process.env } = {}) {
   }
 
   /** Ficha de uma conta. Abrir a ficha fica na trilha (leitura de dado pessoal). */
-  async function getAccount(actor, accountId, { findSubscription } = {}) {
+  async function getAccount(actor, accountId, { findSubscription, now = Date.now() } = {}) {
     if (!UUID.test(accountId || '')) throw adminFail('admin_bad_input', 'Conta inválida.');
     const [account] = await q(`SELECT a.id, a.primary_email, a.created_at, s.stripe_customer_id
       FROM moont.accounts a LEFT JOIN moont.account_stripe_customers s ON s.account_id = a.id WHERE a.id = $1::uuid`, [accountId]);
@@ -147,7 +147,7 @@ export function createAdminStore({ sql: injectedSql, env = process.env } = {}) {
     const [identities, grants, quota, library, billing, templates, role] = await Promise.all([
       q(`SELECT provider, email_normalized, created_at FROM moont.account_identities WHERE account_id = $1::uuid ORDER BY created_at`, [accountId]),
       q(`SELECT * FROM moont.account_access_grants WHERE account_id = $1::uuid ORDER BY created_at DESC LIMIT 20`, [accountId]),
-      customerId ? metric('Banco: cota de imagens', () => q(`SELECT period_start_sec, used FROM moont.image_quota_periods
+      customerId ? metric('Banco: cota de imagens', () => q(`SELECT period_start_sec, period_end_sec, used FROM moont.image_quota_periods
         WHERE owner_id = $1 ORDER BY period_start_sec DESC LIMIT 3`, [customerId])) : { value: [], source: 'Banco: cota de imagens' },
       customerId ? metric('Banco: biblioteca', async () => (await q(`SELECT project_count, updated_at FROM moont.account_libraries WHERE owner_id = $1`, [customerId]))[0]
         // Sem linha na biblioteca: a conta nunca sincronizou, então são 0 projetos na nuvem (fato, não falha de leitura).
@@ -174,12 +174,51 @@ export function createAdminStore({ sql: injectedSql, env = process.env } = {}) {
       role: role[0]?.role || null,
       identities: identities.map((i) => ({ provider: i.provider, email: i.email_normalized, createdAt: iso(i.created_at) })),
       grants: grants.map(grantRow),
-      quota: { ...quota, value: quota.value ? quota.value.map((p) => ({ periodStart: iso(num(p.period_start_sec) * 1000), used: num(p.used) })) : null },
+      quota: quotaForAccount(quota, {
+        nowSec: Math.floor(now / 1000),
+        // Com isenção ativa o ciclo da cota pode seguir a âncora da isenção,
+        // não o Stripe (account-entitlements); aí vale só a data da linha.
+        subscriptionStartSec: hasActiveGrant(grants, Math.floor(now / 1000))
+          ? null : num(subscription.value?.periodStartSec),
+      }),
       library: { ...library, value: library.value ? { projectCount: num(library.value.project_count), updatedAt: num(library.value.updated_at) ? iso(num(library.value.updated_at)) : null } : library.value },
       billingEvents: { ...billing, value: billing.value ? billing.value.map((e) => ({ type: e.event_type, status: e.object_status, receivedAt: iso(e.received_at) })) : null },
       templates,
       subscription,
     };
+  }
+
+  /**
+   * MOO-39: `value` traz só a linha do ciclo vigente (ou nada); a tela lê
+   * value[0] como "ciclo atual". As últimas linhas ficam em `history`.
+   * Ciclo vigente: o início informado pelo Stripe, quando houver; senão a
+   * linha com início <= agora < fim. Linha sem fim gravado (criada pela tela
+   * de Uso) só vale se começou há menos de 31 dias.
+   */
+  function hasActiveGrant(grants, nowSec) {
+    return grants.some((g) => g.revoked_at == null && num(g.starts_at_sec) <= nowSec
+      && (g.expires_at_sec == null || num(g.expires_at_sec) > nowSec));
+  }
+
+  function quotaForAccount(quota, { nowSec, subscriptionStartSec }) {
+    if (!quota.value) return { ...quota, value: null, history: null };
+    const rows = quota.value.map((p) => {
+      const start = num(p.period_start_sec);
+      const end = p.period_end_sec == null ? null : num(p.period_end_sec);
+      return { start, end, used: num(p.used) };
+    });
+    const isCurrent = (row) => (subscriptionStartSec > 0
+      ? row.start === subscriptionStartSec
+      : row.start <= nowSec && (row.end ? nowSec < row.end : nowSec - row.start < 31 * 86_400));
+    // Linhas vêm em ordem decrescente de início: a primeira vigente é a atual.
+    const currentRow = rows.find(isCurrent) || null;
+    const history = rows.map((row) => ({
+      periodStart: iso(row.start * 1000),
+      periodEnd: row.end ? iso(row.end * 1000) : null,
+      used: row.used,
+      current: row === currentRow,
+    }));
+    return { ...quota, value: history.filter((row) => row.current), history };
   }
 
   function grantRow(g) {
@@ -198,8 +237,8 @@ export function createAdminStore({ sql: injectedSql, env = process.env } = {}) {
     return rows.map((g) => ({ ...grantRow(g), email: g.primary_email }));
   }
 
-  async function health() {
-    const [stuck, images24h, agentJobs, webhooks, tokens] = await Promise.all([
+  async function health({ checkPrices } = {}) {
+    const [stuck, images24h, agentJobs, webhooks, tokens, planPrices] = await Promise.all([
       metric('Banco: cota de imagens', async () => {
         const [r] = await q(`SELECT count(*)::int AS n, min(created_at) AS oldest FROM moont.image_quota_operations
           WHERE status = 'reserved' AND created_at < now() - interval '15 minutes'`);
@@ -228,8 +267,12 @@ export function createAdminStore({ sql: injectedSql, env = process.env } = {}) {
         const [o] = await q(`SELECT count(*)::int AS n FROM moont.oauth_refresh_tokens WHERE revoked_at IS NULL AND expires_at > now()`);
         return { agentTokens: a.n, oauthSessions: o.n };
       }),
+      // MOO-38: preço da tela × price do Stripe. Falha do Stripe vira "—".
+      typeof checkPrices === 'function'
+        ? metric('Stripe: preços dos planos', () => checkPrices())
+        : { value: null, source: 'Stripe: preços dos planos', reason: 'Conferência não configurada.' },
     ]);
-    return { stuckReservations: stuck, images24h, agentJobs, webhooks, tokens };
+    return { stuckReservations: stuck, images24h, agentJobs, webhooks, tokens, planPrices };
   }
 
   async function listActions({ target = '' } = {}) {

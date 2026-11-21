@@ -9,6 +9,13 @@ import { PRESENTATION_VISUAL_PRESETS, applyPresentationVisualPreset, getPresenta
 import { DEFAULT_BRAND, mkSlide } from '../../src/utils/doc-schema.js';
 
 describe('CardThumbnail', () => {
+  it('não mostra os marcadores de destaque crus na faixa (reteste T09)', () => {
+    expect(cardThumbnailModel({ title:'**Três pães. Nada de vitrine cheia.**' }).title).toBe('Três pães. Nada de vitrine cheia.');
+    expect(cardThumbnailModel({ title:'Pão de __36 horas__ e *fermento* natural' }).title).toBe('Pão de 36 horas e fermento natural');
+    expect(cardThumbnailModel({ title:'', subtitle:'**Só** o apoio' }).title).toBe('Só o apoio');
+    expect(cardThumbnailModel({ title:'5 * 3 = 15' }).title).toBe('5 * 3 = 15');
+  });
+
   it('mostra o texto do card 1 também em fundos claros da Biblioteca', () => {
     const html = renderToStaticMarkup(React.createElement(CardThumbnail, {
       slide:{ id:'s1', title:'Título visível' },
