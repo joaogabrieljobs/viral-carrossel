@@ -11,7 +11,7 @@ import {
   saveUserProfile,
 } from '../utils/user-profile.js';
 import { TEXT_PROVIDERS, IMAGE_PROVIDERS } from '../config/ai-providers.js';
-import { normalizeAccountUsage } from '../utils/account-usage.js';
+import { normalizeAccountUsage, planImageStatusLabel } from '../utils/account-usage.js';
 import AgentAccessPanel from './AgentAccessPanel.jsx';
 import { useModalDialog } from '../hooks/useModalDialog.js';
 import { confirmCurrentPassword } from '../lib/billing.js';
@@ -507,10 +507,7 @@ export default function AccountProfile({
     && !accessStatus.verificationUnavailable && !accessStatus.verificationRefreshing;
   const imageStatus = aiSettings?.useOwnImageKey
     ? `${imageProvider.name}${hasImageAI ? '' : ' · falta chave'}`
-    : usage.noIncludedImages ? 'não inclusas no plano'
-      : !usage.hasUsage ? 'consumo indisponível · consulte Uso'
-        : usage.exhausted ? 'limite deste ciclo atingido'
-          : `${usage.remaining} disponíveis no plano`;
+    : planImageStatusLabel(usage);
 
   const openEdit = () => {
     setDraft(normalizeUserProfile(profile));

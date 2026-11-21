@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { cleanupStaleImageReferences } from '../lib/image-references.js';
 import { cleanupExpiredAgentTokens } from '../lib/agent-token-store.js';
+import { cleanupExpiredOAuthArtifacts } from '../lib/oauth-store.js';
 
 export const config = { maxDuration: 120 };
 
@@ -16,8 +17,11 @@ export default async function handler(req, res) {
   const tokenCleanup = process.env.LIBRARY_SYNC_BACKEND === 'postgres'
     ? cleanupExpiredAgentTokens()
     : Promise.resolve({ deleted: 0, skipped: true });
-  const [imagesResult, tokensResult] = await Promise.allSettled([
-    cleanupStaleImageReferences(), tokenCleanup,
+  const oauthCleanup = process.env.LIBRARY_SYNC_BACKEND === 'postgres'
+    ? cleanupExpiredOAuthArtifacts()
+    : Promise.resolve({ skipped: true });
+  const [imagesResult, tokensResult, oauthResult] = await Promise.allSettled([
+    cleanupStaleImageReferences(), tokenCleanup, oauthCleanup,
   ]);
   if (imagesResult.status === 'rejected') {
     console.error('[image-references] scheduled_cleanup_failed');
@@ -29,5 +33,10 @@ export default async function handler(req, res) {
     console.error('[agent-tokens] scheduled_cleanup_failed', error?.code || error?.message || error);
     agentTokens = { deleted: 0, failed: true };
   }
-  return res.status(200).json({ ...imagesResult.value, agentTokens });
+  let oauth = oauthResult.value;
+  if (oauthResult.status === 'rejected') {
+    console.error('[oauth] scheduled_cleanup_failed', oauthResult.reason?.code || oauthResult.reason?.message || oauthResult.reason);
+    oauth = { failed: true };
+  }
+  return res.status(200).json({ ...imagesResult.value, agentTokens, oauth });
 }

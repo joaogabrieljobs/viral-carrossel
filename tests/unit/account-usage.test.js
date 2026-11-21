@@ -150,3 +150,20 @@ describe('account usage page', () => {
     expect(html).toContain('anteriores à ativação do histórico detalhado');
   });
 });
+
+// MOO-34 (auditoria 20/11, visto em produção): conta isenta sem limite de
+// imagens via no Perfil "Imagens: null disponíveis no plano".
+describe('MOO-34 — rótulo de imagens no Perfil', () => {
+  it('isenção sem limite mostra "sem limite", nunca "null"', async () => {
+    const { planImageStatusLabel } = await import('../../src/utils/account-usage.js');
+    const usage = normalizeAccountUsage({ imageQuota: { tier: 'max', used: 48, limit: null, unlimited: true } });
+    const label = planImageStatusLabel(usage);
+    expect(label).toBe('sem limite no plano');
+    expect(label).not.toMatch(/null|undefined|NaN/);
+  });
+
+  it('plano com saldo continua mostrando quantas restam', async () => {
+    const { planImageStatusLabel } = await import('../../src/utils/account-usage.js');
+    expect(planImageStatusLabel(normalizeAccountUsage({ imageQuota: { tier: 'creator', used: 13, limit: 50 } }))).toBe('37 disponíveis no plano');
+  });
+});

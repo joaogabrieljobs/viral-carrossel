@@ -239,7 +239,7 @@ export default function Paywall({
             }}
           />
           {error && !(onManageBilling && error === loginHint) && (
-            <p style={{ margin: '0 0 12px', fontSize: 13, color: '#ff8fab' }}>{error}</p>
+            <p role="alert" style={{ margin: '0 0 12px', fontSize: 13, color: '#ff8fab' }}>{error}</p>
           )}
           <button
             type="submit"

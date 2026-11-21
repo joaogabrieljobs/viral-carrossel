@@ -48,6 +48,27 @@ export function canvasScaleWithinArea(width, height, requested = 3) {
   return Math.min(requested, fit);
 }
 
+/**
+ * Resultado de um pacote com arquivos que podem falhar um a um (MOO-08):
+ * parcial vira aviso com a contagem real; nenhum arquivo vira erro.
+ */
+export function packagedFilesOutcome({ total, failed, label }) {
+  const ok = total - failed;
+  if (total > 0 && ok <= 0) {
+    throw Object.assign(new Error(`Nenhuma das ${total} ${label} pôde ser lida. Nada foi baixado.`), { code: 'export_empty' });
+  }
+  if (failed > 0) {
+    return { level: 'warning', message: `${ok} de ${total} ${label} baixadas no ZIP. ${failed} não pôde ser lida e ficou de fora.` };
+  }
+  return { level: 'success', message: `${total} ${label} baixadas no ZIP` };
+}
+
+// Folha de compartilhar fechada não é download feito (MOO-27): segue o mesmo
+// caminho silencioso do cancelamento, sem aviso de sucesso.
+function assertDelivered(delivered) {
+  if (delivered === false) throw Object.assign(new Error('Download cancelado.'), { code: 'export_cancelled' });
+}
+
 /** Extrai todas as URLs de `background-image`, inclusive em camadas múltiplas. */
 export function extractCssBackgroundUrls(backgroundImage) {
   const source = String(backgroundImage || '');
@@ -336,14 +357,14 @@ export function useExport({
         const entry = await videoGet(slide.videoId);
         if (entry?.blob) {
           const ext = (entry.mime || 'video/mp4').split('/')[1].split(';')[0] || 'mp4';
-          await downloadBlob(entry.blob, `${isPresentation ? `${fileStem}-` : ''}slide-${String(idx+1).padStart(2,'0')}-video.${ext}`);
+          assertDelivered(await downloadBlob(entry.blob, `${isPresentation ? `${fileStem}-` : ''}slide-${String(idx+1).padStart(2,'0')}-video.${ext}`));
           toast(`Vídeo do ${itemLabel} ${idx+1} baixado. Adicione o texto no editor de vídeo (CapCut, InShot, etc).`, 'success', 6000);
           return true;
         }
       }
       await waitForRender([idx]);
       const canvas = await renderSlideToCanvas(slide);
-      await downloadCanvasPng(canvas, `${isPresentation ? `${fileStem}-` : ''}slide-${String(idx+1).padStart(2,'0')}.png`);
+      assertDelivered(await downloadCanvasPng(canvas, `${isPresentation ? `${fileStem}-` : ''}slide-${String(idx+1).padStart(2,'0')}.png`));
       toast(`${isPresentation ? 'Slide' : 'Card'} ${idx+1} baixado`, 'success');
       return true;
     } catch(e) {
@@ -361,6 +382,7 @@ export function useExport({
       await waitForRender();
       const zip = new JSZip();
       const videoSlides = [];
+      let missingVideos = 0;
       for (let i=0; i<slides.length; i++) {
         throwIfExportCancelled();
         setExportProgress({current:i+1,total:slides.length});
@@ -374,14 +396,17 @@ export function useExport({
               const ext = (entry.mime || 'video/mp4').split('/')[1].split(';')[0] || 'mp4';
               zip.file(`slide-${String(i+1).padStart(2,'0')}-video.${ext}`, entry.blob);
               videoSlides.push({ idx: i+1, title: slide.title, subtitle: slide.subtitle, body: slide.bodyAfterImage || '' });
-            }
+            } else missingVideos += 1;
           } catch (e) {
+            missingVideos += 1;
             console.warn(`Falha ao empacotar vídeo do slide ${i+1}:`, e.message);
           }
         }
         // PNG do preview sempre (mesmo se tem vídeo — útil de referência)
         const canvas = await renderSlideToCanvas(slide);
         const blob = await canvasToPngBlob(canvas);
+        // Libera a memória do canvas antes do próximo slide (MOO-09).
+        canvas.width = 0; canvas.height = 0;
         const suffix = slide?.videoId ? '-preview' : '';
         zip.file(`slide-${String(i+1).padStart(2,'0')}${suffix}.png`, blob);
       }
@@ -416,11 +441,15 @@ export function useExport({
         ].join('\n');
         zip.file('LEIA-ME.md', readme);
       }
-      const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+      // PNG e vídeo já são comprimidos: STORE poupa CPU e memória (MOO-09).
+      const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
       throwIfExportCancelled();
-      await downloadBlob(zipBlob, `${fileStem}.zip`);
+      assertDelivered(await downloadBlob(zipBlob, `${fileStem}.zip`));
       const videoNote = videoSlides.length > 0 ? ` (${videoSlides.length} c/ vídeo — veja LEIA-ME.md)` : '';
-      toast(`ZIP com ${slides.length} ${itemLabel}s pronto${videoNote}`, 'success');
+      if (missingVideos > 0) {
+        // Vídeo que não pôde ser lido não some em silêncio (MOO-08).
+        toast(`ZIP com ${slides.length} ${itemLabel}s pronto, mas ${missingVideos} vídeo(s) não puderam ser lidos e ficaram só como imagem.`, 'warning', 0);
+      } else toast(`ZIP com ${slides.length} ${itemLabel}s pronto${videoNote}`, 'success');
       trackEvent('export_zip', { card_count: String(slides.length), videos: String(videoSlides.length) });
       return true;
     } catch(e) {
@@ -446,6 +475,7 @@ export function useExport({
     try {
       const zip = new JSZip();
       let aiCount = 0;
+      let failedPhotos = 0;
       for (let k = 0; k < withPhotos.length; k++) {
         throwIfExportCancelled();
         setExportProgress({ current: k + 1, total: withPhotos.length });
@@ -460,22 +490,26 @@ export function useExport({
           if (s.bgImageSource === 'ai') aiCount++;
           zip.file(`${tag}-${String(i + 1).padStart(2, '0')}.${ext}`, blob);
         } catch (e) {
+          failedPhotos += 1;
           console.warn(`Falha ao empacotar foto do slide ${i + 1}:`, e.message);
         }
       }
-      const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+      const outcome = packagedFilesOutcome({ total: withPhotos.length, failed: failedPhotos, label: 'fotos' });
+      // Fotos e vídeos já são comprimidos: STORE poupa CPU e memória (MOO-09).
+      const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
       throwIfExportCancelled();
-      await downloadBlob(zipBlob, `${fileStem}-fotos.zip`);
+      assertDelivered(await downloadBlob(zipBlob, `${fileStem}-fotos.zip`));
       toast(
-        aiCount > 0
-          ? `${withPhotos.length} fotos baixadas (${aiCount} geradas por IA — guarde pra reuso!)`
-          : `${withPhotos.length} fotos baixadas no ZIP`,
-        'success',
-        5000,
+        outcome.level === 'success' && aiCount > 0
+          ? `${outcome.message} (${aiCount} geradas por IA, guarde para reuso)`
+          : outcome.message,
+        outcome.level,
+        outcome.level === 'success' ? 5000 : 0,
       );
       return true;
     } catch (e) {
-      if (e?.code !== 'export_cancelled') setError('Erro ao baixar fotos: ' + e.message);
+      if (e?.code === 'export_empty') toast(e.message, 'error', 0);
+      else if (e?.code !== 'export_cancelled') setError('Erro ao baixar fotos: ' + e.message);
       return false;
     } finally {
       finishExport();
@@ -506,7 +540,7 @@ export function useExport({
         canvas.height = 1;
       }
       throwIfExportCancelled();
-      await downloadBlob(pdf.output('blob'), `${fileStem}.pdf`);
+      assertDelivered(await downloadBlob(pdf.output('blob'), `${fileStem}.pdf`));
       toast(`PDF com ${slides.length} ${itemLabel}s gerado`, 'success');
       return true;
     } catch(e) {

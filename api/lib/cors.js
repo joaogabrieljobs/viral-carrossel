@@ -35,3 +35,27 @@ export function applyCors(req, res, opts = {}) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', opts.headers || 'Content-Type');
 }
+
+/**
+ * Recusa POST vindo de outro site (MOO-03). Cookie SameSite=Lax protege o
+ * cookie existente, não a gravação de um novo: um <form> de outro site podia
+ * logar a vítima na conta do atacante. Formulário não manda JSON nem Origin
+ * desta lista; cliente sem navegador (sem Origin) segue normalmente.
+ * @returns {boolean} true quando já respondeu 403/415.
+ */
+export function rejectCrossSiteRequest(req, res, { requireJson = true } = {}) {
+  if (req.method !== 'POST') return false;
+  const origin = req.headers?.origin;
+  if ((origin && !allowedOrigins().has(origin)) || req.headers?.['sec-fetch-site'] === 'cross-site') {
+    res.status(403).json({ error: 'Origem não autorizada.', code: 'origin_denied' });
+    return true;
+  }
+  // Formulário de navegador sempre declara Content-Type (form, multipart ou
+  // text/plain); só ele é recusado aqui.
+  const contentType = String(req.headers?.['content-type'] || '');
+  if (requireJson && contentType && !/^application\/json(?:;|$)/i.test(contentType)) {
+    res.status(415).json({ error: 'Envie JSON.', code: 'json_required' });
+    return true;
+  }
+  return false;
+}

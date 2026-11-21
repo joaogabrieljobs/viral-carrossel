@@ -1,3 +1,4 @@
+import { ocrQuotaDay } from './ocr-quota.js';
 import { getPostgresConnection } from './postgres-connection.js';
 
 const ENSURE_DAY = `
@@ -50,7 +51,7 @@ function ownerId(customerId) {
 }
 
 function day(now) {
-  return new Date(now).toISOString().slice(0, 10);
+  return ocrQuotaDay(now);
 }
 
 function validOperationId(operationId) {

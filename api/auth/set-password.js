@@ -1,3 +1,4 @@
+import { publicErrorBody } from '../lib/public-error.js';
 import { timingSafeEqual } from 'crypto';
 import { applyCors } from '../lib/cors.js';
 import {
@@ -102,6 +103,6 @@ export default async function handler(req, res) {
     return res.status(200).json(body);
   } catch (e) {
     console.error('[auth/set-password]', e?.message || e);
-    return res.status(e?.status === 503 ? 503 : 500).json({ error: e.message || 'set_password_error' });
+    return res.status(e?.status === 503 ? 503 : 500).json(publicErrorBody(e, 'set_password_error', 'Não foi possível criar a senha agora. Tente novamente em instantes.'));
   }
 }

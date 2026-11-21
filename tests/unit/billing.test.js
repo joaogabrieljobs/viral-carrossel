@@ -146,3 +146,33 @@ describe('logoutAccess', () => {
     await expect(logoutAccess()).rejects.toThrow('Não foi possível confirmar a saída');
   });
 });
+
+// MOO-15 (auditoria 20/11): quem voltava do Stripe com a confirmação falhando
+// por instabilidade via o paywall e um aviso de 8 s; havia uma tentativa só.
+describe('MOO-15 — confirmação do checkout tenta de novo em falha passageira', () => {
+  it('503 e depois sucesso: confirma na segunda tentativa', async () => {
+    const { confirmCheckoutSessionWithRetry } = await import('../../src/lib/billing.js');
+    const fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 503, json: () => Promise.resolve({ error: 'instável' }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({ active: true }) });
+    vi.stubGlobal('fetch', fetch);
+    await expect(confirmCheckoutSessionWithRetry('cs_1', { sleep: async () => {} })).resolves.toMatchObject({ active: true });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('recusa definitiva (402 pagamento pendente) não repete', async () => {
+    const { confirmCheckoutSessionWithRetry } = await import('../../src/lib/billing.js');
+    const fetch = vi.fn().mockResolvedValue({ ok: false, status: 402, json: () => Promise.resolve({ error: 'Pagamento pendente.' }) });
+    vi.stubGlobal('fetch', fetch);
+    await expect(confirmCheckoutSessionWithRetry('cs_1', { sleep: async () => {} })).rejects.toThrow('Pagamento pendente.');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('rede caindo nas 3 tentativas: desiste depois da terceira', async () => {
+    const { confirmCheckoutSessionWithRetry } = await import('../../src/lib/billing.js');
+    const fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    vi.stubGlobal('fetch', fetch);
+    await expect(confirmCheckoutSessionWithRetry('cs_1', { sleep: async () => {} })).rejects.toThrow();
+    expect(fetch).toHaveBeenCalledTimes(3);
+  });
+});

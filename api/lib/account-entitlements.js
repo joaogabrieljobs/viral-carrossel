@@ -184,14 +184,29 @@ export async function resolveAccountExemption(customerId, { nowSec = Math.floor(
     quotaPeriodStartSec: bounds.periodStartSec, quotaPeriodEndSec: bounds.periodEndSec };
 }
 
-export async function resolveAccountEntitlement(customerId, options = {}) {
-  const exempt = await resolveAccountExemption(customerId, options);
-  if (exempt) return exempt;
-  const subscription = await (options.findSubscription || findActiveSubscription)(customerId);
-  if (!subscription) return { active: false, accessSource: null, billingExempt: false, status: 'inactive' };
+function paidEntitlement(subscription) {
   const bounds = periodBoundsFromSubscription(subscription);
   return { active: true, accessSource: 'stripe', billingExempt: false, status: subscription.status,
     tier: resolveTierFromSubscription(subscription), subscription,
     quotaPeriodStart: bounds.periodStart, quotaPeriodEnd: bounds.periodEnd,
     quotaPeriodStartSec: bounds.periodStartSec, quotaPeriodEndSec: bounds.periodEndSec };
+}
+
+export async function resolveAccountEntitlement(customerId, options = {}) {
+  const findSubscription = options.findSubscription || findActiveSubscription;
+  const exempt = await resolveAccountExemption(customerId, options);
+  if (exempt) {
+    // Isenção não rebaixa quem já paga (MOO-13): vale o maior dos dois planos.
+    // Isenção Max ou sem limite de imagens já é o teto e dispensa o Stripe; se
+    // o Stripe falhar, a isenção continua valendo.
+    if (exempt.unlimitedImages || exempt.tier === PLAN_ORDER.at(-1)) return exempt;
+    let subscription = null;
+    try { subscription = await findSubscription(customerId); } catch { return exempt; }
+    if (!subscription) return exempt;
+    const paid = paidEntitlement(subscription);
+    return PLAN_ORDER.indexOf(paid.tier) > PLAN_ORDER.indexOf(exempt.tier) ? paid : exempt;
+  }
+  const subscription = await findSubscription(customerId);
+  if (!subscription) return { active: false, accessSource: null, billingExempt: false, status: 'inactive' };
+  return paidEntitlement(subscription);
 }

@@ -33,7 +33,37 @@ describe('account access entitlement resolver', () => {
       quotaPeriodEnd: '2026-03-31T13:42:09.000Z', quotaPeriodStartSec: sec('2026-02-28T13:42:09Z'),
       quotaPeriodEndSec: sec('2026-03-31T13:42:09Z') });
     expect(entitlement).not.toHaveProperty('subscription');
-    expect(findSubscription).not.toHaveBeenCalled();
+  });
+
+  // MOO-13 (auditoria 20/11): a isenção substituía a assinatura. Um assinante
+  // Max que recebia isenção Criador caía de plano e continuava sendo cobrado.
+  describe('MOO-13 — isenção não rebaixa quem já paga', () => {
+    const paid = tier => ({ id: 'sub_real', status: 'active', metadata: { tier },
+      items: { data: [{ current_period_start: anchor, current_period_end: now + 86400 }] } });
+    const resolve = (candidate, findSubscription) => resolveAccountEntitlement('cus_owner', { enabled: true, nowSec: now,
+      store: { findGrantForCustomer: vi.fn().mockResolvedValue(candidate) }, findSubscription });
+
+    it('assinatura maior que a isenção prevalece', async () => {
+      const entitlement = await resolve(grant, vi.fn().mockResolvedValue(paid('max')));
+      expect(entitlement).toMatchObject({ active: true, accessSource: 'stripe', billingExempt: false, tier: 'max' });
+    });
+
+    it('isenção maior que a assinatura prevalece', async () => {
+      const entitlement = await resolve({ ...grant, tier: 'pro' }, vi.fn().mockResolvedValue(paid('essential')));
+      expect(entitlement).toMatchObject({ accessSource: 'exempt', tier: 'pro' });
+    });
+
+    it('isenção Max ou sem limite de imagens não consulta o Stripe', async () => {
+      const findSubscription = vi.fn();
+      await resolve({ ...grant, tier: 'max' }, findSubscription);
+      await resolve({ ...grant, unlimitedImages: true }, findSubscription);
+      expect(findSubscription).not.toHaveBeenCalled();
+    });
+
+    it('falha do Stripe mantém a isenção em vez de derrubar o acesso', async () => {
+      const entitlement = await resolve(grant, vi.fn().mockRejectedValue(new Error('stripe offline')));
+      expect(entitlement).toMatchObject({ active: true, accessSource: 'exempt', tier: 'creator' });
+    });
   });
 
   it.each([null, { ...grant, revokedAt: new Date() }, { ...grant, expiresAtSec: now },

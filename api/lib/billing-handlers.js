@@ -1,3 +1,4 @@
+import { publicErrorBody } from './public-error.js';
 import crypto from 'crypto';
 import {
   getStripe,
@@ -387,7 +388,7 @@ export async function handleCheckout(req, res) {
     return res.status(200).json({ url: session.url, sessionId: session.id, tier });
   } catch (e) {
     console.error('[stripe/checkout]', e);
-    return res.status(e?.status === 503 ? 503 : 500).json({ error: e.message || 'checkout_error' });
+    return res.status(e?.status === 503 ? 503 : 500).json(publicErrorBody(e, 'checkout_error', 'Não foi possível abrir o pagamento agora. Tente novamente em instantes.'));
   }
 }
 
@@ -535,7 +536,7 @@ export async function handlePortal(req, res) {
     return res.status(200).json({ url: portal.url });
   } catch (e) {
     console.error('[stripe/portal]', e);
-    return res.status(500).json({ error: e.message || 'portal_error' });
+    return res.status(500).json(publicErrorBody(e, 'portal_error', 'Não foi possível abrir o portal de cobrança agora. Tente novamente em instantes.'));
   }
 }
 

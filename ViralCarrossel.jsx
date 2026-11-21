@@ -6299,8 +6299,8 @@ ${jsonShapeLine}`;
       return { cancelled: false };
     } catch (err) {
       if (isGenerationCancelled(err) || job.signal.aborted) return { cancelled: true };
+      // Sem a mensagem bruta: pode trazer texto do briefing (MOO-37).
       trackEvent('carousel_generate_error', {
-        msg: String(err?.message || '').slice(0, 80),
         code: String(err?.code || '').slice(0, 80),
         stage: String(err?.stage || '').slice(0, 40),
       });

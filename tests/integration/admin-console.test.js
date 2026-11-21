@@ -239,3 +239,30 @@ describe('console admin — trilha e moderação', () => {
     expect(await templates.isModerator(ADMIN)).toBe(false);
   });
 });
+
+// MOO-19 (auditoria 20/11): o documento diz que ação contra outra conta admin
+// é recusada, mas o handler aceitava, inclusive o admin isentar a si mesmo.
+describe('MOO-19 — admin não concede isenção a si nem age sobre outro admin', () => {
+  const ADMIN_CONTA = '44444444-4444-4444-8444-444444444444';
+  beforeEach(async () => {
+    await sql.unsafe(`INSERT INTO moont.accounts (id, primary_email) VALUES ($1::uuid, 'admin@empresa.exemplo')`, [ADMIN_CONTA]);
+    await sql.unsafe(`INSERT INTO moont.account_stripe_customers (stripe_customer_id, account_id, verified_at) VALUES ($1, $2::uuid, now())`, [ADMIN, ADMIN_CONTA]);
+  });
+
+  it('isenção para a própria conta responde 403 e não cria concessão', async () => {
+    const proprio = { ...pedido, accountId: ADMIN_CONTA };
+    const { code, challengeId } = await pedirCodigo(ADMIN, 'grant', proprio);
+    const res = await call(ADMIN, { method: 'POST', body: { action: 'grant', challengeId, code, ...proprio } });
+    expect(res.statusCode).toBe(403);
+    expect(res.body.code).toBe('admin_target_forbidden');
+    expect(await sql.unsafe('SELECT id FROM moont.account_access_grants WHERE account_id = $1::uuid', [ADMIN_CONTA])).toEqual([]);
+  });
+
+  it('isenção para conta com papel de admin ou suporte responde 403', async () => {
+    await sql.unsafe(`INSERT INTO moont.admin_roles (owner_id, role, granted_by, reason) VALUES ($1, 'suporte', 'teste', 'teste')`, [CLIENTE]);
+    const { code, challengeId } = await pedirCodigo(ADMIN, 'grant', pedido);
+    const res = await call(ADMIN, { method: 'POST', body: { action: 'grant', challengeId, code, ...pedido } });
+    expect(res.statusCode).toBe(403);
+    expect(res.body.code).toBe('admin_target_forbidden');
+  });
+});

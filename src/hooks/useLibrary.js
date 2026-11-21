@@ -422,7 +422,7 @@ export function useLibrary({
       : [];
     const blob = new Blob([JSON.stringify({ vcVersion: 2, folders, docs: [comImagens] }, null, 2)], { type: 'application/json' });
     const fname = `${(entry.name || 'carrossel').replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'carrossel'}.json`;
-    await downloadBlob(blob, fname);
+    if (!(await downloadBlob(blob, fname))) return;
     if (missingBg > 0) {
       toast(`Backup "${fname}" salvo — ${missingBg} slide(s) sem imagem de fundo no arquivo.`, 'warning', 5500);
     } else {
@@ -450,7 +450,7 @@ export function useLibrary({
       docs,
     }, null, 2)], { type: 'application/json' });
     const fname = `moont-backup-${new Date().toISOString().slice(0,10)}.json`;
-    await downloadBlob(blob, fname);
+    if (!(await downloadBlob(blob, fname))) return;
     if (missingBg > 0) {
       toast(`Backup completo "${fname}" — ${library.length} projeto(s), ${missingBg} slide(s) sem imagem.`, 'warning', 6500);
     } else {

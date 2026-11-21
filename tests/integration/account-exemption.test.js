@@ -110,7 +110,8 @@ describe('authenticated account exemption across app and MCP', () => {
       currentPeriodStart: '2026-10-31T13:42:09.000Z', currentPeriodEnd: '2026-11-30T13:42:09.000Z',
       imageQuota: { used: 28, limit: 50, remaining: 22 } });
     expect(deps.usage).toHaveBeenCalledWith({ customerId: owner.stripeCustomerId, periodStartSec: anchor, limit: 50 });
-    expect(stripeMock.subscriptions.list).not.toHaveBeenCalled();
+    // Isenção abaixo do Max consulta a assinatura para não rebaixar quem paga (MOO-13).
+    expect(stripeMock.subscriptions.list).toHaveBeenCalledWith(expect.objectContaining({ customer: owner.stripeCustomerId }));
     // Billing helper remains truthful even when app access is exempt.
     expect(await findActiveSubscription(owner.stripeCustomerId)).toBeNull();
   });
@@ -146,7 +147,6 @@ describe('authenticated account exemption across app and MCP', () => {
     const google = makeRes(); await googleCallback(makeReq({ url: '/api/auth/google/callback?code=test-code&state=state-test' }), google);
     expect(google.redirectUrl).toBe('https://moont.ai/?billing=restored&login=google');
     expect(verifyAccessToken(cookieValue(google, COOKIE_NAME))).toMatchObject({ accountId: owner.id, customerId: owner.stripeCustomerId });
-    expect(stripeMock.subscriptions.list).not.toHaveBeenCalled();
   });
 
   it('bootstrap password setup accepts exempt account without force and still requires operator secret', async () => {

@@ -1,5 +1,5 @@
 import { waitUntil } from '@vercel/functions';
-import { applyCors } from '../lib/cors.js';
+import { applyCors, rejectCrossSiteRequest } from '../lib/cors.js';
 import { isValidEmail, normalizeEmail } from '../lib/password-auth.js';
 import { passwordResetConfigured, sendPasswordReset } from '../lib/password-reset.js';
 import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
@@ -11,6 +11,7 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (rejectCrossSiteRequest(req, res)) return;
   const limited = await consumeRateLimit(req, {
     limit: 5, windowMs: 15 * 60_000, keyPrefix: 'forgot-password', failClosed: true,
   });

@@ -60,3 +60,13 @@ export function normalizeAccountUsage({
     periodEnd,
   };
 }
+
+/** Rótulo curto do saldo de imagens do plano no Perfil (sem chave própria). */
+export function planImageStatusLabel(usage) {
+  if (usage.noIncludedImages) return 'não inclusas no plano';
+  // Isenção sem limite: o uso é contado, mas não há saldo (MOO-34).
+  if (usage.unlimited) return 'sem limite no plano';
+  if (!usage.hasUsage) return 'consumo indisponível · consulte Uso';
+  if (usage.exhausted) return 'limite deste ciclo atingido';
+  return `${usage.remaining} disponíveis no plano`;
+}

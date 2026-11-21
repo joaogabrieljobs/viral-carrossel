@@ -1,4 +1,6 @@
-import { applyCors } from '../lib/cors.js';
+import { publicErrorBody } from '../lib/public-error.js';
+import { createHash } from 'node:crypto';
+import { applyCors, rejectCrossSiteRequest } from '../lib/cors.js';
 import { createAccessToken, readCurrentAccessCookie, setAccessCookie, setCheckoutIdentityCookie, setLoginHintCookie } from '../lib/access.js';
 import {
   normalizeEmail,
@@ -59,6 +61,7 @@ export default async function handler(req, res) {
   applyCors(req, res, { credentials: true });
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (rejectCrossSiteRequest(req, res)) return;
 
   const limited = await consumeRateLimit(req, {
     limit: 20, windowMs: 60_000, keyPrefix: 'login', failClosed: true,
@@ -81,6 +84,15 @@ export default async function handler(req, res) {
   if (!isValidEmail(cleanEmail) || !String(password || '')) {
     return res.status(400).json({ error: 'Informe e-mail e senha.' });
   }
+
+  // Limite por e-mail além do limite por IP (MOO-05): várias origens não
+  // multiplicam as tentativas contra a mesma conta, e cada tentativa barrada
+  // deixa de consultar o Stripe. Google e "Esqueci a senha" seguem livres.
+  const perEmail = await consumeRateLimit(req, {
+    limit: 10, windowMs: 15 * 60_000, keyPrefix: 'login-email', failClosed: true,
+    subject: createHash('sha256').update(cleanEmail).digest('hex').slice(0, 40),
+  });
+  if (perEmail) return rateLimitResponse(res, perEmail.retryAfterSec);
 
   try {
     const matches = await getAuthRecordsMatchingPassword(cleanEmail, password);
@@ -151,6 +163,6 @@ export default async function handler(req, res) {
     });
   } catch (e) {
     console.error('[auth/login]', e?.message || e);
-    return res.status(e?.status === 503 ? 503 : 500).json({ error: e.message || 'login_error' });
+    return res.status(e?.status === 503 ? 503 : 500).json(publicErrorBody(e, 'login_error', 'Não foi possível entrar agora. Tente novamente em instantes.'));
   }
 }

@@ -4,6 +4,7 @@ import { makeReq, makeRes } from '../helpers/http.js';
 const deps = vi.hoisted(() => ({
   cleanupImages: vi.fn(),
   cleanupTokens: vi.fn(),
+  cleanupOAuth: vi.fn(),
 }));
 
 vi.mock('../../api/lib/image-references.js', () => ({
@@ -11,6 +12,9 @@ vi.mock('../../api/lib/image-references.js', () => ({
 }));
 vi.mock('../../api/lib/agent-token-store.js', () => ({
   cleanupExpiredAgentTokens: deps.cleanupTokens,
+}));
+vi.mock('../../api/lib/oauth-store.js', () => ({
+  cleanupExpiredOAuthArtifacts: deps.cleanupOAuth,
 }));
 
 import handler from '../../api/cron/cleanup-image-references.js';
@@ -21,6 +25,7 @@ describe('limpeza diária de credenciais OAuth', () => {
     vi.stubEnv('LIBRARY_SYNC_BACKEND', 'postgres');
     deps.cleanupImages.mockResolvedValue({ deleted: 1, hasMore: false });
     deps.cleanupTokens.mockResolvedValue({ deleted: 3 });
+    deps.cleanupOAuth.mockResolvedValue({ codes: 2, refreshTokens: 0, adminChallenges: 0 });
   });
 
   afterEach(() => {
@@ -37,7 +42,9 @@ describe('limpeza diária de credenciais OAuth', () => {
     expect(response.statusCode).toBe(200);
     expect(response.body).toEqual({
       deleted: 1, hasMore: false, agentTokens: { deleted: 3 },
+      oauth: { codes: 2, refreshTokens: 0, adminChallenges: 0 },
     });
+    expect(deps.cleanupOAuth).toHaveBeenCalledOnce();
     expect(deps.cleanupTokens).toHaveBeenCalledOnce();
   });
 

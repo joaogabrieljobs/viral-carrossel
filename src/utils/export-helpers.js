@@ -269,7 +269,10 @@ function vcPreferFileShareForDownloads() {
   return false;
 }
 
-/** Descarga um Blob; em mobile tenta primeiro partilhar ficheiro, depois `<a download>`. */
+/**
+ * Descarga um Blob; em mobile tenta primeiro partilhar ficheiro, depois `<a download>`.
+ * @returns {Promise<boolean>} false quando a pessoa fecha a folha de compartilhar (MOO-27).
+ */
 async function downloadBlob(blob, filename) {
   const mime = blob.type || 'application/octet-stream';
   const tryShare =
@@ -283,10 +286,10 @@ async function downloadBlob(blob, filename) {
       const file = new File([blob], filename, { type: mime });
       if (navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], title: filename });
-        return;
+        return true;
       }
     } catch (e) {
-      if (e?.name === 'AbortError') return;
+      if (e?.name === 'AbortError') return false;
       /* continua para âncora */
     }
   }
@@ -303,6 +306,7 @@ async function downloadBlob(blob, filename) {
   } finally {
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
+  return true;
 }
 
 export {
@@ -317,5 +321,5 @@ export {
 /** canvas → PNG baixado (usa canvasToPngBlob + downloadBlob). */
 export async function downloadCanvasPng(canvas, filename) {
   const blob = await canvasToPngBlob(canvas);
-  await downloadBlob(blob, filename);
+  return downloadBlob(blob, filename);
 }

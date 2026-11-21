@@ -178,6 +178,13 @@ export function createAdminHandler({
         const payload = intentPayload(intent, body);
         const customerId = await store.customerOf(payload.accountId).catch(() => null);
         if (!customerId) throw adminFail('admin_not_found', 'Conta não encontrada ou sem cliente verificado.', 404);
+        // Ninguém se isenta sozinho, e conta com papel de admin ou suporte não
+        // recebe nem perde isenção por outro admin (MOO-19). Revogar a própria
+        // isenção continua permitido.
+        const selfTarget = customerId === owner;
+        if ((intent === 'grant' && selfTarget) || (!selfTarget && await store.roleOf(customerId))) {
+          throw adminFail('admin_target_forbidden', 'Esta ação não pode ser feita na sua conta nem em outra conta da equipe.', 403);
+        }
         const hooks = {
           before: (tx) => store.consumeChallenge(tx, actor, { challengeId: body.challengeId, code: body.code, action: intent, payload, now: now() }),
           after: (tx, result) => store.recordAction(tx, {

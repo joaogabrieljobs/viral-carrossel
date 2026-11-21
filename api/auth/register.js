@@ -1,4 +1,4 @@
-import { applyCors } from '../lib/cors.js';
+import { applyCors, rejectCrossSiteRequest } from '../lib/cors.js';
 import { createAccessToken, setAccessCookie, setCheckoutIdentityCookie, setLoginHintCookie } from '../lib/access.js';
 import { FREE_PLAN } from '../../shared/plans.js';
 import {
@@ -44,6 +44,7 @@ export default async function handler(req, res) {
   applyCors(req, res, { credentials: true });
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (rejectCrossSiteRequest(req, res)) return;
 
   const limited = await consumeRateLimit(req, {
     limit: 10, windowMs: 60_000, keyPrefix: 'register', failClosed: true,

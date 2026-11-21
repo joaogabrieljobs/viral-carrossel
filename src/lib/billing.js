@@ -105,9 +105,27 @@ export async function confirmCheckoutSession(sessionId) {
     body: JSON.stringify(pendingId ? { sessionId: pendingId } : {}),
   });
   const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.error || 'Não foi possível confirmar a assinatura');
+  if (!r.ok) throw Object.assign(new Error(data.error || 'Não foi possível confirmar a assinatura'), { status: r.status });
   clearPendingCheckoutSessionId();
   return data;
+}
+
+/**
+ * Confirmação com nova tentativa em falha passageira (rede, 5xx, 429), até 3
+ * vezes (MOO-15). Recusa definitiva (402 pendente, 403, 409) não repete.
+ */
+export async function confirmCheckoutSessionWithRetry(sessionId, {
+  attempts = 3, delays = [1500, 3000], sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
+} = {}) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await confirmCheckoutSession(sessionId);
+    } catch (error) {
+      const transient = !Number.isInteger(error?.status) || error.status >= 500 || error.status === 429;
+      if (!transient || attempt >= attempts) throw error;
+      await sleep(delays[attempt - 1] ?? delays.at(-1));
+    }
+  }
 }
 
 export async function openBillingPortal() {

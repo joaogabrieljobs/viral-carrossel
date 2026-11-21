@@ -227,3 +227,22 @@ export async function rotateRefreshToken({ token, clientId, resource, issue = nu
   }
   return result;
 }
+
+/**
+ * Cron diário (MOO-18): apaga códigos de autorização vencidos há mais de um
+ * dia, refresh tokens vencidos ou revogados há mais de sete dias e códigos
+ * do console admin vencidos há mais de um dia. Só hashes ficam guardados,
+ * mas não há motivo para manter dono e cliente para sempre.
+ */
+export async function cleanupExpiredOAuthArtifacts({ sql = getPostgresConnection(), refreshRetentionDays = 7 } = {}) {
+  const codes = await sql.unsafe(
+    `DELETE FROM moont.oauth_codes WHERE expires_at < now() - interval '1 day' RETURNING code_hash`);
+  const refreshTokens = await sql.unsafe(
+    `DELETE FROM moont.oauth_refresh_tokens
+     WHERE expires_at < now() - ($1 * interval '1 day')
+       OR (revoked_at IS NOT NULL AND revoked_at < now() - ($1 * interval '1 day'))
+     RETURNING token_hash`, [refreshRetentionDays]);
+  const adminChallenges = await sql.unsafe(
+    `DELETE FROM moont.admin_challenges WHERE expires_at < now() - interval '1 day' RETURNING id`);
+  return { codes: codes.length, refreshTokens: refreshTokens.length, adminChallenges: adminChallenges.length };
+}

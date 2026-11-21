@@ -20,8 +20,14 @@ function hasUpstash() {
   );
 }
 
+// O dia da cota é o dia em Brasília, não o dia UTC (virava às 21h, MOO-30).
+const BRAZIL_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' });
+export function ocrQuotaDay(now = Date.now()) {
+  return BRAZIL_DAY.format(new Date(now));
+}
+
 function dayKey(customerId, now = Date.now()) {
-  return `vc:ocr:${String(customerId || 'unknown')}:${new Date(now).toISOString().slice(0, 10)}`;
+  return `vc:ocr:${String(customerId || 'unknown')}:${ocrQuotaDay(now)}`;
 }
 
 async function upstash(command) {

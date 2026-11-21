@@ -9,7 +9,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   fetchAccessSession,
   isAccessSessionUnavailable,
-  confirmCheckoutSession,
+  confirmCheckoutSessionWithRetry,
   clearPendingCheckoutSessionId,
   openBillingPortal,
   logoutAccess,
@@ -424,7 +424,7 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
 
       if (billing === 'success') {
         try {
-          await confirmCheckoutSession(sessionId || undefined);
+          await confirmCheckoutSessionWithRetry(sessionId || undefined);
           trackEvent('billing_success');
         } catch (e) {
           console.warn('[billing] confirm failed', e);
@@ -474,7 +474,8 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
       }
       if (billing === 'success' && session.active) clearPendingCheckoutSessionId();
       if (billing === 'success' && confirmFailed && !session.active) {
-        toast?.('Não foi possível confirmar a assinatura agora. Recarregue esta página para tentar novamente.', 'warning', 8000);
+        // Fica na tela até a pessoa fechar (MOO-15): o pagamento pode ter sido feito.
+        toast?.('Seu pagamento pode já ter sido aprovado, mas não conseguimos confirmar a assinatura agora. Recarregue esta página em alguns instantes para confirmar. Não pague de novo.', 'warning', 0);
       }
 
       // Isolamento por conta: projetos vivem no localStorage deste browser.
