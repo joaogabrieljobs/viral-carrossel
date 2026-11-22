@@ -1,3 +1,4 @@
+import { modelStyleRules } from '../config/model-style.js';
 import { runAIJob, throwIfGenerationCancelled, isGenerationCancelled, abortableDelay } from './generation-control.js';
 /**
  * TRANSPORTE DE IA — extraído do monólito (decomposição B2).
@@ -221,11 +222,12 @@ const callOpenAIChat = async (userMsg, { json = false, jsonParser = null, maxTok
   // Em local dev, o proxy usa a chave do .env.local quando o frontend não envia uma.
   // Fora do dev (Claude artifact), a chave é obrigatória.
   if (!IS_LOCAL_DEV && !key) throw new Error('Falta a chave da OpenAI. Adicione-a em Configurar IA.');
+  const model = getTextModel('openai');
   const body = {
-    model: getTextModel('openai'),
+    model,
     max_completion_tokens: maxTokens,
     messages: [
-      { role: 'system', content: `${systemPrompt} Responda APENAS o que foi pedido, sem texto extra, sem markdown explicativo.` },
+      { role: 'system', content: `${systemPrompt} Responda APENAS o que foi pedido, sem texto extra, sem markdown explicativo.${modelStyleRules(model)}` },
       { role: 'user',   content: userMsg },
     ],
   };

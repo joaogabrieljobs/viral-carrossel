@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TEXT_PROVIDERS } from '../../src/config/ai-providers.js';
+import { LUNA_STYLE_RULES } from '../../src/config/model-style.js';
 import { callAnthropic, callOpenAIChat, setAIRuntimeSettings } from '../../src/utils/ai-client.js';
 
 // Teste de custo 22/11: GLM-4.7 × Claude Haiku 5.5 × GPT-6 Luna pela própria
@@ -43,11 +44,21 @@ describe('Haiku 5.5 e GPT-6 Luna na chave própria', () => {
     expect(calls[0].body).not.toHaveProperty('response_format');
   });
 
+  it('GPT-6 Luna recebe as regras de estilo de redação (reteste 22/11)', async () => {
+    setAIRuntimeSettings({ textProvider: 'openai', textModels: { openai: 'gpt-6-luna' }, keys: { openai: 'sk-proj-teste' } });
+    const calls = stubFetch({ choices: [{ message: { content: '{"ok":true}' }, finish_reason: 'stop' }] });
+    await callOpenAIChat('pedido', { json: true, thinking: 'disabled', key: 'sk-proj-teste', systemPrompt: 'BASE.' });
+    const system = calls[0].body.messages[0].content;
+    expect(system.startsWith('BASE.')).toBe(true);
+    expect(system).toContain(LUNA_STYLE_RULES);
+  });
+
   it('GPT-5.6 continua como antes', async () => {
     setAIRuntimeSettings({ textProvider: 'openai', textModels: { openai: 'gpt-5.6-luna' }, keys: { openai: 'sk-proj-teste' } });
     const calls = stubFetch({ choices: [{ message: { content: '{"ok":true}' }, finish_reason: 'stop' }] });
     await callOpenAIChat('pedido', { json: true, thinking: 'disabled', key: 'sk-proj-teste' });
     expect(calls[0].body.response_format).toEqual({ type: 'json_object' });
     expect(calls[0].body).not.toHaveProperty('reasoning_effort');
+    expect(calls[0].body.messages[0].content).not.toContain(LUNA_STYLE_RULES);
   });
 });
