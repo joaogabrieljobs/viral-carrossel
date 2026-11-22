@@ -7,7 +7,8 @@ export const TEXT_PROVIDERS = {
     placeholder: 'sk-ant-...',
     keyUrl: 'https://console.anthropic.com/settings/keys',
     models: [
-      { id: 'claude-haiku-4-5', name: 'Haiku 4.5', note: 'Mais econômico', tier: 'economy' },
+      { id: 'claude-haiku-5-5', name: 'Haiku 5.5', note: 'Mais econômico', tier: 'economy' },
+      { id: 'claude-haiku-4-5', name: 'Haiku 4.5', note: 'Versão anterior', tier: 'economy' },
       { id: 'claude-sonnet-5', name: 'Sonnet 5', note: 'Melhor equilíbrio', tier: 'balanced' },
       { id: 'claude-opus-5', name: 'Opus 5', note: 'Máxima qualidade', tier: 'quality' },
     ],
@@ -20,7 +21,8 @@ export const TEXT_PROVIDERS = {
     placeholder: 'sk-proj-...',
     keyUrl: 'https://platform.openai.com/api-keys',
     models: [
-      { id: 'gpt-5.6-luna', name: 'GPT-5.6 Luna', note: 'Mais econômico', tier: 'economy' },
+      { id: 'gpt-6-luna', name: 'GPT-6 Luna', note: 'Mais econômico', tier: 'economy' },
+      { id: 'gpt-5.6-luna', name: 'GPT-5.6 Luna', note: 'Versão anterior', tier: 'economy' },
       { id: 'gpt-5.6-terra', name: 'GPT-5.6 Terra', note: 'Melhor equilíbrio', tier: 'balanced' },
       { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', note: 'Máxima qualidade', tier: 'quality' },
     ],

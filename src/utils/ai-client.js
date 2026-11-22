@@ -156,13 +156,18 @@ function assertCompleteText(reason, aiDiagnostics) {
   throw Object.assign(new Error('A resposta da IA ficou incompleta. Reduza a quantidade de slides ou o material e tente novamente. Seu projeto foi preservado.'), { code: 'ai_output_truncated', ...(aiDiagnostics ? { aiDiagnostics } : {}) });
 }
 
-const callAnthropic = async (userMsg, { json = false, jsonParser = null, maxTokens = 4096, tools = null, signal, systemPrompt = AI_SYSTEM_PT } = {}) => {
+const callAnthropic = async (userMsg, { json = false, jsonParser = null, maxTokens = 4096, tools = null, signal, systemPrompt = AI_SYSTEM_PT, thinking } = {}) => {
+  const model = getTextModel('anthropic');
   const body = {
-    model: getTextModel('anthropic'),
+    model,
     max_tokens: maxTokens,
     system: systemPrompt,
     messages: [{ role: 'user', content: userMsg }],
   };
+  // Haiku 5.5 pensa por padrão (esforço médio) e o raciocínio conta no teto de
+  // saída. A geração do Moont pede raciocínio desligado, como no GLM; o Haiku
+  // 5.5 aceita isso no esforço padrão (teste de custo 22/11).
+  if (thinking === 'disabled' && /^claude-haiku-5-5$/.test(model)) body.thinking = { type: 'disabled' };
   if (tools) body.tools = tools;
   const headers = { 'Content-Type': 'application/json' };
   // Claude é BYOK: sem chave do utilizador o proxy responde 400 (o fallback para a
@@ -211,7 +216,7 @@ const callAnthropic = async (userMsg, { json = false, jsonParser = null, maxToke
 };
 
 // Backend OpenAI — Chat Completions com a família GPT-5.6.
-const callOpenAIChat = async (userMsg, { json = false, jsonParser = null, maxTokens = 4096, key, signal, systemPrompt = AI_SYSTEM_PT }) => {
+const callOpenAIChat = async (userMsg, { json = false, jsonParser = null, maxTokens = 4096, key, signal, systemPrompt = AI_SYSTEM_PT, thinking }) => {
   key = String(key || getProviderKey('openai')).trim();
   // Em local dev, o proxy usa a chave do .env.local quando o frontend não envia uma.
   // Fora do dev (Claude artifact), a chave é obrigatória.
@@ -224,7 +229,12 @@ const callOpenAIChat = async (userMsg, { json = false, jsonParser = null, maxTok
       { role: 'user',   content: userMsg },
     ],
   };
-  if (json) body.response_format = { type: 'json_object' };
+  // GPT-6 (teste de custo 22/11): raciocínio por padrão em "medium"; a geração
+  // pede desligado (`none`, aceito pelo modelo). A documentação não confirma o
+  // json_object legado na família 6: o JSON vem pelo pedido, como no Claude.
+  const gpt6 = /^gpt-6(?:[.-]|$)/.test(body.model);
+  if (gpt6 && thinking === 'disabled') body.reasoning_effort = 'none';
+  if (json && !gpt6) body.response_format = { type: 'json_object' };
   const headers = { 'Content-Type': 'application/json' };
   if (IS_LOCAL_DEV) {
     if (key) headers['x-openai-key'] = key; // senão, proxy usa OPENAI_API_KEY do .env.local
@@ -417,9 +427,9 @@ const callAI = (userMsg, { json = false, jsonParser = null, maxTokens = 4096, op
   if (provider === 'anthropic' && !getProviderKey('anthropic')) provider = 'zai';
   if (provider === 'kimi' && !getProviderKey('kimi')) provider = 'zai';
 
-  if (provider === 'anthropic') return callAnthropic(userMsg, { json, jsonParser, maxTokens, signal, systemPrompt });
+  if (provider === 'anthropic') return callAnthropic(userMsg, { json, jsonParser, maxTokens, signal, systemPrompt, thinking });
   if (provider === 'openai') {
-    return callOpenAIChat(userMsg, { json, jsonParser, maxTokens, signal, systemPrompt, key: getProviderKey('openai') || openaiKey });
+    return callOpenAIChat(userMsg, { json, jsonParser, maxTokens, signal, systemPrompt, thinking, key: getProviderKey('openai') || openaiKey });
   }
   if (provider === 'zai' || provider === 'kimi') {
     return callCompatibleChat(provider, userMsg, { json, jsonParser, maxTokens, signal, systemPrompt, temperature, onRetry, thinking, onResponseMetadata });
