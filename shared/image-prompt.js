@@ -27,10 +27,39 @@ export const IMAGE_REFERENCE_BLOCKED_MESSAGE = 'Este gerador não aceita imagens
 
 const CANVAS_PRESENTATION = 'CANVAS: Compose for the image panel on the widescreen 16:9 slide. Put the subject in the usable panel area and reserve space for editable type only where it overlaps the image.';
 
+/**
+ * Direção de arte padrão (I02), versão longa. O catálogo final trazia uma
+ * versão curta; no reteste real de 22/11 as fotos saíram claras, saturadas e
+ * com cara de banco de imagem. Voltam as seções da direção que estava no ar,
+ * sem a que pedia tratar o tema de forma indireta (o catálogo pede a cena do
+ * material) e sem citar carrossel, porque agora vale também para o painel de
+ * apresentação.
+ */
+const DEFAULT_ART_DIRECTION_LONG = `DEFAULT ART DIRECTION (follow as far as it fits the scene; specific project, family and panel directions take priority):
+GENERAL DIRECTION
+Generate realistic, natural and sophisticated images that look like real photographs or carefully composed documentary scenes captured in a real moment — not artificially created. Avoid creative exaggeration, visual fantasy, gratuitous surrealism, excess elements, overly dramatic compositions or visual cliché metaphors.
+
+AESTHETIC
+Realistic, clean, contemporary, natural. Use natural or soft light, moderate contrast, sober balanced colors, real texture of environments and people, discrete cinematic composition, natural shallow depth of field, editorial premium atmosphere. Subtle film grain. Slightly desaturated muted tones. No glamorization, no heavy retouching, no studio strobes, no extreme contrast.
+
+COMPOSITION
+Leave visual breathing space for text overlay. Negative space, slightly defocused background, one clear focal element, few objects, balance between information and visual silence. Image must not compete with text.
+
+PEOPLE (only when the scene calls for them)
+Real, natural, spontaneous — never posed-model, no advertising smile. Contemporary, discrete clothing. Real skin texture with visible pores and slight imperfections, natural unposed expressions.
+
+VISUAL QUALITY
+Photorealistic, shot like 35mm film photograph at eye level using a 50mm lens, subtle film grain, natural color balance. Realistic materials, organic texture, subtle imperfections. Avoid: plasticized skin, deformed hands, malformed objects, floating elements, fake logos, excessive sharpness, evident AI aesthetic.
+
+EXPECTED OUTPUT
+A photorealistic, natural image with low saturation, moderate contrast, clean composition and generous text-friendly space. Feels real, silent and visually refined.`;
+
 /** Textos fixos do catálogo (chaves I02, I12–I19, I22, I23, I26 e I31). */
 export const IMAGE_PROMPT_TEXT = Object.freeze({
   // I02 — só sem direção estética explícita e sem moodboard de estilo.
-  defaultArtDirection: 'DEFAULT ART DIRECTION: Generate a realistic, natural image that looks like a real photograph or a documentary scene captured in a real moment. Avoid creative exaggeration, excess elements, overly dramatic compositions and visual cliché metaphors. Aesthetic: natural or soft light, moderate contrast, sober balanced colors, slightly desaturated muted tones, subtle film grain, discrete cinematic composition, natural shallow depth of field. No glamorization, no heavy retouching, no studio strobes, no extreme contrast. Composition: one clear focal element, few objects, negative space and a slightly defocused background. Leave the specified overlay area quiet; the image must not compete with text. People, only when the scene calls for them: real, natural, spontaneous, never posed-model, no advertising smile, real skin texture with slight imperfections. Avoid plasticized skin, deformed hands, malformed objects, floating elements, fake logos, excessive sharpness and evident AI aesthetic. Specific project, family and panel directions take priority over these defaults.',
+  defaultArtDirection: DEFAULT_ART_DIRECTION_LONG,
+  // Versão curta: entra quando a longa não cabe no limite da rota (ex.: plano com âncora).
+  defaultArtDirectionShort: 'DEFAULT ART DIRECTION: Generate a realistic, natural image that looks like a real photograph or a documentary scene captured in a real moment. Avoid creative exaggeration, excess elements, overly dramatic compositions and visual cliché metaphors. Aesthetic: natural or soft light, moderate contrast, sober balanced colors, slightly desaturated muted tones, subtle film grain, discrete cinematic composition, natural shallow depth of field. No glamorization, no heavy retouching, no studio strobes, no extreme contrast. Composition: one clear focal element, few objects, negative space and a slightly defocused background. Leave the specified overlay area quiet; the image must not compete with text. People, only when the scene calls for them: real, natural, spontaneous, never posed-model, no advertising smile, real skin texture with slight imperfections. Avoid plasticized skin, deformed hands, malformed objects, floating elements, fake logos, excessive sharpness and evident AI aesthetic. Specific project, family and panel directions take priority over these defaults.',
   // I12 — carrossel sem mídia explícita.
   mediumCarousel: 'For a carousel with no specified medium, use editorial photography. Reserve clear space for editable type where the selected layout overlays text.',
   // I13 — apresentação sem estilo nem referência de estilo (inclui a regra de tela I15).
@@ -155,6 +184,7 @@ function shrinkBody(head, body, tail, max) {
 }
 
 const OPTIONAL_DROP_ORDER = Object.freeze(['defaultArtDirection', 'medium', 'treatment']);
+const OPTIONAL_DROP_ORDER_CAROUSEL = Object.freeze(['medium', 'defaultArtDirection', 'treatment']);
 const REQUIRED_SHRINK_ORDER = Object.freeze(['style', 'subjects', 'slideAction']);
 const REQUIRED_DROP_ORDER = Object.freeze([
   'slideAction', 'style', 'moodboardOnly', 'subjects', 'framing', 'presentationPanel', 'referenceMap', 'identityAnchor', 'referenceRoles',
@@ -247,8 +277,13 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
 
   let ativos = blocos;
   const remover = (key) => { ativos = ativos.filter((bloco) => bloco.key !== key); dropped.push(key); };
-  // 1) Blocos opcionais saem inteiros, do mais genérico para o mais específico.
-  for (const key of OPTIONAL_DROP_ORDER) {
+  // 0) A direção de arte longa cede lugar à curta antes de qualquer bloco sair.
+  const arte = ativos.find((bloco) => bloco.key === 'defaultArtDirection');
+  if (arte && tamanhoTotal(ativos) > teto) { arte.text = T.defaultArtDirectionShort; trimmed.push('defaultArtDirection'); }
+  // 1) Blocos opcionais saem inteiros. No carrossel a frase de mídia repete o
+  //    que a direção de arte já diz e sai antes dela; na apresentação ela
+  //    carrega a regra de tela e fica.
+  for (const key of (presentation ? OPTIONAL_DROP_ORDER : OPTIONAL_DROP_ORDER_CAROUSEL)) {
     if (tamanhoTotal(ativos) <= teto) break;
     if (ativos.some((bloco) => bloco.key === key && bloco.tier === 'optional')) remover(key);
   }

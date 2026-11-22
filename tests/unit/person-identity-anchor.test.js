@@ -127,8 +127,8 @@ describe('âncora fixa só a identidade, não a cena', () => {
 
   it('a ficha vale só para a aparência; ação, pose e lugar vêm da cena do card', async () => {
     const { composeSubjectsDirection, PERSON_IDENTITY_DIRECTION, buildVisualBiblePromptRules } = await import('../../src/utils/visual-bible.js');
-    expect(composeSubjectsDirection(e04)).toMatch(/Match their recurring appearance\. The scene sets action, pose and location\./);
-    expect(composeSubjectsDirection(e04)).toMatch(/Do not add anyone or anything simply because it appears in this list/);
+    expect(composeSubjectsDirection(e04)).toMatch(/These descriptions fix appearance only[^\n]*the SCENE decides action, pose, setting and which subjects appear\./);
+    expect(composeSubjectsDirection(e04)).toMatch(/Do not add a subject the scene does not call for/);
     expect(PERSON_IDENTITY_DIRECTION).toMatch(/Use only the requested scene for action, pose, framing, setting and objects/);
     expect(PERSON_IDENTITY_DIRECTION).toMatch(/Match neither the background nor the pose of the anchor/);
     expect(buildVisualBiblePromptRules()).toMatch(/A ação, o lugar momentâneo, a pose e o enquadramento pertencem à imageQuery/);

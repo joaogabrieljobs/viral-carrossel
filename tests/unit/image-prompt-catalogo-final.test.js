@@ -328,19 +328,26 @@ describe('orçamento por rota e modelo', () => {
     expect(cheio.prompt.split('\n\n')).toContain(plano.prompt.split('\n\n').at(-1));
   });
 
-  it('a ordem de descarte começa pela estética padrão e a família é a última opcional a sair', () => {
+  it('a direção de arte encurta antes de qualquer bloco sair; no carrossel a frase de mídia sai antes dela e a família é a última', () => {
     const base = { scene: Q, format: 'carousel', framing: B.I27, familyEnglish: 'FAMILY' };
     const fixos = buildImagePrompt({ scene: Q, framing: B.I27 }, { route: 'openai', model: 'gpt-image-2' });
     const tudo = buildImagePrompt(base, { route: 'openai', model: 'gpt-image-2' });
     expect(tudo.dropped).toEqual([]);
-    const semPadrao = buildImagePrompt(base, { route: 'openai', model: 'gpt-image-2', limit: tudo.chars - 1 });
-    expect(semPadrao.dropped).toEqual(['defaultArtDirection']);
-    expect(semPadrao.defaultAesthetic).toBe(false);
-    const soFamilia = buildImagePrompt(base, { route: 'openai', model: 'gpt-image-2', limit: semPadrao.chars - 1 });
-    expect(soFamilia.dropped).toEqual(['defaultArtDirection', 'medium']);
+    expect(tudo.prompt).toContain(IMAGE_PROMPT_TEXT.defaultArtDirection);
+    const curta = buildImagePrompt(base, { route: 'openai', model: 'gpt-image-2', limit: tudo.chars - 1 });
+    expect(curta.dropped).toEqual([]);
+    expect(curta.trimmed).toEqual(['defaultArtDirection']);
+    expect(curta.defaultAesthetic).toBe(true);
+    expect(curta.prompt).toContain(IMAGE_PROMPT_TEXT.defaultArtDirectionShort);
+    const semMidia = buildImagePrompt(base, { route: 'openai', model: 'gpt-image-2', limit: curta.chars - 1 });
+    expect(semMidia.dropped).toEqual(['medium']);
+    expect(semMidia.defaultAesthetic).toBe(true);
+    const soFamilia = buildImagePrompt(base, { route: 'openai', model: 'gpt-image-2', limit: semMidia.chars - 1 });
+    expect(soFamilia.dropped).toEqual(['medium', 'defaultArtDirection']);
+    expect(soFamilia.defaultAesthetic).toBe(false);
     expect(soFamilia.prompt).toContain('VISUAL TREATMENT: FAMILY');
     const nenhumOpcional = buildImagePrompt(base, { route: 'openai', model: 'gpt-image-2', limit: soFamilia.chars - 1 });
-    expect(nenhumOpcional.dropped).toEqual(['defaultArtDirection', 'medium', 'treatment']);
+    expect(nenhumOpcional.dropped).toEqual(['medium', 'defaultArtDirection', 'treatment']);
     expect(nenhumOpcional.prompt).toBe(fixos.prompt.split(`\n\n${B.I12}`)[0]);
   });
 

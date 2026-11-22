@@ -64,7 +64,9 @@ export function buildVisualBiblePromptRules() {
 }
 
 /** Cabeçalho da ficha no pedido de imagem (catálogo final, I25). */
-const SUBJECTS_HEADER = 'PROJECT SUBJECTS: Apply the following visible traits and exclusions only to subjects called for by this scene. Match their recurring appearance. The scene sets action, pose and location. Do not add anyone or anything simply because it appears in this list.';
+// Texto que estava no ar antes do catálogo: a versão curta do catálogo deixou o
+// gerador pôr todos os elementos da ficha em todas as cenas (reteste de 22/11).
+const SUBJECTS_HEADER = 'PROJECT SUBJECTS — whenever one of these appears in the scene it must match this description exactly, and look the same in every image of this project. These descriptions fix appearance only (face, hair, clothing, color, material, shape). Any action, pose or place written in them does not apply here: the SCENE decides action, pose, setting and which subjects appear. Do not add a subject the scene does not call for. Do not add attributes, accessories or objects that contradict these descriptions:';
 const comPonto = (texto) => (/[.!?]$/.test(texto) ? texto : `${texto}.`);
 
 /**

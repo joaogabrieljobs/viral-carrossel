@@ -47,7 +47,7 @@ describe('cena do card — ficha visual e enquadramento no prompt de imagem', ()
 
   it('a ficha não troca a linguagem visual: sem estilo explícito, a direção de arte padrão continua', () => {
     const com = buildGptImageFullPrompt('quiet city', null, { subjects: ficha }, {});
-    expect(com).toContain('DEFAULT ART DIRECTION: Generate a realistic, natural image');
+    expect(com).toContain('DEFAULT ART DIRECTION (follow as far as it fits the scene');
     expect(com).not.toContain('PROJECT OR SLIDE STYLE');
   });
 
@@ -63,13 +63,14 @@ describe('cena do card — ficha visual e enquadramento no prompt de imagem', ()
     expect(plano.prompt).toMatch(/Brand sentence that is complete\.\nCANVAS: /);
   });
 
-  it('sem estilo explícito, o que não cabe em 4000 sai inteiro: a estética padrão primeiro', () => {
+  it('sem estilo explícito, o que não cabe em 4000 sai inteiro: a direção de arte encurta, depois saem a frase de mídia e ela', () => {
     const fichaLonga = `${ficha}\n${Array.from({ length: 11 }, (_, i) => `- extra${i}: ${'trait '.repeat(45).trim()}.`).join('\n')}`;
     const plano = planImagePrompt('moonrise', null, { subjects: fichaLonga }, { route: 'sjinn' });
     expect(plano.chars).toBeLessThanOrEqual(4000);
     expect(plano.prompt).toContain(fichaLonga);
-    expect(plano.dropped).toEqual(['defaultArtDirection']);
+    expect(plano.trimmed).toEqual(['defaultArtDirection']);
+    expect(plano.dropped).toEqual(['medium', 'defaultArtDirection']);
     expect(plano.prompt).not.toContain('DEFAULT ART DIRECTION');
-    expect(plano.prompt).toContain('For a carousel with no specified medium, use editorial photography.');
+    expect(plano.prompt).not.toContain('For a carousel with no specified medium');
   });
 });

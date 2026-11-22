@@ -38,7 +38,7 @@ describe('ficha visual — o que chega ao gerador de imagem', () => {
     expect(texto).toMatch(/^PROJECT SUBJECTS/);
     expect(texto).toContain('- raul: adult man wearing a plain olive-green shirt');
     expect(texto).toContain('Exclude: flash, reflectors, objects on the wall.');
-    expect(texto).toContain('Match their recurring appearance.');
+    expect(texto).toContain('These descriptions fix appearance only');
     expect(texto.length).toBeLessThanOrEqual(1600);
   });
 
@@ -50,7 +50,7 @@ describe('ficha visual — o que chega ao gerador de imagem', () => {
   it('a direção de cena junta ficha e enquadramento do painel', () => {
     const coluna = { canvas: { applied: true, zones: { photo: { x: 0, y: 0, w: 46, h: 100 } } } };
     const texto = composeSceneDirection({ visualBible: { entities: [raul] }, slide: coluna, fmt: 'carrossel' });
-    expect(texto).toMatch(/^FRAMING: Compose for the final visible image panel[\s\S]*PROJECT SUBJECTS: /);
+    expect(texto).toMatch(/^FRAMING: Compose for the final visible image panel[\s\S]*PROJECT SUBJECTS — /);
     expect(texto).toMatch(/central vertical third/);
     // Sem ficha ainda há enquadramento.
     expect(composeSceneDirection({ slide: {}, fmt: 'carrossel' })).toMatch(/^FRAMING: /);
