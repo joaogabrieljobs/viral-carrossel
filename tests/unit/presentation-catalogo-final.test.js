@@ -141,11 +141,11 @@ describe('catálogo final 22/11 — 3. pedido de planejamento', () => {
 - Rótulos de etapas, IDs, gaps e instruções deste plano são internos e não devem aparecer como títulos ou texto dos slides.
 
 FIDELIDADE EM TODOS OS CAMPOS:
-- Afirme uma garantia apenas se o material a declarar expressamente, com o mesmo alcance e as mesmas condições. Use o verbo correspondente à ação documentada. A intenção de prestar um serviço não comprova reserva, execução nem resultado.`);
+- Não use garantir, garante, garantia nem garantido quando o material não usa essa palavra. Uma encomenda reserva o pedido; não garante disponibilidade, frescor ou resultado. Diga o que acontece ("reserva", "separa", "fica pronto para retirada").`);
     expect(text).toContain(`- evidence contém no máximo ${n + 4} itens concisos; isso é teto, não meta. Reutilize o mesmo evidenceId quando ele sustentar perguntas e contribuições diferentes; isso não autoriza repetir a mesma afirmação em várias páginas. Cada fato`);
     expect(text).toContain('as mesmas evidências podem sustentar contribuições distintas sem duplicar o texto dos slides.');
     expect(text).toContain('- Em apresentação conceitual, use apenas os conceitos fornecidos; a ausência de dados próprios não autoriza acrescentar teoria externa. evidence é o catálogo do plano inteiro. Pode ser [] em um deck conceitual sem evidências citáveis, desde que a explicação se limite aos conceitos fornecidos. Para um slide sem evidência própria, use evidenceIds: [] apenas nessa posição. Fatos ou propostas específicos exigem os trechos literais definidos acima. Registre informação ausente essencial em gaps; não fabrique fonte para completar o plano.');
-    for (const old of ['ROTEIRO POR POSIÇÃO', 'Comece a keyMessage de cada posição', 'Sem base no material, use a posição para a etapa vizinha', 'Não use garantir, garante', 'Reutilize a mesma evidência quando apoiar várias páginas', 'podem sustentar várias páginas', 'sem dados próprios, evidence pode ser []', 'A lacuna fica só em gaps']) {
+    for (const old of ['ROTEIRO POR POSIÇÃO', 'Comece a keyMessage de cada posição', 'Sem base no material, use a posição para a etapa vizinha', 'Reutilize a mesma evidência quando apoiar várias páginas', 'podem sustentar várias páginas', 'sem dados próprios, evidence pode ser []', 'A lacuna fica só em gaps']) {
       expect(text, old).not.toContain(old);
     }
   });
@@ -198,9 +198,8 @@ describe('catálogo final 22/11 — 4. pacote do caminho', () => {
     const pack = buildApresentacaoPackBlock(route.defaultSlideCount, pathId);
     expect(pack).toContain(`Total: ${route.defaultSlideCount} slides. Siga o plano validado; combine etapas próximas e omita funções sem base somente quando a redistribuição mantiver contribuições distintas sustentadas. Mantenha a quantidade e a ordem do plano. Nos lotes, escreva somente as posições atribuídas e use o plano geral para dar continuidade. Se o espaço não bastar, priorize a informação essencial; não apague condições para caber.`);
     expect(pack).toMatch(/\nSEQUÊNCIA-BASE:\n1\. [^\n]+\n(?:\d+\. [^\n]+\n)+Evidência obrigatória vale para a afirmação factual que a etapa pretende fazer\. Se a instrução admitir um conceito, uma decisão documentada ou um caso em andamento, use o suporte correspondente\. Uma função opcional sem material pode ser redistribuída conforme o plano; não apresente resultados ausentes como observados\.\n\n/);
-    expect(pack).toContain('- Afirme uma garantia apenas se o material a declarar expressamente, com o mesmo alcance e as mesmas condições.');
+    expect(pack).toContain('- Não use garantir, garante, garantia nem garantido quando o material não usa essa palavra.');
     expect(pack).not.toContain('Estas funções não exigem uma página cada');
-    expect(pack).not.toContain('Não use garantir, garante');
   });
 
   it.each(PATH_IDS.filter(id => id !== 'pitch'))('%s: redige pela contribuição do plano e trata nota de produção e cenário didático', (pathId) => {
@@ -261,14 +260,14 @@ describe('catálogo final 22/11 — 7. revisão editorial', () => {
     expect(rules).not.toContain('Elimine repetição entre páginas e entre título, apoio e bloco de dados');
     expect(rules).toContain('- Notas de produção como "fictício", "exemplo" e "rascunho" não entram automaticamente no título nem qualificam o nome da marca.');
     expect(rules).toContain('Use cenários didáticos somente se fornecidos ou expressamente solicitados; uma restrição a usar apenas as fontes fornecidas prevalece, mesmo sobre exemplos rotulados como hipotéticos.');
-    expect(rules).toContain('- Afirme uma garantia apenas se o material a declarar expressamente');
+    expect(rules).toContain('- Não use garantir, garante, garantia nem garantido quando o material não usa essa palavra.');
   });
   it('Pitch: repetição sem contribuição disponível não é corrigida com detalhe inventado', () => {
     const rules = buildPresentationReviewRules('pitch');
     expect(rules).toContain('Se um slide apenas repetir outro, substitua a repetição por uma contribuição distinta já sustentada e pertinente àquela etapa. Quando não houver contribuição disponível, não invente detalhes nem considere a estrutura corrigida: a insuficiência exige novo planejamento antes da publicação, sem alterar o schema desta revisão.');
     expect(rules).not.toContain('acrescente um detalhe sustentado pertinente àquela etapa');
     expect(rules).toContain('- Notas de produção como "fictício", "exemplo" e "rascunho" não entram automaticamente na abertura nem qualificam o nome da empresa.');
-    expect(rules).toContain('- Afirme uma garantia apenas se o material a declarar expressamente');
+    expect(rules).toContain('- Não use garantir, garante, garantia nem garantido quando o material não usa essa palavra.');
   });
   it('Caso: confere contexto e ações; comparação só quando o caso a apresenta', () => {
     const rules = buildPresentationReviewRules('estudo_de_caso');
@@ -284,13 +283,12 @@ describe('catálogo final 22/11 — 8. resumo', () => {
     expect(rules).toContain('- Não atribua fatos, falas, sensações, problemas recorrentes ou compromissos a pessoas sem base. No resumo, use somente cenários e exemplos já presentes no deck e sustentados pelas fontes ou expressamente solicitados; não crie exemplos novos nesta etapa. Nunca complete uma lacuna factual com um cenário plausível nem transforme exemplo em caso ou resultado real.');
     expect(rules).not.toContain('Use cenários didáticos somente se fornecidos');
     expect(rules).toContain('- Notas de produção como "fictício", "exemplo" e "rascunho" não entram automaticamente no título nem qualificam o nome da marca.');
-    expect(rules).toContain('- Afirme uma garantia apenas se o material a declarar expressamente');
-    expect(rules).not.toContain('Não use garantir, garante');
+    expect(rules).toContain('- Não use garantir, garante, garantia nem garantido quando o material não usa essa palavra.');
   });
   it('Pitch: nota de produção e garantia seguem a mesma regra no resumo', () => {
     const rules = buildPresentationSummaryRules('pitch');
     expect(rules).toContain('- Notas de produção como "fictício", "exemplo" e "rascunho" não entram automaticamente na abertura nem qualificam o nome da empresa.');
-    expect(rules).toContain('- Afirme uma garantia apenas se o material a declarar expressamente');
+    expect(rules).toContain('- Não use garantir, garante, garantia nem garantido quando o material não usa essa palavra.');
     expect(rules).not.toContain('Material fictício ou simulado continua identificado como fictício');
   });
 });

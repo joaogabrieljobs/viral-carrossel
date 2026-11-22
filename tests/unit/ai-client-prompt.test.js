@@ -47,7 +47,7 @@ describe('cena do card — ficha visual e enquadramento no prompt de imagem', ()
 
   it('a ficha não troca a linguagem visual: sem estilo explícito, a direção de arte padrão continua', () => {
     const com = buildGptImageFullPrompt('quiet city', null, { subjects: ficha }, {});
-    expect(com).toContain('DEFAULT ART DIRECTION: Use an editorial photograph');
+    expect(com).toContain('DEFAULT ART DIRECTION: Generate a realistic, natural image');
     expect(com).not.toContain('PROJECT OR SLIDE STYLE');
   });
 
