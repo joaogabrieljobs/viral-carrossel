@@ -221,6 +221,58 @@ function buildCarouselOutline(modeId, n) {
 }
 
 /**
+ * Ângulo de cada modo (ajuste de 22/11, depois do reteste real). Com um
+ * briefing que só traz dados de oferta, as regras de fidelidade do catálogo
+ * deixavam todos os modos com a mesma capa e os mesmos títulos. O ângulo diz
+ * por onde o texto entra e como os títulos soam em cada modo, usando só os
+ * fatos do material. Texto escrito na integração; não veio do catálogo.
+ */
+const ANGLE_HEAD = 'ÂNGULO DESTE MODO — os fatos são os mesmos em qualquer modo; muda por onde o texto entra, a ordem e a voz dos títulos. Nenhum fato, cena, sensação ou causa nova:';
+const ANGLE_NO_BRAND_OPENING = '- A capa não abre com o nome da marca seguido da descrição do negócio; isso é lista de fatos, não este modo.';
+const MODE_ANGLES = Object.freeze({
+  editorial: {
+    entry: 'uma afirmação que o material sustenta sobre o assunto, dita como posição, não como apresentação da marca.',
+    titles: 'frases afirmativas que formam um argumento em cadeia (a afirmação, como funciona, o que apoia, o que decorre); cada título depende do anterior.',
+  },
+  deep: {
+    entry: 'uma pergunta de "como" ou "por que" que o material responde.',
+    titles: 'nomeiam a relação explicada no card (o que depende de quê, em que condição), não o item nem o dado isolado.',
+  },
+  pain: {
+    entry: 'a situação de quem o pedido quer alcançar, tirada do pedido ou do material (quem é, o que procura, que condição precisa cumprir). Fale com o leitor em segunda pessoa, como pergunta ou condição ("Quer…?", "Se você…"), sem afirmar sentimento, hábito ou problema que não foi informado.',
+    titles: 'os primeiros cards ficam do lado do leitor (situação, condição, restrição); a oferta entra só a partir da SAÍDA, como resposta. Preço e horário aparecem como condição da saída, no apoio.',
+  },
+  viral: {
+    entry: 'uma pergunta ou um contraste montado com um fato real e específico do material (um número, um prazo, uma condição incomum), que só se entende lendo os cards seguintes.',
+    titles: 'curtos; cada um responde um pedaço da pergunta e puxa o seguinte, sem repetir a capa.',
+  },
+  storytelling: {
+    entry: 'o primeiro momento, em ordem de tempo, do que o material diz que acontece: o primeiro acontecimento da história fornecida ou o começo do percurso do produto, do pedido ou do trabalho.',
+    titles: 'sujeito + verbo de algo que o material afirma, em sequência no tempo (quem faz o quê, o que acontece depois). Preço, horário e quantidade ficam no apoio do card daquele momento; não viram título.',
+  },
+  how_to: {
+    entry: 'o que o leitor vai conseguir fazer ao seguir os passos.',
+    titles: 'os passos reais, no imperativo, na ordem de execução.',
+  },
+  jornalistico: {
+    entry: 'o fato principal em forma de manchete: quem, o quê, onde e, se informado, quando.',
+    titles: 'terceira pessoa, informativos, sem falar com o leitor antes do fecho.',
+    brandOpening: true,
+  },
+  sensacionalista: {
+    entry: 'o fato mais forte do material em uma frase curta e incisiva.',
+    titles: 'curtos, um fato por título, verbo forte; sem adjetivo ou consequência que o material não sustenta.',
+  },
+});
+
+/** Ângulo do modo: como ele se distingue dos outros com os mesmos fatos. */
+export function buildNarrativeModeAngle(modeId) {
+  const angle = MODE_ANGLES[modeId];
+  if (!angle || !NARRATIVE_SEQUENCES[modeId]) return '';
+  return [ANGLE_HEAD, `- Entrada: ${angle.entry}`, `- Títulos: ${angle.titles}`, angle.brandOpening ? '' : ANGLE_NO_BRAND_OPENING].filter(Boolean).join('\n');
+}
+
+/**
  * Bloco do prompt com uma função por posição. Vazio para "Seguir meu pedido"
  * (none) e para pacotes com arco próprio (apresentação, tendência, modelos).
  */
@@ -237,5 +289,6 @@ Como aplicar:
 - Distribua o material conforme a progressão, sem seguir automaticamente a ordem do briefing. Uma referência breve à tese ou ao CTA pode orientar a leitura; não reexponha fatos, listas ou argumentos.
 - Fato, mecanismo, causa, padrão, sensação, hábito, intenção, acontecimento e resultado precisam de suporte no material. Uma função ausente não pode ser preenchida por "raciocínio" especulativo; use apenas outra relação sustentada que avance a mesma pergunta e preserve a modalidade.
 - Preserve o total solicitado, os campos e limites de texto; não fabrique conteúdo para preencher posições. A adequação e a suficiência do material precisam estar resolvidas antes desta chamada quando não houver contribuição distinta para cada posição.
-- Este roteiro prevalece sobre exemplos genéricos de estrutura; fatos, restrições, idioma, limites e CTA do pedido continuam acima dele.`;
+- Este roteiro prevalece sobre exemplos genéricos de estrutura; fatos, restrições, idioma, limites e CTA do pedido continuam acima dele.
+${buildNarrativeModeAngle(modeId)}`;
 }

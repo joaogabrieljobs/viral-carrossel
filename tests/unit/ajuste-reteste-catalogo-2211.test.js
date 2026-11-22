@@ -118,3 +118,58 @@ describe('ajuste do reteste — direção de arte padrão', () => {
     expect(plano.trimmed).toEqual([]);
   });
 });
+
+// 3) Com briefing que só traz dados de oferta, os modos saíam como a mesma
+//    lista de fatos (reteste de 22/11: "história", "dor" e "atenção" abriam com
+//    os mesmos três títulos). Cada modo ganha um ângulo próprio de entrada e de
+//    título, usando só os fatos do material.
+import { buildNarrativeModeSequence, buildNarrativeModeAngle, NARRATIVE_SEQUENCES } from '../../src/utils/narrative-sequence.js';
+
+describe('ajuste do reteste — ângulo de cada modo de carrossel', () => {
+  const COM_ROTEIRO = Object.keys(NARRATIVE_SEQUENCES);
+
+  it.each(COM_ROTEIRO)('%s: o roteiro termina com o ângulo do modo', (modo) => {
+    const angulo = buildNarrativeModeAngle(modo);
+    expect(angulo.startsWith('ÂNGULO DESTE MODO — os fatos são os mesmos em qualquer modo; muda por onde o texto entra, a ordem e a voz dos títulos. Nenhum fato, cena, sensação ou causa nova:\n- Entrada: ')).toBe(true);
+    expect(angulo).toContain('\n- Títulos: ');
+    for (const n of [4, 6, 9]) expect(buildNarrativeModeSequence(modo, 'livre', n).endsWith(`\n${angulo}`)).toBe(true);
+  });
+
+  it('os ângulos são diferentes entre si', () => {
+    const angulos = COM_ROTEIRO.map(modo => buildNarrativeModeAngle(modo));
+    expect(new Set(angulos).size).toBe(COM_ROTEIRO.length);
+  });
+
+  it('história: ordem de tempo, título com sujeito e verbo, dado no apoio', () => {
+    const angulo = buildNarrativeModeAngle('storytelling');
+    expect(angulo).toContain('em ordem de tempo');
+    expect(angulo).toContain('sujeito + verbo');
+    expect(angulo).toContain('Preço, horário e quantidade ficam no apoio');
+  });
+
+  it('dor: começa do lado do leitor, em segunda pessoa, sem presumir sentimento; a oferta vem depois', () => {
+    const angulo = buildNarrativeModeAngle('pain');
+    expect(angulo).toContain('segunda pessoa');
+    expect(angulo).toContain('sem afirmar sentimento, hábito ou problema que não foi informado');
+    expect(angulo).toContain('a oferta entra só');
+  });
+
+  it('atenção: capa é pergunta ou contraste feito de um fato real', () => {
+    const angulo = buildNarrativeModeAngle('viral');
+    expect(angulo).toContain('uma pergunta ou um contraste montado com um fato real e específico do material');
+  });
+
+  it('só "Informar com clareza" pode abrir pelo nome do negócio', () => {
+    const marca = 'A capa não abre com o nome da marca seguido da descrição do negócio';
+    for (const modo of COM_ROTEIRO) {
+      if (modo === 'jornalistico') expect(buildNarrativeModeAngle(modo)).not.toContain(marca);
+      else expect(buildNarrativeModeAngle(modo)).toContain(marca);
+    }
+  });
+
+  it('sem modo, pacote próprio ou poucos cards: nada de ângulo', () => {
+    expect(buildNarrativeModeAngle('none')).toBe('');
+    expect(buildNarrativeModeSequence('none', 'livre', 6)).toBe('');
+    expect(buildNarrativeModeSequence('pain', 'apresentacao', 8)).toBe('');
+  });
+});
