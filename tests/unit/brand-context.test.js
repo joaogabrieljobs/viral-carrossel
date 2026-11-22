@@ -92,3 +92,19 @@ describe('buildSeededLibraryDoc herda contexto da marca', () => {
     expect(doc.styleKit.stylePrompt).toBe('Foto');
   });
 });
+
+// MF-14 (reteste 21/11, print do E04): cada projeto gerado tinha marca própria
+// fora da lista de marcas; abrir o E04 não trocava a marca ativa (a do E09) e o
+// painel "Projetos da marca" mostrava o E09 sem o projeto aberto.
+describe('MF-14 — painel de projetos sempre inclui o projeto aberto', () => {
+  it('projeto aberto de marca fora da lista entra primeiro', async () => {
+    const { projectsForPanel } = await import('../../src/utils/brand-context.js');
+    const library = [
+      { id: 'e09', doc: { brand: { id: 'n6yp14k' } } },
+      { id: 'e04', doc: { brand: { id: 'p8e34kb' } } },
+    ];
+    expect(projectsForPanel(library, 'n6yp14k', 'e04').map(entry => entry.id)).toEqual(['e04', 'e09']);
+    expect(projectsForPanel(library, 'n6yp14k', 'e09').map(entry => entry.id)).toEqual(['e09']);
+    expect(projectsForPanel(library, 'n6yp14k', null).map(entry => entry.id)).toEqual(['e09']);
+  });
+});

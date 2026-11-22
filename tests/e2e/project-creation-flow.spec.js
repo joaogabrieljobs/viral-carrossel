@@ -35,7 +35,8 @@ const generated = (count, prefix = 'Projeto novo') => ({
   slides: Array.from({ length: count }, (_, index) => ({
     title: `${prefix} ${index + 1}`,
     subtitle: `Orientação concreta ${index + 1} para organizar o trabalho.`,
-    bodyAfterImage: index > 1 ? 'Comece pelo próximo passo que o cliente consegue executar.' : '',
+    // Textos distintos por card: frase igual em 3+ cards pede reparo de repetição.
+    bodyAfterImage: index > 1 ? ['Comece pelo próximo passo que o cliente consegue executar.', 'Escolha uma tarefa curta para hoje.', 'Revise o combinado ao fim da semana.', 'Registre o que funcionou.', 'Ajuste o plano com a equipe.', 'Celebre a entrega concluída.'][index - 2] || 'Siga o roteiro.' : '',
     imageQuery: '',
   })),
   caption: 'Um próximo passo claro para começar.',

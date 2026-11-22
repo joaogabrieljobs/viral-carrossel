@@ -425,3 +425,28 @@ export function presentationPathMaterialNotice(pathId, sourceText) {
   if (CASE_BASELINE.test(String(sourceText || ''))) return '';
   return 'Seu material não traz um ponto de partida (o "antes"). O Estudo de caso mostra o que foi informado, sem comparação. Para um antes e depois, acrescente como era a situação inicial.';
 }
+
+/**
+ * Reteste 22/11 (WebExpresso): com briefing de oferta, "Contar uma história",
+ * "Ir a fundo" e "Aula" viravam a mesma lista do Caso, sem aviso. A checagem
+ * olha o material, não o texto gerado: vale com ou sem revisão.
+ */
+const STORY_MARKERS = /\b(?:fund(?:ou|ad[oa])|abriu|come[cç]ou|quando|hist[oó]ria|era uma vez|virada|decidiu|desde\s+(?:19|20)\d{2}|em\s+(?:19|20)\d{2}|founded|started|opened|when|story|since\s+(?:19|20)\d{2}|in\s+(?:19|20)\d{2})\b/i;
+const TEACHING_MARKERS = /\b(?:como\s+(?:fazer|usar|escolher|montar)|passo|etapa|porque|por que|erro|exemplo|m[eé]todo|t[eé]cnica|conceito|exerc[ií]cio|how\s+to|step|why|mistake|example|method|technique|concept)\b/i;
+const DEEP_MIN_WORDS = 150;
+
+export function narrativeModeMaterialNotice(modeId, sourceText) {
+  const text = String(sourceText || '');
+  const id = String(modeId || '');
+  if (id === 'estudo_de_caso') return presentationPathMaterialNotice(id, text);
+  if (id === 'storytelling' && !STORY_MARKERS.test(text)) {
+    return 'Seu material não traz uma história (uma pessoa, um momento, uma virada). "Contar uma história" vai organizar os fatos da oferta, sem narrativa. Para uma história, conte como começou ou um caso real; ou escolha Passo a passo, Falar da dor ou Pitch.';
+  }
+  if (id === 'deep' && (text.match(/\p{L}+/gu) || []).length < DEEP_MIN_WORDS) {
+    return 'Seu material é curto para "Ir a fundo": o carrossel vai repetir os mesmos fatos. Acrescente contexto, dados ou exemplos, ou escolha um modo mais direto.';
+  }
+  if (id === 'aula_workshop' && !TEACHING_MARKERS.test(text)) {
+    return 'Seu material não traz o que ensinar (conceito, passo, exemplo ou erro comum). A Aula vai listar os fatos da oferta. Para uma aula, acrescente o que a pessoa precisa aprender; ou escolha Proposta ou Pitch.';
+  }
+  return '';
+}

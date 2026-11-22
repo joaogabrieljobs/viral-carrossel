@@ -1,6 +1,6 @@
 import { ApprovalPanel } from './panels/ApprovalPanel.jsx';
 import { SlideLogoPanel } from './panels/SlideLogoPanel.jsx';
-import { LOGO_SIZE_MIN, LOGO_SIZE_MAX, LOGO_SIZE_DEFAULT } from '../utils/slide-logo.js';
+import { LOGO_SIZE_MIN, LOGO_SIZE_MAX, LOGO_SIZE_DEFAULT, applyCardSettingToAll, ownPhotoOverlay } from '../utils/slide-logo.js';
 import { RemixPanel } from './panels/RemixPanel.jsx';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState, useLayoutEffect, useRef, useCallback } from 'react';
@@ -31,7 +31,7 @@ import { applyTextFontToAllCards } from '../utils/card-text-fonts.js';
 import { CardTextFontPanel } from './panels/CardTextFontPanel.jsx';
 import { resolvePresetChromeDetalhado, textoParaEdicao } from '../utils/preset-tokens.js';
 import { addOverlayToSlide, removeOverlayFromSlide, overlayMoveKey, parseOverlayMoveKey } from '../utils/card-overlays.js';
-import { projectsForBrand } from '../utils/brand-context.js';
+import { projectsForBrand, projectsForPanel } from '../utils/brand-context.js';
 import { projectHasCarouselContent } from '../utils/context-status.js';
 import { trackEvent, lsGet } from '../utils/telemetry.js';
 import { appModeLabel } from '../utils/ui-depth-labels.js';
@@ -555,6 +555,7 @@ function SidebarContent({
         bgImageSource: 'imported',
         bgImageFailed: false,
         bgImageError: null,
+        overlay: ownPhotoOverlay(slide.overlay),
       });
     } catch (error) {
       if (imageTargetMatches(imageTargetRef.current, target)) {
@@ -988,8 +989,14 @@ function SidebarContent({
                 >
                   {anyCanvasEnabled
                     ? <><Check size={14} strokeWidth={2.5}/>Composição ativa</>
-                    : <><Sparkles size={14}/>{slides.some((item) => item.canvas?.applied) ? 'Editar composição' : 'Ativar composição'}</>}
+                    : <><Sparkles size={14}/>{slides.some((item) => item.canvas?.applied) ? `Editar composição em todos os ${itemsLabel}` : `Ativar composição em todos os ${itemsLabel}`}</>}
                 </button>
+                {/* Reteste 22/11: ativar num card mudava o layout de todos sem avisar. */}
+                {!anyCanvasEnabled && slides.length > 1 && (
+                  <p style={{ margin:0, fontSize:11.5, lineHeight:1.45, color:'var(--text-muted)' }}>
+                    Muda o layout dos {slides.length} {itemsLabel} deste projeto. Para desfazer: Cmd+Z ou Desativar.
+                  </p>
+                )}
                 {anyCanvasEnabled && (
                   <button
                     type="button"
@@ -1839,6 +1846,10 @@ function SidebarContent({
                     onChange={v=>updateSlide({bgZoom:v})}
                   />
                   <Slider label="Overlay escuro" value={slide.overlay} min={0} max={100} onChange={v=>updateSlide({overlay:v})}/>
+                  {setSlides ? <button type="button" className="vc-btn vc-btn-ghost" style={{ alignSelf:'flex-start', fontSize:12 }}
+                    onClick={() => { setSlides(current => applyCardSettingToAll(current, { overlay: slide.overlay })); toast?.('Escurecimento aplicado em todos os cards. Desfazer: Cmd+Z.', 'success'); }}>
+                    Usar este escurecimento em todos os cards
+                  </button> : null}
                   <Slider label="Opacidade" value={slide.bgOpacity} min={0} max={100} onChange={v=>updateSlide({bgOpacity:v})}/>
                   <Toggle label="Espelhar horizontalmente" value={slide.bgMirror} onChange={v=>updateSlide({bgMirror:v})}/>
                 </>
@@ -3500,7 +3511,7 @@ function SidebarContent({
                 activeBrandId={activeBrandId}
                 onSelectBrand={onSelectBrand || (() => {})}
                 onOpenBrands={setBrandsOpen ? () => setBrandsOpen(true) : null}
-                projectCount={projectsForBrand(library, activeBrandId).length}
+                projectCount={projectsForPanel(library, activeBrandId, activeDocId || activeEntry?.id).length}
                 toast={toast}
               />
               <div
@@ -3553,7 +3564,7 @@ function SidebarContent({
                   paddingRight: 2,
                 }}
               >
-                {projectsForBrand(library, activeBrandId).length === 0 ? (
+                {projectsForPanel(library, activeBrandId, activeDocId || activeEntry?.id).length === 0 ? (
                   <div style={{
                     gridColumn: '1 / -1',
                     padding: '14px 12px',
@@ -3567,8 +3578,10 @@ function SidebarContent({
                     Nenhum projeto nesta marca ainda. Crie Comunica ou Apresenta.
                   </div>
                 ) : null}
-                {[...projectsForBrand(library, activeBrandId)]
-                  .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+                {[...projectsForPanel(library, activeBrandId, activeDocId || activeEntry?.id)]
+                  // MF-14: o projeto aberto vem primeiro, mesmo de outra marca.
+                  .sort((a, b) => Number(b.id === (activeDocId || activeEntry?.id)) - Number(a.id === (activeDocId || activeEntry?.id))
+                    || (b.updatedAt || 0) - (a.updatedAt || 0))
                   .map((entry) => {
                     const isActive = entry.id === (activeDocId || activeEntry?.id);
                     const slidesOf = entry.doc?.slides || [];

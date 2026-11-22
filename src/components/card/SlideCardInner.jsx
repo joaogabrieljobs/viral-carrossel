@@ -21,7 +21,7 @@ import { pctBox, CanvasZonesOverlay } from './CanvasZonesOverlay.jsx';
 import { VcBgPatternLayer, CultureInlineRich, CultureRichParagraphs, OverflowScaler } from './render-primitives.jsx';
 import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks, inkIfReadable, accentInkOnSurface } from '../../utils/brand-visuals.js';
 import { displayListMarkers } from '../../utils/list-markers.js';
-import { groundInks } from '../../utils/presentation-families.js';
+import { brandPaletteOverrides, groundInks } from '../../utils/presentation-families.js';
 import { resolvePresetChrome, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
 import { footerChromeReservePx, footerGuardApplies, footerPillBottomPx, footerPillColors, textZonesAboveFooter, STORIES_FOOTER_LIFT } from '../../utils/card-chrome.js';
 import { titleLetterSpacingEm } from '../../utils/title-tracking.js';
@@ -984,7 +984,8 @@ const ClassicCanvasInner = React.forwardRef(({
       style={{ width:f.w, height:f.h, background:bg, position:'relative', overflow:'hidden', fontFamily: bodyFF }}
     >
       <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
-      <PresentationArtChrome slide={slide} frame={f} accent={brand.accent} ink={titleInk} index={num - 1} total={total} />
+      <PresentationArtChrome slide={slide} frame={f} accent={brand.accent} ink={titleInk} index={num - 1} total={total}
+        paletteOverrides={brandPaletteOverrides(slide.presentationChrome?.family || slide.presentationDesignFamily, brand)} />
       <SocialArtChrome slide={slide} brand={brand} frame={f} titleFont={titleFF} bodyFont={bodyFF} index={num - 1} total={total} titleInsetPx={padTitleXp} />
       {!slide.presentationSuppressPhoto && <div
         {...movOu('photo', photoZoneBoxStyle)}
@@ -1246,6 +1247,7 @@ const ClassicCanvasInner = React.forwardRef(({
         fontFamily={bodyAfterFF}
         family={slide.presentationDesignFamily}
         accent={brand.accent}
+        paletteOverrides={brandPaletteOverrides(slide.presentationDesignFamily, brand)}
         numericTypography={slide.presentationNumericTypography}
         forExport={forExport}
         onChange={(blocks) => onInlineTextChange?.('presentationBlocks', blocks)}
@@ -2159,7 +2161,7 @@ const SlideCardInner = React.forwardRef(({
   // marinho do fechamento do Executivo).
   const familyGround = slide.presentationArtDirectionVersion === 2 && slide.presentationChrome?.family
     && slide.presentationChrome.ground && slide.presentationChrome.ground !== 'bg'
-    ? groundInks(slide.presentationChrome.family, slide.presentationChrome.ground) : null;
+    ? groundInks(slide.presentationChrome.family, slide.presentationChrome.ground, brandPaletteOverrides(slide.presentationChrome.family, brand)) : null;
   const slideCardBg = familyGround?.bg || resolveSlideBrandBg(brand, slideIdx, slide) || '#fafafc';
   const photoInk = needsLightPhotoText(slide);
   const inkSurface = photoInk ? '#111111' : slideCardBg;

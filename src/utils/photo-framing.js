@@ -98,6 +98,42 @@ async function faceBoosts(canvas) {
   }
 }
 
+/**
+ * Reteste 22/11: sem FaceDetector (a maioria dos navegadores), o smartcrop
+ * escolhia a região de mais detalhe (mãos) e cortava a cabeça ao trocar de
+ * formato. A pele mais alta da foto, em geral o rosto, vira reforço.
+ */
+const isSkin = (r, g, b) => r > 95 && g > 40 && b > 20 && r > g && r > b
+  && (Math.max(r, g, b) - Math.min(r, g, b)) > 15 && Math.abs(r - g) > 15;
+
+export function topSkinRegion(data, width, height) {
+  if (!data || !(width > 0) || !(height > 0)) return null;
+  const minRow = Math.max(2, Math.round(width * 0.04));
+  let top = -1;
+  for (let y = 0; y < height && top < 0; y += 1) {
+    let count = 0;
+    for (let x = 0; x < width; x += 1) {
+      const i = (y * width + x) * 4;
+      if (isSkin(data[i], data[i + 1], data[i + 2])) count += 1;
+    }
+    if (count >= minRow) top = y;
+  }
+  if (top < 0) return null;
+  // Faixa abaixo do topo da pele, do tamanho de um rosto (até 18% da altura).
+  const bottom = Math.min(height, top + Math.max(4, Math.round(height * 0.18)));
+  let left = width; let right = -1;
+  for (let y = top; y < bottom; y += 1) for (let x = 0; x < width; x += 1) {
+    const i = (y * width + x) * 4;
+    if (isSkin(data[i], data[i + 1], data[i + 2])) { left = Math.min(left, x); right = Math.max(right, x); }
+  }
+  if (right < left) return null;
+  const pad = Math.round((right - left + 1) * 0.3);
+  return {
+    x: Math.max(0, left - pad), y: Math.max(0, top - pad),
+    width: Math.min(width, right - left + 1 + pad * 2), height: Math.min(height, bottom - top + pad * 2), weight: 0.8,
+  };
+}
+
 async function analyze({ src, width, height }) {
   const img = await loadImage(src);
   const scale = Math.min(1, 384 / Math.max(img.naturalWidth, img.naturalHeight));
@@ -106,7 +142,13 @@ async function analyze({ src, width, height }) {
   canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
   try {
     canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-    const boost = await faceBoosts(canvas);
+    const faces = await faceBoosts(canvas);
+    let boost = faces;
+    if (!faces.length) {
+      const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      const head = topSkinRegion(pixels, canvas.width, canvas.height);
+      boost = head ? [head] : [];
+    }
     const result = await smartcrop.crop(canvas, {
       width, height, minScale: 1, maxScale: 1, prescale: false, boost,
     });

@@ -7,8 +7,20 @@ export const LOGO_SIZE_MIN = 48;
 export const LOGO_SIZE_MAX = 900;
 /** Default antigo (120) saía minúsculo no preview Stories / Feed. */
 export const LOGO_SIZE_DEFAULT = 260;
-/** Tamanho forçado em todo import novo (não herda valor antigo minúsculo). */
-export const LOGO_SIZE_IMPORT = 300;
+/** Tamanho de todo import novo. Reteste 22/11: 300 cobria foto e texto. */
+export const LOGO_SIZE_IMPORT = 180;
+
+/** "Usar em todos os cards": copia o ajuste do card ativo para o projeto. */
+export function applyCardSettingToAll(slides, patch) {
+  return (Array.isArray(slides) ? slides : []).map(slide => ({ ...slide, ...patch }));
+}
+
+/** Foto própria entra com escurecimento mais leve que o das fotos geradas. */
+export const OWN_PHOTO_OVERLAY = 40;
+export function ownPhotoOverlay(current) {
+  const value = Number(current);
+  return Number.isFinite(value) && value < OWN_PHOTO_OVERLAY ? value : OWN_PHOTO_OVERLAY;
+}
 /** Limita o custo do PNG portátil quando o IndexedDB está indisponível. */
 export const LOGO_INLINE_MAX_BYTES = 256 * 1024;
 

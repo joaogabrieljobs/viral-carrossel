@@ -18,6 +18,7 @@ import {
   brandLogoReplacementPatch,
   clearLogoOffsetOnSlide,
   clearLogoOffsetOnSlides,
+  applyCardSettingToAll,
 } from '../../utils/slide-logo.js';
 import { origemParaBlob } from '../../utils/image-store.js';
 import { Slider } from '../ui/primitives.jsx';
@@ -66,13 +67,14 @@ export function SlideLogoPanel({
 
   const setBrandLogo = (partial) => {
     if (!setBrand) return;
-    setBrand((current) => ({ ...current, ...partial }));
+    // Reteste 22/11: tamanho escolhido no controle sobrevive a duplicar/reabrir.
+    setBrand((current) => ({ ...current, ...partial, ...(partial.logoSize != null ? { logoSizeChosen: true } : {}) }));
     // Card ativo deixa de travar o padrão antigo
     updateSlide(clearSlideLogoLayout());
   };
 
   const setCardLayout = (partial) => {
-    updateSlide({ ...partial, logoHidden: false });
+    updateSlide({ ...partial, ...(partial.logoSize != null ? { logoSizeChosen: true } : {}), logoHidden: false });
   };
 
   /** Aplica a logo em cards sem promover a logo específica do projeto ao perfil global. */
@@ -503,6 +505,13 @@ export function SlideLogoPanel({
               max={100}
               onChange={(v) => setCardLayout({ logoOpacity: v })}
             />
+            {setSlides ? <button type="button" className="vc-btn vc-btn-ghost" style={{ alignSelf: 'flex-start', fontSize: 12 }}
+              onClick={() => {
+                setSlides((current) => applyCardSettingToAll(current, { logoSize: ctrl.logoSize, logoSizeChosen: true, logoOpacity: ctrl.logoOpacity }));
+                toast?.('Tamanho e opacidade da logo aplicados em todos os cards. Desfazer: Cmd+Z.', 'success');
+              }}>
+              Usar tamanho e opacidade em todos os cards
+            </button> : null}
           </>
         ) : null}
 

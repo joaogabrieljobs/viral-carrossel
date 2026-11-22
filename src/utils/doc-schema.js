@@ -16,11 +16,16 @@ import { normalizePresentationPath } from './presentation.js';
 import { resolvePresentationVisualPresetDefinition } from '../styles/presentation-presets.jsx';
 import { repairMissingPresentationEvidence } from './presentation-composition.js';
 
-/** Logos ≤140px na escala 1080 ficavam ilegíveis / “fora” do preview. */
-function coerceReadableLogoSize(size) {
+/**
+ * Logos ≤140px na escala 1080 ficavam ilegíveis / “fora” do preview (padrão
+ * antigo 120). Reteste 22/11: esse corte desfazia a logo pequena que a pessoa
+ * escolheu no controle, ao duplicar e ao reabrir. Tamanho escolhido no
+ * controle (`chosen`) é preservado; o legado segue a regra antiga.
+ */
+function coerceReadableLogoSize(size, chosen = false) {
   const n = Number(size);
   if (!Number.isFinite(n)) return LOGO_SIZE_DEFAULT;
-  if (n < 140) return LOGO_SIZE_DEFAULT;
+  if (n < LOGO_SIZE_MIN || (!chosen && n < 140)) return LOGO_SIZE_DEFAULT;
   return Math.max(LOGO_SIZE_MIN, Math.min(LOGO_SIZE_MAX, n));
 }
 
@@ -341,7 +346,7 @@ function ensureDocShape(d) {
         ...b,
         brandTone: normalizeBrandTone(b.brandTone),
         useBrandVoice: b.useBrandVoice === false ? false : true,
-        logoSize: coerceReadableLogoSize(b.logoSize),
+        logoSize: coerceReadableLogoSize(b.logoSize, b.logoSizeChosen === true),
       };
     })(),
     material: { ...DEFAULT_DOC.material, ...(migrated.material && typeof migrated.material === 'object' ? migrated.material : {}) },
@@ -375,7 +380,7 @@ function ensureDocShape(d) {
         ...(sl.logoSize != null ? {
           logoSize: plannedPresentation && Number.isFinite(logoSize) && logoSize >= 80
             ? Math.min(LOGO_SIZE_MAX, logoSize)
-            : coerceReadableLogoSize(sl.logoSize),
+            : coerceReadableLogoSize(sl.logoSize, sl.logoSizeChosen === true),
         } : {}),
       };
       // Projetos anteriores à edição individual não tinham este campo. Migra

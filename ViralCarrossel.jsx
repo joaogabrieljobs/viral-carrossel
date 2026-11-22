@@ -223,7 +223,7 @@ import {
   normalizePresentationPath,
   getPresentationPath,
   clampPresentationSlideCount,
-  presentationPathMaterialNotice,
+  narrativeModeMaterialNotice,
 } from './src/utils/presentation.js';
 import {
   applyBatchPhotosToSlides,
@@ -542,6 +542,7 @@ import {
   applyLogoAssetToSlides,
   clearLogoOffsetOnSlide,
   projectLogoFromStored,
+  ownPhotoOverlay,
 } from './src/utils/slide-logo.js';
 import { appModeLabel } from './src/utils/ui-depth-labels.js';
 import {
@@ -4298,6 +4299,8 @@ export default function App() {
           bgImageSource: 'imported',
           bgImageFailed: false,
           bgImageError: null,
+          // Reteste 22/11: foto própria entra com escurecimento mais leve.
+          overlay: ownPhotoOverlay(slidesLiveRef.current[sIdx]?.overlay),
         }, slidesLiveRef.current[sIdx]));
         setImportProgress({ phase: 'import', current: 1, total: 1, label: 'Foto importada · 1/1' });
         toast('Foto importada.', 'success', 2500);
@@ -5785,8 +5788,10 @@ ${jsonShapeLine}`;
     if (reviewStatus === 'fitted') toast('Encurtei o texto que não cabia no layout da apresentação.', 'warning', 6500);
     // MF-11: Estudo de caso sem ponto de partida no material vira lista de
     // fatos; o aviso fica fora do slide.
-    const pathMaterialNotice = isPresentationGeneration && !remix
-      ? presentationPathMaterialNotice(presentationPathId, [topic, materialFactualSource].filter(Boolean).join('\n'))
+    // Reteste 22/11: vale também para o carrossel (Contar uma história, Ir a
+    // fundo) e para a Aula; checa o material, com ou sem revisão.
+    const pathMaterialNotice = !remix
+      ? narrativeModeMaterialNotice(isPresentationGeneration ? presentationPathId : effectiveMode, [topic, materialFactualSource].filter(Boolean).join('\n'))
       : '';
     if (reviewStatus === 'needs_attention') {
       toast(generationIncomplete
@@ -6071,6 +6076,8 @@ ${jsonShapeLine}`;
         ? (effectiveVisualPresetDef?.sourceVersion || null)
         : undefined,
       slideTextDensity: td, contentObjective: objective, editorialReviewStatus: reviewStatus,
+      // MF-11 / reteste 22/11: aviso de modo sem base no material, fixo no projeto.
+      materialNotice: pathMaterialNotice || '', presentationMaterialNotice: undefined,
       editorialReviewIssues: reviewStatus === 'needs_attention'
         ? (editorialViolations.length ? editorialViolations : editorialIssues).map(issue => ({
             slideIndex: issue.slideIndex ?? null,
@@ -6085,9 +6092,6 @@ ${jsonShapeLine}`;
         : [],
       ...(generationPlan ? {
         presentationPlan: generationPlan,
-        // MF-11: aviso do Caso sem ponto de partida, gravado no projeto para
-        // aparecer fixo (o toast sumia e saía junto com o aviso da revisão).
-        presentationMaterialNotice: pathMaterialNotice || '',
         presentationQuality: {
           version: 1,
           reviewStatus,
@@ -8211,8 +8215,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
               {!genProgress && <button type="button" className="vc-btn vc-btn-ghost" onClick={() => { setCreationPreviewSlides([]); setGenerationPreviewContext(null); }}>Fechar prévia da geração</button>}
             </div>}
             <EditorialReviewNotice status={doc.editorialReviewStatus} issues={doc.editorialReviewIssues} isPresentation={isPresentationProject} onReviewed={() => history.set(current => ({ ...current, editorialReviewStatus:'reviewed_by_user', editorialReviewIssues:[] }))}
-              materialNotice={isPresentationProject ? doc.presentationMaterialNotice || '' : ''}
-              onDismissMaterialNotice={() => history.set(current => ({ ...current, presentationMaterialNotice: '' }))}/>
+              materialNotice={doc.materialNotice || doc.presentationMaterialNotice || ''}
+              onDismissMaterialNotice={() => history.set(current => ({ ...current, materialNotice: '', presentationMaterialNotice: '' }))}/>
             {empty ? (
               // Empty state
               <div className="empty-grid" style={{

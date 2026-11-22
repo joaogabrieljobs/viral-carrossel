@@ -416,3 +416,54 @@ describe('escassez por sobra ou vitrine (D07)', () => {
       { count: 1, presetId: 'apresentacao', factualSource: `${padaria} Os pães ficam expostos na vitrine.` })).toEqual([]);
   });
 });
+
+// Reteste 22/11 (WebExpresso, Black Friday): "quem tem site aparece primeiro",
+// "muitos acham que site é caro" (carrosséis) e "You keep full ownership"
+// (apresentação em inglês) passaram sem aviso.
+describe('generalização, vantagem e propriedade sem fonte (PT e EN)', () => {
+  const oferta = 'WebExpresso. We build one-page sites for San Diego small businesses. Only 10 websites this Black Friday. $399 or 3 payments of $133. Second language free: English, Spanish or Portuguese. Your domain, your hosting, your name: about $3 a month, no monthly fee from us. Live in 3 days. Ends Nov 30.';
+  const audit = text => auditDraftFactuality({ slides: [{ title: 'Site', subtitle: text, bodyAfterImage: '' }] }, { count: 1, presetId: 'livre', densityId: '1_1', factualSource: oferta });
+  it.each([
+    ['Quem tem site aparece primeiro no Google.', /vantagem/],
+    ['Muitos acham que site é caro.', /generalização/],
+    ['Most people think a website is expensive.', /generalização/],
+    ['Businesses with a site show up first.', /vantagem/],
+    ['You keep full ownership of everything.', /propriedade/],
+    ['O site é todo seu, para sempre.', /propriedade/],
+  ])('marca "%s"', (frase, categoria) => {
+    expect(audit(frase).map(item => item.category)).toEqual(expect.arrayContaining([expect.stringMatching(categoria)]));
+  });
+  it.each([
+    'Your domain, your hosting, your name.',
+    'Your site goes live in 3 days.',
+  ])('não marca o fato do material "%s"', (frase) => {
+    expect(audit(frase)).toEqual([]);
+  });
+});
+
+// Reteste 22/11 (WebExpresso, X01–X07): 6 de 7 apresentações saíram como
+// "Rascunho preservado" por paráfrase do próprio material: "sem custo" e
+// "gratuito" (material: "grátis", "sem cobrar"), "três vezes" ("3 parcelas"),
+// "vagas limitadas" ("São 10 vagas"), "inclui landing page, segunda língua e
+// configuração de hospedagem".
+describe('paráfrase do material não é invenção (WebExpresso)', () => {
+  const briefing = 'WebExpresso faz landing page para pequenos negócios nos Estados Unidos, com foco em San Diego. Preço: US$ 399, ou 3 parcelas de US$ 133 (a 1ª na reserva, a 2ª quando o site vai ao ar, a 3ª 30 dias depois). Na Black Friday, a segunda língua é grátis (inglês, espanhol ou português). Hospedagem e domínio ficam no nome e no cartão do cliente, cerca de US$ 3 por mês; a WebExpresso configura sem cobrar. Não há mensalidade da WebExpresso. São 10 vagas, até 30 de novembro. Há modelos prontos para taqueria, barbearia e lavanderia. O pedido é feito pelo formulário do site ou por mensagem.';
+  const audit = (subtitle, bodyAfterImage = '') => auditDraftFactuality({ slides: [{ title: 'Oferta', subtitle, bodyAfterImage }] }, { count: 1, presetId: 'apresentacao', factualSource: briefing });
+  it.each([
+    'A segunda língua sai sem custo extra na Black Friday.',
+    'Segunda língua gratuita até 30 de novembro.',
+    'Você paga em três vezes de US$ 133.',
+    'São vagas limitadas: só 10 sites.',
+    'O pagamento acompanha a entrega: a 1ª parcela é na reserva, a 2ª quando o site vai ao ar e a 3ª 30 dias depois.',
+    'O pacote inclui landing page, segunda língua e configuração de hospedagem.',
+  ])('aceita "%s"', (frase) => {
+    expect(audit(frase)).toEqual([]);
+  });
+  it.each([
+    ['O pacote inclui logotipo e fotos profissionais.', 'item incluso'],
+    ['Você paga em cinco vezes.', 'dado sem fonte'],
+    ['Suporte gratuito por um ano.', 'dado sem fonte'],
+  ])('continua marcando invenção "%s"', (frase, categoria) => {
+    expect(audit(frase).map(item => item.category)).toContain(categoria);
+  });
+});

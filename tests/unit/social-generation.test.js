@@ -112,7 +112,8 @@ describe('Prender atenção: títulos completos e preservação do texto', () =>
       slideIndex,
       reason: 'Separar título e condensar o apoio',
       title: `Título específico ${slideIndex + 1}`,
-      subtitle: `Apoio direto ${slideIndex + 1}.\nUma segunda linha útil.\nFecho curto.`,
+      // Textos distintos por card: frase igual em 3+ cards agora pede reparo de repetição.
+      subtitle: `Apoio direto ${slideIndex + 1}.\nSegunda linha ${['útil', 'clara', 'nova', 'firme', 'leve'][slideIndex]}.\nFecho ${['curto', 'breve', 'simples', 'direto', 'final'][slideIndex]}.`,
     }));
     const ai = vi.fn().mockResolvedValueOnce(first).mockResolvedValueOnce({ edits });
     const output = await generateReviewedCarousel({

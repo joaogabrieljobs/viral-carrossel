@@ -705,8 +705,24 @@ export function familyFont(key, role = 'text') {
 }
 
 /** Cores de tinta para o fundo da página. */
-export function groundInks(key, ground = 'bg') {
+/**
+ * Reteste 22/11 (WebExpresso, marca própria): barra do título, números dos
+ * passos e o fundo invertido do fecho saíam na cor da família (azul,
+ * azul-marinho). Marca com destaque próprio sobrepõe o destaque e o fundo
+ * invertido (o tom mais escuro da marca).
+ */
+const isHexColor = value => /^#[0-9a-f]{6}$/i.test(String(value || '').trim());
+export function brandPaletteOverrides(key, brand = {}) {
   const p = familySpec(key).palette;
+  const accent = isHexColor(brand?.accent) ? brand.accent.trim() : '';
+  if (!accent || accent.toLowerCase() === String(p.accent || '').toLowerCase()) return {};
+  const darkest = [brand.bg, brand.titleColor].filter(isHexColor)
+    .sort((a, b) => wcagContrast(b, '#FFFFFF') - wcagContrast(a, '#FFFFFF'))[0];
+  return darkest ? { accent, inverse: darkest.trim() } : { accent };
+}
+
+export function groundInks(key, ground = 'bg', overrides = {}) {
+  const p = { ...familySpec(key).palette, ...(overrides || {}) };
   const raw = ground === 'inverse' ? { bg: p.inverse, ink: p.inverseInk, muted: p.inverseMuted }
     : ground === 'accent' ? { bg: p.accent, ink: p.inverseInk || '#FFFFFF', muted: p.inverseMuted || p.inverseInk }
       : ground === 'surface' ? { bg: p.surface, ink: p.ink, muted: p.muted }

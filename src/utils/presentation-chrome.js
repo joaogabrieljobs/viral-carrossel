@@ -11,9 +11,9 @@ import { FORMAT_SPECS, familyFont, familySpec, groundInks } from './presentation
 
 const pct = (value) => `${value}%`;
 
-export function resolveChromeColor(familyKey, ground, token) {
-  const p = familySpec(familyKey).palette;
-  const inks = groundInks(familyKey, ground);
+export function resolveChromeColor(familyKey, ground, token, overrides = {}) {
+  const p = { ...familySpec(familyKey).palette, ...(overrides || {}) };
+  const inks = groundInks(familyKey, ground, overrides);
   if (token === 'ink') return inks.ink;
   if (token === 'muted') return inks.muted;
   if (token === 'rule') return ground === 'bg' || ground === 'surface' ? p.rule : inks.muted;
@@ -39,16 +39,16 @@ export function fillChromeTokens(text, tokens = {}) {
  * @param {object} layout resultado de familyLayout
  * @param {{ frame: {w:number,h:number}, tokens?: object }} ctx
  */
-export function chromeElements(layout, { frame, tokens = {} } = {}) {
+export function chromeElements(layout, { frame, tokens = {}, overrides = {} } = {}) {
   if (!layout || !frame) return [];
   const family = layout.family;
   const ground = layout.ground || 'bg';
   const ref = FORMAT_SPECS[layout.format] || FORMAT_SPECS['16:9'];
   const scale = frame.w / ref.w;
-  const color = (token) => resolveChromeColor(family, ground, token);
+  const color = (token) => resolveChromeColor(family, ground, token, overrides);
   const out = [];
   if (ground !== 'bg') {
-    out.push({ key: 'ground', z: 0, style: { left: 0, top: 0, width: '100%', height: '100%', background: groundInks(family, ground).bg } });
+    out.push({ key: 'ground', z: 0, style: { left: 0, top: 0, width: '100%', height: '100%', background: groundInks(family, ground, overrides).bg } });
   }
   (layout.chrome || []).forEach((d, i) => {
     const key = `${d.t}-${i}`;

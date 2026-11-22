@@ -6,7 +6,8 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwA
 const session = { ...SESSAO_ATIVA, tier: 'creator', imageQuota: { limit: 50, remaining: 50, used: 0 } };
 const completion = value => ({ choices: [{ message: { content: JSON.stringify(value) } }] });
 const draft = (version = 'Original') => ({
-  slides: [1, 2, 3].map(i => ({ title: `${version} ${i}`, subtitle: `Crie imagens no MUSA ${i}.`, imageQuery: 'expressive three dimensional orange imaginary world inside a creative studio' })),
+  slides: [1, 2, 3].map(i => ({ title: `${version} ${i}`, // Textos distintos por card: frase igual em 3+ cards pede reparo de repetição.
+  subtitle: ['Crie imagens no MUSA 1.', 'Monte personagens no estúdio 2.', 'Publique seu mundo criativo 3.'][i - 1], imageQuery: 'expressive three dimensional orange imaginary world inside a creative studio' })),
   caption: 'Explore seu mundo criativo no MUSA.',
   projectDesign: { titleFont: 'Anton', bodyFont: 'Inter', titleWeight: 400, titleCase: 'upper', accent: '#FF5C00', layout: 'fullbleed' },
 });

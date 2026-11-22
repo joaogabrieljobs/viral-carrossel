@@ -604,3 +604,38 @@ describe('repetição de título entre slides', () => {
     expect(buildEditorialReviewPrompt('', { slides }, { presetId: 'apresentacao', count: 3 })).toContain('TÍTULO REPETIDO — correção obrigatória nos slideIndex 2');
   });
 });
+
+// Reteste 22/11 (WebExpresso W02): título "Na Black Friday, segunda língua
+// grátis" com apoio sobre modelos de taqueria; "segunda língua grátis" em 3
+// cards do mesmo projeto.
+describe('coerência título × apoio e frase repetida no carrossel', () => {
+  const slides = [
+    { title: 'Sua landing page pronta nesta Black Friday', subtitle: 'Site por US$ 399. Segunda língua grátis.' },
+    { title: 'Sem mensalidade', subtitle: 'Hospedagem no seu nome. Segunda língua grátis na oferta.' },
+    { title: 'Na Black Friday, segunda língua grátis', subtitle: 'Taqueria, barbearia e lavanderia: layouts para o seu cliente.' },
+    { title: '10 vagas até 30 de novembro', subtitle: 'Reserve pelo formulário.' },
+  ];
+  it('frase de 3 palavras em 3 cards conta como repetida', async () => {
+    const { repeatedPhraseSlides } = await import('../../src/utils/editorial-review.js');
+    expect(repeatedPhraseSlides(slides)).toEqual([{ phrase: 'segunda lingua gratis', slideIndexes: [0, 1, 2] }]);
+  });
+  it('a revisão do carrossel pede coerência título × apoio e cita a frase repetida', () => {
+    const prompt = buildEditorialReviewPrompt('', { slides }, { presetId: 'livre', densityId: '1_1', count: 4 });
+    expect(prompt).toMatch(/TÍTULO × APOIO/);
+    expect(prompt).toContain('"segunda lingua gratis" aparece nos slideIndex 0, 1, 2');
+  });
+  it('a revisão da apresentação também pede coerência', () => {
+    expect(buildEditorialReviewPrompt('', { slides }, { presetId: 'apresentacao', count: 4 })).toMatch(/TÍTULO × APOIO/);
+  });
+  it('repetição que sobra no carrossel ganha um reparo e não vira rascunho', async () => {
+    const cfg = { count: 4, presetId: 'livre', densityId: '1_1', factualSource: 'Landing page por US$ 399. Segunda língua grátis. Hospedagem no seu nome. Taqueria, barbearia e lavanderia. 10 vagas até 30 de novembro. Reserve pelo formulário. Sem mensalidade. Black Friday.' };
+    const rascunho = { slides: slides.map(slide => ({ ...slide, imageQuery: '', bodyAfterImage: '' })), caption: 'Oferta.' };
+    const reparo = { edits: [{ slideIndex: 1, reason: 'Repetição', subtitle: 'Hospedagem no seu nome, sem mensalidade.' }] };
+    const ai = vi.fn().mockResolvedValueOnce(structuredClone(rascunho)).mockResolvedValueOnce({ edits: [] }).mockResolvedValueOnce(reparo);
+    const output = await generateReviewedCarousel({ prompt: 'briefing', config: cfg }, ai);
+    expect(ai).toHaveBeenCalledTimes(3);
+    expect(ai.mock.calls[2][0]).toContain('REPARO DE REPETIÇÃO');
+    expect(output.result.slides[1].subtitle).toBe('Hospedagem no seu nome, sem mensalidade.');
+    expect(output.reviewStatus).toBe('repaired');
+  });
+});

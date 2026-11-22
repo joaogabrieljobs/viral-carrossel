@@ -37,9 +37,11 @@ const planWithCount = count => {
   }));
   return value;
 };
+const SUBTITLES = ['A oferta continua em estudo.', 'O escopo ainda depende do piloto.', 'Preço segue em definição.', 'Parceiros avaliam a proposta.', 'Critérios de sucesso em discussão.', 'Próxima validação marcada.', 'Riscos mapeados pela equipe.', 'Cronograma depende de aprovação.', 'Dados do teste chegam depois.', 'Decisão fica para a reunião.', 'Responsáveis definidos por etapa.', 'Feedback dos parceiros orienta ajustes.'];
 const batch = (offset, size = 3) => ({
   slides: Array.from({ length: size }, (_, index) => ({
-    title: `Mensagem ${offset + index + 1}`, subtitle: 'A oferta continua em estudo.', bodyAfterImage: '', imageQuery: '',
+    // Textos distintos por slide: frase igual em 3+ slides agora pede reparo de repetição.
+    title: `Mensagem ${offset + index + 1}`, subtitle: SUBTITLES[(offset + index) % SUBTITLES.length], bodyAfterImage: '', imageQuery: '',
     speakerNotes: 'Preço a definir.', presentationBlocks: [],
   })), caption: 'Primeira oferta em estudo.',
 });
@@ -559,5 +561,23 @@ describe('revisão da apresentação planejada que falha', () => {
     expect(ai).toHaveBeenCalledTimes(3);
     expect(output.reviewStatus).toBe('unavailable');
     expect(output.reviewDiagnostics).toEqual([expect.objectContaining({ attempt: 1, outcome: 'request_failed', status: 503 })]);
+  });
+});
+
+// Reteste 22/11 (WebExpresso X01–X07): "Edição inválida" / "Bloco de revisão
+// inválido" em uma edição descartava a revisão inteira, nas duas tentativas.
+describe('revisão da apresentação com uma edição inválida', () => {
+  it('aproveita as edições válidas e descarta só a inválida', async () => {
+    const review = { edits: [
+      { slideIndex: 0, reason: 'Clareza', subtitle: 'Software pronto para organizar informações.' },
+      { slideIndex: 1, reason: 'Bloco', presentationBlocks: [{ type: 'steps', items: 'não é lista' }] },
+    ] };
+    const ai = vi.fn().mockResolvedValueOnce(plan()).mockResolvedValueOnce(draft()).mockResolvedValueOnce(review);
+    const output = await generateReviewedCarousel({ prompt: 'Material.', config: config() }, ai);
+    expect(ai).toHaveBeenCalledTimes(3);
+    expect(output.result.slides[0].subtitle).toBe('Software pronto para organizar informações.');
+    expect(output.result.slides[1].presentationBlocks).toEqual(draft().slides[1].presentationBlocks);
+    expect(output.reviewStatus).toBe('revised');
+    expect(output.reviewDiagnostics).toEqual([expect.objectContaining({ attempt: 1, outcome: 'salvaged', dropped: 1 })]);
   });
 });

@@ -7,11 +7,11 @@ import { chromeElements, chromeTokensForSlide } from '../../utils/presentation-c
  * os únicos textos são numeração e tokens que já existem no slide.
  * Compartilhado entre preview e exportação.
  */
-export default function PresentationArtChrome({ slide, frame, accent, ink, index = 0, total = 1 }) {
+export default function PresentationArtChrome({ slide, frame, accent, ink, index = 0, total = 1, paletteOverrides = {} }) {
   if (slide.presentationArtDirectionVersion === 2 && slide.presentationChrome?.chrome) {
     const { family, format, ground, chrome } = slide.presentationChrome;
     const elements = chromeElements({ family, format, ground, chrome }, {
-      frame, tokens: chromeTokensForSlide(slide, { index, total }),
+      frame, tokens: chromeTokensForSlide(slide, { index, total }), overrides: paletteOverrides,
     });
     return <div aria-hidden="true" data-vc-presentation-art={family}>
       {elements.map((item) => <div key={item.key} data-vc-art-device={item.key} style={{

@@ -106,7 +106,7 @@ export function metricRowFit({ values, columnPx, unit, fontFamily, weight }) {
 
 /** A small, allowlisted set of editable primitives shared by preview and export.
  * React escapes every value; generated content never controls markup or CSS. */
-export default function PresentationBlocks({ blocks: raw, rect, frame, ink, background, fontFamily, family = 'executive', accent, numericTypography, onChange, forExport = false, artDirectionVersion = 2 }) {
+export default function PresentationBlocks({ blocks: raw, rect, frame, ink, background, fontFamily, family = 'executive', accent, numericTypography, onChange, forExport = false, artDirectionVersion = 2, paletteOverrides = {} }) {
   // Mede de novo quando as fontes terminam de carregar (a exportação espera
   // por elas; a primeira medida pode usar a fonte de reserva).
   const [, setFontsReady] = useState(0);
@@ -134,7 +134,11 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, back
   const fontSize = 26 * unit;
   // Tratamento de evidência da família (fios, zebra, painel, numeração).
   const key = normalizeFamilyKey(family);
-  const st = familyEvidenceStyle(key);
+  // Reteste 22/11: números e fios dos blocos seguem o destaque da marca própria.
+  const familyStyle = familyEvidenceStyle(key);
+  const st = paletteOverrides?.accent ? Object.fromEntries(Object.entries(familyStyle)
+    .map(([name, value]) => [name, typeof value === 'string' && value.toLowerCase() === String(familyStyle.accent || '').toLowerCase() ? paletteOverrides.accent : value]))
+    : familyStyle;
   const panel = st.panel;
   const ruleColor = st.metricRuleColor || accent || ink;
   const headerFont = familyFont(key, st.headerRole === 'display' ? 'display' : st.headerRole === 'label' ? 'label' : 'text');

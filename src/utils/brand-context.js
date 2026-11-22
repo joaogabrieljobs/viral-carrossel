@@ -44,6 +44,18 @@ export function projectsForBrand(library, brandId) {
   });
 }
 
+/**
+ * MF-14: projeto aberto cuja marca não está na lista de marcas não trocava a
+ * marca ativa, e o painel listava os projetos de outra marca sem ele. O
+ * projeto aberto sempre aparece (primeiro, quando é de outra marca).
+ */
+export function projectsForPanel(library, brandId, activeDocId) {
+  const list = projectsForBrand(library, brandId);
+  if (!activeDocId || list.some((entry) => entry?.id === activeDocId)) return list;
+  const active = (library || []).find((entry) => entry?.id === activeDocId);
+  return active ? [active, ...list] : list;
+}
+
 export function brandHasContext(brand) {
   return styleKitHasContent(brand?.styleKit);
 }

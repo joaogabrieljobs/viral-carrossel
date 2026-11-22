@@ -3,6 +3,7 @@
  * Sem teto — se houver mais fotos do que slides, cria slides novos.
  */
 import { automaticPhotoFramingPatch } from './photo-framing.js';
+import { ownPhotoOverlay } from './slide-logo.js';
 
 /**
  * @param {object[]} slides
@@ -53,6 +54,8 @@ export function applyBatchPhotosToSlides(slides, imagePayloads, mkSlide, brand, 
         bgImageSource: 'imported',
         bgImageFailed: false,
         bgImageError: null,
+        // Reteste 22/11: foto própria entra com escurecimento mais leve.
+        overlay: ownPhotoOverlay(base.overlay),
       };
     }
     next.push(base);

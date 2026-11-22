@@ -28,11 +28,12 @@ const COMPOUND = `(?:${Object.keys(TENS).join('|')})(?:\\s+e\\s+|[ -])(?:${SINGL
 const COUNT = `(?:\\d+(?:[.,]\\d+)?|${COMPOUND}|${TEENS}|${SINGLE}|dez|vinte|trinta|cem|ten|hundred)`;
 // Quantidade e unidade na mesma linha: numa tabela, "41.200" seguido da
 // célula "Ano" não é a alegação "41.200 anos" (MF-04).
-const QUANTITY = new RegExp(`\\b${COUNT}[^\\S\\n]*(?:%|por cento|percent|vezes|vez|times?|anos?|years?|meses|m[eê]s|months?|semanas?|weeks?|dias?|days?|horas?|hours?|minutos?|minutes?|segundos?|seconds?|cliques?|clicks?|toques?|taps?|clientes?|customers?|patients?|pacientes?)\\b`, 'giu');
+const QUANTITY = new RegExp(`\\b${COUNT}[^\\S\\n]*(?:%|por cento|percent|vezes|vez|times?|anos?|years?|meses|m[eê]s|months?|semanas?|weeks?|dias?|days?|horas?|hours?|minutos?|minutes?|segundos?|seconds?|cliques?|clicks?|toques?|taps?|clientes?|customers?|patients?|pacientes?|parcelas?|payments?|installments?)\\b`, 'giu');
 // Percent signs have no word boundary after them; keep that alternative apart.
 const PERCENTAGE = /\b\d+(?:[.,]\d+)?\s*%/gu;
 const UNIT_ALIASES = [
-  [/\b(?:vezes|vez|times?)\b/g, 'times'], [/\b(?:anos?|years?)\b/g, 'years'],
+  // "3 parcelas" sustenta "três vezes" (reteste 22/11, WebExpresso).
+  [/\b(?:vezes|vez|times?|parcelas?|payments?|installments?)\b/g, 'times'], [/\b(?:anos?|years?)\b/g, 'years'],
   [/\b(?:meses|mes|months?)\b/g, 'months'], [/\b(?:semanas?|weeks?)\b/g, 'weeks'],
   [/\b(?:dias?|days?)\b/g, 'days'], [/\b(?:horas?|hours?)\b/g, 'hours'],
   [/\b(?:minutos?|minutes?)\b/g, 'minutes'], [/\b(?:segundos?|seconds?)\b/g, 'seconds'],
@@ -113,7 +114,12 @@ const ROUTINES = /\b(?:feit[oa]s? a mao|a mao|todos os dias|todo dia|toda manha|
 const AVAILABILITY = /\b(?:pode(?:m)?\s+(?:ficar|sair)\s+sem|pode(?:m)?\s+nao\s+encontrar|quem\s+chega\s+(?:cedo|tarde|primeiro|sem)|acaba(?:m)?\s+(?:cedo|rapido|logo)|esgota(?:m|do|dos|da|das)?|estoque\s+limitado|ultimas\s+unidades|antes\s+que\s+acabe|vagas?\s+limitadas?|no\s+horario\s+que\s+(?:voce|preferir|quiser|escolher)|quando\s+(?:voce\s+)?quiser|a\s+qualquer\s+hora|(?:ja\s+)?reserva(?:m)?\s+o\s+seu|nenhum[a]?\s+(?:\S+\s+){0,3}(?:consegue|pode)\s+(?:imitar|copiar|igualar)|pouca\s+gente\s+(?:imagina|sabe|conhece)|o\s+que\s+(?:sobra|sobrar|sobrou|sobrarem|resta|restar|restou)|vitrines?|(?:pode|podem|vai|vao|antes\s+de|ate)\s+acabar)\b/gu;
 // Reteste 21/11 (T02, T06): regra geral e atributo sensorial do produto que o
 // material não traz ("costuma levar", "crosta firme e miolo que rende").
-const GENERALIZATION = /\b(?:costuma(?:m)?|geralmente|normalmente|em geral|a maioria d[oa]s?|quase sempre|tipicamente)\b/gu;
+const GENERALIZATION = /\b(?:costuma(?:m)?|geralmente|normalmente|em geral|a maioria d[oa]s?|quase sempre|tipicamente|muit[oa]s\s+(?:acham|pensam|acreditam|dizem|imaginam)|tod[oa]\s+mundo\s+(?:acha|pensa|sabe)|most\s+people|many\s+(?:people\s+)?(?:think|believe|assume)|everyone\s+(?:knows|thinks)|usually|typically)\b/gu;
+// Reteste 22/11 (WebExpresso): vantagem de posição e propriedade prometidas
+// sem estar no material ("quem tem site aparece primeiro", "You keep full
+// ownership").
+const ADVANTAGE = /\b(?:aparece(?:m)?\s+primeiro|sai(?:em)?\s+na\s+frente|fica(?:m)?\s+na\s+frente|primeiro\s+lugar\s+no\s+google|show(?:s)?\s+up\s+first|ranks?\s+(?:first|higher)|stand(?:s)?\s+out\s+from\s+(?:the\s+)?competition)\b/gu;
+const OWNERSHIP = /\b(?:full\s+ownership|you\s+own\s+(?:it|everything|the\s+site)|(?:é|e)\s+(?:todo\s+)?(?:seu|sua)\s+para\s+sempre|tod[oa]\s+seu|propriedade\s+(?:total|completa)|seu\s+para\s+sempre|forever\s+yours)\b/gu;
 const SENSORY = /\b(?:crosta|casca|crocante|crocantes|miolo|macio|macia|aerad[oa]|umid[oa]|sabor|sabores|aroma|perfumad[oa]|textura|derrete(?:m)?)\b/gu;
 const CHANNELS = /\b(?:whatsapp|DM|direct|coment[aá]rios|agendamento|agende (?:uma )?consulta|patients?|pacientes?)\b/giu;
 const CONDITIONAL = /\b(?:pode|podem|poderia|talvez|se (?:voce|sua|seu|ja)|por exemplo|uma opcao|may|might|could|if (?:you|your)|for example|an option)\b/;
@@ -144,7 +150,9 @@ export function auditUnsupportedCommercialClaims(slides, source) {
         const claim = match[0].trim();
         if (rule.category === 'garantia' && negatedGuarantee(text, match.index)) continue;
         if (rule.category === 'item incluso' && (negatedInclusion(text, match.index) || inclusionWithoutItem(claim))) continue;
-        if (!sourceText.includes(normalize(claim))) violations.push({ slideIndex, category: rule.category, claim });
+        // Mesma equivalência da auditoria de fatos (reteste 22/11).
+        if (rule.category === 'item incluso' && inclusionCovered(claim, source)) continue;
+        if (!sourceText.includes(normalize(claim)) && !equivalent(sourceText).includes(equivalent(normalize(claim)))) violations.push({ slideIndex, category: rule.category, claim });
       }
     }
   }
@@ -178,6 +186,26 @@ function derivedPrice(claim, prices) {
   return walk(0, 0);
 }
 
+/**
+ * Reteste 22/11 (WebExpresso): paráfrase do próprio material virava "sem
+ * fonte" e 6 de 7 apresentações saíram como rascunho. Equivalências fechadas:
+ * "grátis" = "gratuito" = "sem custo" = "sem cobrar" = "free"; vagas contadas
+ * no material sustentam "vagas limitadas"; um "inclui …" cujos itens estão no
+ * material é paráfrase, não item novo.
+ */
+const FREE_WORDS = /\b(?:gratis|gratuit[oa]s?|sem custo(?: extra| adicional)?|sem cobrar|sem cobranca|de graca|free(?: of charge)?|for free|no charge|no cost|at no cost|no extra cost)\b/g;
+const equivalent = text => String(text).replace(FREE_WORDS, 'gratis');
+const COUNTED_SPOTS = /\b(?:\d+|dez|ten|cinco|five|vinte|twenty)\s+(?:vagas|spots|sites|websites|lugares|unidades|clientes|places)\b|\b(?:only|apenas|somente|so)\s+\d+\b/;
+const LIMITED_SPOTS = /^(?:vagas?\s+limitadas?|poucas\s+vagas|limited\s+(?:spots|availability|places))$/;
+const STOP = new Set('a o as os de da do das dos e em um uma para por com no na nos nas que como ao aos seu sua sao the and of to in for with your you inclui inclusos inclusas incluso inclusa vem acompanha includes include'.split(' '));
+const stemsOf = text => normalize(text).split(/[^a-z0-9]+/).filter(word => word.length > 2 && !STOP.has(word)).map(word => word.slice(0, 6));
+function inclusionCovered(claim, sourceText) {
+  const stems = stemsOf(claim.replace(/^\S+\s*/, ''));
+  if (stems.length < 2) return false;
+  const sourceStems = new Set(stemsOf(sourceText));
+  return stems.filter(stem => sourceStems.has(stem)).length / stems.length >= 0.8;
+}
+
 export function auditDraftFactuality(draft, config = {}) {
   // Never treat the fully expanded generation prompt (examples, templates,
   // narrative recipes) as evidence. Callers pass raw user material explicitly.
@@ -187,6 +215,8 @@ export function auditDraftFactuality(draft, config = {}) {
   // kept separate in the prompt but pass the same negative-clause filter here.
   const evidence = factualEvidenceText([source, config.userInstructions].filter(Boolean).join('\n'));
   const sourceText = normalize(evidence);
+  const sourceEquivalent = equivalent(sourceText);
+  const countedSpots = COUNTED_SPOTS.test(sourceText);
   const quantities = quantityKeys(evidence);
   const channels = new Set([...evidence.matchAll(CHANNELS)].map(match => normalize(match[0])));
   const prices = sourcePrices(evidence);
@@ -203,7 +233,8 @@ export function auditDraftFactuality(draft, config = {}) {
         if (rule.category === 'garantia' && negatedGuarantee(text, match.index)) continue;
         if (rule.category === 'item incluso' && (negatedInclusion(text, match.index) || inclusionWithoutItem(claim))) continue;
         if (rule.category === 'preço' && derivedPrice(claim, prices)) continue;
-        if (!sourceText.includes(normalize(claim))) add(rule.category, claim);
+        if (rule.category === 'item incluso' && inclusionCovered(claim, evidence)) continue;
+        if (!sourceText.includes(normalize(claim)) && !sourceEquivalent.includes(equivalent(normalize(claim)))) add(rule.category, claim);
       }
     }
     for (const match of [...text.matchAll(QUANTITY), ...text.matchAll(PERCENTAGE)]) {
@@ -220,6 +251,7 @@ export function auditDraftFactuality(draft, config = {}) {
         if (!sourceText.includes(match[0]) && !CONDITIONAL.test(normalized)) add('rotina ou feitura sem fonte', match[0]);
       }
       for (const match of normalized.matchAll(AVAILABILITY)) {
+        if (countedSpots && LIMITED_SPOTS.test(match[0])) continue;
         if (!sourceText.includes(match[0])) add('disponibilidade ou escassez sem fonte', match[0]);
       }
       for (const match of normalized.matchAll(GENERALIZATION)) {
@@ -227,6 +259,12 @@ export function auditDraftFactuality(draft, config = {}) {
       }
       for (const match of normalized.matchAll(SENSORY)) {
         if (!sourceText.includes(match[0])) add('atributo sensorial sem fonte', match[0]);
+      }
+      for (const match of normalized.matchAll(ADVANTAGE)) {
+        if (!sourceText.includes(match[0])) add('vantagem sem fonte', match[0]);
+      }
+      for (const match of normalized.matchAll(OWNERSHIP)) {
+        if (!sourceText.includes(match[0])) add('propriedade ou posse sem fonte', match[0]);
       }
       for (const match of sentence.matchAll(CHANNELS)) {
         if (!channels.has(normalize(match[0])) && !CONDITIONAL.test(normalized)) add('canal ou serviço não informado', match[0]);
@@ -276,7 +314,8 @@ Leia cada frase do rascunho, inclusive títulos, blocos e legenda, e confira no 
 - conveniência que contradiz um fato (ex.: "na volta do trabalho" para loja que fecha às 13h; "retire quando quiser" com horário definido);
 - número reinterpretado ("seis mãos" para 6 funcionários).
 - escassez, disponibilidade ou superioridade: "pode ficar sem", "quem chega cedo leva", "esgota", "no horário que você escolher", "nenhum concorrente consegue imitar".
-- generalização apresentada como regra: "costuma levar", "geralmente", "a maioria das padarias".
+- generalização apresentada como regra: "costuma levar", "geralmente", "a maioria das padarias", "muitos acham", "most people think".
+- vantagem ou posse prometida: "quem tem site aparece primeiro", "you keep full ownership", "é todo seu".
 Corrija também erros de digitação e palavras inexistentes. Uma frase verdadeira e simples vale mais que um detalhe específico inventado. Ao corrigir, mantenha a função do card no arco.`;
 }
 

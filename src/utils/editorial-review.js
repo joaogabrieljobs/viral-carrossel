@@ -394,8 +394,36 @@ export function repeatedFactSlides(slides) {
   return [...seen].filter(([, indexes]) => indexes.length >= 3).map(([fact, slideIndexes]) => ({ fact, slideIndexes }));
 }
 
+// Reteste 22/11 (WebExpresso): "segunda língua grátis" em 3 cards; sem
+// número, a contagem de fatos não via. Trinca de palavras de conteúdo
+// repetida em 3 ou mais cards (dentro da mesma frase).
+const PHRASE_STOP = new Set('a o as os de da do das dos e em um uma uns umas para por com no na nos nas que como ao aos seu sua seus suas se sem mais muito esta estao este essa esse isso sao foi ser tem ter vai pode podem cada pelo pela quando onde voce the and of to in for with your you on at by is are this that it from have will can'.split(' '));
+const plainWords = text => String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[*_]/g, '');
+
+export function repeatedPhraseSlides(slides) {
+  const seen = new Map();
+  (Array.isArray(slides) ? slides : []).forEach((slide, index) => {
+    const text = [...['title', 'subtitle', 'bodyAfterImage'].map(field => String(slide?.[field] || '')), blockText(slide?.presentationBlocks)].join('. ');
+    const phrases = new Set();
+    for (const sentence of plainWords(text).split(/[.!?;:\n]+/)) {
+      // Número fica na frase: "Passo 1" e "Passo 2" não são repetição.
+      const words = (sentence.match(/[a-z0-9]+/g) || []).filter(word => (word.length > 3 || /\d/.test(word)) && !PHRASE_STOP.has(word));
+      for (let i = 0; i + 2 < words.length; i += 1) phrases.add(words.slice(i, i + 3).join(' '));
+    }
+    phrases.forEach(phrase => seen.set(phrase, [...(seen.get(phrase) || []), index]));
+  });
+  const found = [...seen].filter(([, indexes]) => indexes.length >= 3);
+  // Trincas sobrepostas da mesma frase longa: fica a primeira por conjunto de cards.
+  const bySet = new Map();
+  for (const [phrase, slideIndexes] of found) {
+    const key = slideIndexes.join(',');
+    if (!bySet.has(key)) bySet.set(key, { phrase, slideIndexes });
+  }
+  return [...bySet.values()];
+}
+
 function repeatedFactRule(slides) {
-  const repeated = repeatedFactSlides(slides);
+  const repeated = [...repeatedFactSlides(slides), ...repeatedPhraseSlides(slides).map(item => ({ fact: item.phrase, slideIndexes: item.slideIndexes }))];
   return repeated.length
     ? `\nFATO REPETIDO — ${repeated.map(item => `"${item.fact}" aparece nos slideIndex ${item.slideIndexes.join(', ')}`).join('; ')}. Mantenha cada fato no slide em que ele é o assunto (no máximo 2 slides); nos outros, troque por outra informação do material ou condense, sem inventar e sem mudar a quantidade de slides.`
     : '';
@@ -407,6 +435,10 @@ function repeatedTitleRule(slides) {
     ? `\nTÍTULO REPETIDO — correção obrigatória nos slideIndex ${repeated.join(', ')}: o title repete (ou quase) o de um slide anterior. Reescreva com a ideia própria deste slide, sem repetir o mesmo fato; se o slide não tem ideia nova, condense o conteúdo com o anterior sem mudar a quantidade.`
     : '';
 }
+
+// Reteste 22/11 (W02): título "segunda língua grátis" com apoio sobre os
+// modelos de taqueria. Não há regra segura por palavras; a revisão confere.
+const TITLE_SUPPORT_RULE = '\nTÍTULO × APOIO — em cada card, título e apoio tratam do mesmo assunto. Se o apoio desenvolve outro fato, reescreva o título para o assunto do apoio (ou o apoio para o assunto do título), usando só o material.';
 
 export function buildEditorialReviewPrompt(prompt, draft, config = {}) {
   if (config.presetId === 'apresentacao') {
@@ -433,7 +465,7 @@ ${buildReviewFactCheckPrompt()}
 Verifique também: promessa da capa entregue; caminho escolhido respeitado; uma ideia por slide; progressão sem repetição; títulos legíveis a distância; argumentos e exemplos sustentados pelo material; síntese e próximo passo coerentes.${limitsBlock}
 Leia todos os campos do rascunho, inclusive blocos nativos, speakerNotes e caption. Verifique fatos, estágio e condições em cada campo, não apenas no texto principal. Decisão pendente permanece pendente; aceite não autoriza deduzir encerramento contratual. Base, período e condições essenciais de indicadores e escopo devem estar visíveis no slide correspondente, não somente nas notas.
 Corrija apenas problemas identificados. Preserve ordem, quantidade, assunto, arco, números e fatos sustentados.${lessonRepair} Remova ou qualifique alegações sem apoio; não acrescente fontes ou fatos. Não altere imageQuery nem configuração visual.
-Use slideIndex começando em zero. Não envie edições para slides que já estejam bons. Cada índice aparece no máximo uma vez. ${buildPresentationReviewRules(config.presentationPath)}${repeatedTitleRule(draft?.slides)}${repeatedFactRule(draft?.slides)}
+Use slideIndex começando em zero. Não envie edições para slides que já estejam bons. Cada índice aparece no máximo uma vez. ${buildPresentationReviewRules(config.presentationPath)}${repeatedTitleRule(draft?.slides)}${repeatedFactRule(draft?.slides)}${TITLE_SUPPORT_RULE}
 Resposta: um único objeto JSON {"edits":[{"slideIndex":0,"reason":"problema concreto","title":"texto corrigido"}],"caption":"resumo geral corrigido apenas se necessário"}.
 Cada edição exige slideIndex e reason; inclua somente os campos que mudam: ${editableFields}. caption é opcional. Se estiver adequado, retorne {"edits":[]}. Sem texto fora do JSON ou campos adicionais.${plannedRules}`;
   }
@@ -450,7 +482,7 @@ Cada edição exige slideIndex e reason; inclua somente os campos que mudam: ${e
   const echoRule = echoes.length
     ? `\nAPOIO QUE REPETE O TÍTULO — correção obrigatória nos slideIndex ${echoes.join(', ')}: o subtitle diz de novo o que o title já diz. Reescreva o subtitle com uma informação nova do material ou deixe-o vazio.`
     : '';
-  const repeatRule = repeatedTitleRule(draft?.slides) + repeatedFactRule(draft?.slides);
+  const repeatRule = repeatedTitleRule(draft?.slides) + repeatedFactRule(draft?.slides) + TITLE_SUPPORT_RULE;
   const explicitScriptRule = config?.explicitCardScript?.count
     ? `\nROTEIRO EXPLÍCITO DO USUÁRIO — preserve a correspondência entre cada bloco e o slideIndex equivalente. Não funda, reordene, mova para outro card nem omita um bloco. A revisão pode melhorar clareza e encaixe dentro do próprio card, sem trocar sua função, fatos ou intenção.`
     : '';
@@ -697,9 +729,32 @@ async function reviewSocialDraft({ prompt, draft, config, textOptions, onStage }
   }
   let violations = auditSocialDraft(candidate, config);
   if (!violations.length) {
-    return finishSocialReview(candidate, reviewApplied
+    const status = reviewApplied
       ? JSON.stringify(candidate) === JSON.stringify(draft) ? 'unchanged' : 'revised'
-      : 'unavailable');
+      : 'unavailable';
+    // Reteste 22/11 (WebExpresso): a mesma frase ou fato em 3+ cards depois
+    // da revisão ganha um reparo dirigido; falha não vira rascunho.
+    const repeated = [...repeatedFactSlides(candidate.slides), ...repeatedPhraseSlides(candidate.slides).map(item => ({ fact: item.phrase, slideIndexes: item.slideIndexes }))];
+    if (reviewResponded && repeated.length) {
+      const sizeOf = slides => [...repeatedFactSlides(slides), ...repeatedPhraseSlides(slides)].reduce((sum, item) => sum + item.slideIndexes.length - 2, 0);
+      const targets = [...new Set(repeated.flatMap(item => item.slideIndexes))].sort((a, b) => a - b);
+      onStage?.('repairing');
+      try {
+        const repair = unwrapEditorialReview(await callAI(`${buildEditorialReviewPrompt(prompt, candidate, config)}
+REPARO DE REPETIÇÃO — última passagem, sem gerar outro carrossel.
+Edite somente slideIndex ${targets.join(', ')}. Repetições: ${repeated.map(item => `"${item.fact}" nos slideIndex ${item.slideIndexes.join(', ')}`).join('; ')}. Mantenha cada uma só no card em que ela é o assunto; nos outros, use outra informação do material ou condense. Não acrescente fatos nem mude a quantidade de cards. Preserve caption.`, textOptions));
+        throwIfGenerationCancelled(textOptions.signal);
+        if (Array.isArray(repair?.edits) && repair.edits.every(edit => targets.includes(edit?.slideIndex)) && !hasOwn(repair, 'caption')) {
+          const repaired = retainGroundedFields(applyEditorialReview(candidate, repair, config, { deferQualityChecks: true }), candidate, config).result;
+          if (!auditSocialDraft(repaired, config).length && sizeOf(repaired.slides) < sizeOf(candidate.slides)) {
+            return finishSocialReview(repaired, 'repaired');
+          }
+        }
+      } catch (error) {
+        if (isGenerationCancelled(error) || textOptions.signal?.aborted) throw error;
+      }
+    }
+    return finishSocialReview(candidate, status);
   }
   // A service outage is not a reason to make another equally expensive call.
   // If a response arrived, give the specific remaining problems one repair.
@@ -876,6 +931,18 @@ ${attempt > 1 ? `A resposta anterior deste lote não pôde ser utilizada. Refaç
 
 /** Planning → validated batches → review. Repair is bounded at each stage,
  * and complete, useful slides remain available if a later response fails. */
+/** Aplica só as edições que passam sozinhas; devolve null se nenhuma passar. */
+function salvagePresentationReview(draft, review, config) {
+  const value = unwrapEditorialReview(review);
+  if (!isObject(value) || !Array.isArray(value.edits) || !value.edits.length) return null;
+  const indexes = value.edits.map(edit => edit?.slideIndex);
+  if (new Set(indexes).size !== indexes.length) return null;
+  const valid = value.edits.filter(edit => leniently(() => { applyEditorialReview(draft, { edits: [edit] }, config); return true; }, false));
+  if (!valid.length || valid.length === value.edits.length) return null;
+  const result = leniently(() => applyEditorialReview(draft, { edits: valid }, config), null);
+  return result ? { result, dropped: value.edits.length - valid.length } : null;
+}
+
 export async function generatePlannedPresentation({ prompt, config, aiOptions, onStage, onReview, onDraft, onPlan }, callAI) {
   const textOptions = { ...aiOptions, ...presentationAIOptions('apresentacao', config.presentationPath), json: true, jsonParser: parsePresentationPlanResponse, temperature: 0.2, thinking: 'disabled', maxTokens: 8192 };
   const planning = config.planningContext || {};
@@ -959,7 +1026,7 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
   // dirigido; se falhar ou não melhorar, o deck segue como estava (repetição
   // é qualidade, não fato sem fonte).
   const repetitionOf = slides => {
-    const facts = repeatedFactSlides(slides);
+    const facts = [...repeatedFactSlides(slides), ...repeatedPhraseSlides(slides).map(item => ({ fact: item.phrase, slideIndexes: item.slideIndexes }))];
     const titles = repeatedTitleIndexes(slides);
     return { facts, titles, size: facts.reduce((sum, item) => sum + item.slideIndexes.length - 2, 0) + titles.length };
   };
@@ -1021,6 +1088,13 @@ REPARO DE FATOS: edite somente os slides com slideIndex ${indexes.join(', ')}. E
       // abaixo (MF-04), sem nova tentativa.
       const validButLong = responded && leniently(() => { applyEditorialReview(draft, review, plannedConfig, { deferQualityChecks: true }); return true; }, false);
       if (validButLong) { reviewDiagnostics.push({ attempt, outcome: 'over_limits' }); break; }
+      // Reteste 22/11 (WebExpresso): uma edição inválida (bloco fora do
+      // contrato) descartava a revisão inteira. Aproveita as válidas.
+      const salvaged = responded ? salvagePresentationReview(draft, review, plannedConfig) : null;
+      if (salvaged) {
+        reviewDiagnostics.push({ attempt, outcome: 'salvaged', dropped: salvaged.dropped, message: String(error?.message || '').slice(0, 160) });
+        return settle(salvaged.result, JSON.stringify(salvaged.result) === JSON.stringify(draft) ? 'unchanged' : 'revised');
+      }
       reviewDiagnostics.push({
         attempt, outcome: responded ? 'invalid_response' : 'request_failed',
         ...(Number.isInteger(error?.status) ? { status: error.status } : {}),
