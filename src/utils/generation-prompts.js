@@ -28,151 +28,129 @@ export const GENERATION_TOPIC_MAX_CHARS = 1500;
 const SOCIAL_FACTUAL_GROUNDING_RULES = `FIDELIDADE AO MATERIAL — vale também para título, legenda e CTA:
 - Use o pedido, brief e material fornecidos como fonte dos fatos. O modo narrativo muda a organização e o ritmo, nunca os fatos, a oferta, o público ou a ação final.
 - Não complete lacunas com números, tempo decorrido, frequência, depoimentos, falas, eventos, diagnósticos, canais de contato, itens inclusos, preço, prazo ou garantias. Um benefício esperado não é um resultado comprovado.
-- Não transforme possibilidade em certeza, associação em causa, nem um caso em regra para a maioria ou para todos. Afirmações de perda, ganho ou conversão exigem apoio no material; caso contrário descreva a dificuldade observável sem prometer seu efeito.
-- Se uma cena foi fornecida, preserve apenas seus acontecimentos. Não acrescente uma história anterior, um concorrente, uma reação ou um desfecho para tornar o arco mais dramático. Só crie ficção se o usuário pedir, deixando claro que é exemplo hipotético.
+- Não transforme possibilidade em certeza, associação em causa, nem um caso em regra para a maioria ou para todos. Afirmações de perda, ganho ou conversão exigem apoio no material; caso contrário descreva apenas a dificuldade observável que o material informa, sem prometer seu efeito. Não atribua ao público sensações, emoções, hábitos, frequência ou experiências que não foram fornecidos; uma pergunta retórica também não pode pressupor esses fatos.
+- Se uma cena foi fornecida, preserve apenas seus acontecimentos. Não acrescente uma história anterior, um concorrente, uma reação ou um desfecho para tornar o arco mais dramático. Só crie ficção se o usuário pedir. Uma indicação de produção como "marca fictícia" não vira automaticamente texto visível; identifique junto ao trecho pertinente qualquer cena, caso, depoimento, dado ou resultado simulado que possa ser confundido com evidência real.
 - Instruções de estilo, exemplos de fórmula e hipóteses do método não comprovam fatos. Não copie seus detalhes para o conteúdo final.
 - Preserve o vocabulário do público e a intenção do CTA do pedido. Não substitua clientes por pacientes nem acrescente WhatsApp, DM, comentários ou outro canal não solicitado. Na ausência de CTA, prefira uma conclusão útil sem inventar oferta.
-- Cada card acrescenta uma ideia; não repita o mesmo número, problema ou argumento para preencher a sequência. Revise naturalidade e precisão no idioma solicitado.`;
+- Cada card acrescenta uma ideia; não repita o mesmo número, problema ou argumento para preencher a sequência. Uma referência breve à tese ou ao CTA é permitida quando necessária à compreensão, sem reexpor o conteúdo de outro card. Revise naturalidade e precisão no idioma solicitado.`;
 
-// Cada modo substitui a seção MÉTODO no prompt. Todos devem escalar ao número
-// de slides pedido (hook → meio(s) → fecho), sem assumir sempre 5 slides no miolo.
+// Cada modo substitui a seção MÉTODO no prompt. Todos se adaptam à quantidade
+// de cards pedida e só pedem o que o material sustenta (catálogo final de 22/11):
+// cada método traz o que fazer quando o material não dá cena, causa ou processo.
 const GEN_MODES = [
   {
     id: 'editorial',
     Icon: Newspaper,
     label: 'Editorial',
     desc: 'Tese forte, camadas de mercado e leitura que desmonta o óbvio',
-    method: `MÉTODO EDITORIAL — leitura estratégica (escala ao número total de slides):
-Objetivo: defender uma leitura específica do tema com observação, mecanismo e consequência concreta.
-- Slide 1 · HOOK/Tese: uma observação específica que desperta curiosidade e que o miolo sustenta. Pode ser direta, uma cena ou um contraste; não force tese contraintuitiva nem a fórmula "Não é sobre X. É sobre Y.".
-- Slides do meio (2 até penúltimo): cada um = UMA camada nova — sem repetir o mesmo tipo de argumento. Ordens possíveis (combine conforme N): contexto de mercado → onde a leitura óbvia quebra → mecanismo ou estrutura por trás → impacto na categoria ou no consumidor → erro recorrente → contraste com o que "todo mundo faz". Vocabulário útil quando couber: categoria, distribuição, posicionamento, percepção, comportamento, recorrência, narrativa (da categoria), repertório, diferenciação, sinal, confiança.
-- Último slide · Fecho: conclua a tese com uma consequência sustentada e o próximo passo pedido; evite máximas sobre quem vence ou fica para trás.
-EVITE: tom de guru, frase vazia de inspiração, repetir "insights" genéricos em vários slides.`,
+    method: `MÉTODO — Explicar com autoridade (adapte à quantidade pedida):
+Defenda uma leitura específica sustentada pelo material, com contexto, explicação e consequência proporcional às evidências.
+- Abertura: uma tese, observação ou pergunta que o desenvolvimento possa sustentar; cena e contraste só se fornecidos. Não force tese contraintuitiva nem a fórmula "Não é sobre X. É sobre Y.".
+- Desenvolvimento: cada card acrescenta uma relação distinta entre os fatos. Use leitura comum, comportamento de mercado, erro recorrente, mecanismo ou consequência somente quando o material os informa ou demonstra; não invente o que o público costuma pensar nem o que "todo mundo faz".
+- Quando houver apenas uma oferta, explique a relação entre necessidade declarada, solução descrita, condições e aplicação; não apresente preço ou quantidade como prova de eficácia e não invente diagnóstico para abrir o argumento.
+- Sem causa documentada, explique o funcionamento ou a escolha descritos, sem lhes atribuir efeito comprovado. Um exemplo só entra se fornecido ou se sua criação tiver sido solicitada e for identificado como hipotético.
+- Fecho: conclua a tese no alcance que o material permite e use o CTA pedido; sem CTA, conclua de modo útil.
+Use o vocabulário do público; evite tom de guru, jargão de mercado desnecessário e máximas sobre quem vence ou fica para trás. Fatos, restrições, idioma, limites e CTA do pedido prevalecem; não complete a estrutura com detalhes ausentes.`,
   },
   {
     id: 'deep',
     Icon: Brain,
     label: 'Profundo',
     desc: 'Autopsia do tema — variáveis, padrão escondido, o que muda na prática',
-    method: `MÉTODO PROFUNDO — anatomia do fenômeno (modo "patologista"; escala ao N de slides):
-Disseque o tema: variáveis, padrões, hipóteses testáveis. Zero "seja autêntico", zero conselho genérico.
-- Slide 1 · HOOK: uma pergunta ou observação específica que o material permite investigar. Não force uma tese contraintuitiva, um segredo ou uma afirmação absoluta.
-- Slides do meio — distribua estas ETAPAS ao longo dos slides 2…penúltimo (se N for pequeno, una etapas adjacentes; se N for grande, detalhe mais dentro da mesma etapa):
-  (A) AUTÓPSIA — o que acontece por dentro do fenômeno (mecanismo, não aparência): gatilho, fricção, atrito, sinal, ciclo, dependência.
-  (B) PADRÃO OCULTO — princípio que conecta casos visíveis; nomeie o que se repete.
-  (C) DEMONSTRAÇÃO — um caso fornecido, ou a sequência de ações explicitamente descrita no material; não invente um caso para preencher esta etapa.
-  (D) IMPLICAÇÃO — o que muda na decisão ou na leitura quando você enxerga isso.
-- Último slide · Fecho: mostre qual decisão muda ao reconhecer o mecanismo; uma pergunta específica pode encerrar, sem hierarquia entre quem entendeu e quem não entendeu.
-Vocabulário preferido: mecanismo, gatilho, sinal, distribuição, comportamento, recorrência, fricção, antecipação, hipótese, variável, sistema. EVITE: hack, segredo, fórmula mágica.`,
+    method: `MÉTODO — Ir a fundo (adapte à quantidade pedida):
+Investigue uma pergunta delimitada mostrando como os elementos descritos se relacionam, quais condições importam e o que isso permite concluir.
+- Abertura: pergunta ou observação que o material permite investigar; não force segredo, tese contraintuitiva ou afirmação absoluta.
+- Desenvolvimento: explique o funcionamento documentado, as variáveis ou condições fornecidas e suas relações sustentadas. Associação não comprova causa; hipótese continua hipótese e não entra como constatação.
+- Demonstração: use caso, trecho ou sequência de ações presentes no material; não crie cena, resultado, analogia factual ou exemplo para preencher etapa.
+- Em oferta sem mecanismo causal, examine a lógica explícita da própria proposta: o que cada condição permite, limita ou exige, comparando apenas alternativas fornecidas e sem atribuir ganhos não demonstrados. Isso deve formar uma análise, sem um card isolado por preço, vaga ou prazo.
+- Se só houver atributos soltos e faltarem relações para uma análise, obtenha contexto, processo ou exemplos antes desta chamada, ou uma escolha de outro modo; não repita os mesmos fatos como supostas camadas de profundidade.
+- Fecho: conclusão no alcance das evidências e a decisão ou pergunta pertinente; preserve o CTA pedido e não hierarquize leitores entre quem entendeu e quem não entendeu.
+Use termos claros do assunto; não imponha "autópsia", "patologista", "padrão oculto" ou jargão de mercado. Fatos, restrições, idioma, limites e CTA prevalecem; não crie causas, padrões ou detalhes ausentes.`,
   },
   {
     id: 'pain',
     Icon: HeartHandshake,
     label: 'Odisseia da Dor',
     desc: 'Nomeia a dor, valida, mostra o que falhou e uma saída honesta',
-    method: `MÉTODO ODISSEIA DA DOR — jornada empática (escala ao N de slides):
-Escreva para quem sofre com o tema agora. Nomear, validar, expor o ciclo, apontar direção pequena e real — não promessa. Tom sóbrio e perto; ZERO "você consegue", ZERO performance coaching.
-- Slide 1 · IDENTIFICAÇÃO: o sentimento que o leitor mal consegue nomear — preciso o suficiente para ele pensar "sou eu". Ex.: "Você fez tudo certo. E ainda assim travou." / "Você não está cansado. Está exausto de fingir que está bem."
-- Slides do meio — distribua ao longo de 2…penúltimo:
-  VALIDAÇÃO (a dificuldade observável descrita no material),
-  FALSO REMÉDIO (somente se o material informar uma tentativa anterior; caso contrário explique o obstáculo atual, sem inventar histórico),
-  RAIZ (mecanismo; sintoma vs causa — o que muda a autoimagem),
-  SAÍDA (ângulo honesto e possível hoje — não milagre).
-Se poucos slides: priorize validação → raiz → saída.
-- Último slide: saída honesta e convite gentil coerente com o CTA solicitado.
-Vocabulário: ciclo, raiz, sintoma, exaustão, repetição, pausa, presença. EVITE: jornada, mindset, foco, você nasceu pra isso.`,
+    method: `MÉTODO — Falar da dor (adapte à quantidade pedida):
+Reconheça uma dificuldade ou necessidade explicitamente presente no material e conecte-a à saída que ele oferece, com empatia e sem diagnosticar o leitor.
+- Abertura: descreva a situação fornecida. Use segunda pessoa apenas quando o briefing sustentar essa experiência do público; caso contrário, formule a situação como condição ("Se...") sem sugerir que já aconteceu a todos.
+- Desenvolvimento: explique o obstáculo descrito e seus limites. Tentativa anterior, sentimento, frequência, causa ou consequência só entram se fornecidos; o benefício de um produto não prova que seu oposto ocorre com o público.
+- Causa: só apresente uma raiz quando sustentada; sem causa conhecida, detalhe o funcionamento ou a restrição observável informada, sem criar diagnóstico ou histórico.
+- Saída: mostre como a solução descrita responde à necessidade declarada, preservando condições e a diferença entre proposta e resultado comprovado.
+- Sem dificuldade no material, trabalhe o desejo ou necessidade declarados; se só houver oferta sem necessidade, obtenha esse contexto ou outra escolha de modo antes da redação, sem inventar dor para vender.
+- Fecho: saída proporcional ao material e CTA solicitado; sem CTA, uma conclusão útil. Não exija relato pessoal, confissão ou sofrimento.
+Tom sóbrio e próximo, com vocabulário do público; evite coaching, culpa, moralismo e jargão terapêutico. Fatos, restrições, idioma e limites prevalecem; não crie detalhes para preencher o arco.`,
   },
   {
     id: 'viral',
     Icon: TrendingUp,
     label: 'Viral Trends',
     desc: 'Parada de scroll, loop de tensão, prova e frase para salvar ou enviar',
-    method: `MÉTODO VIRAL TRENDS — retenção e clareza algorítmica (escala ao N de slides):
-Cada slide deve entregar informação e criar motivo para continuar; feche no miolo a pergunta aberta na capa.
-- Slide 1 · PARADA DE SCROLL (≤0,5s): UMA técnica abaixo. PROIBIDO abrir com "Hoje vou te ensinar", "Você sabia que", "5 dicas infalíveis".
-  • INTERRUPÇÃO — contraria a expectativa do nicho.
-  • PROMESSA NUMÉRICA específica — quantidade real de ideias entregues; prazo ou resultado só se sustentado pelo material.
-  • REVELAÇÃO ATRASADA — resultado primeiro, causa depois.
-  • IDENTIFICAÇÃO brutal — "isso sou eu."
-  • PERGUNTA que tira sono — a dúvida às 2h.
-- Slides do meio — distribua funções (repetir ou expandir se N for grande):
-  BUILD-UP (abre pergunta e entrega uma pista útil, sem enrolação),
-  DESENVOLVIMENTO (prova parcial, autoridade rápida sem paper acadêmico),
-  SHARE-TRIGGER (uma frase quotável memorável),
-  PAYOFF (fecha o loop — o "ahá").
-- Último slide: entregue o payoff e o próximo passo solicitado. EVITE: "segue pra mais", "marca o amigo", "compartilha se gostou".
-Tom: curto, rápido, confiante; urgência sem sensacionalismo.`,
+    method: `MÉTODO — Prender atenção (adapte à quantidade pedida):
+Abra uma pergunta relevante ou um contraste sustentado e entregue informação concreta desde o segundo card, concluindo a resposta antes do CTA.
+- Abertura: escolha uma pergunta respondível, uma observação específica, um contraste fornecido ou uma quantidade real de itens entregues. Não atribua ao público hábitos, sentimentos, busca na internet, sofrimento ou urgência ausentes.
+- Desenvolvimento: avance por explicações, condições ou evidências distintas do material. Cada card entrega parte útil da resposta; não mantenha suspense apenas para adiar informação, nem reserve um card para uma frase de efeito sem contribuição nova.
+- Resposta: feche a pergunta quando a informação necessária estiver apresentada, até o penúltimo card. A última posição acrescenta conclusão ou próximo passo, sem repetir a resposta inteira.
+- Em oferta, a curiosidade pode vir do que é oferecido, de uma condição ou do funcionamento informados; não crie problema, comparação, escassez ou benefício para justificar o gancho.
+Tom curto, rápido e confiante. Não use "Hoje vou te ensinar", "Você sabia que", "5 dicas infalíveis", "segue pra mais", "marca o amigo" ou "compartilha se gostou" como fórmula. Urgência só quando houver condição temporal real no material. Fatos, restrições, idioma, limites e CTA do pedido prevalecem; não invente detalhes.`,
   },
   {
     id: 'storytelling',
     Icon: BookOpen,
     label: 'Storytelling',
     desc: 'História com arco — cena, tempo e virada (não headline de pitch)',
-    method: `MÉTODO STORYTELLING — narrativa em cena (escala ao N de slides):
-Conte a situação fornecida como uma sequência compreensível; não explique em modo manual. Use somente ações e detalhes presentes no material. Sem caso fornecido, acompanhe o processo descrito, sem fabricar cliente, cenário ou depoimento.
-- Slide 1 · IN MEDIAS RES: entre na ação que consta no material, sem adicionar horário, contagem, fala ou acontecimento.
-- Slides do meio — distribua ao longo de 2…penúltimo:
-  CONTEXTO (o que estava em jogo, segundo o material),
-  VIRADA (a descoberta ou mudança que foi informada; não exija um evento extraordinário),
-  CONSEQUÊNCIA (o próximo passo possível, sem apresentar sucesso esperado como já ocorrido),
-  e se couber GENERALIZAÇÃO leve (o que isso significa além deste caso) — antes do fecho.
-Se poucos slides: contexto → virada → consequência.
-- Último slide: conclusão da situação e CTA solicitado, sem inventar um final feliz.
-Use verbos no passado/presente; EVITE "muitas pessoas", "em geral", gerúndio em excesso.`,
+    method: `MÉTODO — Contar uma história (adapte à quantidade pedida):
+Conte uma sequência sustentada pelo material com situação inicial, ações ou mudança e estado final; não transforme fatos isolados de uma oferta em acontecimentos.
+- Havendo história: use somente pessoas, lugares, ações, intenções e acontecimentos fornecidos; entre numa ação real do relato, desenvolva sua sequência e preserve a ordem conhecida. Uma virada só existe se uma mudança foi informada; resultado posterior não comprova que a escolha o causou.
+- Sem história, mas com processo descrito: acompanhe o próprio processo em ordem, usando como sujeito o produto, trabalho ou pedido que o material descreve. Preserve o que é prática existente, proposta ou futuro; não apresente o percurso como experiência real de um cliente nem fabrique intenção, conflito ou decisão.
+- Se houver apenas preço, vagas, prazo ou características sem acontecimentos ou processo, o material não sustenta este modo: obtenha uma sequência ou uma escolha de outro modo antes de iniciar a redação. Não disfarce uma lista de oferta como história nem crie ficção para preencher cards.
+- Abertura: ação ou estado inicial fornecido; desenvolvimento: avanços distintos da sequência; mudança, quando documentada; consequência ou próximo estado apenas no alcance do material; fecho: estado final conhecido e CTA pedido, sem inventar final feliz.
+Não amplie um caso para "muitas pessoas" ou "em geral". Use verbos no tempo e na modalidade sustentados, sem gerúndio excessivo. Fatos, restrições, idioma, limites e CTA prevalecem; não crie detalhes para completar o arco. Ficção só se o usuário solicitar, identificando junto ao trecho qualquer caso ou resultado que possa ser confundido com real.`,
   },
   {
     id: 'how_to',
     Icon: GraduationCap,
     label: 'Passo-a-passo',
     desc: 'Manual — um passo por slide, imperativo e verificável',
-    method: `MÉTODO PASSO-A-PASSO — tutorial replicável (escala ao N de slides):
-Sem palestra motivacional. O leitor deve sair sabendo o que fazer na ordem certa.
-- Slide 1 · PROMESSA: deixe explícito resultado + número de passos (alinhado ao total de slides intermediários). Ex.: "Como [resultado] em [K] passos."
-- Slides do meio (2 até penúltimo): UM PASSO POR SLIDE, numerados em sequência real (Passo 1… Passo K). Em cada um:
-  • TÍTULO: "Passo N · [verbo + objeto]" (nome curto e ativo).
-  • SUBTÍTULO: a ação concreta e, se couber no limite, como executá-la. Um erro ou exemplo é opcional e deve vir do material; não force três explicações em cada card.
-  Linguagem imperativa: "Identifique…", "Anote…", "Compare…" — evite "é importante que você…".
-- Penúltimo slide: entregue o último passo; inclua nele um erro específico a evitar, sem substituir o passo prometido.
-- Último slide: síntese do procedimento e CTA solicitado.
-Se houver checklist ou variação, conte apenas os passos reais na promessa da capa; não invente passos para preencher espaço.`,
+    method: `Ensine o procedimento na ordem em que o leitor pode executá-lo. Na capa, identifique a tarefa e o número real de passos. Preserve o alcance do resultado que o material sustenta.
+Reserve um card para cada passo efetivo. No título, use “Passo N · verbo + objeto”. No apoio, descreva como executar a ação com os insumos e as condições fornecidos. Um exemplo ou erro a evitar só entra se documentado e se couber no limite do card.
+Posições adicionais podem explicar uma preparação, condição ou verificação distinta já fornecida. Coloque cada uma onde fizer sentido para a execução. Numere somente os passos reais. No último card, use o critério de conclusão quando fornecido e o CTA pedido. Sem CTA, feche com a conclusão sustentada.
+Preserve a sequência, o idioma, as restrições, o total de cards e os limites ativos. A contagem de cards não determina a contagem de passos. Preço, vagas e prazo isolados não descrevem um procedimento.`,
   },
   {
     id: 'jornalistico',
     Icon: ScrollText,
     label: 'Jornalístico',
     desc: 'Fio tipo capa digital: selo de editoria, manchete e texto em pirâmide invertida',
-    method: `MÉTODO JORNALÍSTICO — fio editorial / digital first (escala ao N de slides):
-Soar como postagem de veículo sério ou newsletter de analítico — não viral barulhento nem pitch de marca.
-- Slide 1 · CAPA: hierarquia de três camadas quando couber ao formato do JSON (use título e subtítulo de forma criativa para isso):
-  (A) SELO/CATEGORIA — uma linha curta em tom de editoria em CAIXA ALTA OU caixa alta suave (ex.: "ANÁLISE", "MERCADO", "[NICHO]").
-  (B) MANCHETE — frase objetiva, dentro do limite de título da densidade escolhida.
-  (C) LEAD/NUT — 1 linha ou 2 máximas: o "por que importa agora", factual e direto — sem perguntinha vazia.
-- Slides do meio (2…penúltimo): informação principal primeiro, seguida de contexto apenas se couber no limite. Um slide = um fato ou ângulo sustentado. Não simule reportagem, pesquisa, fonte ou tendência de mercado ausentes.
-- Último slide · FECHO: linha-editorial ou o que falta saber próximo — convite sóbrio (pergunta precisa ou "salve para acompanhar").
-EVITE: "X mudou tudo" sem nuance; clickbait que o miolo não sustenta; tom de relatório institucional de marca.`,
+    method: `MÉTODO — Informar com clareza (adapte à quantidade pedida):
+Apresente o fato principal e o contexto relevante com redação objetiva, sem simular reportagem independente.
+- Capa: title com a manchete factual; subtitle com contexto essencial quando couber nos limites. Não force selo de editoria nem três camadas num layout de dois campos.
+- Desenvolvimento: acrescente contexto, detalhe verificável e implicação sustentada, uma contribuição por card; não reescreva a manchete nem reserve página a dado sem relevância.
+- Se o material for anúncio ou oferta, preserve essa natureza. Não invente atualidade, acontecimento, pesquisa, fonte, tendência, comparação ou consequência para soar como notícia.
+- Fecho: conclusão factual e o CTA solicitado; acompanhamento futuro só quando informado. Sem CTA, encerre com uma informação útil, sem prometer cobertura continuada.
+Evite clickbait, "X mudou tudo" sem apoio e perguntas vazias. Fatos, restrições, idioma e limites prevalecem; não invente informações nem troque a intenção comercial do pedido por tom de veículo independente.`,
   },
   {
     id: 'sensacionalista',
     Icon: Megaphone,
     label: 'Sensacionalista',
     desc: 'Ganchos tipo tablóide, tensão extrema e viradas — sem mentir nem prometer miragem',
-    method: `MÉTODO SENSACIONALISTA — alto impacto, tom de tablóide moderno (escala ao N de slides):
-Máximo drama na forma, honestidade no conteúdo: pode exagerar RITMO e TENSÃO lexical, não fatos nem promessas.
-- Slide 1 · BERRANTE CONTROLADO — UMA destas âncoras (troque conforme tema):
-  • REVELAÇÃO com custo ("O que ninguém te contou sobre [X]").
-  • CONTRASTE concreto entre o problema descrito e a ação proposta; número ou prazo somente se o material os confirmar.
-  • PERGUNTA que arranha ("Por que [grupo] ainda acredita em [Y]?").
-  PROIBIDO: "chocante!", "você não vai acreditar" vazio, ou prometer prova que o carrossel não entrega.
-- Slides do meio — distribua tensão máxima: cada slide abre novo micro-gancho OU fecha um aberto antes; uso de cortes curtos, frases de efeito, contraste visceral ("parecia X / era Y"). Um slide deve ter a frase "compartilhável" de choque sóbrio quando houver espaço — não vulgaridade gratuita.
-- Último slide: síntese sustentada e CTA solicitado. Tensão não autoriza catastrofismo, generalizações ou promessa de conversão.
-Tom: urgência, segunda pessoa só quando intensificar impacto — sem moralismo.`,
+    method: `MÉTODO — Criar alto impacto (adapte à quantidade pedida):
+Use ritmo incisivo, contraste e precisão para tornar memorável o que o material realmente sustenta.
+- Abertura: uma afirmação concreta, um contraste fornecido ou uma pergunta respondível pelo conteúdo. Não use "ninguém te contou", crença atribuída a um grupo, surpresa, custo ou ameaça sem suporte.
+- Desenvolvimento: cada card acrescenta explicação, condição, evidência ou consequência sustentada. Cortes curtos não dispensam qualificadores; não reserve um card só para slogan, choque ou paráfrase de outro.
+- Sem contraste no material, dê destaque a uma escolha ou característica relevante já informada; não fabrique um "parecia X / era Y".
+- Fecho: conclusão proporcional às evidências e CTA pedido, sem repetir a revelação inteira. Urgência e escassez só quando constarem no material; tensão lexical não cria prazo, risco ou perda.
+Evite "chocante", "você não vai acreditar", catastrofismo, moralismo e promessa de conversão. Fatos, restrições, idioma, limites e CTA prevalecem; não invente detalhe para produzir impacto.`,
   },
   {
     id: 'none', Icon: ScrollText, label: 'Nenhum',
     desc: 'Segue o pedido e o brief, sem fórmula narrativa predefinida.',
-    method: 'SEM MODO NARRATIVO: siga a entrega e a organização pedidas pelo usuário e pelo brief. Não imponha tese editorial, tutorial, história ou fórmula de retenção. Garanta clareza, coerência e ausência de repetição.',
+    method: `SEM MODO NARRATIVO: siga a entrega e a organização pedidas pelo usuário e pelo brief. Não imponha tese editorial, tutorial, história ou fórmula de retenção. Garanta clareza, coerência e ausência de repetição.
+O modo organiza o arco. Fatos, restrições, idioma e CTA do pedido têm prioridade sobre estas sugestões. Não crie detalhes ausentes para completar a estrutura.`,
   },
-].map(mode => ({ ...mode, method: `${mode.method}\nO modo organiza o arco. Fatos, restrições, idioma e CTA do pedido têm prioridade sobre estas sugestões. Não crie detalhes ausentes para completar a estrutura.` }));
+];
 const GEN_MODE_BY_ID = Object.fromEntries(GEN_MODES.map(m => [m.id, m]));
 
 /** IDs legados que deixaram de ser modos narrativos. */
@@ -244,8 +222,8 @@ function persoHybridCharBands(textDensityId = '1_1') {
   return tendenciaStyleSandwichCharBands(textDensityId);
 }
 
-function buildPersoHybridLayoutBlock(slideCount, textDensityId = '1_1') {
-  const n = Math.min(12, Math.max(2, slideCount | 0));
+// A regra do miolo vale "do terceiro card em diante": não depende da quantidade.
+function buildPersoHybridLayoutBlock(_slideCount, textDensityId = '1_1') {
   const { subHi, bodyHi } = persoHybridCharBands(textDensityId || '1_1');
   return `
 LAYOUT VISUAL HÍBRIDO (Personalizado · densidade ${SLIDE_TEXT_DENSITY_BY_ID[textDensityId]?.label || textDensityId} — prioridade quando ativo):
@@ -253,7 +231,7 @@ LAYOUT VISUAL HÍBRIDO (Personalizado · densidade ${SLIDE_TEXT_DENSITY_BY_ID[te
 - Slide 1 e Slide 2: subtítulo até ${scaledCeiling(80, textDensityId)} caracteres; formato de tela inteira (“full-bleed”) — só "title", "subtitle" e "imageQuery". O campo "bodyAfterImage" DEVE ser exatamente "" (vazio).
 
 - A segunda tela já desenvolve o argumento; não repita a abertura. O último slide conclui o arco, mesmo usando dois blocos.
-- Slide 3 a Slide ${n} (todos quando N≥3): "title" OBRIGATÓRIO, curto e específico. "subtitle" acima da fotografia: até ${subHi} caracteres. "bodyAfterImage" abaixo: até ${bodyHi} caracteres, apenas se acrescentar uma informação útil. Pode deixar o payoff vazio se a ideia já estiver completa; não repita a legenda para preencher a zona. Os dois campos dividem o orçamento de apoio do card, conforme o CONTRATO DE TEXTO. Destaque lexical: no máximo UM trecho entre **asteriscos duplos**.
+- Do terceiro card em diante, quando houver: "title" OBRIGATÓRIO, curto e específico. "subtitle" acima da fotografia: até ${subHi} caracteres. "bodyAfterImage" abaixo: até ${bodyHi} caracteres, apenas se acrescentar uma informação útil. Pode deixar o payoff vazio se a ideia já estiver completa; não repita a legenda para preencher a zona. Os dois campos dividem o orçamento de apoio do card, conforme o CONTRATO DE TEXTO. Destaque lexical: no máximo UM trecho entre **asteriscos duplos**.
 - TODOS os cards, em qualquer modo narrativo, exigem title não vazio. Nunca use "Seu título aqui" nem coloque o texto inteiro no subtitle.
 - Opcionalmente "cultureTone": "", "light", "dark" ou "accent" (mesmo significado visual do Pacote Cultura).
 - Slide só texto SEM foto neste formato: imageQuery ""; bodyAfterImage permanece opcional. Não crie texto para preencher a composição.
@@ -293,44 +271,54 @@ const buildBrandBlock = (brand) => {
 const buildImgParamsBlockPT = (p) => {
   if (!p) return '';
   const lines = [];
+  // Catálogo 22/11: as instruções revisadas são condicionais ("quando o
+  // conteúdo permitir", "preserve o que foi informado") e entram sem o "siga
+  // estritamente"; as demais continuam como ordem direta.
+  let strict = true;
+  const soft = (line) => { strict = false; lines.push(line); };
   // Fidelidade (low=metafórico · high=literal)
-  if (p.fidelity >= 75)      lines.push('• FIDELIDADE ALTA: a imageQuery DEVE retratar literalmente o tema do slide. Sujeitos e objetos diretamente reconhecíveis e nomeados.');
+  if (p.fidelity >= 75)      soft('• Fidelidade alta: mostre o sujeito ou produto pedido de maneira reconhecível. Quando o tema for abstrato, escolha o elemento concreto que o material fornece. Não invente participante ou ocorrência para torná-lo literal.');
   else if (p.fidelity >= 60) lines.push('• Fidelidade média-alta: a imageQuery deve mostrar elementos diretos do tema, sem ser metafórica demais.');
-  else if (p.fidelity <= 25) lines.push('• FIDELIDADE BAIXA: imageQueries 100% metafóricas. NUNCA mostre o tema literalmente — sugira por atmosfera, gesto ou objeto periférico apenas.');
+  else if (p.fidelity <= 25) soft('• Fidelidade muito baixa: quando o conteúdo permitir, sugira o tema por luz, enquadramento ou detalhe periférico. Mantenha reconhecíveis os sujeitos indispensáveis ao pedido e preserve os atributos informados.');
   else if (p.fidelity <= 40) lines.push('• Fidelidade baixa: prefira sugerir o tema indiretamente.');
   // Criatividade
-  if (p.creativity >= 75)      lines.push('• CRIATIVIDADE ALTA: composições inusitadas, ângulos inesperados, contraposições visuais, simbolismo sutil, justaposições conceituais.');
+  if (p.creativity >= 75)      soft('• Criatividade alta: varie ângulo, escala ou composição e, quando pertinente, relacione elementos já presentes na cena. Preserve produto, identidade, ação informada e área útil do painel.');
   else if (p.creativity >= 60) lines.push('• Criatividade média-alta: composições com algum elemento inesperado.');
   else if (p.creativity <= 25) lines.push('• CRIATIVIDADE BAIXA: composições convencionais e diretas. Enquadramento clássico editorial. Nada experimental.');
   else if (p.creativity <= 40) lines.push('• Criatividade baixa: composições convencionais e seguras.');
   // Irreverência
-  if (p.irreverence >= 75)      lines.push('• IRREVERÊNCIA ALTA: humor sutil, situações cheeky, cenas inusitadas, leve desconforto cômico, quebra do esperado, momentos absurdos do cotidiano.');
-  else if (p.irreverence >= 60) lines.push('• Irreverência média-alta: aceite cenas levemente humoradas ou inesperadas.');
+  if (p.irreverence >= 75)      soft('• Irreverência alta: use humor visual discreto na composição ou no contraste entre elementos existentes. Preserve o tom e as pessoas do briefing, sem atribuir constrangimento, falas ou acontecimentos.');
+  else if (p.irreverence >= 60) soft('• Irreverência média-alta: se o tema e o tom comportarem, use enquadramento ou associação levemente bem-humorados entre elementos existentes.');
   else if (p.irreverence <= 25) lines.push('• TOM SÉRIO: imagens contemplativas, sóbrias, formais, atemporais. Zero humor, zero ironia.');
   else if (p.irreverence <= 40) lines.push('• Tom sério: contemplativo, formal.');
   // Objetividade
-  if (p.objectivity >= 75)      lines.push('• OBJETIVIDADE ALTA: cenas factuais e documentárias. Pessoas reais em ações concretas, ambientes reconhecíveis, sem ambiguidade visual.');
-  else if (p.objectivity >= 60) lines.push('• Objetividade média-alta: cenas claras e factuais.');
-  else if (p.objectivity <= 25) lines.push('• OBJETIVIDADE BAIXA: cenas atmosféricas, abstratas, evocativas. Emoção sobre fato. Detalhes ambíguos. Luz e atmosfera importam mais que ação.');
+  if (p.objectivity >= 75)      soft('• Objetividade alta: descreva o sujeito informado e a ação observável com precisão. Uma cena gerada é ilustrativa. Não simule a presença de clientes, equipe real ou um acontecimento documentado.');
+  else if (p.objectivity >= 60) soft('• Objetividade média-alta: descreva o sujeito e a ação com clareza e preserve o alcance do que foi informado. Use somente material fornecido para evidência real.');
+  else if (p.objectivity <= 25) soft('• Objetividade muito baixa: sugira o clima por luz, textura, foco e espaço. A atmosfera pode ser ambígua, preservando os atributos do produto e a identidade informada, sem presumir emoções do público.');
   else if (p.objectivity <= 40) lines.push('• Objetividade baixa: priorize atmosfera sobre ação.');
   if (!lines.length) return '';
-  return `\n\nDIREÇÃO DE IMAGEM (eixos ajustados pelo usuário — siga estritamente):\n${lines.join('\n')}\n`;
+  return `\n\nDIREÇÃO DE IMAGEM (eixos ajustados pelo usuário${strict ? ' — siga estritamente' : ''}):\n${lines.join('\n')}\n`;
 };
 
-// Versão em inglês compacta para injetar no prompt do GPT Image (OpenAI).
+// Versão em inglês para injetar no prompt do GPT Image (OpenAI).
 const buildImgParamsTagsEN = (p) => {
   if (!p) return '';
+  // `tags` são os rótulos curtos de antes, sob um único prefixo; `sentences`
+  // são as instruções completas do catálogo 22/11, que preservam o sujeito, o
+  // produto e a ação pedidos mesmo quando o eixo pede um tratamento indireto.
   const tags = [];
+  const sentences = [];
   if (p.fidelity >= 75)      tags.push('literal direct subject representation, theme clearly shown');
-  else if (p.fidelity <= 25) tags.push('metaphorical indirect — never show the theme literally, only suggest through atmosphere');
-  if (p.creativity >= 75)      tags.push('unconventional unexpected composition, conceptual juxtaposition, surprising angle');
-  else if (p.creativity <= 25) tags.push('classic editorial composition, conventional framing, straight photography');
-  if (p.irreverence >= 75)      tags.push('subtle wit and humor, slightly cheeky, unexpected mundane situations, dry comedy, broken expectation');
+  else if (p.fidelity <= 25) sentences.push('Use an indirect visual treatment through light, framing or a supported detail. Keep every subject, product and action the brief explicitly requires recognizable.');
+  if (p.creativity >= 75)      sentences.push('Use an unexpected angle, scale or composition. Build conceptual juxtapositions from the subjects already specified and preserve their relationships.');
+  else if (p.creativity <= 25) sentences.push('Use a classic, straightforward composition with familiar framing in the requested visual medium.');
+  if (p.irreverence >= 75)      sentences.push('Use understated visual wit in scale, timing or composition when appropriate to the subject. Keep the requested action and people intact; do not stage embarrassment or a customer reaction.');
   else if (p.irreverence <= 25) tags.push('serious sober contemplative formal timeless tone, no humor');
-  if (p.objectivity >= 75)      tags.push('documentary factual mode, real people in concrete actions, no ambiguity');
-  else if (p.objectivity <= 25) tags.push('atmospheric evocative ambiguous, emotion over fact, light and mood dominate');
-  if (!tags.length) return '';
-  return `\nAdditional art direction (user adjusted): ${tags.join('; ')}.`;
+  if (p.objectivity >= 75)      sentences.push('Depict the supplied subject and action clearly, with observable detail. Use a documentary style when appropriate; the generated image is illustrative and cannot establish a real participant, event or outcome.');
+  else if (p.objectivity <= 25) sentences.push('Let light, negative space and depth create an evocative mood. Preserve the supplied subject, material properties and action without assigning feelings or experiences to the people depicted.');
+  if (!tags.length && !sentences.length) return '';
+  const parts = [tags.length ? `Additional art direction (user adjusted): ${tags.join('; ')}.` : '', ...sentences].filter(Boolean);
+  return `\n${parts.join(' ')}`;
 };
 
 const VC_ZWSP = /[\u200B-\u200D\uFEFF]/g;
@@ -889,6 +877,12 @@ function buildGenerationLanguageLayer(presetId, tone, narrativeMode = 'editorial
       String(tone || '').trim() ? `\n- Tom base da marca (aplicar dentro do registo jornalístico-analítico): "${String(tone).trim()}".` : ''
     }`;
   }
+  if (narrativeMode === 'pain') {
+    return `REGRAS DE TEXTO — Falar da dor; tom "${tone}":
+- Linguagem empática e concreta, ancorada na dificuldade ou necessidade fornecida; não exija história, cena ou tom terapêutico.
+- Não atribua sentimento, sintoma, hábito, culpa ou diagnóstico ao leitor. Segunda pessoa não autoriza inventar sua experiência; condicionais não devem apresentar causa ou benefício sem suporte.
+- A marca orienta o vocabulário; evite slogans, coaching e fórmulas "não é sobre X, é sobre Y".`;
+  }
   if (storyLike) {
     return `REGRAS DE TEXTO (modo narrativo "${narrativeMode}" — prioridade sobre tom genérico):
 - Vocabulário de história, não de slide de pitch. Evite fórmulas de marca (“não é sobre X, é sobre Y”) salvo um fecho pontual.
@@ -896,9 +890,9 @@ function buildGenerationLanguageLayer(presetId, tone, narrativeMode = 'editorial
 - Deixe identidade da marca colorir a voz, mas não substitua arco narrativo por mensagem institucional.`;
   }
   if (viralMode && narrativeMode === 'sensacionalista') {
-    return `REGRAS DE TEXTO (modo Sensacionalista — tom "${tone}"):
-- Frases de impacto máximo; urgência lexical sem mentir nem inventar consequência não sustentada pelo miolo.
-- Gancho/miolo devem soar “capa sensacionalista” honesta — não post corporativo nem ensaio acadêmico.`;
+    return `REGRAS DE TEXTO — Criar alto impacto; tom "${tone}":
+- Frases incisivas e concretas, com contraste apenas quando sustentado; preserve condições e ressalvas que mudam a afirmação.
+- Impacto vem da seleção dos fatos e do ritmo, sem exigir tablóide, choque, ameaça, urgência ou escassez ausentes.`;
   }
   if (viralMode) {
     return `REGRAS DE TEXTO (modo Viral — tom "${tone}"):
@@ -906,13 +900,13 @@ function buildGenerationLanguageLayer(presetId, tone, narrativeMode = 'editorial
 - Marca e material podem informar vocabulário — não viram slide de posicionamento institucional no lugar de tensão ou payoff.`;
   }
   if (journalMode) {
-    return `REGRAS DE TEXTO (modo Jornalístico — tom "${tone}"):
-- Clara hierarquia de capa quando o slide permitir (categoria/manifestação no título vs lead no subtítulo, ou distribua conforme método).
-- Prosa econômica, factual onde couber ao tema — sem meme de influencer nem tom de guru.`;
+    return `REGRAS DE TEXTO — Informar com clareza; tom "${tone}":
+- Manchete factual no title e contexto essencial no subtitle, dentro dos limites do layout; não force selo, categoria ou terceiro campo visual.
+- Prosa econômica e precisa, sem tom de guru, especulação ou simulação de veículo independente; preserve a natureza de anúncio quando for o caso.`;
   }
   if (howToMode) {
     return `REGRAS DE TEXTO (modo Passo-a-passo — tom "${tone}"):
-- Imperativo e verificável em cada subtítulo; sem narrativa pessoal nem tese de marca entre um passo e outro.
+- Use o imperativo para ações executáveis. Apresente pré-requisitos, condições e critérios no registro adequado, sem transformá-los em passos; sem narrativa pessoal nem tese de marca entre um passo e outro.
 - Marca só afina escolha de palavras — não slogan por slide.`;
   }
   return `REGRAS DE TEXTO (prioridade: pedido e material factual → limites de texto → modo narrativo → tom "${tone}". Não replique um único formato nem uma “voz de página” fixa):
@@ -920,6 +914,22 @@ function buildGenerationLanguageLayer(presetId, tone, narrativeMode = 'editorial
 - Cada slide = 1 ideia principal; evite repetir a mesma fórmula em todos os slides.
 - Prefira substância a frases vazias; evite motivacional genérico e guru.
 - Ritmo: hook enxuto → desenvolvimento → fechamento, conforme o modo escolhido (não imponha sempre o mesmo arco “analítico”).`;
+}
+
+/**
+ * Linha que fecha o bloco de linguagem do pedido. Os modos revisados no
+ * catálogo de 22/11 trocam "se for hipótese, escreva isso" por preservar a
+ * modalidade do material; apresentação e pacote Cultura seguem com a padrão.
+ */
+const LANGUAGE_GUARD_DEFAULT = 'Não invente garantia, prazo, preço, item incluso ou promessa comercial que não esteja no material. Se for hipótese, escreva isso.';
+const LANGUAGE_GUARD_BY_MODE = Object.freeze({
+  pain: 'Não invente garantia, prazo, preço, item incluso ou promessa comercial. Preserve a modalidade do material; hipótese continua hipótese. Fatos, idioma, restrições, limites e CTA prevalecem sobre o tom.',
+  jornalistico: 'Não invente garantia, prazo, preço, item incluso ou promessa comercial. Hipótese continua hipótese; fatos, idioma, restrições, limites e CTA do pedido prevalecem.',
+  sensacionalista: 'Não invente garantia, prazo, preço, item incluso, consequência ou promessa comercial. Hipótese continua hipótese; fatos, idioma, restrições, limites e CTA do pedido prevalecem.',
+});
+function buildGenerationLanguageGuard(presetId, narrativeMode = 'editorial') {
+  if (presetId === 'apresentacao' || isTendenciaCulturaPreset(presetId)) return LANGUAGE_GUARD_DEFAULT;
+  return LANGUAGE_GUARD_BY_MODE[narrativeMode] || LANGUAGE_GUARD_DEFAULT;
 }
 
 const EXPLICIT_LANGUAGE_PATTERNS = [
@@ -1127,55 +1137,41 @@ ${hookVisualHint}
 function buildGenerationSlideLayoutRules(narrativeModeId, creativePresetId, textDensityId = '1_1', slideCount = 9, presentationPath = 'auto') {
   const rules = buildGenerationSlideLayoutRulesBody(narrativeModeId, creativePresetId, textDensityId, slideCount, presentationPath);
   if (creativePresetId === 'apresentacao') return rules;
-  return `${rules}\n\n${buildSocialTextLimitsPrompt({ densityId: textDensityId })}\n\n${SOCIAL_FACTUAL_GROUNDING_RULES}`;
+  return `${rules.trim()}\n\n${buildSocialTextLimitsPrompt({ densityId: textDensityId })}\n\n${SOCIAL_FACTUAL_GROUNDING_RULES}`;
 }
 
-function buildGenerationImageLayer(presetId, topic, n, audience, projectDirection = false, presentationPath = 'auto', presentationFamilyKey) {
+// Regras de cena comuns às três variantes de carrossel (catálogo de imagem de
+// 22/11). A ficha visual (visual-bible.js) entra uma única vez, ao final.
+const IMAGE_QUERY_SCENE_RULES = `• Para um card com imagem, escreva uma única cena em INGLÊS, com 8–15 palavras e até 280 caracteres. Preserve o sujeito, a ação ou o estado que explicam o card. Em card só de texto, use imageQuery "".
+• O assunto e os atributos identificáveis vêm do material. Você pode escolher luz, perspectiva, fundo neutro e composição compatíveis com o briefing para uma imagem ilustrativa. Não transforme esses recursos em fato sobre um cliente, produto, evento ou resultado. Em sequência, varie o enquadramento quando útil e mantenha a aparência dos elementos recorrentes.
+• Reserve a área das camadas de texto apenas quando houver sobreposição. Deixe títulos, números, marcas e dados fora da arte gerada. Uma demonstração, depoimento ou resultado real exige o material correspondente.`;
+
+// Nicho e público já estão no contexto do pedido; aqui só entra o pedido.
+function buildGenerationImageLayer(presetId, topic, _niche, _audience, projectDirection = false, presentationPath = 'auto', presentationFamilyKey) {
   if (presetId === 'apresentacao') {
     if (isPitchPath(presentationPath)) return `imageQuery — APOIO VISUAL DO PITCH:
 • Use "" quando o argumento depende de fluxo, comparação, modelo comercial, métricas, marcos ou responsabilidades. Essas informações devem existir nos campos de texto editáveis.
 • Uma fotografia é opcional e deve esclarecer um uso ou contexto específico de “${topic}”. Não preencha todo o deck com retratos, cenas de rotina ou acessórios; não faça um complemento parecer o produto principal.
 • Demonstrações reais usam apenas materiais fornecidos. Não peça à IA para inventar screenshot, gráfico, cliente, equipe, depoimento ou evidência.
-• Se uma imagem for útil, descreva em INGLÊS, 8–15 palavras, com composição horizontal 16:9 e espaço para texto. Não desenhe texto, números, logo ou marca-d'água.
+• Se uma imagem for útil, descreva em INGLÊS, 8–15 palavras, para o painel do slide 16:9, com espaço para texto somente onde ele se sobrepõe. Não desenhe texto, números, logo ou marca-d'água.
 • ${projectDirection ? 'Preserve a estética do brief nas imagens necessárias; ela não obriga fotografia em cada slide.' : 'Mantenha coerência visual nas imagens necessárias.'}${presentationFamilyKey ? `\n${buildPresentationFamilyImageRules(presentationFamilyKey)}` : ''}`;
     return buildPresentationImageRules(presentationPath, topic, projectDirection, presentationFamilyKey);
   }
-  if (projectDirection) return `imageQuery — DIREÇÃO DO PROJETO:
-• INGLÊS, 8–15 palavras: sujeito + ação + ambiente. A linguagem visual e a luz do brief entram só quando couberem na cena — luz de interior não se aplica a uma cena externa; não repita a mesma expressão de luz em todas as queries.
-• Relacione a cena à mensagem específica do card. Varie cenas mantendo a identidade do projeto.
-• Siga a estética explicitada no brief/estilo (fotografia, 3D, animação, colagem etc.). Não imponha realismo, silêncio visual ou tons dessaturados por padrão.
-• Reserve área legível para as camadas editáveis de título/subtítulo; nunca desenhe texto, logo ou marca-d'água dentro da imagem.
-• As referências são moodboard, não autorização para copiar rosto, personagem ou logo. Arquivos apenas citados no Markdown não estão anexados.
+  if (projectDirection) return `imageQuery — direção do projeto.
+${IMAGE_QUERY_SCENE_RULES}
+• Siga o meio, paleta e linguagem escolhidos no projeto, incluindo fotografia, colagem, animação ou 3D. Use a luz compatível com a cena. Trate as referências de estilo como moodboard e só atribua um papel específico quando o app o identificar. Arquivo citado em texto não conta como imagem anexada.
 
 ${buildVisualBiblePromptRules()}`;
 
-  const nicheStr = n ? ` (nicho: ${n})` : '';
-  const audStr = audience ? ` (público: ${audience})` : '';
   if (isTendenciaCulturaPreset(presetId)) {
-    return `imageQuery — DIREÇÃO DE ARTE “CULTURA EM CURSO” (a IA do gerador de imagem aplicará realismo, luz natural e estética premium em cima — você só precisa descrever a CENA):
-• Idioma: INGLÊS, 8-15 palavras descritivas.
-• Estrutura: [sujeito real] + [ação cotidiana ou estado] + [ambiente específico observado] + [detalhe de luz/atmosfera].
-• OBRIGATÓRIO — relação INDIRETA e inteligente com o tema "${topic}"${nicheStr}${audStr}. NUNCA escolha a representação mais óbvia. A imagem deve sugerir o conceito por atmosfera, gesto, contexto, objeto ou tensão visual — não ser uma "legenda" do título.
-• EVITE clichês visuais: xadrez (estratégia), gráficos subindo (crescimento), lâmpadas (ideia), robôs/hologramas (tecnologia), reuniões corporativas (negócios), explosão de tinta (criatividade), aperto de mãos (parceria), engrenagens, escalada de montanha, lupa.
-• EVITE: pessoas posando como modelo, sorriso publicitário, diversidade encenada, expressões artificiais, fundo de estúdio, luz dramática teatral, paisagens aleatórias desconectadas, animais decorativos.
-• PREFIRA cenas reais e bem observadas: escritórios contemporâneos, ruas urbanas, cafés, casas, lojas, bastidores, mãos manuseando objeto, detalhes de processo, espaços culturais, mesas com objetos, interiores residenciais.
-• Composição: espaço negativo para texto, fundo levemente desfocado, foco claro em UM elemento, poucos objetos, silêncio visual.
-• Slides de miolo no layout sanduíche mostram a foto como retângulo horizontal com cantos arredondados entre dois blocos de texto — prefira enquadramento horizontal (panorâmico ou ~3:2) com protagonista reconhecível no centro da largura.
-• Exemplos BONS (note como sugerem o tema sem ilustrá-lo literalmente):
-  - tema "produtividade" → "open notebook beside cooling coffee on wooden desk, late afternoon window light"
-  - tema "estratégia"   → "hands rearranging objects on a quiet meeting room table, soft overhead light"
-  - tema "longevidade"  → "older woman walking slowly through tree-lined street, soft morning haze"
-  - tema "marca pessoal"→ "person reflected on storefront glass at dusk, warm street lights blurred behind"
-  - tema "tecnologia"   → "single hand resting on closed laptop on minimal desk, quiet morning light through curtain"
-• Cada slide: imageQuery DIFERENTE, todas dentro do mesmo universo visual sóbrio — sinais de tempo, grupo, consumo ou tensão social, nunca “stock genérico de negócios”.`;
+    return `imageQuery — pacote Tendência/Cultura para “${topic}”.
+${IMAGE_QUERY_SCENE_RULES}
+• Quando o pedido deixar a escolha aberta, sugira o tema por um gesto, textura ou detalhe ligado à pauta. Em demonstrações, produto identificado ou fidelidade alta, mostre o sujeito requerido. Use a estética de observação e evite metáforas prontas.
+• No miolo em que a foto ocupa um painel horizontal entre textos, coloque o detalhe essencial no centro útil do retângulo, afastado dos cantos arredondados. Varie a escala sem perder a continuidade de luz e tratamento. Preserve indicações expressas de estética, tom e literalidade.`;
   }
-  return `imageQuery — uma por slide (INGLÊS, 8-15 palavras). O pipeline de imagem da aplicação aplica realismo; você descreve a CENA:
-• Alinhe cada imageQuery ao argumento DAQUELE slide e ao tema "${topic}"${nicheStr}${audStr}.
-• Relação com o tema: prefira sugestão inteligente à ilustração óbvia — salvo se os eixos de direção de imagem do usuário (bloco acima) pedirem literalidade ou contrário.
-• Varie ambiente, clima e composição entre slides quando o conteúdo ou o modo narrativo pedirem contraste — não prenda todo o carrossel a um único clima visual “editorial”.
-• Os eixos ajustados pelo usuário têm PRIORIDADE sobre exemplos genéricos ou um “look” único.
-• EVITE repetir o mesmo clichê visual em todos os slides sem necessidade.
-• Cada slide: imageQuery DIFERENTE.
+  return `imageQuery — para cada card de “${topic}”.
+${IMAGE_QUERY_SCENE_RULES}
+• Use a literalidade escolhida pelo usuário. Quando houver liberdade, prefira um detalhe visual específico a uma metáfora genérica.
 
 ${buildVisualBiblePromptRules()}`;
 }
@@ -1237,74 +1233,47 @@ function buildRefineSingleSlideRules(narrativeModeId, textDensityId = '1_1', opt
   return `${rules}\n${buildSocialTextLimitsPrompt({ densityId: textDensityId })}\n${SOCIAL_FACTUAL_GROUNDING_RULES}`;
 }
 
-/** Estrutura sugerida da legenda conforme modo narrativo. */
+/**
+ * Legenda por modo (catálogo de 22/11): uma orientação em prosa, sem roteiro
+ * numerado nem CTA sugerido. O CTA é o do pedido; sem ele, uma conclusão útil.
+ */
+const CAPTION_OUTLINE_BY_MODE = Object.freeze({
+  none: 'LEGENDA: complemente a leitura no tom do briefing, com contexto útil sustentado pelo material e sem impor fórmula narrativa.',
+  editorial: 'LEGENDA — Explicar com autoridade: formule a conclusão central em outras palavras e acrescente, se houver, uma condição ou implicação sustentada ainda útil. Só mencione leitura comum, problema ou consequência presentes no material; não recrie o arco inteiro.',
+  how_to: 'LEGENDA — Ensinar passo a passo: explique brevemente a utilidade do procedimento e, se constar no material, uma condição para executá-lo. Não reenumere os passos nem sugira pular uma etapa necessária; a ação inicial deve respeitar a ordem do procedimento.',
+  storytelling: 'LEGENDA — Contar uma história: mantenha a voz humana e encerre a leitura com o significado sustentado da sequência narrada. Só use tensão, virada ou emoção documentadas; não reconte todos os acontecimentos nem force partilha de experiência.',
+  viral: 'LEGENDA — Prender atenção: uma abertura curta ligada ao assunto e a resposta útil já sustentada pelo carrossel. Não esconda a resposta atrás de um pedido de engajamento nem repita números para alongar a legenda.',
+  pain: 'LEGENDA — Falar da dor: acolha apenas a dificuldade descrita no material e mostre como a saída proposta se relaciona com ela, sem presumir sentimento ou diagnóstico. Não exija relato pessoal do leitor nem reconstitua todo o arco.',
+  deep: 'LEGENDA — Ir a fundo: destaque a conclusão da investigação e uma condição ou limite sustentado que ajude a aplicá-la. Tese contraintuitiva e padrão recorrente só entram quando o material os sustenta; não os crie por efeito de estilo.',
+  jornalistico: 'LEGENDA — Informar com clareza: mantenha redação factual e acrescente contexto ou condição relevante que complemente a notícia, sem reproduzir manchete e lead dos cards. O próximo acontecimento só é mencionado se constar no material; não prometa cobertura ou acompanhamento futuro.',
+  sensacionalista: 'LEGENDA — Criar alto impacto: use uma abertura incisiva e entregue a conclusão sustentada no próprio texto. Contraste e tensão vêm dos fatos; não condicione revelação a engajamento, nem crie suspense que obrigue a repetir o carrossel.',
+});
+const CAPTION_FIDELITY_RULES = 'Use somente fatos e relações sustentados pelo material, preservando idioma, modalidade, condições, restrições e a intenção do pedido. Não acrescente número, tempo, frequência, emoção, hábito, fala, cena, diagnóstico, causalidade, generalização, item incluso, preço, prazo, garantia, oferta, canal de contato ou promessa ausentes. Benefício esperado não é resultado comprovado; instruções de estilo e seus exemplos não são fatos. Ficção só se solicitada, com identificação junto ao trecho que possa parecer evidência real; notas de produção não viram copy automaticamente.';
+const CAPTION_CLOSING_RULES = `Não transcreva os cards nem recapitule seus dados; acrescente um contexto sustentado ainda útil ou seja breve. Use o CTA solicitado. Sem CTA, encerre com uma conclusão útil. Se o usuário dispensar ou proibir chamadas à ação, omita também a pergunta de engajamento. Preserve o limite de ${INSTAGRAM_CAPTION_LIMIT} caracteres e até ${INSTAGRAM_HASHTAG_LIMIT} hashtags específicas, sem obrigação de preencher o teto.`;
+
 function buildCaptionOutlineInstructionsBody(narrativeModeId, presetId = 'livre') {
   if (presetId === 'apresentacao') {
     return `NOTAS DA APRESENTAÇÃO (campo "caption"):
 Escreva um resumo executivo curto do deck, com a ideia central e o próximo passo. Sem hashtags, emojis, pedido de curtida, salvamento, compartilhamento ou comentário.`;
   }
-  if (narrativeModeId === 'none') return 'LEGENDA: complemente o conteúdo com uma informação útil e um próximo passo pertinente ao pedido. Siga a voz do brief, sem impor uma fórmula narrativa.';
+  if (narrativeModeId === 'none') return CAPTION_OUTLINE_BY_MODE.none;
   if (isTendenciaCulturaPreset(presetId)) {
     return `ESTRUTURA DA LEGENDA CULTURA:
 1. Primeiro parágrafo: expanda a percepção nomeada no carrossel, sem copiar a capa.
 2. Segundo parágrafo: pergunta de identificação OU convite útil ligado à conclusão.
 3. Hashtags específicas ao nicho no final.`;
   }
-  switch (narrativeModeId) {
-    case 'storytelling':
-    case 'pain':
-      return `ESTRUTURA DA LEGENDA (modo narrativo — tom humano):
-1. Abrir com tensão, momento ou pergunta (não copiar o título do slide 1).
-2. Uma ou duas linhas que sintetizem o arco (${narrativeModeId === 'pain' ? 'da dor e da saída honesta' : 'da história e da virada'}).
-3. Insight central sem soar como relatório executivo.
-4. Convite aos comentários ou à partilha de experiência.
-5. Hashtags no final.`;
-    case 'viral':
-      return `ESTRUTURA DA LEGENDA (modo viral — ritmo curto):
-1. Linha que reforça parada de scroll (gancho).
-2. Uma ou duas linhas com payoff, número ou virada principal.
-3. CTA de save ou pergunta direta.
-4. Hashtags. Evite ensaio longo.`;
-    case 'how_to':
-      return `ESTRUTURA DA LEGENDA (modo passo-a-passo):
-1. Reformular a promessa do que o carrossel ensina.
-2. Resumir os passos em uma linha fluida (sem listar todos os títulos).
-3. Sugerir qual passo testar primeiro OU salvamento com motivo útil.
-4. Hashtags.`;
-    case 'deep':
-      return `ESTRUTURA DA LEGENDA (modo profundo):
-1. Tese contraintuitiva reformulada.
-2. Padrão ou mecanismo central em linguagem acessível.
-3. Implicação para quem reconhece o padrão.
-4. Pergunta precisa ou save para revisitar.
-5. Hashtags.`;
-    case 'jornalistico':
-      return `ESTRUTURA DA LEGENDA (modo jornalístico — fio/coletânea):
-1. Linha de editoria/subject em CAIXAS compactas só se ficar natural no Instagram.
-2. Manchete resumindo o ângulo (não copie slide 1 por extenso).
-3. Lead em 2-3 linhas: o núcleo factual ou implicação.
-4. Para onde isso aponta a seguir + pergunta precisa OU save sóbrio.
-5. Hashtags.`;
-    case 'sensacionalista':
-      return `ESTRUTURA DA LEGENDA (modo sensacionalista — honestidade):
-1. Gancho forte que casa com o payoff do carrossel (sem cilada).
-2. Uma ou duas linhas de tensão antes da revelação sintetizada.
-3. PAYOFF verdadeiro — aquilo que o leitor vai descobrir se engajar.
-4. Pergunta provocadora ou save com âncora concreta.
-5. Hashtags. Ritmo curtíssimo.`;
-    default:
-      return `ESTRUTURA DA LEGENDA:
-1. Frase-tese forte (não repita literalmente o slide 1).
-2. Contextualize o problema ou a leitura comum.
-3. Sua leitura ou síntese principal.
-4. Consequência prática ou insight aplicável.
-5. Pergunta nos comentários OU CTA de salvamento elegante.`;
-  }
+  return CAPTION_OUTLINE_BY_MODE[narrativeModeId] || CAPTION_OUTLINE_BY_MODE.editorial;
 }
 
 function buildCaptionOutlineInstructions(narrativeModeId, presetId = 'livre') {
   const outline = buildCaptionOutlineInstructionsBody(narrativeModeId, presetId);
-  return presetId === 'apresentacao' ? outline : `${outline}\nAs sugestões de CTA acima só valem se o pedido não especificou outra ação. O CTA do pedido tem prioridade.\n${SOCIAL_FACTUAL_GROUNDING_RULES}`;
+  if (presetId === 'apresentacao') return outline;
+  // O pacote Cultura mantém o roteiro próprio, que ainda sugere um convite.
+  if (isTendenciaCulturaPreset(presetId) && narrativeModeId !== 'none') {
+    return `${outline}\nAs sugestões de CTA acima só valem se o pedido não especificou outra ação. O CTA do pedido tem prioridade.\n${SOCIAL_FACTUAL_GROUNDING_RULES}`;
+  }
+  return `${outline}\n${CAPTION_FIDELITY_RULES}\n${CAPTION_CLOSING_RULES}`;
 }
 
 /** Regras para o modal de variações de gancho — alinhadas ao modo + pacote. */
@@ -1424,20 +1393,20 @@ function buildCaptionVoiceRules(presetId, narrativeMode = 'editorial') {
     narrativeMode === 'storytelling' || narrativeMode === 'pain'
       ? `- Legenda com voz humana; sintetize o arco ${narrativeMode === 'pain' ? 'empático ' : ''}sem soar como resumo de relatório.`
       : narrativeMode === 'sensacionalista'
-        ? `- Legenda ultra-curta; gancho + payoff real (sem cilada); CTA ou pergunta com âncora concreta.`
+        ? `- Legenda ultra-curta; gancho + payoff real (sem cilada); fecho concreto alinhado ao pedido.`
         : narrativeMode === 'viral'
-          ? `- Legenda enxuta; reforço de gancho + payoff; CTA ou pergunta direta.`
+          ? `- Legenda enxuta; reforço de gancho + payoff; fecho coerente com o pedido.`
           : narrativeMode === 'how_to'
-            ? `- Legenda útil: o que foi ensinado + qual passo testar primeiro.`
+            ? `- Legenda útil: para que serve o procedimento e, se pertinente, como iniciar respeitando a ordem e as condições fornecidas; não reenumere os passos.`
             : narrativeMode === 'deep'
-              ? `- Legenda que destaque padrão ou mecanismo sem jargão desnecessário.`
+              ? `- Legenda que destaque apenas o mecanismo, a relação ou a condição documentados, sem pressupor padrão recorrente.`
               : narrativeMode === 'jornalistico'
                 ? `- Legenda em tom de fio: manchete + lead factual antes de hashtags.`
                 : '';
   return [
     `- Legenda até ${INSTAGRAM_CAPTION_LIMIT} caracteres, incluindo espaços, quebras e hashtags. Use parágrafos curtos; não existe número obrigatório de linhas.`,
     '- Baseie a legenda no carrossel completo, incluindo bodyAfterImage. Complemente a leitura sem transcrever os slides nem adicionar fatos ou promessas ausentes.',
-    '- Use uma única ação final (pergunta OU convite); assinatura da marca só quando couber, antes das hashtags e sem duplicar o CTA.',
+    '- Use o CTA solicitado. Se o briefing proibir CTA, encerre com uma frase declarativa e sem convite ou pergunta de engajamento. Se for omisso, uma conclusão basta. Quando couber uma ação final, use apenas uma; assinatura da marca só quando couber, antes das hashtags e sem duplicar o CTA.',
     presetLine, isTendenciaCulturaPreset(presetId) ? '' : modeLine,
   ].filter(Boolean).join('\n');
 }
@@ -1481,7 +1450,7 @@ ${isPresentation
     : 'bodyAfterImage' in slide
       ? 'cultureTone é opcional: omita ou use "", "light", "dark", "accent". Respeite os campos vazios exigidos pelo layout.'
       : ''}
-Sem cercas de código, comentários ou vírgulas finais; escape aspas e quebras de linha dentro das strings. Destaque no máximo um trecho com **asteriscos duplos**; para itálico use _underscores_. Esses marcadores são formatados pelo card, não são texto literal. Não use outros recursos de Markdown. Copie domínios e URLs exatamente como no material, sem espaço antes de .com e sem cortar o começo do endereço.
+Sem cercas de código, comentários ou vírgulas finais; escape aspas e quebras de linha dentro das strings. Destaque no máximo um trecho com **asteriscos duplos**; para itálico use _underscores_. Esses marcadores são formatados pelo card, não são texto literal. ${isPresentation ? 'Não use outros recursos de Markdown.' : 'Não use outros recursos de Markdown, exceto o prefixo "- " quando o pedido ou o formato daquele card previr uma enumeração concreta e o layout a aceitar. Fora dessas listas, use prosa sem marcadores; etapas numeradas só quando solicitadas pelo modo ou usuário.'} Copie domínios e URLs exatamente como no material, sem espaço antes de .com e sem cortar o começo do endereço.
 ${JSON.stringify({
     slides: [slide], caption: '',
     // Ficha visual: só nos carrosséis com imagem direta do material. Cultura pede
@@ -1563,6 +1532,7 @@ export {
   coerceCultureTone,
   buildGenerationIntroLine,
   buildGenerationLanguageLayer,
+  buildGenerationLanguageGuard,
   resolveRequestedContentLanguage,
   buildContentLanguageRule,
   buildGenerationSlideLayoutRules,

@@ -8,7 +8,7 @@ export const NARRATIVE_CHOICES = [
   { id: 'none', label: 'Seguir meu pedido', desc: 'Organiza o conteúdo conforme seu briefing.', example: 'Apresente meus serviços, benefícios e como contratar.' },
   { id: 'editorial', label: 'Explicar com autoridade', desc: 'Defende uma ideia com contexto, argumentos e consequências.', example: 'Por que uma proposta clara ajuda o cliente a decidir.' },
   { id: 'how_to', label: 'Ensinar passo a passo', desc: 'Mostra uma sequência prática que a pessoa pode seguir.', example: 'Como preparar uma proposta comercial em cinco etapas.' },
-  { id: 'storytelling', label: 'Contar uma história', desc: 'Conecta uma situação, uma mudança e o que aconteceu depois.', example: 'O que mudou quando uma pequena loja ganhou um site.' },
+  { id: 'storytelling', label: 'Contar uma história', desc: 'Narra uma situação ou um processo a partir de acontecimentos documentados.', example: 'O que mudou quando uma pequena loja ganhou um site.' },
   { id: 'viral', label: 'Prender atenção', desc: 'Começa com um gancho e entrega a resposta ao longo dos cards.', example: 'Seu cliente procura no Google. Quem ele encontra?' },
   { id: 'pain', label: 'Falar da dor', desc: 'Reconhece um problema e apresenta uma saída possível.', example: 'Você responde orçamentos o dia inteiro, mas vende pouco.' },
   { id: 'deep', label: 'Ir a fundo', desc: 'Explora causas, exemplos e implicações de um assunto.', example: 'O que existe por trás de um cliente que pede desconto.' },

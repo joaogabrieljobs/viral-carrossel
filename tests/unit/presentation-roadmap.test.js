@@ -41,19 +41,23 @@ describe('roteiro por posição das apresentações', () => {
 
   it('o prompt numera as posições e manda não seguir a ordem dos fatos', () => {
     const prompt = buildPresentationRoadmapPrompt('aula_workshop', 6);
-    expect(prompt).toContain('ROTEIRO POR POSIÇÃO — 6 slides');
+    expect(prompt).toContain('ROTEIRO DE REFERÊNCIA — 6 slides');
     expect(prompt).toMatch(/\n4\. ATIVIDADE:/);
-    expect(prompt).toContain('Não organize o deck na ordem em que os fatos aparecem no briefing');
+    expect(prompt).toContain('Não organize o deck na ordem dos fatos do briefing');
   });
 });
 
 describe('o caminho define o tipo de entrega', () => {
-  it('briefing de negócio vira objeto da Aula, não folheto', () => {
+  // Catálogo final 22/11: o negócio do briefing deixou de virar "caso" da Aula
+  // por padrão; a Aula exige um conceito, procedimento ou critério ensinável.
+  it('Aula exige núcleo ensinável: oferta não vira aula nem folheto', () => {
     const prompt = buildPresentationRoadmapPrompt('aula_workshop', 8);
     expect(prompt).toContain('TIPO DE ENTREGA: Aula / Workshop');
-    expect(prompt).toContain('o negócio entra como caso para explicar, exemplificar e praticar');
+    expect(prompt).toContain('uma oferta com preço, vagas e prazo não basta');
+    expect(prompt).toContain('sem transformar condições comerciais em uma aula sobre a oferta');
+    expect(prompt).not.toContain('o negócio entra como caso para explicar, exemplificar e praticar');
     expect(buildPresentationRoadmapPrompt('proposta_comercial', 8)).toContain('Não invente fornecedor, serviço');
-    expect(prompt).toContain('Comece a keyMessage de cada posição com o nome da etapa');
+    expect(prompt).toContain('Inicie keyMessage com o nome da etapa e dois-pontos');
   });
   it('Automático continua escolhendo pelo briefing', () => {
     expect(buildPresentationRoadmapPrompt('auto', 8)).not.toContain('TIPO DE ENTREGA');

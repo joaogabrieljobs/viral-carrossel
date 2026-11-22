@@ -88,10 +88,12 @@ describe('referência por card', () => {
     };
     expect(slideReferenceDescriptors(slide).map(ref => ref.mention)).toEqual(['capa', 'pessoa', 'imagem3']);
     const prompt = composeSlideReferencePrompt(slide, 'Coloque @pessoa no @ambiente');
-    expect(prompt).toContain('@capa = reference image 1');
-    expect(prompt).toContain('@pessoa = reference image 2 (Pessoa.png)');
-    expect(prompt).toContain('@imagem3 = reference image 3 (Ambiente.png)');
-    expect(prompt).toContain('Coloque @pessoa no @ambiente');
+    // Mapa dos anexos na ordem real de envio; a direção do card vem logo abaixo.
+    expect(prompt).toBe('REFERENCE MAP (actual attachments, in sent order):\n'
+      + '@capa = image 1 (subject)\n@pessoa = image 2 (subject)\n@imagem3 = image 3 (subject)\n'
+      + 'Use each named reference only for its assigned role. The scene direction below refers to these labels.\n'
+      + 'Coloque @pessoa no @ambiente');
+    expect(composeSlideReferencePrompt({}, 'sem anexos')).toBe('sem anexos');
   });
 
   it('não publica um ID falso quando o armazenamento falha', async () => {

@@ -444,7 +444,7 @@ test('novo carrossel usa quantidade, narrativa, marca, material e estilo sem sob
   expect(created.doc.styleKit.stylePrompt).toBe('Fundo claro, fotografia editorial e títulos em azul.');
   expect(prompts).toHaveLength(2);
   expect(prompts[0]).toMatch(/exatamente 5 itens em slides/);
-  expect(prompts[0]).toContain('MÉTODO PASSO-A-PASSO');
+  expect(prompts[0]).toContain('Ensine o procedimento na ordem em que o leitor pode executá-lo.');
   expect(prompts[0]).toContain('Brief deste lançamento');
   expect(prompts[0]).toContain('diagnóstico inicial e revisão mensal');
   expect(prompts[0]).toContain('Não invente preços nem promessas');

@@ -308,7 +308,7 @@ test('objetivo do Criar rápido aplica e persiste o modo narrativo sugerido', as
   await expect.poll(async () => (await doc(page))?.quickNarrativeMode).toBe('how_to');
   await page.getByRole('button', { name: 'Gerar carrossel', exact: true }).click();
   await expect.poll(async () => (await doc(page))?.slides[0]?.title).toBe('Educativo 1');
-  expect(prompts[0]).toContain('MÉTODO PASSO-A-PASSO');
+  expect(prompts[0]).toContain('Ensine o procedimento na ordem em que o leitor pode executá-lo.');
 });
 
 test('roteiro inline com rótulos equivalentes define quantidade, ordem e fidelidade', async ({ page }) => {
@@ -469,7 +469,7 @@ test('prompt tem modos persistidos, Nenhum não impõe método e só texto não 
   await generate(page);
   await expect.poll(async () => (await doc(page))?.slides.length).toBe(3);
   expect(prompts[0]).toContain('SEM MODO NARRATIVO');
-  expect(prompts[0]).not.toContain('MÉTODO EDITORIAL');
+  expect(prompts[0]).not.toContain('MÉTODO — Explicar com autoridade');
   expect(images).toHaveLength(0);
   await prompt(page);
   await modes.selectOption('storytelling');
@@ -480,7 +480,7 @@ test('prompt tem modos persistidos, Nenhum não impõe método e só texto não 
   await replace.getByRole('button', { name: 'Substituir', exact: true }).click();
   await expect.poll(() => prompts.length).toBe(4);
   await expect(page.getByRole('region', { name: 'Geração em andamento' })).toHaveCount(0);
-  expect(prompts[2]).toContain('MÉTODO STORYTELLING');
+  expect(prompts[2]).toContain('MÉTODO — Contar uma história');
   await expect.poll(async () => (await doc(page))?.quickNarrativeMode).toBe('storytelling');
   await page.reload();
   await enterSavedProject(page);

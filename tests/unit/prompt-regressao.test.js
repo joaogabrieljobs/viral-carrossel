@@ -87,7 +87,7 @@ describe('montagem final dos prompts de texto', () => {
   });
   it('livre/editorial/1_1 não mistura faixas genéricas com o híbrido', () => {
     const final = assembledPrompt('livre');
-    expect(final).toContain('MÉTODO EDITORIAL');
+    expect(final).toContain('MÉTODO — Explicar com autoridade');
     expect(final).toContain('subtitle: até 160 caracteres');
     expect(final).toContain('juntos: até 300 caracteres');
     expect(final).not.toMatch(/260–403|248–384/);
@@ -109,7 +109,7 @@ describe('montagem final dos prompts de texto', () => {
       expect(final).toContain('ÚLTIMO SLIDE (posição 9)');
       expect(final).toContain('ESTRUTURA DA LEGENDA CULTURA');
       expect(final).toContain('sem emojis');
-      expect(final).not.toMatch(/MÉTODO EDITORIAL|intermediários e fecho COM foto|50–85|8-12 linhas/);
+      expect(final).not.toMatch(/MÉTODO — Explicar com autoridade|intermediários e fecho COM foto|50–85|8-12 linhas/);
     }
   });
 

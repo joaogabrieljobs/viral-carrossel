@@ -1,0 +1,435 @@
+{
+ "origem": "Catálogo final de prompts de imagem (22/11/2026). Textos copiados sem alteração; dados de exemplo só existem em teste.",
+ "cenarios": [
+  {
+   "cenario": "A. Carrossel, sem marca e sem referência",
+   "rota": "sjinn",
+   "modelo": "gpt-image-2-api",
+   "resultado": "Pronto",
+   "caracteres": "1278",
+   "esteticaPadrao": "Sim",
+   "prompt": "SCENE: baker shaping sourdough loaf on floured wooden table, morning window light\n\nHARD RULES: No lettering, captions, logos or watermarks anywhere in the image. Keep factual claims, charts and interface content in editable layers. Deliver the image only. Keep the subject’s identifying geometry and materials consistent with the scene. In photographs, retain natural anatomy, skin texture and coherent lighting.\n\nFRAMING: Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning.\n\nFor a carousel with no specified medium, use editorial photography. Reserve clear space for editable type where the selected layout overlays text.\n\nDEFAULT ART DIRECTION: Use an editorial photograph with natural materials, believable anatomy and coherent light. Choose the angle and depth of field that make the subject and action legible. Keep one focal point, control distractions and leave the specified overlay area quiet. Avoid stock metaphors and staged reactions. For photography, retain natural skin, hands, texture and object geometry. Specific project, family and panel directions take priority over these defaults."
+  },
+  {
+   "cenario": "A. Carrossel, sem marca e sem referência",
+   "rota": "openai",
+   "modelo": "gpt-image-2",
+   "resultado": "Pronto",
+   "caracteres": "1278",
+   "esteticaPadrao": "Sim",
+   "prompt": "SCENE: baker shaping sourdough loaf on floured wooden table, morning window light\n\nHARD RULES: No lettering, captions, logos or watermarks anywhere in the image. Keep factual claims, charts and interface content in editable layers. Deliver the image only. Keep the subject’s identifying geometry and materials consistent with the scene. In photographs, retain natural anatomy, skin texture and coherent lighting.\n\nFRAMING: Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning.\n\nFor a carousel with no specified medium, use editorial photography. Reserve clear space for editable type where the selected layout overlays text.\n\nDEFAULT ART DIRECTION: Use an editorial photograph with natural materials, believable anatomy and coherent light. Choose the angle and depth of field that make the subject and action legible. Keep one focal point, control distractions and leave the specified overlay area quiet. Avoid stock metaphors and staged reactions. For photography, retain natural skin, hands, texture and object geometry. Specific project, family and panel directions take priority over these defaults."
+  },
+  {
+   "cenario": "A. Carrossel, sem marca e sem referência",
+   "rota": "zai",
+   "modelo": "cogview-4-250304",
+   "resultado": "Pronto",
+   "caracteres": "1278",
+   "esteticaPadrao": "Sim",
+   "prompt": "SCENE: baker shaping sourdough loaf on floured wooden table, morning window light\n\nHARD RULES: No lettering, captions, logos or watermarks anywhere in the image. Keep factual claims, charts and interface content in editable layers. Deliver the image only. Keep the subject’s identifying geometry and materials consistent with the scene. In photographs, retain natural anatomy, skin texture and coherent lighting.\n\nFRAMING: Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning.\n\nFor a carousel with no specified medium, use editorial photography. Reserve clear space for editable type where the selected layout overlays text.\n\nDEFAULT ART DIRECTION: Use an editorial photograph with natural materials, believable anatomy and coherent light. Choose the angle and depth of field that make the subject and action legible. Keep one focal point, control distractions and leave the specified overlay area quiet. Avoid stock metaphors and staged reactions. For photography, retain natural skin, hands, texture and object geometry. Specific project, family and panel directions take priority over these defaults."
+  },
+  {
+   "cenario": "B. Carrossel com ficha visual e família Revista",
+   "rota": "sjinn",
+   "modelo": "gpt-image-2-api",
+   "resultado": "Pronto",
+   "caracteres": "2076",
+   "esteticaPadrao": "Sim",
+   "prompt": "SCENE: baker shaping sourdough loaf on floured wooden table, morning window light\n\nHARD RULES: No lettering, captions, logos or watermarks anywhere in the image. Keep factual claims, charts and interface content in editable layers. Deliver the image only. Keep the subject’s identifying geometry and materials consistent with the scene. In photographs, retain natural anatomy, skin texture and coherent lighting.\n\nFRAMING: Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning.\n\nPROJECT SUBJECTS: Apply the following visible traits and exclusions only to subjects called for by this scene. Match their recurring appearance. The scene sets action, pose and location. Do not add anyone or anything simply because it appears in this list.\n- marta: Marta Sales, the baker, wearing a plain apron over everyday clothes. Exclude: a chef hat.\n- pao-campones: round rustic sourdough loaf with a dark crackled crust and flour dusting. Exclude: sliced sandwich bread.\n\nFor a carousel with no specified medium, use editorial photography. Reserve clear space for editable type where the selected layout overlays text.\n\nVISUAL TREATMENT: Use soft side light, soft shadows and paper or earth tones in the surroundings. Place the focal point off-centre when the panel allows it. Leave the area reserved for type quiet.\nApply this treatment to the requested scene within the specified crop. Explicit project or slide style takes precedence.\n\nDEFAULT ART DIRECTION: Use an editorial photograph with natural materials, believable anatomy and coherent light. Choose the angle and depth of field that make the subject and action legible. Keep one focal point, control distractions and leave the specified overlay area quiet. Avoid stock metaphors and staged reactions. For photography, retain natural skin, hands, texture and object geometry. Specific project, family and panel directions take priority over these defaults."
+  },
+  {
+   "cenario": "B. Carrossel com ficha visual e família Revista",
+   "rota": "openai",
+   "modelo": "gpt-image-2",
+   "resultado": "Pronto",
+   "caracteres": "2076",
+   "esteticaPadrao": "Sim",
+   "prompt": "SCENE: baker shaping sourdough loaf on floured wooden table, morning window light\n\nHARD RULES: No lettering, captions, logos or watermarks anywhere in the image. Keep factual claims, charts and interface content in editable layers. Deliver the image only. Keep the subject’s identifying geometry and materials consistent with the scene. In photographs, retain natural anatomy, skin texture and coherent lighting.\n\nFRAMING: Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning.\n\nPROJECT SUBJECTS: Apply the following visible traits and exclusions only to subjects called for by this scene. Match their recurring appearance. The scene sets action, pose and location. Do not add anyone or anything simply because it appears in this list.\n- marta: Marta Sales, the baker, wearing a plain apron over everyday clothes. Exclude: a chef hat.\n- pao-campones: round rustic sourdough loaf with a dark crackled crust and flour dusting. Exclude: sliced sandwich bread.\n\nFor a carousel with no specified medium, use editorial photography. Reserve clear space for editable type where the selected layout overlays text.\n\nVISUAL TREATMENT: Use soft side light, soft shadows and paper or earth tones in the surroundings. Place the focal point off-centre when the panel allows it. Leave the area reserved for type quiet.\nApply this treatment to the requested scene within the specified crop. Explicit project or slide style takes precedence.\n\nDEFAULT ART DIRECTION: Use an editorial photograph with natural materials, believable anatomy and coherent light. Choose the angle and depth of field that make the subject and action legible. Keep one focal point, control distractions and leave the specified overlay area quiet. Avoid stock metaphors and staged reactions. For photography, retain natural skin, hands, texture and object geometry. Specific project, family and panel directions take priority over these defaults."
+  },
+  {
+   "cenario": "B. Carrossel com ficha visual e família Revista",
+   "rota": "zai",
+   "modelo": "cogview-4-250304",
+   "resultado": "Pronto",
+   "caracteres": "2076",
+   "esteticaPadrao": "Sim",
+   "prompt": "SCENE: baker shaping sourdough loaf on floured wooden table, morning window light\n\nHARD RULES: No lettering, captions, logos or watermarks anywhere in the image. Keep factual claims, charts and interface content in editable layers. Deliver the image only. Keep the subject’s identifying geometry and materials consistent with the scene. In photographs, retain natural anatomy, skin texture and coherent lighting.\n\nFRAMING: Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning.\n\nPROJECT SUBJECTS: Apply the following visible traits and exclusions only to subjects called for by this scene. Match their recurring appearance. The scene sets action, pose and location. Do not add anyone or anything simply because it appears in this list.\n- marta: Marta Sales, the baker, wearing a plain apron over everyday clothes. Exclude: a chef hat.\n- pao-campones: round rustic sourdough loaf with a dark crackled crust and flour dusting. Exclude: sliced sandwich bread.\n\nFor a carousel with no specified medium, use editorial photography. Reserve clear space for editable type where the selected layout overlays text.\n\nVISUAL TREATMENT: Use soft side light, soft shadows and paper or earth tones in the surroundings. Place the focal point off-centre when the panel allows it. Leave the area reserved for type quiet.\nApply this treatment to the requested scene within the specified crop. Explicit project or slide style takes precedence.\n\nDEFAULT ART DIRECTION: Use an editorial photograph with natural materials, believable anatomy and coherent light. Choose the angle and depth of field that make the subject and action legible. Keep one focal point, control distractions and leave the specified overlay area quiet. Avoid stock metaphors and staged reactions. For photography, retain natural skin, hands, texture and object geometry. Specific project, family and panel directions take priority over these defaults."
+  },
+  {
+   "cenario": "C. Carrossel com direção visual do projeto",
+   "rota": "sjinn",
+   "modelo": "gpt-image-2-api",
+   "resultado": "Pronto",
+   "caracteres": "1065",
+   "esteticaPadrao": "Não",
+   "prompt": "SCENE: baker shaping sourdough loaf on floured wooden table, morning window light\n\nHARD RULES: No lettering, captions, logos or watermarks anywhere in the image. Keep factual claims, charts and interface content in editable layers. Deliver the image only. Keep the subject’s identifying geometry and materials consistent with the scene. In photographs, retain natural anatomy, skin texture and coherent lighting.\n\nFRAMING: Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning.\n\nPROJECT OR SLIDE STYLE: Apply the requested medium, palette, materials and lighting below. Use natural subject colours unless the project specifies otherwise.\nPROJECT VISUAL STYLE BIBLE:\nUse paper collage with uncoated paper textures and muted warm colours.\nCANVAS: Compose for the selected social format and its visible crop. Keep the specified overlay zone quiet and essential detail inside the protected area."
+  },
+  {
+   "cenario": "C. Carrossel com direção visual do projeto",
+   "rota": "openai",
+   "modelo": "gpt-image-2",
+   "resultado": "Pronto",
+   "caracteres": "1065",
+   "esteticaPadrao": "Não",
+   "prompt": "SCENE: baker shaping sourdough loaf on floured wooden table, morning window light\n\nHARD RULES: No lettering, captions, logos or watermarks anywhere in the image. Keep factual claims, charts and interface content in editable layers. Deliver the image only. Keep the subject’s identifying geometry and materials consistent with the scene. In photographs, retain natural anatomy, skin texture and coherent lighting.\n\nFRAMING: Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning.\n\nPROJECT OR SLIDE STYLE: Apply the requested medium, palette, materials and lighting below. Use natural subject colours unless the project specifies otherwise.\nPROJECT VISUAL STYLE BIBLE:\nUse paper collage with uncoated paper textures and muted warm colours.\nCANVAS: Compose for the selected social format and its visible crop. Keep the specified overlay zone quiet and essential detail inside the protected area."
+  },
+  {
+   "cenario": "C. Carrossel com direção visual do projeto",
+   "rota": "zai",
+   "modelo": "cogview-4-250304",
+   "resultado": "Pronto",
+   "caracteres": "1065",
+   "esteticaPadrao": "Não",
+   "prompt": "SCENE: baker shaping sourdough loaf on floured wooden table, morning window light\n\nHARD RULES: No lettering, captions, logos or watermarks anywhere in the image. Keep factual claims, charts and interface content in editable layers. Deliver the image only. Keep the subject’s identifying geometry and materials consistent with the scene. In photographs, retain natural anatomy, skin texture and coherent lighting.\n\nFRAMING: Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning.\n\nPROJECT OR SLIDE STYLE: Apply the requested medium, palette, materials and lighting below. Use natural subject colours unless the project specifies otherwise.\nPROJECT VISUAL STYLE BIBLE:\nUse paper collage with uncoated paper textures and muted warm colours.\nCANVAS: Compose for the selected social format and its visible crop. Keep the specified overlay zone quiet and essential detail inside the protected area."
+  },
+  {
+   "cenario": "D. Carrossel com imagem de referência (moodboard)",
+   "rota": "sjinn",
+   "modelo": "gpt-image-2-api",
+   "resultado": "Pronto",
+   "caracteres": "1417",
+   "esteticaPadrao": "Não",
+   "prompt": "SCENE: baker shaping sourdough loaf on floured wooden table, morning window light\n\nHARD RULES: No lettering, captions, logos or watermarks anywhere in the image. Keep factual claims, charts and interface content in editable layers. Deliver the image only. Keep the subject’s identifying geometry and materials consistent with the scene. In photographs, retain natural anatomy, skin texture and coherent lighting.\n\nFRAMING: Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning.\n\nREFERENCE ROLES: Use moodboard images for medium, palette, lighting and composition. Follow a named product or subject reference only for its assigned role. A separate identity anchor governs identity only. Create the scene in this request. Exclude lettering, logos and watermarks from every role.\n\nREFERENCE MAP (actual attachments, in sent order):\n@mood = image 1 (moodboard)\nUse each named reference only for its assigned role. The scene direction below refers to these labels.\n\n\nMatch the visual medium, palette, materials and composition of the attached references in a new scene aligned with this card.\n\nCANVAS: Compose for the selected social format and its visible crop. Keep the specified overlay zone quiet and essential detail inside the protected area."
+  },
+  {
+   "cenario": "D. Carrossel com imagem de referência (moodboard)",
+   "rota": "openai",
+   "modelo": "gpt-image-2",
+   "resultado": "Pronto",
+   "caracteres": "1417",
+   "esteticaPadrao": "Não",
+   "prompt": "SCENE: baker shaping sourdough loaf on floured wooden table, morning window light\n\nHARD RULES: No lettering, captions, logos or watermarks anywhere in the image. Keep factual claims, charts and interface content in editable layers. Deliver the image only. Keep the subject’s identifying geometry and materials consistent with the scene. In photographs, retain natural anatomy, skin texture and coherent lighting.\n\nFRAMING: Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning.\n\nREFERENCE ROLES: Use moodboard images for medium, palette, lighting and composition. Follow a named product or subject reference only for its assigned role. A separate identity anchor governs identity only. Create the scene in this request. Exclude lettering, logos and watermarks from every role.\n\nREFERENCE MAP (actual attachments, in sent order):\n@mood = image 1 (moodboard)\nUse each named reference only for its assigned role. The scene direction below refers to these labels.\n\n\nMatch the visual medium, palette, materials and composition of the attached references in a new scene aligned with this card.\n\nCANVAS: Compose for the selected social format and its visible crop. Keep the specified overlay zone quiet and essential detail inside the protected area."
+  },
+  {
+   "cenario": "D. Carrossel com imagem de referência (moodboard)",
+   "rota": "zai",
+   "modelo": "cogview-4-250304",
+   "resultado": "Bloqueado · referência incompatível",
+   "caracteres": "0",
+   "esteticaPadrao": "",
+   "prompt": ""
+  },
+  {
+   "cenario": "E. Carrossel com âncora de identidade (mesma pessoa)",
+   "rota": "sjinn",
+   "modelo": "gpt-image-2-api",
+   "resultado": "Pronto",
+   "caracteres": "2960",
+   "esteticaPadrao": "Sim",
+   "prompt": "SCENE: baker shaping sourdough loaf on floured wooden table, morning window light\n\nHARD RULES: No lettering, captions, logos or watermarks anywhere in the image. Keep factual claims, charts and interface content in editable layers. Deliver the image only. Keep the subject’s identifying geometry and materials consistent with the scene. In photographs, retain natural anatomy, skin texture and coherent lighting.\n\nFRAMING: Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning.\n\nREFERENCE ROLES: Use moodboard images for medium, palette, lighting and composition. Follow a named product or subject reference only for its assigned role. A separate identity anchor governs identity only. Create the scene in this request. Exclude lettering, logos and watermarks from every role.\n\nREFERENCE MAP (actual attachments, in sent order):\n@marta = image 1 (identity)\nUse each named reference only for its assigned role. The scene direction below refers to these labels.\n\n\nIDENTITY ANCHOR: The last attached image is the identity reference for the recurring person assigned to this scene. Match visible facial features, hair, skin tone and build. Use the project subject sheet for specified wardrobe. Use only the requested scene for action, pose, framing, setting and objects. Match neither the background nor the pose of the anchor unless the current scene calls for it.\n\nPROJECT SUBJECTS: Apply the following visible traits and exclusions only to subjects called for by this scene. Match their recurring appearance. The scene sets action, pose and location. Do not add anyone or anything simply because it appears in this list.\n- marta: Marta Sales, the baker, wearing a plain apron over everyday clothes. Exclude: a chef hat.\n- pao-campones: round rustic sourdough loaf with a dark crackled crust and flour dusting. Exclude: sliced sandwich bread.\n\nFor a carousel with no specified medium, use editorial photography. Reserve clear space for editable type where the selected layout overlays text.\n\nVISUAL TREATMENT: Use soft side light, soft shadows and paper or earth tones in the surroundings. Place the focal point off-centre when the panel allows it. Leave the area reserved for type quiet.\nApply this treatment to the requested scene within the specified crop. Explicit project or slide style takes precedence.\n\nDEFAULT ART DIRECTION: Use an editorial photograph with natural materials, believable anatomy and coherent light. Choose the angle and depth of field that make the subject and action legible. Keep one focal point, control distractions and leave the specified overlay area quiet. Avoid stock metaphors and staged reactions. For photography, retain natural skin, hands, texture and object geometry. Specific project, family and panel directions take priority over these defaults."
+  },
+  {
+   "cenario": "E. Carrossel com âncora de identidade (mesma pessoa)",
+   "rota": "openai",
+   "modelo": "gpt-image-2",
+   "resultado": "Pronto",
+   "caracteres": "2960",
+   "esteticaPadrao": "Sim",
+   "prompt": "SCENE: baker shaping sourdough loaf on floured wooden table, morning window light\n\nHARD RULES: No lettering, captions, logos or watermarks anywhere in the image. Keep factual claims, charts and interface content in editable layers. Deliver the image only. Keep the subject’s identifying geometry and materials consistent with the scene. In photographs, retain natural anatomy, skin texture and coherent lighting.\n\nFRAMING: Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning.\n\nREFERENCE ROLES: Use moodboard images for medium, palette, lighting and composition. Follow a named product or subject reference only for its assigned role. A separate identity anchor governs identity only. Create the scene in this request. Exclude lettering, logos and watermarks from every role.\n\nREFERENCE MAP (actual attachments, in sent order):\n@marta = image 1 (identity)\nUse each named reference only for its assigned role. The scene direction below refers to these labels.\n\n\nIDENTITY ANCHOR: The last attached image is the identity reference for the recurring person assigned to this scene. Match visible facial features, hair, skin tone and build. Use the project subject sheet for specified wardrobe. Use only the requested scene for action, pose, framing, setting and objects. Match neither the background nor the pose of the anchor unless the current scene calls for it.\n\nPROJECT SUBJECTS: Apply the following visible traits and exclusions only to subjects called for by this scene. Match their recurring appearance. The scene sets action, pose and location. Do not add anyone or anything simply because it appears in this list.\n- marta: Marta Sales, the baker, wearing a plain apron over everyday clothes. Exclude: a chef hat.\n- pao-campones: round rustic sourdough loaf with a dark crackled crust and flour dusting. Exclude: sliced sandwich bread.\n\nFor a carousel with no specified medium, use editorial photography. Reserve clear space for editable type where the selected layout overlays text.\n\nVISUAL TREATMENT: Use soft side light, soft shadows and paper or earth tones in the surroundings. Place the focal point off-centre when the panel allows it. Leave the area reserved for type quiet.\nApply this treatment to the requested scene within the specified crop. Explicit project or slide style takes precedence.\n\nDEFAULT ART DIRECTION: Use an editorial photograph with natural materials, believable anatomy and coherent light. Choose the angle and depth of field that make the subject and action legible. Keep one focal point, control distractions and leave the specified overlay area quiet. Avoid stock metaphors and staged reactions. For photography, retain natural skin, hands, texture and object geometry. Specific project, family and panel directions take priority over these defaults."
+  },
+  {
+   "cenario": "E. Carrossel com âncora de identidade (mesma pessoa)",
+   "rota": "zai",
+   "modelo": "cogview-4-250304",
+   "resultado": "Bloqueado · referência incompatível",
+   "caracteres": "0",
+   "esteticaPadrao": "",
+   "prompt": ""
+  },
+  {
+   "cenario": "F. Apresentação 16:9 (geração planejada)",
+   "rota": "sjinn",
+   "modelo": "gpt-image-2-api",
+   "resultado": "Pronto",
+   "caracteres": "2110",
+   "esteticaPadrao": "Sim",
+   "prompt": "SCENE: baker shaping sourdough loaf on floured wooden table, morning window light\n\nHARD RULES: No lettering, captions, logos or watermarks anywhere in the image. Keep factual claims, charts and interface content in editable layers. Deliver the image only. Keep the subject’s identifying geometry and materials consistent with the scene. In photographs, retain natural anatomy, skin texture and coherent lighting.\n\nFRAMING: Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning.\n\nPRESENTATION IMAGE PANEL: Supply an illustrative visual for this panel. Keep the important action and subject features inside its crop. Text, values and diagrams are added separately. Do not simulate product captures, charts, customer evidence, testimonials or before-and-after results.\n\nCANVAS: Compose for the image panel on the widescreen 16:9 slide. Put the subject in the usable panel area and reserve space for editable type only where it overlaps the image. Use editorial photography by default or the specified illustrative medium. Use supplied assets for actual demonstrations. Keep factual comparisons, values and diagrams out of the generated image.\n\nVISUAL TREATMENT: Use natural side light, soft shadows and paper or earth tones in the surroundings. Place the subject on a third when the image panel allows and leave the actual text area quiet.\nApply this treatment to the requested scene within the specified crop. Explicit project or slide style takes precedence.\n\nDEFAULT ART DIRECTION: Use an editorial photograph with natural materials, believable anatomy and coherent light. Choose the angle and depth of field that make the subject and action legible. Keep one focal point, control distractions and leave the specified overlay area quiet. Avoid stock metaphors and staged reactions. For photography, retain natural skin, hands, texture and object geometry. Specific project, family and panel directions take priority over these defaults."
+  },
+  {
+   "cenario": "F. Apresentação 16:9 (geração planejada)",
+   "rota": "openai",
+   "modelo": "gpt-image-2",
+   "resultado": "Pronto",
+   "caracteres": "2110",
+   "esteticaPadrao": "Sim",
+   "prompt": "SCENE: baker shaping sourdough loaf on floured wooden table, morning window light\n\nHARD RULES: No lettering, captions, logos or watermarks anywhere in the image. Keep factual claims, charts and interface content in editable layers. Deliver the image only. Keep the subject’s identifying geometry and materials consistent with the scene. In photographs, retain natural anatomy, skin texture and coherent lighting.\n\nFRAMING: Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning.\n\nPRESENTATION IMAGE PANEL: Supply an illustrative visual for this panel. Keep the important action and subject features inside its crop. Text, values and diagrams are added separately. Do not simulate product captures, charts, customer evidence, testimonials or before-and-after results.\n\nCANVAS: Compose for the image panel on the widescreen 16:9 slide. Put the subject in the usable panel area and reserve space for editable type only where it overlaps the image. Use editorial photography by default or the specified illustrative medium. Use supplied assets for actual demonstrations. Keep factual comparisons, values and diagrams out of the generated image.\n\nVISUAL TREATMENT: Use natural side light, soft shadows and paper or earth tones in the surroundings. Place the subject on a third when the image panel allows and leave the actual text area quiet.\nApply this treatment to the requested scene within the specified crop. Explicit project or slide style takes precedence.\n\nDEFAULT ART DIRECTION: Use an editorial photograph with natural materials, believable anatomy and coherent light. Choose the angle and depth of field that make the subject and action legible. Keep one focal point, control distractions and leave the specified overlay area quiet. Avoid stock metaphors and staged reactions. For photography, retain natural skin, hands, texture and object geometry. Specific project, family and panel directions take priority over these defaults."
+  },
+  {
+   "cenario": "F. Apresentação 16:9 (geração planejada)",
+   "rota": "zai",
+   "modelo": "cogview-4-250304",
+   "resultado": "Pronto",
+   "caracteres": "2110",
+   "esteticaPadrao": "Sim",
+   "prompt": "SCENE: baker shaping sourdough loaf on floured wooden table, morning window light\n\nHARD RULES: No lettering, captions, logos or watermarks anywhere in the image. Keep factual claims, charts and interface content in editable layers. Deliver the image only. Keep the subject’s identifying geometry and materials consistent with the scene. In photographs, retain natural anatomy, skin texture and coherent lighting.\n\nFRAMING: Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning.\n\nPRESENTATION IMAGE PANEL: Supply an illustrative visual for this panel. Keep the important action and subject features inside its crop. Text, values and diagrams are added separately. Do not simulate product captures, charts, customer evidence, testimonials or before-and-after results.\n\nCANVAS: Compose for the image panel on the widescreen 16:9 slide. Put the subject in the usable panel area and reserve space for editable type only where it overlaps the image. Use editorial photography by default or the specified illustrative medium. Use supplied assets for actual demonstrations. Keep factual comparisons, values and diagrams out of the generated image.\n\nVISUAL TREATMENT: Use natural side light, soft shadows and paper or earth tones in the surroundings. Place the subject on a third when the image panel allows and leave the actual text area quiet.\nApply this treatment to the requested scene within the specified crop. Explicit project or slide style takes precedence.\n\nDEFAULT ART DIRECTION: Use an editorial photograph with natural materials, believable anatomy and coherent light. Choose the angle and depth of field that make the subject and action legible. Keep one focal point, control distractions and leave the specified overlay area quiet. Avoid stock metaphors and staged reactions. For photography, retain natural skin, hands, texture and object geometry. Specific project, family and panel directions take priority over these defaults."
+  },
+  {
+   "cenario": "G. Agente / MCP",
+   "rota": "mcp",
+   "modelo": "gpt-image-2-api",
+   "resultado": "Pronto",
+   "caracteres": "341",
+   "esteticaPadrao": "Não",
+   "prompt": "SCENE: baker shaping sourdough loaf on floured wooden table, morning window light\n\nOutput an illustrative image for this card. Keep the subject and essential action clear in the final crop, with room around key features. Do not depict a screenshot, chart, testimonial or evidence of a real event. No lettering, captions, logos or watermarks."
+  }
+ ],
+ "blocos": {
+  "I02": "DEFAULT ART DIRECTION: Use an editorial photograph with natural materials, believable anatomy and coherent light. Choose the angle and depth of field that make the subject and action legible. Keep one focal point, control distractions and leave the specified overlay area quiet. Avoid stock metaphors and staged reactions. For photography, retain natural skin, hands, texture and object geometry. Specific project, family and panel directions take priority over these defaults.",
+  "I03": "SCENE: {{scene}}",
+  "I04": "Additional art direction (user adjusted): literal direct subject representation, theme clearly shown.",
+  "I05": "Use an indirect visual treatment through light, framing or a supported detail. Keep every subject, product and action the brief explicitly requires recognizable.",
+  "I06": "Use an unexpected angle, scale or composition. Build conceptual juxtapositions from the subjects already specified and preserve their relationships.",
+  "I07": "Use a classic, straightforward composition with familiar framing in the requested visual medium.",
+  "I08": "Use understated visual wit in scale, timing or composition when appropriate to the subject. Keep the requested action and people intact; do not stage embarrassment or a customer reaction.",
+  "I09": "Additional art direction (user adjusted): serious sober contemplative formal timeless tone, no humor.",
+  "I10": "Depict the supplied subject and action clearly, with observable detail. Use a documentary style when appropriate; the generated image is illustrative and cannot establish a real participant, event or outcome.",
+  "I11": "Let light, negative space and depth create an evocative mood. Preserve the supplied subject, material properties and action without assigning feelings or experiences to the people depicted.",
+  "I12": "For a carousel with no specified medium, use editorial photography. Reserve clear space for editable type where the selected layout overlays text.",
+  "I13": "CANVAS: Compose for the image panel on the widescreen 16:9 slide. Put the subject in the usable panel area and reserve space for editable type only where it overlaps the image. Use editorial photography by default or the specified illustrative medium. Use supplied assets for actual demonstrations. Keep factual comparisons, values and diagrams out of the generated image.",
+  "I14": "CANVAS: Compose for the selected social format and its visible crop. Keep the specified overlay zone quiet and essential detail inside the protected area.",
+  "I15": "CANVAS: Compose for the image panel on the widescreen 16:9 slide. Put the subject in the usable panel area and reserve space for editable type only where it overlaps the image.",
+  "I16": "HARD RULES: No lettering, captions, logos or watermarks anywhere in the image. Keep factual claims, charts and interface content in editable layers. Deliver the image only. Keep the subject’s identifying geometry and materials consistent with the scene. In photographs, retain natural anatomy, skin texture and coherent lighting.",
+  "I17": "REFERENCE ROLES: Use moodboard images for medium, palette, lighting and composition. Follow a named product or subject reference only for its assigned role. A separate identity anchor governs identity only. Create the scene in this request. Exclude lettering, logos and watermarks from every role.",
+  "I18": "Match the visual medium, palette, materials and composition of the attached references in a new scene aligned with this card.",
+  "I19": "PROJECT OR SLIDE STYLE: Apply the requested medium, palette, materials and lighting below. Use natural subject colours unless the project specifies otherwise.\n{{styleBody}}\n{{canvas}}",
+  "I20": "PROJECT VISUAL STYLE BIBLE:\n{{projectStyle}}",
+  "I21": "THIS SLIDE DIRECTION:\n{{slideDirection}}",
+  "I22": "REFERENCE MAP (actual attachments, in sent order):\n{{referenceMap}}\nUse each named reference only for its assigned role. The scene direction below refers to these labels.\n{{resolvedDirection}}",
+  "I23": "PRESENTATION IMAGE PANEL: Supply an illustrative visual for this panel. Keep the important action and subject features inside its crop. Text, values and diagrams are added separately. Do not simulate product captures, charts, customer evidence, testimonials or before-and-after results.",
+  "I24": "IDENTITY ANCHOR: The last attached image is the identity reference for the recurring person assigned to this scene. Match visible facial features, hair, skin tone and build. Use the project subject sheet for specified wardrobe. Use only the requested scene for action, pose, framing, setting and objects. Match neither the background nor the pose of the anchor unless the current scene calls for it.",
+  "I25": "PROJECT SUBJECTS: Apply the following visible traits and exclusions only to subjects called for by this scene. Match their recurring appearance. The scene sets action, pose and location. Do not add anyone or anything simply because it appears in this list.\n{{subjects}}",
+  "I26": "VISUAL TREATMENT: {{familyEnglish}}\nApply this treatment to the requested scene within the specified crop. Explicit project or slide style takes precedence.",
+  "I27": "FRAMING: Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning.",
+  "I28": "FRAMING: Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning. The panel is a tall, narrow column. Keep the essential action and identifying features in the central vertical third; both sides may be cropped.",
+  "I29": "FRAMING: Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning. The panel is a wide, shallow band. Keep the essential action in the central horizontal band; the top and bottom may be cropped.",
+  "I30": "FRAMING: Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning. Type overlays the lower half of this image. Keep the key face, action and product detail above that zone and leave the entire lower half visually quiet. Do not draw the type.",
+  "I31": "Output an illustrative image for this card. Keep the subject and essential action clear in the final crop, with room around key features. Do not depict a screenshot, chart, testimonial or evidence of a real event. No lettering, captions, logos or watermarks."
+ },
+ "familias": [
+  {
+   "tipo": "Carrossel · família",
+   "id": "revista",
+   "pt": "Fotografia editorial de revista, luz lateral suave e tons de papel e terra no ambiente. Posicione o foco fora do centro quando o painel permitir e deixe livre a área reservada ao texto.",
+   "en": "Use soft side light, soft shadows and paper or earth tones in the surroundings. Place the focal point off-centre when the panel allows it. Leave the area reserved for type quiet.",
+   "filtro": "saturate(0.92) contrast(1.03) sepia(0.05)"
+  },
+  {
+   "tipo": "Carrossel · família",
+   "id": "manchete",
+   "pt": "Recortes duros em preto e branco de alto contraste: rostos, mãos, gestos, objetos em close; fundo simples para não competir com a palavra.",
+   "en": "Hard-cut high-contrast black and white photography: faces, hands, gestures or objects in close-up against a simple background that does not compete with type.",
+   "filtro": "grayscale(1) contrast(1.2)"
+  },
+  {
+   "tipo": "Carrossel · família",
+   "id": "grade",
+   "pt": "Enquadre o assunto pedido frontalmente ou de cima, com geometria clara, sombra definida e fundo simples que funcione em preto e branco.",
+   "en": "Give the requested subject clear geometry, a frontal or overhead view, a defined shadow and a plain background that reads in monochrome.",
+   "filtro": "grayscale(1) contrast(1.12)"
+  },
+  {
+   "tipo": "Carrossel · família",
+   "id": "documental",
+   "pt": "Fotografia de ofício, luz de janela e texturas naturais. Se o material pedir pessoas, mostre a ação descrita e proteja rostos e mãos relevantes ao recorte.",
+   "en": "Use documentary-style craft photography, window light and natural textures. Where the scene calls for people, depict the specified action and keep the important facial features or hand movement legible in the crop.",
+   "filtro": "saturate(1.02) contrast(1.02) sepia(0.04)"
+  },
+  {
+   "tipo": "Carrossel · família",
+   "id": "produto",
+   "pt": "Still de produto: objeto inteiro e centralizado, fundo liso escuro ou linho, luz rasante única, sombra suave; nada cortado nas bordas, sem texto no produto.",
+   "en": "Product still life: the whole object centered and fully visible, plain dark or linen background, single raking light, soft shadow; nothing cropped at the edges, no text on the product.",
+   "filtro": "saturate(0.8) contrast(1.05)"
+  },
+  {
+   "tipo": "Carrossel · família",
+   "id": "ficha",
+   "pt": "Vista frontal e limpa do objeto ou processo fornecido, fundo escuro e contraste definido. A imagem ilustra a forma física e os dados técnicos ficam nas camadas editáveis.",
+   "en": "Use a clean technical-plate view of the specified physical object or process, with frontal framing, a dark background and clear contrast. Keep data, labels and interfaces editable outside the image.",
+   "filtro": "grayscale(0.4) contrast(1.08)"
+  },
+  {
+   "tipo": "Carrossel · família",
+   "id": "minimal",
+   "pt": "Fotografia limpa e luminosa, poucos elementos, fundo claro e organizado, assunto nítido com bastante espaço livre.",
+   "en": "Clean bright photography, few elements, light and tidy background, sharp subject with generous empty space.",
+   "filtro": "saturate(0.95)"
+  },
+  {
+   "tipo": "Carrossel · família",
+   "id": "poster",
+   "pt": "Enquadre o assunto como uma silhueta recortável, com luz direta, cores vivas e fundo simples.",
+   "en": "Give the supplied subject a strong cut-out silhouette, direct light and a simple colourful background with poster-like energy.",
+   "filtro": "contrast(1.06) saturate(1.05)"
+  },
+  {
+   "tipo": "Carrossel · família",
+   "id": "cinema",
+   "pt": "Use plano aberto, profundidade e luz motivada pelo ambiente informado. Reserve o espaço do título conforme o painel.",
+   "en": "Use a wide film-still composition, depth and motivated light in the specified setting. Keep the title zone quiet as required by the panel.",
+   "filtro": "contrast(1.08) saturate(0.85) brightness(0.95)"
+  },
+  {
+   "tipo": "Carrossel · estilo viral",
+   "id": "sports_editorial",
+   "pt": "Enquadramento esportivo dinâmico, contraste e luz direta. Preserve a ação fornecida e deixe calma a zona destinada à manchete.",
+   "en": "Use energetic sports-editorial framing, hard directional light and clear contrast on the specified subject. Keep the headline zone quiet wherever the panel places it.",
+   "filtro": "contrast(1.06) saturate(1.04)"
+  },
+  {
+   "tipo": "Carrossel · estilo viral",
+   "id": "case_study_neon",
+   "pt": "Detalhe preciso do produto ou processo informado em fundo escuro. Para demonstrar uma tela ou resultado real, use material fornecido.",
+   "en": "Use precise detail, controlled light and a clean dark background for the specified product or process. Use the generated scene as context only. Actual screens and results require supplied assets.",
+   "filtro": "contrast(1.08) saturate(0.9)"
+  },
+  {
+   "tipo": "Carrossel · estilo viral",
+   "id": "mood_sepia",
+   "pt": "Luz quente de janela, sombras suaves, grão discreto e área calma para o texto no painel. Use o gesto descrito quando houver pessoa na cena.",
+   "en": "Use warm window light, soft shadows and subtle grain. Keep the overlay area quiet and use a person’s gesture only when the scene calls for it.",
+   "filtro": "sepia(0.38) saturate(0.85) contrast(1.05)"
+  },
+  {
+   "tipo": "Carrossel · estilo viral",
+   "id": "bold_promo_rosa",
+   "pt": "Produto ou lifestyle com cor saturada, produto inteiro visível, fundo simples, luz direta; sem texto e sem etiqueta de preço.",
+   "en": "Bright product or lifestyle photography with saturated colour, product fully visible, plain background, direct light; no text, no price tags.",
+   "filtro": "contrast(1.06) saturate(1.08)"
+  },
+  {
+   "tipo": "Carrossel · estilo viral",
+   "id": "reflexivo_cream",
+   "pt": "Fotografia contemplativa: luz fria, figura solitária ou natureza-morta, paleta contida e muito espaço livre.",
+   "en": "Quiet contemplative photography: cool light, solitary figure or still life, muted palette, generous negative space.",
+   "filtro": "saturate(0.8) contrast(1.04)"
+  },
+  {
+   "tipo": "Carrossel · estilo viral",
+   "id": "tabloid_keywords",
+   "pt": "Use um recorte editorial direto e expressivo do assunto informado, com alto contraste e fundo simples. Uma imagem gerada serve como ilustração do tema.",
+   "en": "Use a tight, high-contrast editorial crop of the supplied subject against a simple background. Use gesture only when specified. Keep the image illustrative rather than staging a news event.",
+   "filtro": "contrast(1.12) saturate(0.95)"
+  },
+  {
+   "tipo": "Carrossel · estilo viral",
+   "id": "editorial_magazine",
+   "pt": "Fotografia de revista com luz direcional suave, composição deliberada e paleta elegante. Retrato ou lookbook somente quando fizerem parte do assunto.",
+   "en": "Use soft directional light, deliberate magazine framing and an elegant palette. Choose a portrait or lookbook treatment only for a subject that calls for it. Respect the actual panel crop.",
+   "filtro": "contrast(1.04) saturate(0.95)"
+  },
+  {
+   "tipo": "Carrossel · estilo viral",
+   "id": "luxury_hybrid",
+   "pt": "Evidencie a textura e o acabamento reais do assunto com uma fonte de luz suave e sombras quentes. Preserve o material e a cor informados do produto.",
+   "en": "Bring out the actual texture and finish of the supplied subject with one soft key light and warm shadows. Preserve its stated material, colour and shape. Show the product or model fully when the panel allows.",
+   "filtro": "contrast(1.05) saturate(0.92) sepia(0.06)"
+  },
+  {
+   "tipo": "Carrossel · estilo viral",
+   "id": "viral_hype_dark",
+   "pt": "Foto de alta energia: expressão forte ou objeto marcante, fundo escuro, toques de luz vermelha ou quente.",
+   "en": "High energy photography: strong expression or striking object, dark background, red or warm practical light accents.",
+   "filtro": "contrast(1.1) saturate(1.02)"
+  },
+  {
+   "tipo": "Carrossel · estilo viral",
+   "id": "cinematic_hybrid",
+   "pt": "Composição noir em plano aberto, contraste e sombras profundas. Use a iluminação prática do ambiente fornecido e mantenha o assunto reconhecível no painel.",
+   "en": "Use wide noir framing, motivated practical light and deep shadows. Keep the specified subject recognizable in the panel without adding a figure or changing a documented time of day.",
+   "filtro": "contrast(1.12) saturate(0.82) brightness(0.96)"
+  },
+  {
+   "tipo": "Carrossel · estilo viral",
+   "id": "authority_black",
+   "pt": "Composição frontal e sóbria, luz controlada e fundo escuro. Faça retrato apenas se a pessoa fizer parte do assunto.",
+   "en": "Use composed frontal framing, controlled light and a dark background. Include a person only when specified, with the documented role and no invented credentials.",
+   "filtro": "grayscale(0.2) contrast(1.08)"
+  },
+  {
+   "tipo": "Carrossel · estilo viral",
+   "id": "minimal_clean",
+   "pt": "Foto limpa e clara, poucos elementos, fundo claro e organizado, assunto nítido com muito espaço livre.",
+   "en": "Clean bright photography, few elements, tidy light background, sharp subject with generous empty space.",
+   "filtro": "saturate(0.95) contrast(1.02)"
+  },
+  {
+   "tipo": "Apresentação · família",
+   "id": "editorial",
+   "pt": "Luz natural lateral, sombras macias e tons de papel e terra no ambiente. Posicione o assunto no terço que o recorte permitir e preserve o espaço necessário ao texto.",
+   "en": "Use natural side light, soft shadows and paper or earth tones in the surroundings. Place the subject on a third when the image panel allows and leave the actual text area quiet.",
+   "filtro": "saturate(0.9) contrast(1.03) sepia(0.06)"
+  },
+  {
+   "tipo": "Apresentação · família",
+   "id": "executive",
+   "pt": "Luz de janela difusa, paleta fria e neutra, linhas retas e enquadramento sóbrio do assunto do slide.",
+   "en": "Use diffused window light and cool neutral surroundings. Frame the supplied subject with restrained straight lines and purposeful detail, avoiding posed stock photography.",
+   "filtro": "saturate(0.85) contrast(1.03)"
+  },
+  {
+   "tipo": "Apresentação · família",
+   "id": "swiss",
+   "pt": "Organize o assunto com geometria frontal ou a 90°, sombras definidas e fundo simples para o tratamento em preto e branco. Preserve o recorte do módulo ativo.",
+   "en": "Use frontal or overhead geometry, defined shadows and a plain background that reads well after the monochrome filter. Compose for the actual grid module.",
+   "filtro": "grayscale(1) contrast(1.12)"
+  },
+  {
+   "tipo": "Apresentação · família",
+   "id": "cinematic",
+   "pt": "Use profundidade, luz prática e contraste de cinema no painel do slide. Preserve o horário e o sujeito fornecidos e a área destinada ao título.",
+   "en": "Use cinematic depth, motivated light and controlled contrast. Preserve the supplied subject and setting within the actual panel. Keep title space clear without adding letterbox bars or changing the output ratio.",
+   "filtro": "contrast(1.08) saturate(0.82) brightness(0.92)"
+  },
+  {
+   "tipo": "Apresentação · família",
+   "id": "luxury",
+   "pt": "Luz rasante suave em uma fonte, sombras delicadas e espaço ao redor da forma. Valorize o acabamento informado do objeto.",
+   "en": "Use one soft raking light, gentle shadow and ample space around the form. Reveal the actual finish of the specified subject and keep product features intact within the crop.",
+   "filtro": "saturate(0.72) contrast(1.06) brightness(0.94)"
+  },
+  {
+   "tipo": "Apresentação · família",
+   "id": "typographic",
+   "pt": "Trate a imagem como uma pequena pontuação visual, com detalhe gráfico, contraste monocromático e recorte limpo. A tipografia é inserida pelo app.",
+   "en": "Use a small, sharply cropped monochrome detail as visual punctuation in the designated module. Emphasize texture, contour and contrast. Keep letters and printed copy out of the generated image.",
+   "filtro": "grayscale(1) contrast(1.25) brightness(1.02)"
+  },
+  {
+   "tipo": "Apresentação · família",
+   "id": "cultural",
+   "pt": "Contorno limpo e textura de papel ou tinta, com leitura em preto e branco para sobreposição posterior de cor. Use apenas o sujeito indicado.",
+   "en": "Use clean contours and tactile paper or ink textures on the specified subject. Compose for a monochrome image with a later colour overlay. Keep poster lettering and invented works or performances out of the scene.",
+   "filtro": "grayscale(1) contrast(1.18) brightness(1.03)"
+  },
+  {
+   "tipo": "Apresentação · família",
+   "id": "technical",
+   "pt": "Macro técnico com foco preciso, luz fria e fundo escuro. Detalhes de equipamento apenas se a cena os solicitar. Dados, telas reais e marcas gráficas ficam fora da imagem gerada.",
+   "en": "Use a precise technical macro, cool light and a dark background. Show only the supplied physical subject or detail. Keep labels, crop marks, interfaces and technical data out of the generated image.",
+   "filtro": "grayscale(0.55) contrast(1.12) brightness(0.88)"
+  },
+  {
+   "tipo": "Apresentação · família",
+   "id": "photo",
+   "pt": "Luz de janela, cor quente e textura natural. Mostre a ação ou o detalhe de ofício descrito e mantenha mãos e rosto relevantes dentro do recorte.",
+   "en": "Use natural window light, warm restrained colour and realistic textures. For a person called for by the scene, keep the relevant face or hand movement inside the crop and leave room in the direction of the gaze.",
+   "filtro": "saturate(1.02) contrast(1.02) sepia(0.04)"
+  },
+  {
+   "tipo": "Apresentação · família",
+   "id": "modular",
+   "pt": "Luz clara e uniforme, fundo organizado e assunto longe dos cantos arredondados do módulo.",
+   "en": "Use even bright light, clean colour and an orderly background. Keep the essential subject away from rounded module corners. Include only objects called for by the slide.",
+   "filtro": "saturate(0.95) contrast(1.02)"
+  }
+ ],
+ "imageQuery": {
+  "subjects": "visualBible — ficha de continuidade do carrossel:\n• Inclua até 4 entidades recorrentes ou pertinentes às imagens, uma por pessoa, objeto ou lugar descrito no material. Use um id curto em minúsculas por entidade e reutilize-o ao longo do projeto.\n• Escreva en em inglês, com até 40 palavras, preferindo 12–40 quando houver atributos suficientes, como uma descrição completa dos atributos visíveis fornecidos. Preserve cor, material, forma, quantidade e roupa quando conhecidos. Reserve never, em inglês, para exclusões expressas do material. Se não houver exclusão, use \"\".\n• Registre apenas o que identifica a entidade entre as cenas. A ação, o lugar momentâneo, a pose e o enquadramento pertencem à imageQuery. Posição só é atributo fixo quando faz parte do desenho do objeto ou lugar.\n• Não deduza idade, etnia, marca, cargo, acessório, emoção ou aparência de uma pessoa pelo nome. Não complete a extensão com novos atributos. Mencione na cena apenas as entidades pertinentes.\n• Sem entidades visuais fornecidas, devolva \"visualBible\": {\"entities\": []}.",
+  "projectStyle": "ESTILO VISUAL DO PROJETO: extraia do brief a composição, tipografia, cores gráficas e linguagem da imagem; a direção explícita abaixo complementa o brief. Esses requisitos prevalecem sobre exemplos visuais genéricos. Não imponha fotografia sóbria se o projeto pede 3D, animação, fantasia, colagem ou publicidade expressiva. Cores gráficas não tingem automaticamente pele, céu ou produtos.\n{{projectStyle}}\nimageQuery descreve a cena para a arte base; fontes e texto ficam nas camadas editáveis do app. As referências visuais são destinadas à geração da imagem, não foram examinadas pelo modelo de texto."
+ },
+ "comum": {
+  "C01": "Você é especialista em conteúdo estratégico para redes sociais. Escreva com verbos concretos e vocabulário adequado ao público; evite jargão corporativo vazio e tom de guru. Use somente o material fornecido como base factual. Não invente dados, pesquisas, citações, preços, vagas, prazos, depoimentos, casos, cenas, sensações, hábitos do público, generalizações ou relações de causa e efeito; isso também vale para afirmações sem números. Um problema, benefício ou resultado apenas plausível não é um fato disponível. Preserve condições, limites e a diferença entre plano e realização. Notas de produção, como marca fictícia ou rascunho, não viram automaticamente texto público; quando um exemplo, dado ou resultado simulado puder ser confundido com evidência real, identifique seu caráter ilustrativo junto ao conteúdo pertinente. Só desenvolva exemplos hipotéticos quando o usuário os solicitar expressamente, sem apresentá-los como fatos do projeto. Fidelidade e restrições do usuário prevalecem sobre o arco e o tom; não complete etapas com informação ausente. Não use Slide N/Card N como rótulo no texto visível; Passo N é permitido em tutoriais. Preserve o schema solicitado, sem acrescentar campos. IDIOMA DO CONTEÚDO — ordem de prioridade:\n1. Siga o idioma explicitamente pedido pelo usuário, inclusive nas Instruções adicionais, em TODO o texto visível (title, subtitle, bodyAfterImage e caption).\n2. Sem pedido explícito de idioma, siga a língua predominante do briefing e do conteúdo fornecidos pelo usuário. Em revisão ou refinamento, preserve a língua do conteúdo atual, salvo pedido de tradução.\n3. Use português brasileiro apenas quando o pedido e o material não permitirem identificar um idioma.\nInstruções técnicas, rótulos da interface, exemplos internos, voz de referência e palavras-chave de imagem não definem o idioma. Uma regra automática do app que peça português não deve substituir a escolha explícita do usuário ou a língua do briefing. imageQuery permanece no idioma solicitado para busca de imagem, sem mudar o idioma dos demais campos.",
+  "C03": "PEDIDO ATUAL — execute esta entrega:\n\"{{request}}\"\nO texto dos cards é copy pronta para publicar. Não escreva metacomentários como “este card mostra”, “mostre a dor” ou “card 1: o problema”. Use o briefing e as fontes como base do conteúdo. Quando o pedido for anunciar ou vender, apresente a oferta; não transforme a oferta em uma aula sobre marketing. Quando o pedido for ensinar, explicar, informar ou contar uma história, cumpra essa intenção com o material disponível. O modo organiza a entrega sem trocar seu objetivo nem autorizar fatos ausentes."
+ }
+}

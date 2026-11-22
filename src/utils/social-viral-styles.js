@@ -55,7 +55,7 @@ export const VIRAL_STYLES = Object.freeze({
     intent: 'Capa esportiva: foto em sangria, título rosa pastel enorme embaixo, fio coral e numeral coral no miolo; cabeçalho de 3 colunas e contador N/M.',
     scale: HEAVY,
     pick: { cover: COVER, opener: 'vDevNumeral', development: ['vDevNumeral', 'vDevBlock'], photo: ['vPhotoTop', 'vPhotoBleed'], statement: 'vStatement', list: 'vList', comparison: 'compare', closing: CLOSING },
-    photo: { filter: 'contrast(1.06) saturate(1.04)', directionEn: 'Sports editorial photography: dynamic body in action or a strong portrait, hard light, subject in the upper two thirds and calm dark area at the bottom for the headline.', direction: 'Fotografia esportiva editorial: corpo em ação ou retrato forte, luz dura, assunto nos dois terços de cima e área escura calma embaixo para a manchete.' },
+    photo: { filter: 'contrast(1.06) saturate(1.04)', directionEn: 'Use energetic sports-editorial framing, hard directional light and clear contrast on the specified subject. Keep the headline zone quiet wherever the panel places it.', direction: 'Enquadramento esportivo dinâmico, contraste e luz direta. Preserve a ação fornecida e deixe calma a zona destinada à manchete.' },
     devices: 'sports',
   }),
   case_study_neon: v({
@@ -63,7 +63,7 @@ export const VIRAL_STYLES = Object.freeze({
     intent: 'Estudo de caso: título condensado com sublinhado neon, estrela neon de 8 pontas, card de resultado em chão neon e CTA só no fechamento.',
     scale: CONDENSED, pillRole: 'cta', grounds: { statement: 'accent' },
     pick: { cover: COVER, opener: 'vDevNumeral', development: ['vDevNumeral', 'vDevBlock'], photo: ['vPhotoTop', 'vPhotoTop'], statement: 'vStatement', list: 'vList', comparison: 'compare', closing: CLOSING },
-    photo: { filter: 'contrast(1.08) saturate(0.9)', directionEn: 'Case study documentation: real workspace, screen, product or process in use, clean dark background, sharp detail; nothing staged as a result.', direction: 'Documentação de caso: espaço de trabalho real, tela, produto ou processo em uso, fundo escuro limpo, detalhe nítido; nada encenado como resultado.' },
+    photo: { filter: 'contrast(1.08) saturate(0.9)', directionEn: 'Use precise detail, controlled light and a clean dark background for the specified product or process. Use the generated scene as context only. Actual screens and results require supplied assets.', direction: 'Detalhe preciso do produto ou processo informado em fundo escuro. Para demonstrar uma tela ou resultado real, use material fornecido.' },
     devices: 'case',
   }),
   mood_sepia: v({
@@ -71,7 +71,7 @@ export const VIRAL_STYLES = Object.freeze({
     intent: 'Mood reflexivo: creme centralizado sobre sépia escuro, fio âmbar, foto em sépia e hashtag só na capa e no fechamento.',
     scale: HEAVY, pillRole: 'tag',
     pick: { cover: COVER, opener: 'vDevCenter', development: ['vDevCenter', 'vDevCenter'], photo: ['vPhotoColumn', 'vPhotoTop'], statement: 'vStatement', list: 'vList', comparison: 'compare', closing: CLOSING },
-    photo: { filter: 'sepia(0.38) saturate(0.85) contrast(1.05)', directionEn: 'Warm reflective photography: window light, quiet gesture, hands or a person in thought, film grain feel, soft shadows, room for centered text.', direction: 'Fotografia reflexiva e quente: luz de janela, gesto calmo, mãos ou pessoa pensando, sensação de filme, sombras suaves e espaço para texto centralizado.' },
+    photo: { filter: 'sepia(0.38) saturate(0.85) contrast(1.05)', directionEn: 'Use warm window light, soft shadows and subtle grain. Keep the overlay area quiet and use a person’s gesture only when the scene calls for it.', direction: 'Luz quente de janela, sombras suaves, grão discreto e área calma para o texto no painel. Use o gesto descrito quando houver pessoa na cena.' },
     devices: 'mood',
   }),
   bold_promo_rosa: v({
@@ -95,7 +95,7 @@ export const VIRAL_STYLES = Object.freeze({
     intent: 'Manchete de tabloide: Anton gigante, faixa menta de plantão, palavra-chave em destaque menta e afirmação em chão menta.',
     scale: CONDENSED, pillRole: 'tag', grounds: { statement: 'accent' },
     pick: { cover: COVER, opener: 'vDevBlock', development: ['vDevBlock', 'vDevNumeral'], photo: ['vPhotoTop', 'vPhotoBleed'], statement: 'vStatement', list: 'vList', comparison: 'compare', closing: CLOSING },
-    photo: { filter: 'contrast(1.12) saturate(0.95)', directionEn: 'News photography: decisive moment, faces and gestures in close-up, high contrast, simple background behind the subject.', direction: 'Fotojornalismo: momento decisivo, rostos e gestos em close, alto contraste e fundo simples atrás do assunto.' },
+    photo: { filter: 'contrast(1.12) saturate(0.95)', directionEn: 'Use a tight, high-contrast editorial crop of the supplied subject against a simple background. Use gesture only when specified. Keep the image illustrative rather than staging a news event.', direction: 'Use um recorte editorial direto e expressivo do assunto informado, com alto contraste e fundo simples. Uma imagem gerada serve como ilustração do tema.' },
     devices: 'tabloid',
   }),
   editorial_magazine: v({
@@ -104,7 +104,7 @@ export const VIRAL_STYLES = Object.freeze({
     scale: SERIF,
     subtitleOverrides: { longCase: 'normal', longFrom: 48 },
     pick: { cover: COVER, opener: 'vDevCenter', development: ['vDevCenter', 'vDevCenter'], photo: ['vPhotoColumn', 'vPhotoTop'], statement: 'vStatement', list: 'vList', comparison: 'compare', closing: CLOSING },
-    photo: { filter: 'contrast(1.04) saturate(0.95)', directionEn: 'Fashion and lifestyle magazine photography: styled portrait or lookbook scene, soft directional light, subject in the upper half, elegant palette.', direction: 'Fotografia de revista de moda e lifestyle: retrato produzido ou cena de lookbook, luz suave direcional, assunto na metade de cima, paleta elegante.' },
+    photo: { filter: 'contrast(1.04) saturate(0.95)', directionEn: 'Use soft directional light, deliberate magazine framing and an elegant palette. Choose a portrait or lookbook treatment only for a subject that calls for it. Respect the actual panel crop.', direction: 'Fotografia de revista com luz direcional suave, composição deliberada e paleta elegante. Retrato ou lookbook somente quando fizerem parte do assunto.' },
     devices: 'magazine',
   }),
   luxury_hybrid: v({
@@ -113,7 +113,7 @@ export const VIRAL_STYLES = Object.freeze({
     scale: HEAVY,
     subtitleOverrides: { italic: false },
     pick: { cover: COVER, opener: 'vDevNumeral', development: ['vDevNumeral', 'vDevBlock'], photo: ['vPhotoTop', 'vPhotoBleed'], statement: 'vStatement', list: 'vList', comparison: 'compare', closing: CLOSING },
-    photo: { filter: 'contrast(1.05) saturate(0.92) sepia(0.06)', directionEn: 'Luxury fashion photography: rich textures, leather, gold and warm shadows, single soft key light, product or model fully in frame.', direction: 'Moda de luxo: texturas ricas, couro, dourado e sombras quentes, uma luz suave, produto ou modelo inteiro no quadro.' },
+    photo: { filter: 'contrast(1.05) saturate(0.92) sepia(0.06)', directionEn: 'Bring out the actual texture and finish of the supplied subject with one soft key light and warm shadows. Preserve its stated material, colour and shape. Show the product or model fully when the panel allows.', direction: 'Evidencie a textura e o acabamento reais do assunto com uma fonte de luz suave e sombras quentes. Preserve o material e a cor informados do produto.' },
     devices: 'luxury',
   }),
   viral_hype_dark: v({
@@ -130,7 +130,7 @@ export const VIRAL_STYLES = Object.freeze({
     scale: SERIF,
     subtitleOverrides: { italic: false },
     pick: { cover: COVER, opener: 'vDevBlock', development: ['vDevBlock', 'vDevBlock'], photo: ['vPhotoBleed', 'vPhotoColumn'], statement: 'vStatementCenter', list: 'vList', comparison: 'compare', closing: CLOSING },
-    photo: { filter: 'contrast(1.12) saturate(0.82) brightness(0.96)', directionEn: 'Film noir still: night or low light, practical lights, small human figure in a wide frame, deep shadows, low horizon.', direction: 'Fotograma noir: noite ou pouca luz, luzes práticas, figura pequena em plano aberto, sombras fundas e horizonte baixo.' },
+    photo: { filter: 'contrast(1.12) saturate(0.82) brightness(0.96)', directionEn: 'Use wide noir framing, motivated practical light and deep shadows. Keep the specified subject recognizable in the panel without adding a figure or changing a documented time of day.', direction: 'Composição noir em plano aberto, contraste e sombras profundas. Use a iluminação prática do ambiente fornecido e mantenha o assunto reconhecível no painel.' },
     devices: 'cinematic',
   }),
   authority_black: v({
@@ -138,7 +138,7 @@ export const VIRAL_STYLES = Object.freeze({
     intent: 'Autoridade: título branco gigante centralizado, fio âmbar, numeral âmbar e a ficha técnica de 3 colunas sempre legível no rodapé.',
     scale: HEAVY,
     pick: { cover: COVER, opener: 'vDevCenter', development: ['vDevCenter', 'vDevCenter'], photo: ['vPhotoTop', 'vPhotoBleed'], statement: 'vStatement', list: 'vList', comparison: 'compare', closing: CLOSING },
-    photo: { filter: 'grayscale(0.2) contrast(1.08)', directionEn: 'Authority portrait or workplace: confident person or professional setting, frontal framing, dark background, controlled light.', direction: 'Retrato de autoridade ou ambiente profissional: pessoa confiante ou cenário de trabalho, enquadramento frontal, fundo escuro, luz controlada.' },
+    photo: { filter: 'grayscale(0.2) contrast(1.08)', directionEn: 'Use composed frontal framing, controlled light and a dark background. Include a person only when specified, with the documented role and no invented credentials.', direction: 'Composição frontal e sóbria, luz controlada e fundo escuro. Faça retrato apenas se a pessoa fizer parte do assunto.' },
     devices: 'authority',
   }),
   minimal_clean: v({

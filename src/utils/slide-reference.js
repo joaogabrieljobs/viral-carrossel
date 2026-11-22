@@ -1,4 +1,5 @@
 import { imageGet, imagePut, newImageId, dataUrlParaBlob, blobParaDataUrl } from './image-store.js';
+import { IMAGE_PROMPT_TEXT } from '../../shared/image-prompt.js';
 
 const referenceUnavailable = () => Object.assign(
   new Error('Reenvie a referência deste card: o arquivo não está disponível neste navegador.'),
@@ -91,16 +92,26 @@ export function slideReferenceDescriptors(slide = {}) {
   return descriptors;
 }
 
-/** Explica os @nomes sem depender de o modelo adivinhar a ordem dos anexos. */
+/**
+ * Mapa dos anexos realmente enviados, na ordem de envio (catálogo final, I22).
+ * `references` é a lista completa `[{ label, role }]`; anexos sem rótulo contam
+ * na posição mas não entram no mapa. Sem nenhum rótulo, não há mapa.
+ * Papéis usados pelo app: 'moodboard' (referências do projeto), 'subject'
+ * (referências do card) e 'identity' (âncora da pessoa da ficha).
+ */
+export function composeReferenceMap(references = [], resolvedDirection = '') {
+  const linhas = (Array.isArray(references) ? references : [])
+    .map((ref, index) => (ref?.label ? `@${ref.label} = image ${index + 1} (${ref.role || 'subject'})` : ''))
+    .filter(Boolean);
+  if (!linhas.length) return '';
+  return `${IMAGE_PROMPT_TEXT.referenceMapHeader}\n${linhas.join('\n')}\n${IMAGE_PROMPT_TEXT.referenceMapTail}\n${String(resolvedDirection || '').trim()}`;
+}
+
+/** Explica os @nomes do card sem depender de o modelo adivinhar a ordem dos anexos. */
 export function composeSlideReferencePrompt(slide = {}, extra = '') {
-  const references = slideReferenceDescriptors(slide);
   const direction = String(extra || '').trim();
-  if (!references.length) return direction;
-  const labels = references.map((ref, index) => (
-    `- @${ref.mention} = reference image ${index + 1} (${String(ref.name).replace(/\s+/g, ' ').slice(0, 80)})`
-  )).join('\n');
-  const guide = `REFERENCE IMAGE LABELS (same order as the attached images):\n${labels}\nWhen the direction cites an @label, use that exact reference image and do not confuse it with the others.`;
-  return [guide, direction].filter(Boolean).join('\n\n');
+  const references = slideReferenceDescriptors(slide).map((ref) => ({ label: ref.mention, role: 'subject' }));
+  return composeReferenceMap(references, direction) || direction;
 }
 
 /** Nova coleção por card: cada item mantém seu próprio ID e nome. */

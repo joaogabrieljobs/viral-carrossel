@@ -234,7 +234,8 @@ describe('contratos editoriais de texto', () => {
 
 it('brief visual substitui direção fotográfica genérica', () => {
   const layer = buildGenerationImageLayer('livre', 'MUSA', '', '', true);
-  expect(layer).toContain('DIREÇÃO DO PROJETO');
+  expect(layer).toContain('imageQuery — direção do projeto.');
+  expect(layer).toContain('Siga o meio, paleta e linguagem escolhidos no projeto');
   expect(layer).toContain('3D');
   expect(layer).not.toContain('fotografia editorial realista');
 });
@@ -250,13 +251,14 @@ describe('brief factual separado dos exemplos e instruções', () => {
       expect(prompt).toContain('subtitle: até 140 caracteres');
       expect(prompt).toContain('juntos: até 220 caracteres');
       expect(prompt).not.toMatch(/260–403|248–384|400.*620|preencha \*\*subtitle\*\*/);
-      expect(mode.method).toContain('CTA do pedido têm prioridade');
+      // Catálogo 22/11: cada método diz com as próprias palavras que o CTA é o do pedido.
+      expect(mode.method, mode.id).toMatch(/CTA (?:do pedido|pedido|solicitado|prevalecem)/);
     }
   });
 
   it('não usa números e eventos fictícios para ensinar o modo narrativo', () => {
     expect(GEN_MODE_BY_ID.storytelling.method).not.toMatch(/23h|quinta vez|cliente desligou/i);
-    expect(GEN_MODE_BY_ID.storytelling.method).toContain('sem inventar um final feliz');
+    expect(GEN_MODE_BY_ID.storytelling.method).toContain('sem inventar final feliz');
     expect(GEN_MODE_BY_ID.deep.method).not.toContain('Todo mundo mede');
     expect(GEN_MODE_BY_ID.sensacionalista.method).not.toContain('3 dias');
   });

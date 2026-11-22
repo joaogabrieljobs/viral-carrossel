@@ -18,9 +18,11 @@ describe('MF-11 — profundidade de Proposta e Caso', () => {
     expect(buildPresentationReviewRules('aula_workshop')).not.toMatch(/DECISÃO COMERCIAL|ANTES E DEPOIS — /);
   });
 
+  // Catálogo final 22/11: o texto do aviso pede contexto e uma ação já
+  // ocorrida; a detecção (material sem ponto de partida) continua a mesma.
   it('avisa quando o material do Caso não traz ponto de partida', () => {
     const semAntes = 'Padaria Fermento Lento no Rio Vermelho. Três pães: camponês R$ 24. Fermentação de 36 horas. 41.200 pães em 2025.';
-    expect(presentationPathMaterialNotice('estudo_de_caso', semAntes)).toMatch(/antes/);
+    expect(presentationPathMaterialNotice('estudo_de_caso', semAntes)).toMatch(/acrescente o contexto e uma decisão ou ação que já aconteceu/);
     const comAntes = 'Antes de 2023 vendíamos 80 pães por dia; depois do sistema de encomendas passamos a 140.';
     expect(presentationPathMaterialNotice('estudo_de_caso', comAntes)).toBe('');
     expect(presentationPathMaterialNotice('estudo_de_caso', 'As vendas cresceram de 80 para 140 pães por dia.')).toBe('');
@@ -41,7 +43,7 @@ describe('aviso de modo sem base no material', () => {
   });
   it('ir a fundo com material curto', async () => {
     const { narrativeModeMaterialNotice } = await import('../../src/utils/presentation.js');
-    expect(narrativeModeMaterialNotice('deep', oferta)).toMatch(/curto/);
+    expect(narrativeModeMaterialNotice('deep', oferta)).toMatch(/Que relação o leitor deve entender\?/);
     expect(narrativeModeMaterialNotice('deep', `${oferta} `.repeat(4))).toBe('');
   });
   it('aula sem conceito ou procedimento', async () => {
@@ -51,7 +53,7 @@ describe('aviso de modo sem base no material', () => {
   });
   it('caso continua usando a regra do ponto de partida; outros modos sem aviso', async () => {
     const { narrativeModeMaterialNotice } = await import('../../src/utils/presentation.js');
-    expect(narrativeModeMaterialNotice('estudo_de_caso', oferta)).toMatch(/ponto de partida/);
+    expect(narrativeModeMaterialNotice('estudo_de_caso', oferta)).toMatch(/^Para analisar um caso/);
     expect(narrativeModeMaterialNotice('pain', oferta)).toBe('');
     expect(narrativeModeMaterialNotice('how_to', oferta)).toBe('');
   });

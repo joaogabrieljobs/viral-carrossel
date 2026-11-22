@@ -4,6 +4,7 @@
  */
 
 import { assertPublicHttpUrl } from '../../urlSourceFetch.js';
+import { SJINN_PROMPT_LIMIT, assertImagePromptWithinLimit } from '../../shared/image-prompt.js';
 
 const BASE = 'https://sjinn.ai/api/un-api';
 const POLL_MS = 5_000;
@@ -42,8 +43,10 @@ async function sjinnFetch(path, body) {
 }
 
 export async function createGptImage2Task({ prompt, aspectRatio = '2:3', resolution = '1K', imageList = [] }) {
+  // O pedido chega montado dentro do orçamento da rota. Fatiar aqui cortaria o
+  // fim do texto sem critério; acima do limite é erro de quem montou.
   const input = {
-    prompt: String(prompt || '').slice(0, 4000),
+    prompt: assertImagePromptWithinLimit(String(prompt || ''), SJINN_PROMPT_LIMIT),
     aspect_ratio: aspectRatio,
     resolution,
   };

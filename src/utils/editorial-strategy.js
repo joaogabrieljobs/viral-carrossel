@@ -87,8 +87,8 @@ export function buildContentObjectiveReminder(value) {
   const objective = CONTENT_OBJECTIVES.find(o => o.id === id);
   const structure = EDITORIAL_STRUCTURES.find(s => s.objective === id);
   return `OBJETIVO DO CONTEÚDO: ${objective.label}. ${objective.desc}
-${structure ? `Ação final: ${structure.cta}` : 'Escolha uma única ação final que faça sentido para o conteúdo.'}
-Preserve a promessa já feita e o modo/pacote escolhido; objetivo não autoriza novos fatos ou oferta inventada.`;
+${structure ? `Ação final: ${structure.cta}` : 'Preserve o CTA solicitado; quando não houver CTA, encerre com uma conclusão útil. Respeite um pedido explícito de encerrar sem convite.'}
+Preserve a promessa sustentada pelo material já feita e o modo/pacote escolhido; objetivo não autoriza novos fatos ou oferta inventada.`;
 }
 
 export function buildEditorialStrategyBlock(value, presetId = 'livre', preferredStructureId = null, { narrativeMode = null } = {}) {
@@ -102,10 +102,16 @@ export function buildEditorialStrategyBlock(value, presetId = 'livre', preferred
     ? `BIBLIOTECA EDITORIAL (${EDITORIAL_LIBRARY_VERSION}; hipóteses de escrita, sem garantia de desempenho):
 ${candidates.map(s => `- ${s.label}: ${s.arc}. Use quando: ${s.useWhen} Evite quando: ${s.avoidWhen} Exemplo ilustrativo, não copie: "${s.example}".`).join('\n')}`
     : 'O arco vem do ROTEIRO DO MODO deste pedido; use o objetivo só para escolher argumento, exemplo e CTA.';
+  // Catálogo 22/11: com o arco no roteiro do modo, o modo só executa o que o
+  // material sustenta. Com a biblioteca no prompt (objetivo explícito), a
+  // frase continua dizendo como usar a estrutura dentro do modo.
+  const modeLine = modeOwnsArc
+    ? 'O modo narrativo define a forma, mas só execute funções sustentadas pelo material. Não use "raciocínio" para suprir personagem, cena, causa, padrão, emoção, resultado ou processo ausente. Siga o ramo de adequação do método e do roteiro; uma oferta, por si só, não comprova história, tutorial ou análise causal.'
+    : 'O modo narrativo define a forma (cena, tutorial, análise); use a estrutura como funções adaptáveis dentro dele, sem trocar o modo.';
   return `${buildContentObjectiveReminder(id)}
 ${library}
 ${presetId === 'livre'
-    ? 'O modo narrativo define a forma (cena, tutorial, análise); use a estrutura como funções adaptáveis dentro dele, sem trocar o modo.'
+    ? modeLine
     : 'O pacote ativo mantém seu arco e layout. Use o objetivo para selecionar argumento, exemplo e CTA; não sobreponha um segundo arco.'}
 Antes de redigir, compare três abordagens possíveis: utilidade direta, identificação e interpretação menos óbvia. Escolha a mais específica, relevante para o público e sustentada pelo material.
 Planeje capa e segundo slide juntos: promessa clara e primeira entrega concreta. Cada slide seguinte acrescenta algo; o fecho cumpre a promessa.

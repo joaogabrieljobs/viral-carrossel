@@ -11,6 +11,8 @@ import { getServerStatus } from './server-status.js';
 import { extractJSON } from './parsers.js';
 import { buildImgParamsTagsEN } from './generation-prompts.js';
 import { ZAI_FALLBACK_MODELS } from '../../shared/ai-models.js';
+import { imageFramingDirection } from '../../shared/image-aspect.js';
+import { IMAGE_PROMPT_TEXT, imageRouteCapabilities, planImageRequest } from '../../shared/image-prompt.js';
 import { prepareImageReferencesForUpload } from './image-reference-upload.js';
 import { PITCH_SYSTEM_PT } from './pitch-content.js';
 import { assertPaidFeature } from './free-plan.js';
@@ -109,7 +111,7 @@ function sessionGateError(status, data) {
   return e;
 }
 
-const AI_SYSTEM_CORE = 'Você é especialista em conteúdo estratégico para redes sociais. Escreva com verbos concretos e vocabulário adequado ao público; evite jargão corporativo vazio e tom de guru. Não invente dados, pesquisas, citações, prazos ou casos reais; identifique exemplos hipotéticos. Não use Slide N/Card N como rótulo no texto visível; Passo N é permitido em tutoriais. Preserve o schema solicitado, sem acrescentar campos.';
+const AI_SYSTEM_CORE = 'Você é especialista em conteúdo estratégico para redes sociais. Escreva com verbos concretos e vocabulário adequado ao público; evite jargão corporativo vazio e tom de guru. Use somente o material fornecido como base factual. Não invente dados, pesquisas, citações, preços, vagas, prazos, depoimentos, casos, cenas, sensações, hábitos do público, generalizações ou relações de causa e efeito; isso também vale para afirmações sem números. Um problema, benefício ou resultado apenas plausível não é um fato disponível. Preserve condições, limites e a diferença entre plano e realização. Notas de produção, como marca fictícia ou rascunho, não viram automaticamente texto público; quando um exemplo, dado ou resultado simulado puder ser confundido com evidência real, identifique seu caráter ilustrativo junto ao conteúdo pertinente. Só desenvolva exemplos hipotéticos quando o usuário os solicitar expressamente, sem apresentá-los como fatos do projeto. Fidelidade e restrições do usuário prevalecem sobre o arco e o tom; não complete etapas com informação ausente. Não use Slide N/Card N como rótulo no texto visível; Passo N é permitido em tutoriais. Preserve o schema solicitado, sem acrescentar campos.';
 
 const CONTENT_LANGUAGE_SYSTEM_RULES = Object.freeze({
   en: 'Write every reader-visible field (titles, subtitles, paragraphs and captions) in natural English. Do not switch to Portuguese. Image-search keywords may remain in English.',
@@ -453,42 +455,11 @@ const callAIwithSearch = (userMsg, { json = false, maxTokens = 4096, signal: par
 }, parentSignal);
 
 // ─── GPT IMAGE 2 (OpenAI) ─────────────────────────────────────────────────────
-// Migração de DALL·E 3 → gpt-image-2 (modelo flagship lançado em abril/2026):
-// - Fotorealismo significativamente melhor (rosto, pele, texturas)
-// - Sem o "prompt rewriting" agressivo do DALL·E 3 (não precisa do hack "I NEED to test…")
-// - Sem `style:'vivid|natural'` — modelo já é natural por padrão
-// - Suporta resoluções flexíveis (múltiplos de 16, max edge 3840px); `1024x1280` é
-//   exato 4:5 do feed do Instagram, melhor que 1024x1792 (que era 9:16 no DALL·E 3).
-//
-// Prompt baseado nas best practices oficiais (developers.openai.com/cookbook):
-// usar palavra "photorealistic" diretamente, vocabulário de fotografia (lente, luz,
-// grão de filme), detalhes de textura real (poros, rugas, gasto de tecido), e
-// EVITAR palavras que sugiram studio polish/staging.
-const GPT_IMAGE_ART_DIRECTION = `You are an art director specialized in realistic imagery for editorial, institutional and commercial carousels. Create a visual support image for a card, always connected to the central theme of the content but avoiding obvious, generic or excessively literal solutions.
-
-GENERAL DIRECTION
-Generate realistic, natural and sophisticated images that look like real photographs or carefully composed documentary scenes captured in a real moment — not artificially created. Avoid creative exaggeration, visual fantasy, gratuitous surrealism, excess elements, overly dramatic compositions or visual cliché metaphors. The image must convey visual intelligence, subtlety and context.
-
-AESTHETIC
-Realistic, clean, contemporary, natural. Use natural or soft light, moderate contrast, sober balanced colors, real texture of environments and people, discrete cinematic composition, natural shallow depth of field, editorial premium atmosphere. Subtle film grain. Slightly desaturated muted tones. No glamorization, no heavy retouching, no studio strobes, no extreme contrast.
-
-RELATION TO THEME
-Connect to the card's theme intelligently and indirectly. Avoid clichés: no chess for "strategy", no rising graphs for "growth", no lightbulbs for "ideas", no floating holograms or robots for "technology", no generic corporate meetings for "business", no paint splashes for "creativity", no handshakes for "partnership". Suggest the concept through atmosphere, gesture, context, object or visual tension. The image is a sophisticated visual layer, not an obvious caption.
-
-COMPOSITION FOR CAROUSEL
-Designed for carousel cards. Leave visual breathing space for text overlay. Important elements never at edges. Negative space, slightly defocused background, one clear focal element, few objects, balance between information and visual silence. Image must not compete with text.
-
-PEOPLE
-Real, natural, spontaneous — never posed-model, no advertising smile. Contemporary, discrete clothing. Plausible situations. No artificially staged diversity, no generic corporate-ad composition. Real skin texture with visible pores and slight imperfections, natural unposed expressions.
-
-ENVIRONMENTS
-Real, well-observed: contemporary offices, urban streets, cafés, studios, homes, shops, behind-the-scenes, work spaces, cultural spaces, objects on tables, process details. The environment reinforces the theme without looking staged.
-
-VISUAL QUALITY
-Photorealistic, shot like 35mm film photograph at eye level using a 50mm lens, shallow depth of field, subtle film grain, natural color balance. Realistic materials, organic texture, subtle imperfections. Avoid: plasticized skin, deformed hands, malformed objects, floating elements, fake logos, excessive sharpness, evident AI aesthetic.
-
-EXPECTED OUTPUT
-A photorealistic, sophisticated and natural image related to the theme indirectly, with low saturation, moderate contrast, clean composition, generous text-friendly space, premium editorial appearance. Feels real, silent, intelligent and visually refined. Strictly no text, no captions, no watermarks, no logos inside the image.`;
+// Direção de arte padrão do Moont (catálogo final de 22/11/2026, I02). O texto
+// vive em shared/image-prompt.js porque a montagem e o orçamento são comuns ao
+// navegador e ao servidor. Só entra sem direção estética explícita e sem
+// moodboard de estilo; painel, referência de produto e âncora não a desligam.
+const GPT_IMAGE_ART_DIRECTION = IMAGE_PROMPT_TEXT.defaultArtDirection;
 
 function dataUrlToBlob(dataUrl) {
   const m = String(dataUrl).match(/^data:([^;]+);base64,(.+)$/s);
@@ -526,67 +497,54 @@ function resolveSjinnAspectRatio(aspectRatio = '4:5') {
 }
 
 /**
- * `scene` descreve a CENA deste card: a ficha visual do projeto (pessoas,
- * objetos e lugares com os atributos do material) e o enquadramento do painel.
- * Vai colada ao tema, em todos os ramos, e NÃO conta como direção de marca:
- * acrescentá-la não troca a linguagem visual que o projeto já recebia.
- * `maxChars` é o teto do provedor; a cena cede espaço para que as regras
- * fixas ("no text") nunca caiam fora do corte.
+ * Entradas do pedido para `shared/image-prompt.js`.
+ * `direction` é o objeto de `composeImageDirection` (src/utils/image-direction.js).
+ * Chamada antiga: uma string vale como estilo escrito, e anexos sem papel
+ * declarado valem como moodboard de estilo.
+ * O texto dos eixos (I04–I11) é consumido como `buildImgParamsTagsEN` devolver.
  */
-function buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, {
-  withReference = false,
-  priorityFirst = false,
-  aspectRatio = '4:5',
-  scene = '',
-  maxChars = 0,
-} = {}) {
-  const sceneFull = String(scene || '').trim().slice(0, 2200);
-  if (sceneFull) {
-    const semCena = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference, priorityFirst, aspectRatio });
-    // Com direção de marca ou referência, as regras fixas ("no text") ficam no
-    // FIM do prompt: a cena só ocupa o que sobra do teto do provedor. Sem elas,
-    // tema e regras vêm primeiro e o corte só alcança a direção de arte longa.
-    const regrasNoFim = withReference || !!String(imgExtraPrompt || '').trim();
-    const disponivel = maxChars > 0 && regrasNoFim ? Math.max(0, maxChars - semCena.length - 8) : sceneFull.length;
-    const cena = sceneFull.slice(0, disponivel).trim();
-    if (!cena) return semCena;
-    const marcador = `THEME OF THIS CARD: ${(q || '').slice(0, 280)}${buildImgParamsTagsEN(imgParams)}`;
-    const posicao = semCena.indexOf(marcador);
-    if (posicao < 0) return semCena;
-    const corte = posicao + marcador.length;
-    return `${semCena.slice(0, corte)}\n\n${cena}${semCena.slice(corte)}`;
-  }
-  const safeTheme = (q || '').slice(0, 280);
-  const axisTags = buildImgParamsTagsEN(imgParams);
-  const extra = (imgExtraPrompt || '').trim().slice(0, 3000);
-  const presentationWide = normalizeImageAspectRatio(aspectRatio) === '16:9';
-  const canvasRule = presentationWide
-    ? 'Compose for a widescreen 16:9 presentation canvas with intentional negative space for editable type.'
-    : 'Compose for a portrait social-media canvas with intentional negative space for editable type.';
-  const mediumRule = presentationWide
-    ? 'Create a widescreen 16:9 presentation visual. Choose the medium that best communicates the claim: editorial photography, clean diagrammatic illustration, product demonstration, comparison or data-inspired abstraction. Keep generous negative space for editable type.'
-    : 'Use photorealistic real-photograph rendering with generous text-friendly negative space.';
-  if (extra || withReference) {
-    return `THEME OF THIS CARD: ${safeTheme}${axisTags}\n\n` +
-      (withReference ? 'REFERENCE IMAGES ARE ATTACHED: use them as a moodboard for composition, light and visual language. Do not copy faces, characters, lettering or logos unless explicitly requested.\n' : '') +
-      (extra ? `BRAND / CLIENT DIRECTION (takes precedence over generic defaults):\n${extra}\n\n` : 'Match the visual medium, palette, materials and composition of the attached references in a new scene aligned with this card.\n\n') +
-      `${canvasRule} Create the visual language requested above, including illustration, 3D, collage or photography when specified. Keep natural subject colors unless directed otherwise. HARD RULES: no text, no captions, no watermarks, no logos inside the image.`;
-  }
-  if (priorityFirst) {
-    // Caminho SJinn corta a 4000 chars: o que importa (tema, marca, regras duras) vai à frente
-    // e o art-direction longo fica no fim, onde um corte custa menos (auditoria H8).
-    let head =
-      `THEME OF THIS CARD: ${safeTheme}${axisTags}\n\n` +
-      `HARD RULES: ${mediumRule} Strictly no text, no captions, no watermarks, no logos inside the image.\n\n` +
-      'ART DIRECTION (follow as far as it fits the theme):\n';
-    return head + GPT_IMAGE_ART_DIRECTION;
-  }
-  let body =
-    `${GPT_IMAGE_ART_DIRECTION}\n\n` +
-    `THEME OF THIS CARD: ${safeTheme}` +
-    `${axisTags}`;
-  body += `\n\nNow create the image following all the directions above. ${mediumRule}`;
-  return body;
+function imagePromptParts(q, imgParams, direction, { aspectRatio = '4:5', withReference = false, referenceCount } = {}) {
+  const estruturada = direction && typeof direction === 'object';
+  const d = estruturada ? direction : { styleBody: String(direction || '').trim().slice(0, 3000) };
+  const anexos = Number.isFinite(referenceCount)
+    ? Math.max(0, referenceCount)
+    : Math.max(0, Number(d.referenceCount) || 0, withReference ? 1 : 0);
+  return {
+    scene: q,
+    axisTags: buildImgParamsTagsEN(imgParams),
+    format: d.format || (normalizeImageAspectRatio(aspectRatio) === '16:9' ? 'presentation' : 'carousel'),
+    framing: typeof d.framing === 'string' ? d.framing : `FRAMING: ${imageFramingDirection({}, 'carrossel')}`,
+    referenceCount: anexos,
+    styleMoodboard: anexos > 0 && (typeof d.styleMoodboard === 'boolean' ? d.styleMoodboard : true),
+    referenceMap: d.referenceMap || '',
+    identityAnchor: d.identityAnchor || '',
+    presentationPanel: d.presentationPanel === true,
+    slideAction: d.slideAction || '',
+    subjects: d.subjects || '',
+    styleBody: d.styleBody || '',
+    familyEnglish: d.familyEnglish || '',
+  };
+}
+
+/**
+ * Pedido de imagem para a rota e o modelo efetivos: `{ status: 'ready', prompt,
+ * chars, dropped, trimmed, defaultAesthetic }` ou `{ status: 'blocked', code:
+ * 'reference_unsupported' }` quando a rota não aceita os anexos exigidos.
+ * Rotas: 'sjinn' (plano), 'openai', 'zai'. O orçamento vem do modelo; chame de
+ * novo a cada fallback.
+ */
+function planImagePrompt(q, imgParams, direction, { route = 'openai', model = '', limit = 0, ...shape } = {}) {
+  return planImageRequest(imagePromptParts(q, imgParams, direction, shape), { route, model, limit });
+}
+
+/** Prompt completo para o gerador (geração ou edição com referência). */
+function buildGptImageFullPrompt(q, imgParams, direction, options = {}) {
+  return planImagePrompt(q, imgParams, direction, { ...options, limit: options.limit || options.maxChars || 0 }).prompt;
+}
+
+/** Rota sem anexos com referência exigida: erro antes de qualquer chamada. */
+function referenceIncompatibleError(plan) {
+  return Object.assign(new Error(plan.message), { code: plan.code, label: plan.label });
 }
 
 function resolveZaiImageSize(model, aspectRatio = '4:5') {
@@ -604,10 +562,16 @@ async function generateZaiImage(q, imgParams, imgExtraPrompt, signal, options = 
   if (!apiKey) throw new Error('Falta a chave do provedor de imagem. Adicione-a em Configurar IA.');
   const model = _aiRuntimeSettings.imageModels?.zai || 'cogview-4-250304';
   const aspectRatio = normalizeImageAspectRatio(options.aspectRatio);
-  const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: false, aspectRatio, scene: options.sceneDirection });
+  // A rota não aceita anexos: com referência exigida, devolve incompatibilidade
+  // em vez de gerar sem ela.
+  const anexos = options.refImages || (options.refImage ? [options.refImage] : []);
+  const plan = planImagePrompt(q, imgParams, options.imageDirection ?? imgExtraPrompt, {
+    route: 'zai', model, aspectRatio, referenceCount: anexos.length,
+  });
+  if (plan.status !== 'ready') throw referenceIncompatibleError(plan);
   const payload = {
     model,
-    prompt: prompt.slice(0, 32000),
+    prompt: plan.prompt,
     size: resolveZaiImageSize(model, aspectRatio),
     quality: model === 'glm-image' ? 'hd' : 'standard',
   };
@@ -689,7 +653,11 @@ function getOpenAIImageOrder() {
   );
 }
 
-/** Geração com uma ou mais imagens de referência (API edits — multipart). */
+/**
+ * Geração com uma ou mais imagens de referência (API edits — multipart).
+ * `prompt` pode ser uma função `(nomeDoModelo) => texto`: o orçamento é
+ * recalculado a cada fallback. Modelos sem anexos (DALL·E 3) ficam de fora.
+ */
 async function generateDALLEEdits(refBlob, prompt, apiKey, signal, options = {}) {
   assertPaidFeature('image');
   const referenceBlobs = Array.isArray(refBlob) ? refBlob : [refBlob];
@@ -701,14 +669,16 @@ async function generateDALLEEdits(refBlob, prompt, apiKey, signal, options = {})
     headers['Authorization'] = `Bearer ${apiKey}`;
   }
 
-  const order = getOpenAIImageOrder().filter(model => model.name !== 'dall-e-3');
+  const order = getOpenAIImageOrder().filter(model => imageRouteCapabilities('openai', model.name).maxReferences > 0);
 
   let lastErr = null;
   for (const model of order) {
     throwIfGenerationCancelled(signal);
     const fd = new FormData();
     fd.append('model', model.name);
-    fd.append('prompt', prompt.slice(0, model.name === 'dall-e-3' ? 4000 : 32000));
+    fd.append('prompt', typeof prompt === 'function'
+      ? prompt(model.name)
+      : String(prompt).slice(0, imageRouteCapabilities('openai', model.name).promptLimit));
     fd.append('n', '1');
     fd.append('size', resolveOpenAIImageSize(model, options.aspectRatio));
     fd.append('quality', model.quality);
@@ -771,12 +741,12 @@ const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => 
   const aspectRatio = resolveSjinnAspectRatio(requestedAspectRatio);
   const refs = await prepareImageReferencesForUpload(options.refImages || (options.refImage ? [options.refImage] : []));
   throwIfGenerationCancelled(signal);
-  const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, {
-    withReference: refs.length > 0,
-    priorityFirst: true,
+  // Orçamento da rota do plano: 4.000 no pedido completo. O servidor valida o
+  // mesmo comprimento, então o texto sai daqui inteiro e dentro do limite.
+  const plan = planImagePrompt(q, imgParams, options.imageDirection ?? imgExtraPrompt, {
+    route: 'sjinn',
     aspectRatio: requestedAspectRatio,
-    scene: options.sceneDirection,
-    maxChars: 4000,
+    referenceCount: refs.length,
   });
   let res;
   try {
@@ -787,7 +757,7 @@ const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         operationId,
-        prompt: prompt.slice(0, 4000),
+        prompt: plan.prompt,
         aspectRatio,
         resolution: '1K',
         imageList: refs,
@@ -820,7 +790,8 @@ const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => 
 };
 
 /**
- * GPT Image a partir de texto. Opcional: `options.refImage` (data URL ou https) + `options.imgExtraPrompt`.
+ * GPT Image a partir de texto. Opcional: `options.refImages` (data URL ou https) e
+ * `options.imageDirection` (objeto de `composeImageDirection`; `imgExtraPrompt` em texto ainda é aceito como estilo escrito).
  * Com referência, usa POST /v1/images/edits; sem referência, /v1/images/generations.
  * Default: imagens inclusas no plano. BYOK só com useOwnImageKey.
  */
@@ -834,29 +805,24 @@ const generateDALLE = (q, apiKey, imgParams = null, options = {}) => runAIJob(as
     return generatePlatformSjinnImage(q, imgParams, options);
   }
 
+  const direction = options.imageDirection ?? imgExtraPrompt;
   if (_aiRuntimeSettings.imageProvider === 'zai') {
-    if (refs.length) throw Object.assign(new Error('Este gerador não aceita referências. Selecione OpenAI com chave própria para usar o moodboard.'), { code: 'reference_unsupported' });
-    return generateZaiImage(q, imgParams, imgExtraPrompt, signal, options);
+    // Bloqueia antes da chamada quando há referência exigida (rota sem anexos).
+    return generateZaiImage(q, imgParams, direction, signal, { ...options, refImages: refs });
   }
   apiKey = getProviderKey('openai') || apiKey;
   if (!IS_LOCAL_DEV && !apiKey) throw new Error('Chave OpenAI ausente.');
 
   if (refs.length) {
     const blobs = await Promise.all(refs.slice(0, 4).map(ref => blobFromSlideRef(ref, signal)));
-    const promptRef = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, {
-      withReference: true,
-      aspectRatio: options.aspectRatio,
-      scene: options.sceneDirection,
-    });
+    // Orçamento e capacidades do modelo efetivo, recalculados a cada fallback.
+    const promptRef = (modelName) => planImagePrompt(q, imgParams, direction, {
+      route: 'openai', model: modelName, aspectRatio: options.aspectRatio, referenceCount: blobs.length,
+    }).prompt;
     throwIfGenerationCancelled(signal);
     return generateDALLEEdits(blobs, promptRef, apiKey, signal, options);
   }
 
-  const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, {
-    withReference: false,
-    aspectRatio: options.aspectRatio,
-    scene: options.sceneDirection,
-  });
   const headers = { 'Content-Type': 'application/json' };
   if (IS_LOCAL_DEV) {
     if (apiKey) headers['x-openai-key'] = apiKey;
@@ -871,7 +837,11 @@ const generateDALLE = (q, apiKey, imgParams = null, options = {}) => runAIJob(as
     throwIfGenerationCancelled(signal);
     const body = {
       model: model.name,
-      prompt: prompt.slice(0, model.name === 'dall-e-3' ? 4000 : 32000),
+      // DALL·E 3 tem 4.000 caracteres e zero anexos: o pedido é remontado para
+      // o modelo da vez; blocos opcionais saem inteiros, nada é fatiado.
+      prompt: planImagePrompt(q, imgParams, direction, {
+        route: 'openai', model: model.name, aspectRatio: options.aspectRatio, referenceCount: 0,
+      }).prompt,
       n: 1,
       size: resolveOpenAIImageSize(model, options.aspectRatio),
       quality: model.quality,
@@ -988,6 +958,7 @@ export {
   normalizeImageAspectRatio,
   resolveSjinnAspectRatio,
   buildGptImageFullPrompt,
+  planImagePrompt,
   resolveZaiImageSize,
   resolveOpenAIImageSize,
   generateZaiImage,

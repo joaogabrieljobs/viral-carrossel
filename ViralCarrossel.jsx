@@ -71,7 +71,6 @@ import {
   normalizeSlideReferenceMention,
   uniqueSlideReferenceMention,
   slideReferenceDescriptors,
-  composeSlideReferencePrompt,
   storeSlideImageReference,
   importSlideReference,
 } from './src/utils/slide-reference.js';
@@ -101,7 +100,8 @@ import { buildNarrativeModeSequence } from './src/utils/narrative-sequence.js';
 import { socialFamilyFor } from './src/utils/social-families.js';
 import { propagateBrandTypography } from './src/utils/brand-typography.js';
 import { imageAspectRatioForSlide } from './shared/image-aspect.js';
-import { composeSceneDirection, normalizeVisualBible, visualBibleHasPerson, planPersonAnchor, pickPersonAnchorSlide } from './src/utils/visual-bible.js';
+import { normalizeVisualBible, visualBibleHasPerson, planPersonAnchor, pickPersonAnchorSlide } from './src/utils/visual-bible.js';
+import { composeImageDirection } from './src/utils/image-direction.js';
 import {
   PRESENTATION_VISUAL_PRESETS,
   PRESENTATION_VISUAL_PRESET_CATALOG,
@@ -196,6 +196,7 @@ import {
   buildGenerationJsonContract,
   buildGenerationIntroLine,
   buildGenerationLanguageLayer,
+  buildGenerationLanguageGuard,
   buildContentLanguageRule,
   resolveRequestedContentLanguage,
   buildGenerationSlideLayoutRules,
@@ -245,7 +246,6 @@ import {
   normalizeStyleKit,
   buildProjectContextBlock,
   buildStyleKitTextHint,
-  composeImgExtraPrompt,
   resolveQuickGenerationRequest,
   buildGenerationTaskBlock,
 } from './src/utils/style-kit.js';
@@ -5035,10 +5035,13 @@ export default function App() {
       const url = await generateDALLEWithRetry(imageState.query, openaiKey, imgParams, {
         signal: job.signal,
         refImages: [...baseRefs, ...anchorPlan.refImages],
-        imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(generationSnap, [imageState.extraPrompt, anchorPlan.direction].filter(Boolean).join('\n'))),
-        // Ficha visual do projeto + enquadramento do painel, junto do tema; a
-        // proporção acompanha a zona real da foto, não o formato do card.
-        sceneDirection: composeSceneDirection({ visualBible: doc.visualBible, slide: generationSnap, fmt, excludeEntityIds: anchorPlan.excludeEntityIds }),
+        // Estilo, anexos, âncora, ficha visual, família e enquadramento seguem
+        // separados por papel; a proporção acompanha a zona real da foto.
+        imageDirection: composeImageDirection({
+          styleKit, slide: generationSnap, fmt, visualBible: doc.visualBible,
+          slideDirection: imageState.extraPrompt, anchorPlan, baseReferenceCount: baseRefs.length,
+          presentationPanel: fmt === 'apresentacao' && [2, 3].includes(generationSnap.presentationCompositionVersion),
+        }),
         aspectRatio: imageAspectRatioForSlide(generationSnap, fmt),
         usageContext: {
           projectId: generationProjectId,
@@ -5532,7 +5535,7 @@ export default function App() {
     const imgParamsBlock = buildImgParamsBlockPT(effectiveAxes);
     const introLine = buildGenerationIntroLine(cp);
     const langLayer = `${buildGenerationLanguageLayer(cp, tone, effectiveMode, presentationPathId)}
-Não invente garantia, prazo, preço, item incluso ou promessa comercial que não esteja no material. Se for hipótese, escreva isso.`;
+${buildGenerationLanguageGuard(cp, effectiveMode)}`;
     const imageLayer = buildGenerationImageLayer(cp, topic, n, audience, !!(styleKit.contextMd.trim() || styleKit.stylePrompt.trim()), presentationPathId,
       isPresentationGeneration && !effectiveVisualPresetDef?.isCustom ? effectiveVisualPreset : undefined);
     const slideLayoutRules = buildGenerationSlideLayoutRules(effectiveMode, cp, td, count, presentationPathId);
@@ -5543,7 +5546,7 @@ Não invente garantia, prazo, preço, item incluso ou promessa comercial que nã
     const apresentacaoDesignBlock = isPresentationGeneration
       ? buildPresentationDesignSystemPromptBlock(effectiveVisualPresetDef, presentationPathId, { planned: !remix })
       : (!remix && usesSocialLibrary(effectiveVisualPresetDef)
-        ? buildSocialSequencePrompt({ family: socialFamilyFor(effectiveVisualPresetDef, brand), narrative: effectiveMode })
+        ? buildSocialSequencePrompt({ family: socialFamilyFor(effectiveVisualPresetDef, brand), narrative: effectiveMode, densityId: td })
         : '');
     const presentationRoute = isPresentationGeneration
       ? getPresentationPath(presentationPathId)
@@ -5616,7 +5619,7 @@ Não invente garantia, prazo, preço, item incluso ou promessa comercial que nã
       ? `Crie uma APRESENTAÇÃO (deck 16:9) de ${count} slides sobre: "${topic}"`
       : `Crie um carrossel de ${count} slides para Instagram sobre: "${topic}"`;
     const generationTaskBlock = isPresentationGeneration
-      ? `TAREFA: transforme o tema e as fontes em um deck pronto para apresentar. Cada slide deve avançar o caminho escolhido, sustentar uma única ideia e funcionar em uma tela 16:9. A conclusão deve deixar clara a decisão, aprendizagem ou próxima ação.`
+      ? `TAREFA: transforme o tema e as fontes em um deck pronto para apresentar. Cada slide deve cumprir uma função do plano sustentada pelo material, desenvolver uma ideia e funcionar em uma tela 16:9. Não preencha uma etapa do caminho com fatos, cenas, causas ou resultados ausentes. A conclusão deve deixar clara a decisão solicitada, aprendizagem ou próxima ação compatível com o pedido; preserve condições e não apresente uma decisão pendente como aprovada.`
       : buildGenerationTaskBlock(topic, announcement);
     const explicitCardScriptBlock = buildExplicitCardScriptPrompt(explicitCardScript);
     // MF-06: o arco do modo vira uma função por card. Roteiro do usuário e
@@ -6187,15 +6190,17 @@ ${jsonShapeLine}`;
             const url = await generateDALLEWithRetry(q, openaiKey, effectiveAxes, {
               signal: job.signal,
               refImages: [...baseRefs, ...anchorPlan.refImages],
-              imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(newSlides[i], [newSlides[i]?.imgExtraPrompt,
-                anchorPlan.direction,
-                generationPlan ? 'PRESENTATION IMAGE PANEL: keep the main subject complete within the frame, with breathing room around faces, hands and products. This is an illustration, never a fabricated screenshot, chart, testimonial or proof. Editable text is composed separately.' : '',
-              ].filter(Boolean).join('\n'))),
-              sceneDirection: composeSceneDirection({
-                visualBible: isPresentationGeneration ? null : generationVisualBible,
+              imageDirection: composeImageDirection({
+                styleKit,
                 slide: newSlides[i],
                 fmt: isPresentationGeneration ? 'apresentacao' : (fmt && fmt !== 'apresentacao' ? fmt : 'carrossel'),
-                excludeEntityIds: anchorPlan.excludeEntityIds,
+                visualBible: isPresentationGeneration ? null : generationVisualBible,
+                anchorPlan,
+                baseReferenceCount: baseRefs.length,
+                // Painel planejado: sinalizado à parte; não desliga a direção de arte padrão.
+                presentationPanel: !!generationPlan,
+                // A mesma família enviada ao modelo de texto, agora em inglês para o gerador.
+                presentationFamily: isPresentationGeneration && !effectiveVisualPresetDef?.isCustom ? (effectiveVisualPreset || '') : '',
               }),
               aspectRatio: generationPlan
                 ? presentationPhotoAspectRatio(newSlides[i])
@@ -7252,8 +7257,10 @@ Retorne APENAS JSON: ${refineAllWantsBody
             const url = await generateDALLEWithRetry(q, openaiKey, imgParams, {
               signal: templateJob.signal,
               refImages: [...baseRefs, ...anchorPlan.refImages],
-              imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(newSlides[i], [newSlides[i]?.imgExtraPrompt, anchorPlan.direction].filter(Boolean).join('\n'))),
-              sceneDirection: composeSceneDirection({ visualBible: doc.visualBible, slide: newSlides[i], fmt: fmt === 'apresentacao' ? 'carrossel' : fmt, excludeEntityIds: anchorPlan.excludeEntityIds }),
+              imageDirection: composeImageDirection({
+                styleKit, slide: newSlides[i], fmt: fmt === 'apresentacao' ? 'carrossel' : fmt, visualBible: doc.visualBible,
+                anchorPlan, baseReferenceCount: baseRefs.length,
+              }),
               aspectRatio: imageAspectRatioForSlide(newSlides[i], fmt === 'apresentacao' ? 'carrossel' : fmt),
               usageContext: {
                 projectId,
@@ -7286,7 +7293,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
                 expectedImageIdentity,
                 patch:{ bgImageFailed:true, bgImageError:e?.code || e?.message || 'generation_failed' },
               }));
-            if (['quota_exhausted', 'plan_no_images', 'session_required', 'subscription_inactive', 'rate_limited'].includes(e?.code)) {
+            // Referência incompatível com o gerador: os demais cards falhariam igual; avisa e para.
+            if (['reference_unsupported', 'quota_exhausted', 'plan_no_images', 'session_required', 'subscription_inactive', 'rate_limited'].includes(e?.code)) {
               stoppedByQuota = true;
               toast(e.message || 'A geração parou porque não há créditos disponíveis.', 'error', 7000);
               break;

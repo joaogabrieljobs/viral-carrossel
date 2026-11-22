@@ -83,21 +83,22 @@ export function imageAspectRatioForSlide(slide, fmt) {
 }
 
 /**
- * Instrução de enquadramento, em inglês, para o gerador de imagem.
- * Sempre pede o assunto inteiro; acrescenta onde ele precisa ficar quando o
- * painel vai cortar a imagem ou quando há texto sobre a foto.
+ * Instrução de enquadramento, em inglês, para o gerador de imagem (catálogo
+ * final, I27–I30). A regra-base entra uma vez; as variantes acrescentam onde o
+ * essencial precisa ficar quando o painel corta a imagem ou há texto sobre a
+ * foto. Quem monta o pedido prefixa "FRAMING: ".
  */
 export function imageFramingDirection(slide, fmt) {
-  const linhas = ['Keep the main subject complete inside the frame, with breathing room around faces, hands and the key object.'];
+  const linhas = ['Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning.'];
   const panel = photoPanelAspect(slide, fmt);
   if (panel && !panel.fullBleed && panel.mismatch > PANEL_MISMATCH_THRESHOLD) {
     linhas.push(panel.zoneRatio < panel.generatedRatio
-      ? 'The image will be shown in a tall, narrow column: keep the main subject within the central vertical third; the left and right sides will be cropped.'
-      : 'The image will be shown in a wide, short band: keep the main subject within the central horizontal band; the top and bottom will be cropped.');
+      ? 'The panel is a tall, narrow column. Keep the essential action and identifying features in the central vertical third; both sides may be cropped.'
+      : 'The panel is a wide, shallow band. Keep the essential action in the central horizontal band; the top and bottom may be cropped.');
   }
   const titulo = slide?.canvas?.zones?.title;
   if (panel?.fullBleed && titulo && Number.isFinite(titulo.y) && titulo.y >= 35) {
-    linhas.push('Editable text will sit over the lower part of the image: keep faces and the key object in the upper two thirds, and leave the lower third visually calm.');
+    linhas.push('Type overlays the lower half of this image. Keep the key face, action and product detail above that zone and leave the entire lower half visually quiet. Do not draw the type.');
   }
   return linhas.join(' ');
 }

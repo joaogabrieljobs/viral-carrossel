@@ -26,8 +26,11 @@ it('plano envia todos os uploads locais na mesma geração, sem descartá-los', 
   const body = JSON.parse(fetchMock.mock.calls[0][1].body);
   expect(body.operationId).toMatch(/^[A-Za-z0-9._:-]{1,160}$/);
   expect(body.imageList).toEqual(refs);
-  expect(body.prompt).toContain('REFERENCE IMAGES ARE ATTACHED');
-  expect(body.prompt).not.toContain('photorealistic real-photograph rendering');
+  // Anexos sem papel declarado valem como moodboard de estilo: sem estética padrão.
+  expect(body.prompt).toContain('REFERENCE ROLES: Use moodboard images for medium, palette, lighting and composition.');
+  expect(body.prompt).toContain('Match the visual medium, palette, materials and composition of the attached references');
+  expect(body.prompt).not.toContain('DEFAULT ART DIRECTION');
+  expect(body.prompt).not.toContain('use editorial photography');
 });
 it('reusa o identificador fornecido para a mesma tentativa de geração', async () => {
   setAIRuntimeSettings({ useOwnImageKey: false });
@@ -55,9 +58,10 @@ it('plano rejeita referências não suportadas antes da requisição', async () 
   expect(fetchMock).not.toHaveBeenCalled();
 });
 it('direção expressiva não recebe imposição de fotografia realista', () => {
-  const prompt = buildGptImageFullPrompt('floating 3D world', null, 'PROJECT VISUAL STYLE BIBLE: expressive 3D, orange graphic accents', { priorityFirst: true, withReference: true });
-  expect(prompt).toContain('REFERENCE IMAGES ARE ATTACHED');
+  const prompt = buildGptImageFullPrompt('floating 3D world', null, 'PROJECT VISUAL STYLE BIBLE: expressive 3D, orange graphic accents', { route: 'sjinn', withReference: true });
+  expect(prompt).toContain('REFERENCE ROLES:');
   expect(prompt).toContain('expressive 3D');
-  expect(prompt).not.toMatch(/photorealistic real-photograph rendering|muted|quiet/i);
-  expect(prompt.slice(0, 4000)).toContain('no text');
+  expect(prompt).not.toMatch(/DEFAULT ART DIRECTION|use editorial photography|Match the visual medium/i);
+  expect(prompt.length).toBeLessThanOrEqual(4000);
+  expect(prompt).toContain('HARD RULES: No lettering, captions, logos or watermarks anywhere in the image.');
 });

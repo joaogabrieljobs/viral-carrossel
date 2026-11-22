@@ -82,10 +82,16 @@ describe('MF-12 (reteste 21/11) — o prompt não pede lacuna no slide', () => {
     expect(NO_GAP_NOTE_RULE).toMatch(/não há dados/);
   });
 
-  it('a estratégia de apresentação carrega a mesma regra', async () => {
+  // Catálogo final 22/11: a estratégia de apresentação deixou de repetir a
+  // regra do carrossel. Lista de dados ausentes continua fora do slide, mas a
+  // condição ou pendência que muda a leitura acompanha a afirmação afetada.
+  it('a estratégia de apresentação não expõe lista de dados ausentes e preserva a ressalva essencial', async () => {
     const { NO_GAP_NOTE_RULE } = await import('../../src/utils/factual-grounding.js');
     const { presentationStrategyForRoute } = await import('../../src/utils/presentation-content.js');
     const { getPresentationPath } = await import('../../src/utils/presentation.js');
-    expect(presentationStrategyForRoute(getPresentationPath('pitch'))).toContain(NO_GAP_NOTE_RULE);
+    const strategy = presentationStrategyForRoute(getPresentationPath('pitch'));
+    expect(strategy).toContain('Não exponha notas de produção nem uma lista de dados ausentes.');
+    expect(strategy).toContain('omita apenas lacunas irrelevantes. Uma ressalva essencial não é comentário sobre o briefing.');
+    expect(strategy).not.toContain(NO_GAP_NOTE_RULE);
   });
 });

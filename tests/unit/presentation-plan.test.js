@@ -117,7 +117,7 @@ describe('avaliação determinística do contrato de planejamento', () => {
     const prompt = buildPresentationPlanPrompt({ brief: { topic: 'Longevity', audience: 'Parceiros' }, sources, count: 3, presentationPath: 'pitch' });
     expect(prompt).toContain('Quantidade EXATA: 3');
     expect(prompt).toContain('não são fatos do projeto');
-    expect(prompt).toContain('evidence pode ser []');
+    expect(prompt).toContain('Pode ser [] em um deck conceitual sem evidências citáveis');
     expect(prompt).toContain(PRESENTATION_PLAN_PROMPT_VERSION);
   });
   it('ausência de imagem no plano prevalece sobre fotografia sugerida pela redação', () => {
@@ -142,7 +142,7 @@ describe('avaliação determinística do contrato de planejamento', () => {
     expect(prompt).toContain(delivery);
     // MF-11: cada posição recebe uma etapa do caminho, na ordem; o plano não
     // escolhe livremente e o layout usa a mesma etapa.
-    expect(prompt).toContain('ROTEIRO POR POSIÇÃO — 8 slides');
+    expect(prompt).toContain('ROTEIRO DE REFERÊNCIA — 8 slides');
     expect(prompt).not.toContain('sem alocar por índice fixo');
   });
   it('retorna diagnósticos de campo sem IDs ou valores recebidos', () => {

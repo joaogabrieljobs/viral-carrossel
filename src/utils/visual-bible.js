@@ -15,7 +15,9 @@
  * devolver algo inválido, a geração segue exatamente como antes.
  */
 import { imageFramingDirection } from '../../shared/image-aspect.js';
+import { composeFamilyTreatment as composeTreatmentBlock } from '../../shared/image-prompt.js';
 import { socialPhotoDirection } from './social-families.js';
+import { presentationPhotoDirection } from './presentation-families.js';
 
 export const VISUAL_BIBLE_MAX_ENTITIES = 4;
 const EN_MIN = 20;
@@ -53,18 +55,24 @@ export function normalizeVisualBible(raw) {
 
 /** Instrução para o modelo de texto, anexada às regras de `imageQuery`. */
 export function buildVisualBiblePromptRules() {
-  return `visualBible — FICHA VISUAL DO PROJETO:
-• Preencha quando o material descreve pessoas, objetos ou lugares concretos que aparecem nas imagens. Até ${VISUAL_BIBLE_MAX_ENTITIES} entidades, uma por pessoa, objeto ou lugar; a mesma entidade vale para todas as imagens em que ela aparece.
-• Cada entidade: "id" curto em minúsculas; "en" em INGLÊS, 12–40 palavras, com TODOS os atributos visíveis que o material informa — cor, material, forma, quantidade, posição, roupa; "never" em INGLÊS com o que o material nega ou exclui para essa entidade ("" se nada).
-• Copie os atributos do material. Não invente idade, etnia, marca, estampa ou detalhe ausente; o que o material não informa fica de fora da ficha.
-• A ficha guarda o que NÃO muda: aparência, sem ação, pose ou lugar ("kneading dough on a table" fica na imageQuery, não na ficha). A imageQuery de cada card descreve só a cena: ação, estado do objeto naquele momento, ângulo e enquadramento. Card sem a pessoa não cita a pessoa na imageQuery.
-• Material sem elementos visuais concretos: "visualBible": {"entities": []}.`;
+  return `visualBible — ficha de continuidade do carrossel:
+• Inclua até ${VISUAL_BIBLE_MAX_ENTITIES} entidades recorrentes ou pertinentes às imagens, uma por pessoa, objeto ou lugar descrito no material. Use um id curto em minúsculas por entidade e reutilize-o ao longo do projeto.
+• Escreva en em inglês, com até 40 palavras, preferindo 12–40 quando houver atributos suficientes, como uma descrição completa dos atributos visíveis fornecidos. Preserve cor, material, forma, quantidade e roupa quando conhecidos. Reserve never, em inglês, para exclusões expressas do material. Se não houver exclusão, use "".
+• Registre apenas o que identifica a entidade entre as cenas. A ação, o lugar momentâneo, a pose e o enquadramento pertencem à imageQuery. Posição só é atributo fixo quando faz parte do desenho do objeto ou lugar.
+• Não deduza idade, etnia, marca, cargo, acessório, emoção ou aparência de uma pessoa pelo nome. Não complete a extensão com novos atributos. Mencione na cena apenas as entidades pertinentes.
+• Sem entidades visuais fornecidas, devolva "visualBible": {"entities": []}.`;
 }
 
+/** Cabeçalho da ficha no pedido de imagem (catálogo final, I25). */
+const SUBJECTS_HEADER = 'PROJECT SUBJECTS: Apply the following visible traits and exclusions only to subjects called for by this scene. Match their recurring appearance. The scene sets action, pose and location. Do not add anyone or anything simply because it appears in this list.';
+const comPonto = (texto) => (/[.!?]$/.test(texto) ? texto : `${texto}.`);
+
 /**
- * Bloco em inglês para o gerador de imagem. Vai junto do tema do card, e não
- * na "direção da marca": acrescentar a ficha não pode trocar a linguagem
- * visual que o projeto já recebia.
+ * Bloco em inglês para o gerador de imagem. A ficha fixa aparência; ação, pose
+ * e lugar vêm da cena (reteste 0b1cb62, E04: a ficha trazia ação e toda foto
+ * repetia a mesma cena). Não conta como direção estética: acrescentá-la não
+ * troca a linguagem visual do pedido.
+ * O teto é aplicado em entidades inteiras, nunca no meio de uma linha.
  */
 export function composeSubjectsDirection(visualBible, { excludeEntityIds = [] } = {}) {
   const bible = normalizeVisualBible(visualBible);
@@ -72,20 +80,58 @@ export function composeSubjectsDirection(visualBible, { excludeEntityIds = [] } 
   const excluded = new Set(excludeEntityIds);
   const entities = bible.entities.filter((e) => !excluded.has(e.id));
   if (!entities.length) return '';
-  const linhas = entities.map((e) => `- ${e.id}: ${e.en}${e.never ? ` NEVER: ${e.never}.` : ''}`);
-  // Reteste 0b1cb62 (E04): a ficha trazia ação e lugar ("kneading dough on a
-  // wooden table") e toda foto repetia essa cena.
-  return (`PROJECT SUBJECTS — whenever one of these appears in the scene it must match this description exactly, and look the same in every image of this project:\n${linhas.join('\n')}\nThese descriptions fix appearance only (face, hair, clothing, color, material, shape). Any action, pose or place written in them does not apply here: THEME OF THIS CARD decides action, pose, setting and which subjects appear. Do not add a subject the theme does not call for. Do not add attributes, accessories or objects that contradict these descriptions.`).slice(0, SUBJECTS_MAX);
+  const linhas = [];
+  let tamanho = SUBJECTS_HEADER.length;
+  for (const e of entities) {
+    const linha = `- ${e.id}: ${comPonto(e.en)}${e.never ? ` Exclude: ${comPonto(e.never)}` : ''}`;
+    if (linhas.length && tamanho + 1 + linha.length > SUBJECTS_MAX) break;
+    linhas.push(linha);
+    tamanho += 1 + linha.length;
+  }
+  return `${SUBJECTS_HEADER}\n${linhas.join('\n')}`;
 }
 
-/** Ficha + enquadramento do painel: tudo que descreve a cena deste card. */
-export function composeSceneDirection({ visualBible = null, slide = null, fmt = 'carrossel', excludeEntityIds = [] } = {}) {
-  // Carrossel da biblioteca v4: a linguagem fotográfica da família chega ao
-  // pedido real de imagem. Fica na cena (não na direção de marca), então uma
-  // direção de marca ou referência enviada pela pessoa continua prevalecendo.
-  const family = slide?.socialCompositionVersion >= 4 ? socialPhotoDirection(slide.socialFamily, 'en') : '';
-  return [composeSubjectsDirection(visualBible, { excludeEntityIds }), family ? `PHOTOGRAPHIC LANGUAGE: ${family}` : '', `FRAMING: ${imageFramingDirection(slide || {}, fmt)}`]
-    .filter(Boolean).join('\n\n');
+/** Tratamento da família visual, em inglês, para o gerador (I26). */
+export function composeFamilyTreatment(familyEnglish) {
+  return composeTreatmentBlock(familyEnglish);
+}
+
+/** Id de preset/padrão da biblioteca de apresentações gravado no slide. */
+const libraryPresentationId = (slide) => {
+  const id = String(slide?.presentationPresetId || slide?.presentationPatternId || '');
+  return /^(?:pds\.|presentation_)/.test(id) ? id : '';
+};
+
+/**
+ * Direção da família ativa, na versão inglesa do formato selecionado.
+ * Carrossel: família da biblioteca social v4. Apresentação: família do deck —
+ * `presentationFamily` explícita (a mesma chave enviada ao modelo de texto) ou
+ * o preset da biblioteca gravado no slide. Sem família ativa, devolve ''.
+ */
+export function familyDirectionEnglish({ slide = null, fmt = 'carrossel', presentationFamily } = {}) {
+  if (fmt === 'apresentacao') {
+    const key = presentationFamily === undefined ? libraryPresentationId(slide) : presentationFamily;
+    return key ? presentationPhotoDirection(key, 'en') : '';
+  }
+  return slide?.socialCompositionVersion >= 4 ? socialPhotoDirection(slide.socialFamily, 'en') : '';
+}
+
+/**
+ * Partes da cena deste card, cada uma no seu bloco do pedido: enquadramento do
+ * painel (I27–I30), ficha visual (I25) e família em inglês (I26).
+ */
+export function composeSceneParts({ visualBible = null, slide = null, fmt = 'carrossel', excludeEntityIds = [], presentationFamily } = {}) {
+  return {
+    framing: `FRAMING: ${imageFramingDirection(slide || {}, fmt)}`,
+    subjects: composeSubjectsDirection(visualBible, { excludeEntityIds }),
+    familyEnglish: familyDirectionEnglish({ slide, fmt, presentationFamily }),
+  };
+}
+
+/** As mesmas partes em um texto só, na ordem em que entram no pedido. */
+export function composeSceneDirection(options = {}) {
+  const partes = composeSceneParts(options);
+  return [partes.framing, partes.subjects, composeFamilyTreatment(partes.familyEnglish)].filter(Boolean).join('\n\n');
 }
 
 /**
@@ -118,7 +164,8 @@ export function sceneShowsPerson(imageQuery, visualBible) {
   });
 }
 
-export const PERSON_IDENTITY_DIRECTION = 'IDENTITY REFERENCE (explicitly requested): the LAST attached reference image shows the same person who appears in this scene. Reproduce exactly that person: same face, hair, skin tone, apparent age and build. Use that image ONLY for the person\'s identity. Do NOT copy its pose, action, camera angle, framing, objects or background: this image must show a clearly different moment, exactly as described in THEME OF THIS CARD. The scene, action, pose, setting and objects come only from THEME OF THIS CARD; if the reference shows the person doing something else, do not repeat it.';
+/** Âncora de identidade (catálogo final, I24): a mesma pessoa volta e a âncora é o último anexo. */
+export const PERSON_IDENTITY_DIRECTION = 'IDENTITY ANCHOR: The last attached image is the identity reference for the recurring person assigned to this scene. Match visible facial features, hair, skin tone and build. Use the project subject sheet for specified wardrobe. Use only the requested scene for action, pose, framing, setting and objects. Match neither the background nor the pose of the anchor unless the current scene calls for it.';
 
 /** Primeira pessoa da ficha: é dela o rosto que a âncora segura. */
 function firstPersonId(visualBible) {
@@ -146,11 +193,15 @@ export function planPersonAnchor({ visualBible = null, imageQuery = '', anchorUr
   }
   const none = { refImages: [], direction: '', canBecomeAnchor: showsPerson && !anchorUrl, excludeEntityIds: [] };
   if (!id || !anchorUrl || refCount >= 4) return none;
-  const others = 'Other people in the scene (customers, team members) are different people with their own faces; never give them this face.';
+  // Cena que cita a pessoa: texto do catálogo (I24). O mapa de referências
+  // liga a âncora ao id da ficha (`entityId`).
+  // Cena com gente, mas que não cita a pessoa (reteste T04): o catálogo final
+  // não cobre este caso; a variante condicional é mantida com o vocabulário
+  // dos blocos novos para não devolver o rosto trocado em cenas de equipe.
   const direction = showsPerson
-    ? `${PERSON_IDENTITY_DIRECTION.replace('the same person who appears in this scene', `the same person "${id}" (see PROJECT SUBJECTS) who appears in this scene`)} ${others}`
-    : `IDENTITY REFERENCE (explicitly requested): the LAST attached reference image shows the person "${id}" from PROJECT SUBJECTS. If "${id}" appears in this scene, reproduce exactly that person: same face, hair, skin tone, apparent age and build. Use that image ONLY for identity; do NOT copy its pose, camera angle, framing, objects or background. Do not add "${id}" or any person the THEME OF THIS CARD does not call for. ${others}`;
-  return { refImages: [anchorUrl], direction, canBecomeAnchor: false, excludeEntityIds: [] };
+    ? PERSON_IDENTITY_DIRECTION
+    : `IDENTITY ANCHOR: The last attached image is the identity reference for "${id}" from PROJECT SUBJECTS. Only if "${id}" appears in this scene, match visible facial features, hair, skin tone and build. Use only the requested scene for action, pose, framing, setting and objects. Do not add "${id}" or any person the scene does not call for. Other people in the scene are different people with their own faces.`;
+  return { refImages: [anchorUrl], direction, canBecomeAnchor: false, excludeEntityIds: [], entityId: id };
 }
 
 /**

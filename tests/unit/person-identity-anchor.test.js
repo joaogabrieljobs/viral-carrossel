@@ -20,9 +20,9 @@ describe('âncora de identidade da pessoa entre os cards', () => {
     // Outra pessoa (cliente) não herda o rosto da padeira.
     expect(sceneShowsPerson('person holding smartphone with bread order chat', bible)).toBe(false);
   });
-  it('o pedido de identidade é explícito, porque o prompt com referência proíbe copiar rostos por padrão', () => {
-    expect(PERSON_IDENTITY_DIRECTION).toMatch(/explicitly requested/);
-    expect(PERSON_IDENTITY_DIRECTION).toMatch(/same face, hair, skin tone/);
+  it('o pedido de identidade é explícito: a âncora é o último anexo e vale só para a identidade', () => {
+    expect(PERSON_IDENTITY_DIRECTION).toMatch(/^IDENTITY ANCHOR: The last attached image is the identity reference/);
+    expect(PERSON_IDENTITY_DIRECTION).toMatch(/facial features, hair, skin tone and build/);
   });
 });
 
@@ -46,7 +46,7 @@ describe('âncora em todas as imagens do projeto com pessoa na ficha', () => {
       const plan = planPersonAnchor({ visualBible: t04, imageQuery: q, anchorUrl: anchor, refCount: 0 });
       expect(plan.refImages).toEqual([anchor]);
       expect(plan.direction).toMatch(/marta/);
-      expect(plan.direction).toMatch(/If .*marta.* appears/i);
+      expect(plan.direction).toMatch(/Only if .*marta.* appears/i);
       expect(plan.direction).toMatch(/do not add/i);
     }
   });
@@ -58,8 +58,9 @@ describe('âncora em todas as imagens do projeto com pessoa na ficha', () => {
     expect(first.canBecomeAnchor).toBe(true);
     const next = planPersonAnchor({ visualBible: t04, imageQuery: 'Marta smiling behind the counter', anchorUrl: anchor, refCount: 1 });
     expect(next.refImages).toEqual([anchor]);
-    expect(next.direction).toMatch(/same face, hair, skin tone/);
-    expect(next.direction).toMatch(/marta/);
+    expect(next.direction).toBe(PERSON_IDENTITY_DIRECTION);
+    // O id da pessoa segue no mapa de referências (@marta = image N (identity)).
+    expect(next.entityId).toBe('marta');
   });
 
   it('outras pessoas da cena não herdam o rosto', async () => {
@@ -120,15 +121,16 @@ describe('âncora fixa só a identidade, não a cena', () => {
     const { planPersonAnchor } = await import('../../src/utils/visual-bible.js');
     const plan = planPersonAnchor({ visualBible: e04, imageQuery: 'bakery staff handing bread loaf to customer across counter', anchorUrl: anchor, refCount: 0 });
     expect(plan.refImages).toEqual([anchor]);
-    expect(plan.direction).toMatch(/If "marta" appears/);
+    expect(plan.direction).toMatch(/Only if "marta" appears/);
     expect(plan.excludeEntityIds).toEqual([]);
   });
 
-  it('a ficha vale só para a aparência; ação, pose e lugar vêm do tema do card', async () => {
+  it('a ficha vale só para a aparência; ação, pose e lugar vêm da cena do card', async () => {
     const { composeSubjectsDirection, PERSON_IDENTITY_DIRECTION, buildVisualBiblePromptRules } = await import('../../src/utils/visual-bible.js');
-    expect(composeSubjectsDirection(e04)).toMatch(/appearance only/i);
-    expect(composeSubjectsDirection(e04)).toMatch(/THEME OF THIS CARD decides/);
-    expect(PERSON_IDENTITY_DIRECTION).toMatch(/only from THEME OF THIS CARD/);
-    expect(buildVisualBiblePromptRules()).toMatch(/sem ação, pose ou lugar/);
+    expect(composeSubjectsDirection(e04)).toMatch(/Match their recurring appearance\. The scene sets action, pose and location\./);
+    expect(composeSubjectsDirection(e04)).toMatch(/Do not add anyone or anything simply because it appears in this list/);
+    expect(PERSON_IDENTITY_DIRECTION).toMatch(/Use only the requested scene for action, pose, framing, setting and objects/);
+    expect(PERSON_IDENTITY_DIRECTION).toMatch(/Match neither the background nor the pose of the anchor/);
+    expect(buildVisualBiblePromptRules()).toMatch(/A ação, o lugar momentâneo, a pose e o enquadramento pertencem à imageQuery/);
   });
 });

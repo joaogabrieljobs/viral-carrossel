@@ -11,7 +11,7 @@ const routes = [
   ['Proposta comercial', 'propostas comerciais', 'critério de aceite'],
   ['Relatório executivo', 'comunicação executiva', 'Ausência de dados não significa zero'],
   ['Estudo de caso', 'estudos de caso', 'condições comparáveis'],
-  ['Keynote / Manifesto', 'editor de keynotes', 'melhor objeção'],
+  ['Keynote / Manifesto', 'editor de keynotes', 'objeções fornecidas'],
 ];
 
 for (const [label, role, criterion] of routes) {

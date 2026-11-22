@@ -296,13 +296,13 @@ describe('runAgentImageJob', () => {
     }));
     const job = await runAgentImageJob(ctx());
     expect(mocked.create).toHaveBeenCalledTimes(2);
-    // A direção do card segue intacta e ganha as regras fixas do gerador
-    // (sem texto, sem logos, assunto inteiro): antes ia crua para o provedor.
+    // A direção do card segue intacta, como cena, e ganha as regras fixas da
+    // rota do agente (sem texto, sem logos, essencial legível no recorte).
     const enviado = mocked.create.mock.calls[0][0];
     expect(enviado).toMatchObject({ aspectRatio: '9:16', resolution: '1K', imageList: [] });
-    expect(enviado.prompt.startsWith('direção s1\n\nHARD RULES:')).toBe(true);
-    expect(enviado.prompt).toMatch(/no text, no captions, no watermarks, no logos/);
-    expect(enviado.prompt).toMatch(/main subject complete inside the frame/);
+    expect(enviado.prompt.startsWith('SCENE: direção s1\n\nOutput an illustrative image for this card.')).toBe(true);
+    expect(enviado.prompt).toMatch(/No lettering, captions, logos or watermarks\./);
+    expect(enviado.prompt).toMatch(/subject and essential action clear in the final crop/);
     expect(mocked.put).toHaveBeenCalledWith(owner, expect.stringMatching(/^original_[a-f0-9]{64}$/), { dataUrl: 'data:image/png;base64,QUJD' });
     const outcomes = mocked.finishJob.mock.calls[0][2];
     expect(outcomes.map(outcome => outcome.slideId)).toEqual(['s1', 's2']);

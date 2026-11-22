@@ -21,6 +21,10 @@ import {
 } from './sjinn.js';
 import { putLibraryAsset, putLibraryAssetChunk, ASSET_CHUNK_CHARS } from './library-sync-store.js';
 import { getAccountProject } from './library-sync-postgres.js';
+import { imageFramingDirection } from '../../shared/image-aspect.js';
+import { buildImagePrompt, isAestheticDirection } from '../../shared/image-prompt.js';
+import { composeSubjectsDirection, familyDirectionEnglish, planPersonAnchor } from '../../src/utils/visual-bible.js';
+import { composeImgExtraPrompt } from '../../src/utils/style-kit.js';
 import {
   closeAgentImageJobWithoutProject, createAgentImageJob, expireAgentImageJob, finishAgentImageJob, getAgentVisualJobInternal,
   imageJobHash, isImageJobStale, listAgentImageJobsForSettlement,
@@ -35,16 +39,50 @@ function fail(status, code, message, extra = {}) {
   throw Object.assign(new Error(message), { status, code, ...extra });
 }
 
-/**
- * O editor acrescenta regras fixas a toda imagem (sem texto, sem logos, assunto
- * inteiro no quadro). Aqui a query do card ia crua para o gerador; as regras
- * não podem depender de quem faz o pedido.
- */
-const AGENT_IMAGE_HARD_RULES = 'HARD RULES: Strictly no text, no captions, no watermarks, no logos inside the image. Keep the main subject complete inside the frame, with breathing room around faces, hands and the key object.';
+/** Formato do projeto no vocabulário do editor (mesma leitura de `imageAspectRatio`). */
+function agentFormat(doc) {
+  const format = String(doc?.format || doc?.formatId || '').toLowerCase();
+  if (format.includes('apresent') || format === '16:9') return 'apresentacao';
+  if (format.includes('storie') || format === '9:16') return 'stories';
+  if (format.includes('quadr') || format === '1:1') return 'quadrado';
+  return 'carrossel';
+}
 
-export function agentImagePrompt(imageQuery) {
-  const tema = String(imageQuery || '').trim().slice(0, 3600);
-  return `${tema}\n\n${AGENT_IMAGE_HARD_RULES}`;
+/**
+ * Contexto textual do projeto para a imagem de um card, com os mesmos blocos
+ * do editor (catálogo final, 22/11/2026): estilo escrito do projeto e do
+ * slide, ficha visual, família em inglês e enquadramento quando o painel
+ * corta a imagem. A rota não envia anexos, então não há mapa de referências
+ * nem âncora de identidade.
+ */
+export function agentImageContext(doc, slide) {
+  if (!doc || typeof doc !== 'object' || !slide || typeof slide !== 'object') return {};
+  const fmt = agentFormat(doc);
+  const direcao = String(slide.imgExtraPrompt || '').trim().slice(0, 1200);
+  const estetica = isAestheticDirection(direcao);
+  // O enquadramento-base já está nas regras fixas da rota; só a variante do
+  // painel (coluna estreita, faixa baixa, texto sobre a foto) acrescenta algo.
+  const enquadramento = imageFramingDirection(slide, fmt);
+  // Cena sem pessoa tira a pessoa da ficha deste pedido, como no editor.
+  const semPessoa = fmt === 'apresentacao' ? [] : planPersonAnchor({ visualBible: doc.visualBible, imageQuery: slide.imageQuery }).excludeEntityIds;
+  return {
+    format: fmt === 'apresentacao' ? 'presentation' : 'carousel',
+    framing: enquadramento !== imageFramingDirection({}, fmt) ? `FRAMING: ${enquadramento}` : '',
+    subjects: fmt === 'apresentacao' ? '' : composeSubjectsDirection(doc.visualBible, { excludeEntityIds: semPessoa }),
+    styleBody: [composeImgExtraPrompt(doc.styleKit, ''), estetica ? composeImgExtraPrompt(null, direcao) : ''].filter(Boolean),
+    slideAction: !estetica && direcao ? composeImgExtraPrompt(null, direcao) : '',
+    familyEnglish: familyDirectionEnglish({ slide, fmt }),
+  };
+}
+
+/**
+ * Pedido da rota do agente: cena + regras fixas (I31) na parte reservada de
+ * 3.600 caracteres e, quando há contexto e ele cabe, os blocos do projeto até
+ * 4.000 no pedido final. Blocos que não cabem saem inteiros; as regras fixas
+ * nunca saem.
+ */
+export function agentImagePrompt(imageQuery, context = {}) {
+  return buildImagePrompt({ ...context, scene: imageQuery, referenceCount: 0 }, { route: 'mcp' }).prompt;
 }
 
 /** Mesma regra do editor; o SJinn não aceita 4:5, então feed cai em 2:3. */
@@ -166,11 +204,11 @@ async function reserveCredits(ownerId, quota, slides, projectContext = {}) {
   };
 }
 
-async function generateOne(ownerId, slide, aspectRatio, deadlineAt) {
+async function generateOne(ownerId, slide, aspectRatio, deadlineAt, prompt = '') {
   const remaining = deadlineAt - Date.now();
   if (remaining < 5_000) return { slideId: slide.slideId, errorCode: 'image_job_timeout' };
   try {
-    const taskId = await createGptImage2Task({ prompt: agentImagePrompt(slide.imageQuery), aspectRatio, resolution: '1K', imageList: [] });
+    const taskId = await createGptImage2Task({ prompt: prompt || agentImagePrompt(slide.imageQuery), aspectRatio, resolution: '1K', imageList: [] });
     const data = await waitForSjinnTask(taskId, { deadlineMs: Math.min(SJINN_DEADLINE_MS, deadlineAt - Date.now()) });
     const url = extractSjinnOutputUrl(data);
     if (!url) return { slideId: slide.slideId, errorCode: 'image_result_missing' };
@@ -271,10 +309,10 @@ async function retryTerminalSettlement(ownerId, requestId, attempts = 4, finishO
   return false;
 }
 
-export async function runAgentImageJob({ ownerId, requestId, slides, aspectRatio, periodStartSec, deadlineAt }) {
+export async function runAgentImageJob({ ownerId, requestId, slides, aspectRatio, periodStartSec, deadlineAt, prompts = null }) {
   const deadline = deadlineAt || Date.now() + IMAGE_JOB_DEADLINE_MS;
   const outcomes = await mapWithConcurrency(slides, IMAGE_CONCURRENCY,
-    slide => generateOne(ownerId, slide, aspectRatio, deadline));
+    slide => generateOne(ownerId, slide, aspectRatio, deadline, prompts?.[slide.slideId]));
   let finished;
   try {
     finished = await finishAgentImageJob(ownerId, requestId, outcomes);
@@ -342,6 +380,13 @@ export async function startAgentImageJob(ownerId, tokenId, input, { schedule = d
     cardNumber: cardNumberById.get(slide.slideId),
     operationId: imageOperationId(requestId, slide.slideId),
   }));
+  // Pedido de cada card com o contexto textual do projeto. Fica só em memória:
+  // o job gravado continua guardando apenas a imageQuery.
+  const docSlides = new Map((project.entry?.doc?.slides || []).map(slide => [slide?.id, slide]));
+  const prompts = Object.fromEntries(slides.map(slide => [
+    slide.slideId,
+    agentImagePrompt(slide.imageQuery, agentImageContext(project.entry?.doc, docSlides.get(slide.slideId))),
+  ]));
   const projectContext = {
     projectId: project.id,
     projectName: project.entry?.name || project.entry?.doc?.name || '',
@@ -394,7 +439,7 @@ export async function startAgentImageJob(ownerId, tokenId, input, { schedule = d
   const { reserved, quota: balance } = reservation;
   schedule(runAgentImageJob({
     ownerId, requestId, slides, aspectRatio, periodStartSec: quota.periodStartSec,
-    deadlineAt: Date.now() + IMAGE_JOB_DEADLINE_MS,
+    deadlineAt: Date.now() + IMAGE_JOB_DEADLINE_MS, prompts,
   }));
   return { ...created.job, creditsReserved: reserved.length, quota: balance,
     note: 'Geração em andamento. Consulte get_change_status com este requestId até status deixar de ser pending.' };

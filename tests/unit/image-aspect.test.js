@@ -89,8 +89,9 @@ describe('proporção da imagem segue o painel onde ela aparece', () => {
 });
 
 describe('instrução de enquadramento', () => {
-  it('sempre pede o assunto inteiro', () => {
-    expect(imageFramingDirection({}, 'carrossel')).toMatch(/main subject complete inside the frame/);
+  it('sempre pede o essencial legível depois do recorte', () => {
+    expect(imageFramingDirection({}, 'carrossel')).toMatch(/identifying features and the essential action readable after cropping/);
+    expect(imageFramingDirection({}, 'carrossel')).toMatch(/Protect faces, hands and key product features/);
   });
 
   it('coluna estreita: assunto no terço central', () => {
@@ -98,7 +99,7 @@ describe('instrução de enquadramento', () => {
   });
 
   it('faixa muito larga: assunto na faixa central', () => {
-    expect(imageFramingDirection(zona(0, 30, 100, 20), 'carrossel')).toMatch(/wide, short band/);
+    expect(imageFramingDirection(zona(0, 30, 100, 20), 'carrossel')).toMatch(/wide, shallow band.*central horizontal band/);
   });
 
   it('painel bem atendido não recebe aviso de corte', () => {
@@ -106,8 +107,8 @@ describe('instrução de enquadramento', () => {
     expect(texto).not.toMatch(/cropped/);
   });
 
-  it('capa com texto sobre a foto: assunto nos dois terços de cima', () => {
+  it('capa com texto sobre a foto: assunto acima da zona de texto, metade de baixo calma', () => {
     const capa = { canvas: { applied: true, zones: { photo: { x: 0, y: 0, w: 100, h: 100 }, title: { x: 7, y: 47, w: 86, h: 28 } } } };
-    expect(imageFramingDirection(capa, 'carrossel')).toMatch(/upper two thirds/);
+    expect(imageFramingDirection(capa, 'carrossel')).toMatch(/Type overlays the lower half.*above that zone.*lower half visually quiet/);
   });
 });

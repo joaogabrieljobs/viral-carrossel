@@ -255,15 +255,17 @@ describe('biblioteca v4 — prompts', () => {
     const p = presetDe('documental');
     const [capa] = applySocialVisualComposition(sequencia(), { preset: p, brand: applyVisualPreset({}, p.id) });
     const cena = composeSceneDirection({ slide: capa, fmt: 'carrossel' });
-    expect(cena).toContain('PHOTOGRAPHIC LANGUAGE');
-    expect(cena).toContain(SOCIAL_FAMILIES.documental.photo.directionEn);
-    expect(composeSceneDirection({ slide: { title: 'x' } })).not.toContain('PHOTOGRAPHIC LANGUAGE');
+    expect(cena).toContain(`VISUAL TREATMENT: ${SOCIAL_FAMILIES.documental.photo.directionEn}\nApply this treatment to the requested scene within the specified crop.`);
+    expect(composeSceneDirection({ slide: { title: 'x' } })).not.toContain('VISUAL TREATMENT');
   });
   it('bloco de sequência não aumenta limites nem pede texto na imagem', () => {
-    const txt = buildSocialSequencePrompt({ family: 'revista', narrative: 'how_to' });
+    const txt = buildSocialSequencePrompt({ family: 'revista', narrative: 'how_to', densityId: '1_2' });
     expect(txt).toContain(NARRATIVE_VISUAL_MATRIX.how_to.rhythm);
-    expect(txt).toMatch(/não invente oferta/);
-    expect(txt).toMatch(/Nunca escreva texto, título, gráfico, tabela ou logo para a imagem/);
+    // Os tetos são os do contrato da densidade (Balanceado: 10 palavras, 72 caracteres).
+    expect(txt).toContain('título de até 10 palavras e 72 caracteres');
+    expect(txt).not.toMatch(/até 12 palavras/);
+    expect(txt).toMatch(/use o CTA do pedido ou uma conclusão sustentada\. Preserve as condições da oferta/);
+    expect(txt).toMatch(/descreva a cena sem texto, gráfico, tabela ou logo incorporados/);
     expect(buildSocialSequencePrompt({ family: null })).toBe('');
   });
   it('trocar de família não muda o pacote criativo', () => {

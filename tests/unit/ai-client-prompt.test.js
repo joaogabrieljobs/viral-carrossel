@@ -1,16 +1,15 @@
 // Auditoria 2026-09-15 — H8 (prompt SJinn truncado), L2 (cascatas ⊆ config).
 import { describe, it, expect } from 'vitest';
-import { buildGptImageFullPrompt, OPENAI_IMAGE_MODELS, ZAI_FALLBACK_MODELS } from '../../src/utils/ai-client.js';
+import { buildGptImageFullPrompt, planImagePrompt, OPENAI_IMAGE_MODELS, ZAI_FALLBACK_MODELS } from '../../src/utils/ai-client.js';
 import { IMAGE_PROVIDERS, TEXT_PROVIDERS } from '../../src/config/ai-providers.js';
 
-describe('H8 — prompt de imagem do plano sobrevive ao corte de 4000 chars', () => {
-  it('direção de marca e regra "no text" ficam nos primeiros 4000 chars', () => {
+describe('H8 — prompt de imagem do plano cabe em 4000 chars sem perder o essencial', () => {
+  it('estilo do projeto e regras fixas ficam inteiros no pedido do plano', () => {
     const extra = 'B'.repeat(2000);
-    const full = buildGptImageFullPrompt('moonrise over a quiet city', null, extra, { priorityFirst: true });
-    const head = full.slice(0, 4000);
-    expect(head).toContain('BRAND / CLIENT DIRECTION');
-    expect(head).toContain('THEME OF THIS CARD: moonrise');
-    expect(head).toMatch(/no text/i);
+    const full = buildGptImageFullPrompt('moonrise over a quiet city', null, extra, { route: 'sjinn' });
+    expect(full.length).toBeLessThanOrEqual(4000);
+    expect(full.startsWith('SCENE: moonrise over a quiet city\n\nHARD RULES: No lettering')).toBe(true);
+    expect(full).toContain(`PROJECT OR SLIDE STYLE: Apply the requested medium, palette, materials and lighting below. Use natural subject colours unless the project specifies otherwise.\n${extra}\nCANVAS:`);
   });
 });
 
@@ -26,44 +25,51 @@ describe('L2 — cascatas de modelos só citam modelos conhecidos', () => {
 });
 
 describe('cena do card — ficha visual e enquadramento no prompt de imagem', () => {
-  const cena = 'PROJECT SUBJECTS — whenever one of these appears...\n- raul: adult man wearing a plain olive-green shirt\n\nFRAMING: Keep the main subject complete inside the frame.';
+  const ficha = 'PROJECT SUBJECTS: Apply the following visible traits...\n- raul: adult man wearing a plain olive-green shirt.';
+  const coluna = 'FRAMING: Compose for the final visible image panel. The panel is a tall, narrow column.';
 
-  it('sem cena o prompt é idêntico ao de antes', () => {
-    for (const opts of [{}, { priorityFirst: true }, { withReference: true }, { aspectRatio: '16:9' }]) {
-      expect(buildGptImageFullPrompt('quiet city', null, '', { ...opts, scene: '' })).toBe(buildGptImageFullPrompt('quiet city', null, '', opts));
-      expect(buildGptImageFullPrompt('quiet city', null, 'brand', { ...opts, scene: '   ' })).toBe(buildGptImageFullPrompt('quiet city', null, 'brand', opts));
+  it('sem direção estruturada o pedido traz cena, regras fixas e o enquadramento-base', () => {
+    const base = buildGptImageFullPrompt('quiet city', null, '', {});
+    expect(base).toMatch(/^SCENE: quiet city\n\nHARD RULES: [^\n]+\n\nFRAMING: Compose for the final visible image panel\./);
+    expect(buildGptImageFullPrompt('quiet city', null, '   ', {})).toBe(base);
+    expect(buildGptImageFullPrompt('quiet city', null, {}, {})).toBe(base);
+  });
+
+  it('ficha e enquadramento do painel entram depois das regras fixas, em todas as rotas, sem remover nada', () => {
+    for (const opts of [{ route: 'openai', model: 'gpt-image-2' }, { route: 'sjinn' }, { route: 'zai' }, { route: 'openai', model: 'gpt-image-2', withReference: true }]) {
+      const sem = buildGptImageFullPrompt('quiet city', null, { framing: coluna }, opts);
+      const com = buildGptImageFullPrompt('quiet city', null, { framing: coluna, subjects: ficha }, opts);
+      expect(com).toMatch(/^SCENE: quiet city\n\nHARD RULES: [^\n]+\n\nFRAMING: [^\n]+tall, narrow column\./);
+      expect(com).toContain(`\n\n${ficha}\n\n`);
+      expect(com.replace(`\n\n${ficha}`, '')).toBe(sem);
     }
   });
 
-  it('a cena entra logo depois do tema, em todos os ramos, sem remover nada', () => {
-    for (const [extra, opts] of [['', {}], ['', { priorityFirst: true }], ['brand direction', {}], ['', { withReference: true }]]) {
-      const sem = buildGptImageFullPrompt('quiet city', null, extra, opts);
-      const com = buildGptImageFullPrompt('quiet city', null, extra, { ...opts, scene: cena });
-      expect(com).toContain('THEME OF THIS CARD: quiet city\n\nPROJECT SUBJECTS');
-      expect(com.replace(`\n\n${cena}`, '')).toBe(sem);
-    }
+  it('a ficha não troca a linguagem visual: sem estilo explícito, a direção de arte padrão continua', () => {
+    const com = buildGptImageFullPrompt('quiet city', null, { subjects: ficha }, {});
+    expect(com).toContain('DEFAULT ART DIRECTION: Use an editorial photograph');
+    expect(com).not.toContain('PROJECT OR SLIDE STYLE');
   });
 
-  it('a ficha não troca a linguagem visual: sem direção de marca, a direção de arte padrão continua', () => {
-    const com = buildGptImageFullPrompt('quiet city', null, '', { scene: cena });
-    expect(com).toContain('art director');
-    expect(com).not.toContain('BRAND / CLIENT DIRECTION');
+  it('no teto de 4000 do plano as regras fixas, a ficha e o estilo ficam; a bíblia longa cede em fim de frase', () => {
+    const estilo = `PROJECT VISUAL STYLE BIBLE:\n${'Brand sentence that is complete. '.repeat(120)}`.trim();
+    const fichaLonga = `${ficha}\n${Array.from({ length: 4 }, (_, i) => `- extra${i}: ${'trait '.repeat(40).trim()}.`).join('\n')}`;
+    const plano = planImagePrompt('moonrise over a quiet city', null, { styleBody: estilo, subjects: fichaLonga }, { route: 'sjinn' });
+    expect(plano.chars).toBeLessThanOrEqual(4000);
+    expect(plano.prompt).toContain('HARD RULES: No lettering, captions, logos or watermarks anywhere in the image.');
+    expect(plano.prompt).toContain(fichaLonga);
+    expect(plano.prompt).toContain('PROJECT OR SLIDE STYLE');
+    expect(plano.trimmed).toEqual(['style']);
+    expect(plano.prompt).toMatch(/Brand sentence that is complete\.\nCANVAS: /);
   });
 
-  it('no teto de 4000 do plano a regra "no text" e a direção de marca sobrevivem; a cena cede', () => {
-    const extra = 'B'.repeat(3000);
-    const cenaLonga = `${cena}\n${'x'.repeat(2000)}`;
-    const full = buildGptImageFullPrompt('moonrise over a quiet city', null, extra, { priorityFirst: true, scene: cenaLonga, maxChars: 4000 });
-    expect(full.length).toBeLessThanOrEqual(4000);
-    expect(full).toContain('BRAND / CLIENT DIRECTION');
-    expect(full).toMatch(/HARD RULES: no text/);
-    expect(full).toContain('PROJECT SUBJECTS');
-  });
-
-  it('sem direção de marca, tema, cena e regras fixas ficam nos primeiros 4000', () => {
-    const full = buildGptImageFullPrompt('moonrise', null, '', { priorityFirst: true, scene: `${cena}\n${'x'.repeat(2000)}`, maxChars: 4000 });
-    const head = full.slice(0, 4000);
-    expect(head).toContain('PROJECT SUBJECTS');
-    expect(head).toMatch(/Strictly no text/);
+  it('sem estilo explícito, o que não cabe em 4000 sai inteiro: a estética padrão primeiro', () => {
+    const fichaLonga = `${ficha}\n${Array.from({ length: 11 }, (_, i) => `- extra${i}: ${'trait '.repeat(45).trim()}.`).join('\n')}`;
+    const plano = planImagePrompt('moonrise', null, { subjects: fichaLonga }, { route: 'sjinn' });
+    expect(plano.chars).toBeLessThanOrEqual(4000);
+    expect(plano.prompt).toContain(fichaLonga);
+    expect(plano.dropped).toEqual(['defaultArtDirection']);
+    expect(plano.prompt).not.toContain('DEFAULT ART DIRECTION');
+    expect(plano.prompt).toContain('For a carousel with no specified medium, use editorial photography.');
   });
 });

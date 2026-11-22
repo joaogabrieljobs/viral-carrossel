@@ -22,6 +22,7 @@ import {
 } from '../lib/image-quota.js';
 import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
 import { parseImageReferences, assertReferenceStorageConfigured, stageImageReferences } from '../lib/image-references.js';
+import { SJINN_PROMPT_LIMIT } from '../../shared/image-prompt.js';
 import {
   isSjinnConfigured,
   createGptImage2Task,
@@ -67,6 +68,16 @@ export default async function handler(req, res) {
   const prompt = String(body.prompt || '').trim();
   if (prompt.length < 8) {
     return res.status(400).json({ error: 'Prompt de imagem demasiado curto.' });
+  }
+  // O navegador monta o pedido completo dentro deste mesmo limite (blocos
+  // opcionais saem inteiros). Acima dele o pedido é recusado antes de reservar
+  // crédito, em vez de seguir cortado para o gerador.
+  if (prompt.length > SJINN_PROMPT_LIMIT) {
+    return res.status(400).json({
+      error: `O pedido de imagem passou do limite de ${SJINN_PROMPT_LIMIT} caracteres. Encurte a direção da imagem e tente de novo. Nenhum crédito foi usado.`,
+      code: 'prompt_too_long',
+      limit: SJINN_PROMPT_LIMIT,
+    });
   }
 
   const suppliedOperationId = body.operationId ?? req.headers?.['x-idempotency-key'];

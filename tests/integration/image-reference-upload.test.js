@@ -10,6 +10,7 @@ import { put, del, list, issueSignedToken, presignUrl } from '@vercel/blob';
 import { createGptImage2Task, waitForSjinnTask, downloadImageAsBase64 } from '../../api/lib/sjinn.js';
 import { parseImageReferences, stageImageReferences, cleanupStaleImageReferences, REFERENCE_PREFIX, REFERENCE_URL_TTL_MS } from '../../api/lib/image-references.js';
 import { MAX_REFERENCE_BYTES } from '../../shared/image-references.js';
+import { SJINN_PROMPT_LIMIT } from '../../shared/image-prompt.js';
 import handler from '../../api/ai/sjinn-image.js';
 import cleanupHandler from '../../api/cron/cleanup-image-references.js';
 import middleware from '../../middleware.js';
@@ -40,6 +41,26 @@ async function generate(imageList, { signedIn = true } = {}) {
   }), res);
   return res;
 }
+
+it('pedido acima do limite da rota é recusado antes de reservar crédito; no limite exato segue inteiro', async () => {
+  const send = async (prompt) => {
+    const res = makeRes();
+    await handler(makeReq({ method: 'POST', headers: { origin: 'https://viralcarrossel.com.br' },
+      cookie: `${COOKIE_NAME}=${encodeURIComponent(createAccessToken({ customerId: 'cus_ref', email: 'x@teste.exemplo' }))}`,
+      body: { prompt, imageList: [] },
+    }), res);
+    return res;
+  };
+  const longo = await send(`SCENE: ${'x'.repeat(SJINN_PROMPT_LIMIT)}`);
+  expect(longo.statusCode).toBe(400);
+  expect(longo.body).toMatchObject({ code: 'prompt_too_long', limit: SJINN_PROMPT_LIMIT });
+  expect(longo.body.error).toMatch(/Nenhum crédito foi usado/);
+  expect(createGptImage2Task).not.toHaveBeenCalled();
+  const noLimite = await send('x'.repeat(SJINN_PROMPT_LIMIT));
+  expect(noLimite.statusCode).toBe(200);
+  expect(noLimite.body.quota.used).toBe(1);
+  expect(createGptImage2Task.mock.calls[0][0].prompt).toHaveLength(SJINN_PROMPT_LIMIT);
+});
 
 it('quatro anexos viram links privados de GET e são apagados depois do resultado; debita uma imagem', async () => {
   const started = Date.now();

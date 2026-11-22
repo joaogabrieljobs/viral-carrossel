@@ -19,7 +19,7 @@ const cases = [
   ['proposta_comercial', 'proposta', 'propostas comerciais', 'critério de aceite'],
   ['relatorio_executivo', 'relatório', 'comunicação executiva', 'Ausência de dados não significa zero'],
   ['estudo_de_caso', 'case-study', 'estudos de caso', 'condições comparáveis'],
-  ['keynote_manifesto', 'manifesto', 'editor de keynotes', 'melhor objeção'],
+  ['keynote_manifesto', 'manifesto', 'editor de keynotes', 'objeções fornecidas'],
 ];
 const completion = (data, provider = 'zai') => new Response(JSON.stringify(
   provider === 'anthropic'
@@ -178,7 +178,8 @@ it('aula reaproveita o caso fornecido e encerra com aprendizagem em redação, r
     expect(prompt).toContain('Preço ou oferta no material não transformam a conclusão nem a caption em venda');
     expect(prompt).toContain('somente um objetivo comercial explícito autoriza esse chamado');
   }
-  expect(prompts[0]).toContain('Se não houver caso fornecido e as instruções permitirem');
+  expect(prompts[0]).toContain('Se o usuário solicitar expressamente um exemplo hipotético');
+  expect(prompts[0]).not.toContain('Se não houver caso fornecido e as instruções permitirem');
   expect(prompts[0]).not.toContain('Se faltar caso real');
   expect(prompts[1]).toContain(brief);
   for (const path of ['pitch', 'proposta_comercial', 'relatorio_executivo']) {
@@ -221,15 +222,18 @@ describe.each(['auto', 'pitch', 'aula_workshop', 'proposta_comercial', 'relatori
     expect(buildPresentationReviewRules(path)).toContain('Um slide curto e completo não precisa ser ampliado');
   });
 
-  it('preserva idioma e natureza fictícia em redação, revisão e refinamento', () => {
+  // Catálogo final 22/11: "fictício" é nota de produção. Não entra sozinho no
+  // título nem no nome da marca; só acompanha o que puder passar por evidência real.
+  it('preserva idioma e trata "fictício" como nota de produção em redação, revisão e refinamento', () => {
     expect(buildPresentationSystemPrompt(path)).toContain('O idioma explícito do pedido prevalece');
     for (const prompt of [
       buildApresentacaoPackBlock(12, path),
       buildPresentationReviewRules(path),
       buildApresentacaoRefineHint(path),
     ]) {
-      expect(prompt).toMatch(/fictício/);
-      expect(prompt).toMatch(/cliente real/);
+      expect(prompt).toMatch(/Notas de produção como "fictício", "exemplo" e "rascunho" não entram automaticamente (?:no título|na abertura)/);
+      expect(prompt).toMatch(/cliente (?:ou resultado )?real/);
+      expect(prompt).not.toMatch(/preserve essa natureza na abertura|continua identificado como fictício na abertura/);
       expect(prompt).not.toContain('Mesa Clara');
       expect(prompt).not.toContain('R$ 6.000');
     }

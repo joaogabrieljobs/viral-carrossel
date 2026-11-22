@@ -150,14 +150,16 @@ describe('modo Apresentação', () => {
     expect(getPresentationPath('relatorio').stages.find(stage => stage.label === 'SCORECARD').instruction)
       .toContain('Meta só se fornecida');
     expect(getPresentationPath('proposta').stages.find(stage => stage.label === 'PLANO MÚTUO').instruction)
-      .toContain('responsáveis e datas apenas quando informados');
+      .toContain('preservando responsáveis, datas e dependências disponíveis');
     expect(getPresentationPath('proposta').stages.at(-1).visualRole).toBe('decision');
     expect(getPresentationPath('aula').stages.find(stage => stage.label === 'ATIVIDADE').instruction)
       .toContain('entrega e critério de sucesso');
     expect(getPresentationPath('keynote').stages.find(stage => stage.label === 'CICLOS DE CONTRASTE').optionalWhenMissing)
       .toBe(true);
-    expect(getPresentationPath('case').stages[0].instruction).toContain('sem alegar causalidade');
-    expect(buildPresentationPathBlock('auto', 6)).toContain('não exigem uma página cada');
+    expect(getPresentationPath('case').stages[0].instruction).toContain('Abra com a mudança documentada e seus limites');
+    // Catálogo final 22/11: a redação segue o plano validado; combinar ou omitir
+    // etapas só vale quando as contribuições continuam distintas e sustentadas.
+    expect(buildPresentationPathBlock('auto', 6)).toContain('combine etapas próximas e omita funções sem base somente quando a redistribuição mantiver contribuições distintas sustentadas');
   });
 
   it('não oferece biblioteca nem variações de hook social em apresentações', () => {

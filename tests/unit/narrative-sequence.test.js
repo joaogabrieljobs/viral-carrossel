@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { buildNarrativeModeSequence, narrativeMiddleBeats, NARRATIVE_SEQUENCES } from '../../src/utils/narrative-sequence.js';
+import { buildNarrativeModeSequence, narrativeFunctionIds, narrativeMiddleBeats, NARRATIVE_SEQUENCES } from '../../src/utils/narrative-sequence.js';
 import { GEN_MODES } from '../../src/utils/generation-prompts.js';
 
 // MF-06: com o mesmo briefing factual, "Explicar com autoridade", "Falar da
 // dor", "Contar uma história" e "Ir a fundo" devolviam a mesma sequência (um
 // card por fato, na ordem do briefing). Cada modo agora leva ao prompt uma
-// função explícita por posição.
-const funcoes = (modeId, count) => buildNarrativeModeSequence(modeId, 'livre', count)
-  .split('\n').filter(line => /^\d+\. /.test(line)).map(line => line.replace(/^\d+\. /, '').split(' — ')[0]);
+// função explícita por posição. Catálogo 22/11: o valor interno de "funcao"
+// (abaixo) continua o mesmo; o texto do roteiro passou a pedir só o que o
+// material sustenta.
+const funcoes = (modeId, count) => narrativeFunctionIds(modeId, count);
+const miolo = (modeId, middle) => narrativeMiddleBeats(modeId, middle).map(beat => beat.id);
 
 describe('roteiro card a card por modo narrativo', () => {
   it('cobre todos os modos com arco (todos menos "Seguir meu pedido")', () => {
@@ -21,6 +23,8 @@ describe('roteiro card a card por modo narrativo', () => {
     for (const id of Object.keys(NARRATIVE_SEQUENCES)) {
       const lines = funcoes(id, count);
       expect(lines, id).toHaveLength(count);
+      // O prompt lista os mesmos valores, na mesma ordem.
+      expect(buildNarrativeModeSequence(id, 'livre', count), id).toContain(`valores de funcao desta solicitação: ${lines.join(' | ')}.`);
     }
   });
 
@@ -38,21 +42,34 @@ describe('roteiro card a card por modo narrativo', () => {
   });
 
   it('com poucos cards preserva a abertura e o fecho do argumento', () => {
-    expect(narrativeMiddleBeats('pain', 3).map(b => b.split(' — ')[0])).toEqual(['VALIDAÇÃO', 'RAIZ', 'SAÍDA']);
-    expect(narrativeMiddleBeats('viral', 2).map(b => b.split(' — ')[0])).toEqual(['BUILD-UP', 'PAYOFF']);
-    expect(narrativeMiddleBeats('editorial', 1).map(b => b.split(' — ')[0])).toEqual(['CONSEQUÊNCIA']);
+    expect(miolo('pain', 3)).toEqual(['VALIDAÇÃO', 'RAIZ', 'SAÍDA']);
+    expect(miolo('viral', 2)).toEqual(['BUILD-UP', 'PAYOFF']);
+    expect(miolo('editorial', 1)).toEqual(['CONSEQUÊNCIA']);
   });
 
   it('carrossel longo repete a função de desenvolvimento antes do fecho do miolo', () => {
-    const beats = narrativeMiddleBeats('editorial', 8).map(b => b.split(' — ')[0]);
+    const beats = miolo('editorial', 8);
     expect(beats.at(-1)).toBe('CONSEQUÊNCIA');
     expect(beats.filter(b => b === 'EVIDÊNCIA').length).toBeGreaterThan(1);
   });
 
-  it('manda distribuir os fatos pelas funções, sem um card por fato nem fato novo', () => {
+  it('a função desdobrada vem depois da original, mesmo quando é a última do miolo', () => {
+    for (const id of ['pain', 'sensacionalista', 'editorial', 'jornalistico']) {
+      const seq = NARRATIVE_SEQUENCES[id];
+      const beats = narrativeMiddleBeats(id, 8);
+      const original = beats.findIndex(beat => beat !== seq.repeat && beat.id === seq.repeat.id);
+      expect(beats.indexOf(seq.repeat), id).toBeGreaterThan(original);
+    }
+  });
+
+  it('manda distribuir o material pela progressão, sem um card por dado nem fato novo', () => {
     const bloco = buildNarrativeModeSequence('storytelling', 'livre', 7);
-    expect(bloco).toContain('não siga a ordem em que os fatos aparecem no briefing');
-    expect(bloco).toContain('sem criar número, prazo, depoimento');
+    expect(bloco).toContain('sem seguir automaticamente a ordem do briefing');
+    expect(bloco).toContain('nem reserve card para dado isolado sem função');
+    expect(bloco).toContain('não fabrique conteúdo para preencher posições');
+    // Catálogo 22/11: função sem apoio no material não é mais preenchida com "raciocínio".
+    expect(bloco).toContain('Uma função ausente não pode ser preenchida por "raciocínio" especulativo');
+    expect(bloco).not.toContain('cumpra-a com raciocínio sobre o que já foi dito');
   });
 
   it('pacotes com arco próprio e carrosséis curtos demais não recebem roteiro', () => {

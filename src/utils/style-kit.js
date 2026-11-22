@@ -129,10 +129,15 @@ function resolveQuickGenerationRequest(text, fallbackCount = 6, maxCount = 12) {
   return { count, announcement };
 }
 
+/**
+ * Tarefa do pedido de carrossel (catálogo final, C03). O parágrafo de entrega
+ * publicitária continua condicional: não veio na exportação revisada e segue
+ * como estava.
+ */
 function buildGenerationTaskBlock(topic, announcement = false) {
-  return `PEDIDO ATUAL — execute esta entrega, não a transforme em um tema para ensinar:\n${JSON.stringify(String(topic || ''))}\n` +
+  return `PEDIDO ATUAL — execute esta entrega:\n${JSON.stringify(String(topic || ''))}\n` +
     (announcement ? 'ENTREGA PUBLICITÁRIA: escreva os anúncios do produto descrito no brief para o público final. Apresente o produto, uma possibilidade/benefício sustentado e um próximo passo sem inventar data, preço ou disponibilidade. Não ensine a fazer lançamentos, não explique a função de cada card e não escreva instruções para o designer.\n' : '') +
-    'O texto dos cards é copy pronta para publicar. Não escreva metacomentários como “este card mostra”, “mostre a dor” ou “card 1: o problema”. Use o brief como conhecimento do produto; não como assunto do carrossel.\n';
+    'O texto dos cards é copy pronta para publicar. Não escreva metacomentários como “este card mostra”, “mostre a dor” ou “card 1: o problema”. Use o briefing e as fontes como base do conteúdo. Quando o pedido for anunciar ou vender, apresente a oferta; não transforme a oferta em uma aula sobre marketing. Quando o pedido for ensinar, explicar, informar ou contar uma história, cumpra essa intenção com o material disponível. O modo organiza a entrega sem trocar seu objetivo nem autorizar fatos ausentes.\n';
 }
 
 /** Ref do slide tem prioridade; senão a 1.ª do moodboard do projeto. */

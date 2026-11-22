@@ -45,8 +45,8 @@ test('plano: prompt rápido gera três imagens com as referências e o estilo do
     expect(body.imageList).toHaveLength(2);
     expect(body.imageList.every(ref => /^data:image\/(png|jpeg);base64,/.test(ref))).toBe(true);
     expect(body.prompt).toContain('3D expressivo');
-    expect(body.prompt).toContain('REFERENCE IMAGES ARE ATTACHED');
-    expect(body.prompt).not.toContain('photorealistic real-photograph rendering');
+    expect(body.prompt).toContain('REFERENCE ROLES:');
+    expect(body.prompt).not.toContain('DEFAULT ART DIRECTION');
     expect(body.resolution).toBe('1K');
   }
   await expect.poll(async () => (await persisted(page))[0]?.doc.slides.filter(s => s.bgImageId || s.bgImage).length).toBe(3);
@@ -110,7 +110,7 @@ test('upload atual → três anúncios; referências em IndexedDB; projeto B iso
   expect(prompts[0]).toContain(brief);
   expect(prompts[0]).toContain('exatamente 3 itens');
   expect(prompts[0]).toContain('ENTREGA PUBLICITÁRIA');
-  expect(prompts[0]).not.toContain('MÉTODO EDITORIAL');
+  expect(prompts[0]).not.toContain('MÉTODO — Explicar com autoridade');
   expect(generated.brand.titleFont).toContain('Anton');
   expect(generated.visualPreset).toBeNull();
   expect(generated.brand.accent).toBe('#FF5C00');

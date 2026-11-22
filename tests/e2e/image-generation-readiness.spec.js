@@ -184,8 +184,7 @@ test('seleciona múltiplas referências, envia todas ao prompt e permite remover
   await page.getByRole('button', { name:'Gerar imagem', exact:true }).first().click();
   await expect.poll(() => requests.length).toBe(1);
   expect(requests[0].imageList).toHaveLength(3);
-  expect(requests[0].prompt).toContain('@produto = reference image 1 (produto.png)');
-  expect(requests[0].prompt).toContain('@produto2 = reference image 2 (ambiente.png)');
+  expect(requests[0].prompt).toContain('REFERENCE MAP (actual attachments, in sent order):\n@produto = image 1 (subject)\n@produto2 = image 2 (subject)');
   await page.getByRole('button', { name:'Remover ambiente.png', exact:true }).first().click();
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vc_library'))[0].doc.slides[0].imageReferences?.length)).toBe(2);
   await expect(page.getByRole('img', { name:'ambiente.png', exact:true })).toHaveCount(0);

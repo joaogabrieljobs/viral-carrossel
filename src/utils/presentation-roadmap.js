@@ -10,6 +10,7 @@
  * alinhados.
  */
 import { getPresentationPath } from './presentation.js';
+import { PRESENTATION_STAGE_EVIDENCE_RULE } from './presentation-content.js';
 
 /** Escolhe `count` etapas espalhadas por `list`, preservando a primeira e a última. */
 function spread(list, count) {
@@ -84,21 +85,49 @@ export function presentationRoadmap(pathId, count) {
 /** Como o material vira cada tipo de entrega (sem inventar outro negócio). */
 const PATH_FRAMING = Object.freeze({
   pitch: 'o negócio do material é a oportunidade apresentada: problema, solução, prova e pedido.',
-  aula_workshop: 'o tema do material vira conteúdo de aprendizagem, e o negócio entra como caso para explicar, exemplificar e praticar.',
   proposta_comercial: 'a proposta é a oferta descrita no material, feita ao público do briefing: o que ele recebe, em que condições e que decisão toma.',
-  relatorio_executivo: 'os dados do material viram indicadores, achados e recomendações para uma decisão.',
-  estudo_de_caso: 'o negócio do material é o caso: contexto, desafio, escolha, execução e resultado com os dados informados.',
+  relatorio_executivo: 'organize os indicadores, observações e recomendações sustentados pelo material para apoiar uma decisão. Preço, número de vagas e prazo de oferta continuam condições comerciais, não indicadores de desempenho; se não houver resultados observados, não invente achados nem simule uma avaliação de resultados.',
   keynote_manifesto: 'o material sustenta uma tese que muda a forma de ver o tema e termina num chamado.',
 });
 
-/** Bloco do prompt de planejamento: uma etapa por posição, na ordem do caminho. */
-export function buildPresentationRoadmapPrompt(pathId, count) {
-  const route = getPresentationPath(pathId);
-  const roadmap = presentationRoadmap(pathId, count);
+/**
+ * Aula e Estudo de caso dependem do que o material traz (catálogo final
+ * 22/11): uma oferta com preço, vagas e prazo não vira aula nem caso. O
+ * enquadramento destes dois caminhos é próprio e substitui o texto padrão.
+ */
+const PATH_DELIVERY = Object.freeze({
+  aula_workshop: 'Defina objective e thesis como uma aprendizagem observável apoiada no conteúdo fornecido. Antes de adotar esse caminho, identifique um conceito, procedimento ou critério que a fonte permita explicar, aplicar e corrigir; uma oferta com preço, vagas e prazo não basta. Se existir esse núcleo, ensine-o com exemplo, exercício e correção baseados nos mesmos insumos, sem transformar condições comerciais em uma aula sobre a oferta. Sem núcleo ensinável, aplique a regra de incompatibilidade do material; não crie teoria, cenário, fornecedor, serviço, cliente ou entregável para salvar o modo.',
+  estudo_de_caso: 'Use esse caminho quando houver um caso delimitado com contexto e decisões ou intervenção documentados; resultado observado e transformação só quando fornecidos. Se houver execução em andamento, analise decisões e processo sem prometer um antes/depois. Uma oferta, preço, vagas ou prazo não constituem caso: sem base narrativa e analítica, aplique a regra de incompatibilidade do material. objective e thesis descrevem o que o leitor pode avaliar e aprender com essa evidência; não invente fornecedor, serviço, cliente, entregável ou acontecimento.',
+});
+
+function deliveryFraming(route) {
+  if (route.id === 'auto') return '';
+  if (PATH_DELIVERY[route.id]) return `TIPO DE ENTREGA: ${route.label}. ${PATH_DELIVERY[route.id]}\n`;
   // Um briefing de negócio com objetivo comercial ("atrair clientes") puxava
   // todos os caminhos para um folheto. O caminho escolhido define a entrega.
-  const framing = route.id === 'auto' ? '' : `TIPO DE ENTREGA: ${route.label}. ${route.intent} Mesmo que o briefing descreva um negócio ou traga um objetivo comercial, esta apresentação é ${route.label}: ${PATH_FRAMING[route.id] || 'o negócio e seus fatos entram como objeto, caso ou evidência dessa entrega.'} objective e thesis descrevem o que ${route.deliveryMode === 'live' ? 'o público aprende, sente ou passa a fazer' : 'o leitor avalia ou decide'} ao final. Não invente fornecedor, serviço, cliente ou entregável que o material não descreve.\n`;
-  return `${framing}ROTEIRO POR POSIÇÃO — ${roadmap.length} slides, uma etapa deste caminho para cada posição, nesta ordem:
-${roadmap.map((stage, index) => `${index + 1}. ${stage.label}: ${stage.instruction}${stage.optionalWhenMissing ? ' Sem base no material, use a posição para a etapa vizinha.' : ''}`).join('\n')}
-Comece a keyMessage de cada posição com o nome da etapa e dois-pontos (ex.: "${roadmap[Math.min(1, roadmap.length - 1)].label}: …"). A question e a keyMessage de cada posição respondem à etapa indicada usando os fatos do material que a sustentam. Não organize o deck na ordem em que os fatos aparecem no briefing nem dedique uma página a cada dado. Quando faltar informação para a etapa, cumpra-a com o raciocínio que o material permite e registre a lacuna em gaps, sem inventar número, cliente, prazo ou resultado. A lacuna fica só em gaps: a keyMessage não diz que algo "não foi informado" ou está "a definir"; mostra o que existe e o próximo passo.`;
+  return `TIPO DE ENTREGA: ${route.label}. ${route.intent} Mesmo que o briefing descreva um negócio ou traga um objetivo comercial, esta apresentação é ${route.label}: ${PATH_FRAMING[route.id] || 'o negócio e seus fatos entram como objeto, caso ou evidência dessa entrega.'} objective e thesis descrevem o que ${route.deliveryMode === 'live' ? 'o público aprende, sente ou passa a fazer' : 'o leitor avalia ou decide'} ao final. Não invente fornecedor, serviço, cliente ou entregável que o material não descreve.\n`;
+}
+
+/** Marcas da etapa, no mesmo vocabulário da sequência-base da redação. */
+function stageMarks(stage) {
+  const marks = [stage.evidenceRequired ? 'evidência obrigatória' : '', stage.optionalWhenMissing ? 'opcional se faltar material' : ''].filter(Boolean);
+  return marks.length ? ` [${marks.join('; ')}]` : '';
+}
+
+/**
+ * Bloco do prompt de planejamento: uma etapa por posição, na ordem do caminho.
+ * `keyMessageLimit` acompanha o limite do contrato (menor na recuperação compacta).
+ */
+export function buildPresentationRoadmapPrompt(pathId, count, { keyMessageLimit = 160 } = {}) {
+  const route = getPresentationPath(pathId);
+  const roadmap = presentationRoadmap(pathId, count);
+  return `${deliveryFraming(route)}ROTEIRO DE REFERÊNCIA — ${roadmap.length} slides: preserve a progressão abaixo quando sustentada; adapte funções sem base conforme a regra de compatibilidade:
+${roadmap.map((stage, index) => `${index + 1}. ${stage.label}: ${stage.instruction}${stageMarks(stage)}`).join('\n')}
+${PRESENTATION_STAGE_EVIDENCE_RULE}
+Preencha question com a pergunta daquela posição. Inicie keyMessage com o nome da etapa e dois-pontos, como previsto no plano, seguidos de sua contribuição específica. O limite de ${keyMessageLimit} caracteres inclui o prefixo. O redator usa apenas a mensagem após o prefixo ao compor o texto público. Não organize o deck na ordem dos fatos do briefing nem dedique automaticamente uma página a cada dado. Lacunas editoriais ficam em gaps; condições, incertezas e decisões pendentes essenciais à interpretação também acompanham a keyMessage pertinente, em linguagem do público, sem inventar decisão, número, cliente, prazo ou resultado.
+
+COMPATIBILIDADE DO MATERIAL — verifique antes de distribuir as posições:
+- O modo organiza informação existente; não cria acontecimentos, conceitos, mecanismos, sensações ou resultados. Se uma função não tiver base, combine-a com uma função vizinha sustentada ou use a posição para outra pergunta pertinente e realmente distinta, preservando o objetivo e a ordem lógica.
+- Preencha as posições com contribuições sustentadas e preserve a quantidade selecionada. Use gaps para as lacunas relevantes ao objetivo. Ausência de dado opcional permite adaptar a função. Não complete uma posição com uma lacuna, uma repetição ou um fato novo.
+- Rótulos de etapas, IDs, gaps e instruções deste plano são internos e não devem aparecer como títulos ou texto dos slides.`;
 }

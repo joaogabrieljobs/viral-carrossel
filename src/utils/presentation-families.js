@@ -60,7 +60,8 @@ export const PRESENTATION_FAMILIES = Object.freeze({
     },
     photo: {
       filter: 'saturate(0.9) contrast(1.03) sepia(0.06)', radius: 0,
-      direction: 'Arquitetura, interiores e retratos ambientados. Luz natural lateral, sombras macias, tons de papel e terra. Recortes verticais com o assunto num terço; espaço negativo de parede ou céu para respirar ao lado do texto.',
+      direction: 'Luz natural lateral, sombras macias e tons de papel e terra no ambiente. Posicione o assunto no terço que o recorte permitir e preserve o espaço necessário ao texto.',
+      directionEn: 'Use natural side light, soft shadows and paper or earth tones in the surroundings. Place the subject on a third when the image panel allows and leave the actual text area quiet.',
     },
     type: { titleLeading: 1.0, bodyLeading: 1.48, bodyCase: 'normal', tightCovers: true },
     graphic: 'Fio fino no topo como cabeçalho de revista, fio vertical entre colunas, numeral em itálico na abertura de seção, aspas de abertura nas citações.',
@@ -83,7 +84,8 @@ export const PRESENTATION_FAMILIES = Object.freeze({
     },
     photo: {
       filter: 'saturate(0.85) contrast(1.03)', radius: 0,
-      direction: 'Ambientes de trabalho reais, arquitetura corporativa e detalhes de operação. Luz difusa de janela, paleta fria e neutra, sem pose de banco de imagens. Enquadramentos amplos com linhas retas.',
+      direction: 'Luz de janela difusa, paleta fria e neutra, linhas retas e enquadramento sóbrio do assunto do slide.',
+      directionEn: 'Use diffused window light and cool neutral surroundings. Frame the supplied subject with restrained straight lines and purposeful detail, avoiding posed stock photography.',
     },
     type: { titleLeading: 1.06, bodyLeading: 1.45, bodyCase: 'normal', tightCovers: true },
     graphic: 'Barra de acento curta acima do título, fio de rodapé, números tabulares e fundo escuro nas aberturas de seção e na decisão final.',
@@ -106,7 +108,8 @@ export const PRESENTATION_FAMILIES = Object.freeze({
     },
     photo: {
       filter: 'grayscale(1) contrast(1.12)', radius: 0,
-      direction: 'Arquitetura, objetos e superfícies com geometria clara, em preto e branco de alto contraste. Ângulos frontais ou de 90°, sombras duras, muito céu ou parede lisa. Recorte quadrado ou em módulos da grade.',
+      direction: 'Organize o assunto com geometria frontal ou a 90°, sombras definidas e fundo simples para o tratamento em preto e branco. Preserve o recorte do módulo ativo.',
+      directionEn: 'Use frontal or overhead geometry, defined shadows and a plain background that reads well after the monochrome filter. Compose for the actual grid module.',
     },
     // Suíço trabalha com polaridade: título no alto, apoio ancorado na grade.
     type: { titleLeading: 0.98, bodyLeading: 1.4, bodyCase: 'normal', stack: 'fixed' },
@@ -130,7 +133,8 @@ export const PRESENTATION_FAMILIES = Object.freeze({
     },
     photo: {
       filter: 'contrast(1.08) saturate(0.82) brightness(0.92)', radius: 0,
-      direction: 'Paisagens, estradas, cidades à noite e pessoas pequenas no quadro. Luz de hora dourada ou neon, contraste alto, grão sutil. Enquadramento 2.39:1 com horizonte baixo para o título ocupar o céu.',
+      direction: 'Use profundidade, luz prática e contraste de cinema no painel do slide. Preserve o horário e o sujeito fornecidos e a área destinada ao título.',
+      directionEn: 'Use cinematic depth, motivated light and controlled contrast. Preserve the supplied subject and setting within the actual panel. Keep title space clear without adding letterbox bars or changing the output ratio.',
     },
     type: { titleLeading: 0.98, bodyLeading: 1.5, bodyCase: 'normal' },
     graphic: 'Faixas de letterbox, timecode e número de cena em condensada, cartela preta centrada nas aberturas de seção.',
@@ -153,7 +157,8 @@ export const PRESENTATION_FAMILIES = Object.freeze({
     },
     photo: {
       filter: 'saturate(0.72) contrast(1.06) brightness(0.94)', radius: 0,
-      direction: 'Objetos, matérias e gestos: cerâmica, tecido, vidro, madeira, mãos. Luz rasante única, fundo escuro ou linho cru, profundidade de campo curta. Muito espaço negativo; o produto nunca cortado.',
+      direction: 'Luz rasante suave em uma fonte, sombras delicadas e espaço ao redor da forma. Valorize o acabamento informado do objeto.',
+      directionEn: 'Use one soft raking light, gentle shadow and ample space around the form. Reveal the actual finish of the specified subject and keep product features intact within the crop.',
     },
     type: { titleLeading: 1.04, bodyLeading: 1.6, bodyCase: 'normal', tightCovers: true },
     graphic: 'Fio fino dourado, monograma de numeração em itálico, margens largas, centralização apenas em capa e encerramento.',
@@ -176,7 +181,8 @@ export const PRESENTATION_FAMILIES = Object.freeze({
     },
     photo: {
       filter: 'grayscale(1) contrast(1.25) brightness(1.02)', radius: 0,
-      direction: 'Imagem como pontuação: recortes pequenos e duros em preto e branco, de mãos, letras, cartazes e materiais impressos. Nunca compete com a palavra; ocupa um módulo lateral.',
+      direction: 'Trate a imagem como uma pequena pontuação visual, com detalhe gráfico, contraste monocromático e recorte limpo. A tipografia é inserida pelo app.',
+      directionEn: 'Use a small, sharply cropped monochrome detail as visual punctuation in the designated module. Emphasize texture, contour and contrast. Keep letters and printed copy out of the generated image.',
     },
     // Anton: maiúscula acentuada (É, Á, Ô) sobe 110% do corpo. Com 1,03 o acento
     // da linha seguinte tocava o pé da anterior (medido no navegador).
@@ -201,7 +207,8 @@ export const PRESENTATION_FAMILIES = Object.freeze({
     },
     photo: {
       filter: 'grayscale(1) contrast(1.18) brightness(1.03)', radius: 0,
-      direction: 'Obras, cartazes, performances, ateliês e objetos culturais, em preto e branco para receber cor por sobreposição. Recortes de figura com contorno limpo; texturas de papel e tinta.',
+      direction: 'Contorno limpo e textura de papel ou tinta, com leitura em preto e branco para sobreposição posterior de cor. Use apenas o sujeito indicado.',
+      directionEn: 'Use clean contours and tactile paper or ink textures on the specified subject. Compose for a monochrome image with a later colour overlay. Keep poster lettering and invented works or performances out of the scene.',
     },
     type: { titleLeading: 0.98, bodyLeading: 1.45, bodyCase: 'normal' },
     graphic: 'Bloco de cor deslocado atrás da foto, faixa de cor multiplicada sobre a imagem, fita adesiva, círculo e semicírculo como pontuação.',
@@ -225,7 +232,8 @@ export const PRESENTATION_FAMILIES = Object.freeze({
     },
     photo: {
       filter: 'grayscale(0.55) contrast(1.12) brightness(0.88)', radius: 0,
-      direction: 'Hardware, telas, placas, data centers e mãos operando equipamentos. Luz fria de painel, fundo escuro, macro com foco crítico. Fotografia tratada como figura de prancha, com marcas de corte.',
+      direction: 'Macro técnico com foco preciso, luz fria e fundo escuro. Detalhes de equipamento apenas se a cena os solicitar. Dados, telas reais e marcas gráficas ficam fora da imagem gerada.',
+      directionEn: 'Use a precise technical macro, cool light and a dark background. Show only the supplied physical subject or detail. Keep labels, crop marks, interfaces and technical data out of the generated image.',
     },
     type: { titleLeading: 1.05, bodyLeading: 1.5, bodyCase: 'normal', tightCovers: true },
     graphic: 'Grade de 12 colunas visível, marcas de corte nas figuras, rótulos FIG./§ em mono, linha de cota e ponto de status verde.',
@@ -248,7 +256,8 @@ export const PRESENTATION_FAMILIES = Object.freeze({
     },
     photo: {
       filter: 'saturate(1.02) contrast(1.02) sepia(0.04)', radius: 0,
-      direction: 'Pessoas no trabalho, retratos de meio corpo, mãos e detalhes de ofício, comida. Luz natural de janela, pele verdadeira, cores quentes e pouco saturadas. Rostos e mãos inteiros no recorte; olhar com espaço para onde aponta.',
+      direction: 'Luz de janela, cor quente e textura natural. Mostre a ação ou o detalhe de ofício descrito e mantenha mãos e rosto relevantes dentro do recorte.',
+      directionEn: 'Use natural window light, warm restrained colour and realistic textures. For a person called for by the scene, keep the relevant face or hand movement inside the crop and leave room in the direction of the gaze.',
     },
     type: { titleLeading: 1.02, bodyLeading: 1.5, bodyCase: 'normal' },
     graphic: 'Passe-partout branco, legenda numerada sob a foto, díptico de imagens e intervalo escuro entre capítulos.',
@@ -271,7 +280,8 @@ export const PRESENTATION_FAMILIES = Object.freeze({
     },
     photo: {
       filter: 'saturate(0.95) contrast(1.02)', radius: 28,
-      direction: 'Ambientes de aprendizagem e trabalho, telas e objetos de mesa. Luz clara e uniforme, cores limpas, fundo organizado. Recortes que funcionam com cantos arredondados — assunto longe das bordas.',
+      direction: 'Luz clara e uniforme, fundo organizado e assunto longe dos cantos arredondados do módulo.',
+      directionEn: 'Use even bright light, clean colour and an orderly background. Keep the essential subject away from rounded module corners. Include only objects called for by the slide.',
     },
     type: { titleLeading: 1.06, bodyLeading: 1.5, bodyCase: 'normal', tightCovers: true },
     graphic: 'Cartões brancos com cantos de 28 px, etiqueta numerada em pílula, blocos agrupados e uma superfície de cor por sequência.',
@@ -925,6 +935,19 @@ function longReadingLayout(result, portrait) {
     title: { x: m, y: 13, w: 100 - m * 2, h: 23 },
     subtitle: { x: photoLeft ? 39 : m, y: 42, w: 55, h: 49 },
     photo: { x: photoLeft ? m : 100 - m - 26, y: 40, w: 26, h: 50 } };
+}
+
+/**
+ * Direção fotográfica da família: português para o modelo de texto, inglês
+ * para o gerador de imagem. Aceita a chave da família, um nome antigo
+ * ('premium', 'data') ou o id do preset/padrão, como o prompt de texto.
+ */
+export function presentationPhotoDirection(familyKey, lang = 'pt') {
+  if (!familyKey) return '';
+  const key = FAMILY_KEYS.includes(familyKey) || ['premium', 'data'].includes(familyKey)
+    ? normalizeFamilyKey(familyKey) : familyFromPresetId(familyKey);
+  const photo = PRESENTATION_FAMILIES[key].photo;
+  return (lang === 'en' ? photo.directionEn : photo.direction) || '';
 }
 
 /** Filtro CSS padrão da família; ajustes manuais da foto têm prioridade. */

@@ -4,9 +4,10 @@
  * modo narrativo. Família visual e modo narrativo continuam independentes:
  * o modo muda o ritmo de funções, nunca a família nem o texto.
  */
-import { visibleSocialText } from './social-generation.js';
+import { socialTextLimits, visibleSocialText } from './social-generation.js';
 import { normalizePresentationBlocks } from './presentation-quality.js';
 import { SOCIAL_COMPOSERS } from './social-families.js';
+import { scaledCeiling } from './generation-prompts.js';
 
 /**
  * Matriz modo narrativo × função visual (documentada para revisão).
@@ -14,18 +15,19 @@ import { SOCIAL_COMPOSERS } from './social-families.js';
  *    vira afirmação tipográfica (0 = só quando o card é muito curto).
  *  - listFromText: o modo trata cards com itens em linha como lista/etapas.
  *  - stepNumbers: os cards de desenvolvimento ganham numeração de etapa.
- *  - rhythm: descrição da alternância esperada.
+ *  - rhythm: descrição da alternância esperada; vai ao prompt como "Ritmo" e
+ *    só pede etapas que o material sustenta (catálogo 22/11).
  */
 export const NARRATIVE_VISUAL_MATRIX = Object.freeze({
-  none: { shortStatement: 70, listFromText: true, stepNumbers: false, rhythm: 'Segue a ordem do briefing; foto onde houver, afirmação só para frases curtas.' },
-  editorial: { shortStatement: 80, listFromText: true, stepNumbers: false, rhythm: 'Tese → argumento → evidência (foto/quadro) → consequência → fecho.' },
-  how_to: { shortStatement: 40, listFromText: true, stepNumbers: true, rhythm: 'Promessa → etapas numeradas em progressão → recapitulação.' },
-  storytelling: { shortStatement: 110, listFromText: false, stepNumbers: false, rhythm: 'Cena (foto) → virada (afirmação) → consequência (desenvolvimento), alternados.' },
-  viral: { shortStatement: 110, listFromText: true, stepNumbers: false, rhythm: 'Gancho forte → revelação em afirmações curtas → resposta.' },
-  pain: { shortStatement: 100, listFromText: true, stepNumbers: false, rhythm: 'Dor reconhecida (afirmação) → causa (desenvolvimento) → saída (lista).' },
-  deep: { shortStatement: 60, listFromText: true, stepNumbers: false, rhythm: 'Contexto → causas → exemplo → implicações; mais desenvolvimento, poucas afirmações.' },
-  jornalistico: { shortStatement: 50, listFromText: true, stepNumbers: false, rhythm: 'Fato (capa) → contexto → dados (quadro) → por que importa.' },
-  sensacionalista: { shortStatement: 120, listFromText: true, stepNumbers: false, rhythm: 'Contraste alto: afirmações curtas alternadas com prova; fatos fiéis ao briefing.' },
+  none: { shortStatement: 70, listFromText: true, stepNumbers: false, rhythm: 'Siga a organização solicitada pelo usuário; use a ordem do briefing apenas quando ela fizer parte do pedido.' },
+  editorial: { shortStatement: 80, listFromText: true, stepNumbers: false, rhythm: 'Tese sustentada → argumento → evidência fornecida → consequência → fecho; não crie etapa sem apoio.' },
+  how_to: { shortStatement: 40, listFromText: true, stepNumbers: true, rhythm: 'Objetivo do procedimento → passos reais em ordem → conclusão; um passo por card, sem comprimir vários passos em lista.' },
+  storytelling: { shortStatement: 110, listFromText: false, stepNumbers: false, rhythm: 'Ação ou processo fornecido → mudança documentada, se houver → sequência e desfecho sustentados; sem personagem ou virada fabricados.' },
+  viral: { shortStatement: 110, listFromText: true, stepNumbers: false, rhythm: 'Gancho honesto → respostas progressivas → conclusão; cada card entrega informação, sem esconder a resposta por obrigação.' },
+  pain: { shortStatement: 100, listFromText: true, stepNumbers: false, rhythm: 'Dificuldade fornecida → obstáculo ou causa sustentada → saída oferecida; não exija lista nem causa não comprovada.' },
+  deep: { shortStatement: 60, listFromText: true, stepNumbers: false, rhythm: 'Pergunta delimitada → relações ou mecanismos fornecidos → demonstração sustentada → implicações; não invente causas ou exemplos.' },
+  jornalistico: { shortStatement: 50, listFromText: true, stepNumbers: false, rhythm: 'Fato principal → contexto fornecido → detalhe relevante → implicação sustentada; não repita o fato da capa.' },
+  sensacionalista: { shortStatement: 120, listFromText: true, stepNumbers: false, rhythm: 'Contrastes sustentados e afirmações curtas alternadas com explicação ou evidência; sem urgência, prova ou surpresa fabricadas.' },
 });
 
 const LIST_LINE = /^\s*(?:[-•–·▪●]|\d{1,2}[.)]|[a-e][.)])\s+\S/;
@@ -76,21 +78,19 @@ export function rhythmVariants(functions) {
 
 /**
  * Bloco do prompt de texto para carrosséis da biblioteca v4. Não aumenta
- * limites: distribui o mesmo contrato por função, para que "Balanceado" vire
- * cards com ritmo (afirmação curta, lista em itens, foto com legenda) e não
- * um bloco de texto repetido em todos os cards.
+ * limites: repete os tetos do contrato da densidade escolhida e diz como
+ * distribuir o texto (afirmação curta, lista só quando é lista, foto com
+ * legenda), para que os cards tenham ritmo sem inventar conteúdo.
  */
-export function buildSocialSequencePrompt({ family = null, narrative = 'editorial' } = {}) {
+export function buildSocialSequencePrompt({ family = null, narrative = 'editorial', densityId } = {}) {
   const f = SOCIAL_COMPOSERS[family];
   if (!f) return '';
   const m = NARRATIVE_VISUAL_MATRIX[narrative] || NARRATIVE_VISUAL_MATRIX.editorial;
-  return `SEQUÊNCIA VISUAL (${f.kind === 'viral' ? 'estilo' : 'família'} ${f.label}; o texto continua seu, o layout é escolhido pelo app):
-- Ritmo do modo: ${m.rhythm}
-- Capa: title forte e curto (até 8 palavras); subtitle de uma frase ou vazio.
-- Card de afirmação: quando a ideia cabe numa frase, escreva só o title (até 12 palavras) e deixe subtitle vazio. Use em no máximo um card a cada três.
-- Lista/etapas: quando o conteúdo for de fato uma sequência, escreva 3 a 5 itens no subtitle, um por linha, começando com "- " (ou "1. " para etapas), cada item com até 45 caracteres.
-- Card com foto: subtitle de até duas frases curtas; a imagem carrega parte da explicação.
-- Desenvolvimento: uma ideia, subtitle de uma ou duas frases. Não repita o mesmo tamanho de texto em todos os cards.
-- Encerramento: diga o próximo passo que o material sustenta; não invente oferta, preço, prazo ou benefício.
-- Nunca escreva texto, título, gráfico, tabela ou logo para a imagem: a imageQuery descreve apenas a cena fotográfica.`;
+  const limits = socialTextLimits({ densityId });
+  return `SEQUÊNCIA VISUAL — ${f.kind === 'viral' ? 'estilo' : 'família'} ${f.label}. O app escolhe o layout.
+- Ritmo: ${m.rhythm}
+Capa: título de até 8 palavras e subtítulo de uma frase ou vazio. Nos demais cards, título de até ${limits.titleWords} palavras e ${limits.title} caracteres. Para uma afirmação que caiba sozinha no título, deixe subtitle e bodyAfterImage vazios. Use essa composição no máximo uma vez a cada três cards.
+Escreva em prosa por padrão. Use marcadores apenas no card que apresentar uma enumeração de itens independentes prevista no pedido ou no formato específico daquele card. A sequência narrativa entre cards não é uma enumeração. Em uma lista legítima, use um item fornecido por linha, prefixado por "- " ou por número quando a ordem for relevante. Use no máximo 5 itens de até 45 caracteres cada, e aplique o menor teto ativo de linhas e caracteres. Se a enumeração não couber, exponha a ideia em prosa dentro do teto e preserve as condições essenciais.
+Desenvolva uma ideia por card. Nos cards com foto, use até duas frases curtas. O limite do subtitle dos dois primeiros cards é de ${scaledCeiling(80, densityId)} caracteres quando o layout híbrido correspondente estiver ativo. Respeite também os limites combinados de subtitle e bodyAfterImage. A imagem ilustra a ideia, e as condições essenciais ficam no texto. Para um card sem foto, deixe imageQuery vazia. Para fotografia, descreva a cena sem texto, gráfico, tabela ou logo incorporados.
+No fecho, use o CTA do pedido ou uma conclusão sustentada. Preserve as condições da oferta.`;
 }

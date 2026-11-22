@@ -37,8 +37,8 @@ describe('ficha visual — o que chega ao gerador de imagem', () => {
     const texto = composeSubjectsDirection({ entities: [raul, cenario] });
     expect(texto).toMatch(/^PROJECT SUBJECTS/);
     expect(texto).toContain('- raul: adult man wearing a plain olive-green shirt');
-    expect(texto).toContain('NEVER: flash, reflectors, objects on the wall.');
-    expect(texto).toContain('look the same in every image of this project');
+    expect(texto).toContain('Exclude: flash, reflectors, objects on the wall.');
+    expect(texto).toContain('Match their recurring appearance.');
     expect(texto.length).toBeLessThanOrEqual(1600);
   });
 
@@ -50,7 +50,7 @@ describe('ficha visual — o que chega ao gerador de imagem', () => {
   it('a direção de cena junta ficha e enquadramento do painel', () => {
     const coluna = { canvas: { applied: true, zones: { photo: { x: 0, y: 0, w: 46, h: 100 } } } };
     const texto = composeSceneDirection({ visualBible: { entities: [raul] }, slide: coluna, fmt: 'carrossel' });
-    expect(texto).toMatch(/PROJECT SUBJECTS[\s\S]*FRAMING: Keep the main subject complete/);
+    expect(texto).toMatch(/^FRAMING: Compose for the final visible image panel[\s\S]*PROJECT SUBJECTS: /);
     expect(texto).toMatch(/central vertical third/);
     // Sem ficha ainda há enquadramento.
     expect(composeSceneDirection({ slide: {}, fmt: 'carrossel' })).toMatch(/^FRAMING: /);
@@ -61,8 +61,8 @@ describe('ficha visual — instrução ao modelo de texto', () => {
   it('pede atributos do material e proíbe inventar', () => {
     const regras = buildVisualBiblePromptRules();
     expect(regras).toContain('visualBible');
-    expect(regras).toMatch(/Copie os atributos do material/);
-    expect(regras).toMatch(/Não invente/);
+    expect(regras).toMatch(/Preserve cor, material, forma, quantidade e roupa quando conhecidos/);
+    expect(regras).toMatch(/Não deduza idade, etnia, marca, cargo, acessório, emoção ou aparência/);
     expect(regras).toMatch(/"visualBible": \{"entities": \[\]\}/);
   });
 });
@@ -72,8 +72,8 @@ import { validateCarouselDraft } from '../../src/utils/editorial-review.js';
 
 describe('ficha visual — pedida só onde a imagem ilustra o material', () => {
   it('carrossel recebe as regras e o campo no contrato', () => {
-    expect(buildGenerationImageLayer('livre', 'retrato', '', '')).toContain('visualBible — FICHA VISUAL DO PROJETO');
-    expect(buildGenerationImageLayer('livre', 'retrato', '', '', true)).toContain('visualBible — FICHA VISUAL DO PROJETO');
+    expect(buildGenerationImageLayer('livre', 'retrato', '', '')).toContain('visualBible — ficha de continuidade do carrossel');
+    expect(buildGenerationImageLayer('livre', 'retrato', '', '', true)).toContain('visualBible — ficha de continuidade do carrossel');
     const contrato = buildGenerationJsonContract('livre', '1_2', 5);
     expect(contrato).toContain('"visualBible":{"entities":[{"id":"","en":"","never":""}]}');
   });
@@ -87,7 +87,9 @@ describe('ficha visual — pedida só onde a imagem ilustra o material', () => {
 
   it('a regra de luz do brief deixou de ser repetida em toda query', () => {
     const regras = buildGenerationImageLayer('livre', 'pausa na cidade', '', '', true);
-    expect(regras).toMatch(/luz de interior não se aplica a uma cena externa/);
+    // Catálogo de imagem 22/11: a luz acompanha a cena, não é copiada do brief.
+    expect(regras).toMatch(/Use a luz compatível com a cena\./);
+    expect(regras).not.toMatch(/luz do brief/);
   });
 
   it('o rascunho validado conserva a ficha; rascunho sem ficha continua válido', () => {

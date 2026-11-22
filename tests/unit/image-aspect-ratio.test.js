@@ -43,7 +43,7 @@ describe('proporção da geração de imagens', () => {
 
   it('orienta o prompt de apresentação para 16:9 sem impor fotografia a uma direção expressiva', () => {
     const wide = buildGptImageFullPrompt('crescimento trimestral', null, '', { aspectRatio: '16:9' });
-    expect(wide).toMatch(/widescreen 16:9 presentation visual/i);
+    expect(wide).toMatch(/CANVAS: Compose for the image panel on the widescreen 16:9 slide\..*Use editorial photography by default or the specified illustrative medium\./);
 
     const directed = buildGptImageFullPrompt(
       'crescimento trimestral',
@@ -51,8 +51,8 @@ describe('proporção da geração de imagens', () => {
       'Infográfico vetorial expressivo com formas geométricas',
       { aspectRatio: '16:9', withReference: true },
     );
-    expect(directed).toMatch(/widescreen 16:9 presentation canvas/i);
-    expect(directed).not.toMatch(/photorealistic real-photograph rendering/i);
+    expect(directed).toMatch(/Infográfico vetorial expressivo com formas geométricas\nCANVAS: Compose for the image panel on the widescreen 16:9 slide\./);
+    expect(directed).not.toMatch(/Use editorial photography by default|DEFAULT ART DIRECTION/);
   });
 
   it('envia 16:9 ao endpoint de imagens do plano', async () => {
