@@ -173,3 +173,38 @@ describe('ajuste do reteste — ângulo de cada modo de carrossel', () => {
     expect(buildNarrativeModeSequence('pain', 'apresentacao', 8)).toBe('');
   });
 });
+
+// 4) Rodada 3 de imagem (22/11): com moodboard preto e branco o código novo
+//    devolveu fotos claras e quentes (no ar saíam escuras e contrastadas), e em
+//    deck sem ficha visual o gerador pôs uma pessoa numa fachada sem pessoa.
+import { buildImagePrompt } from '../../shared/image-prompt.js';
+
+describe('ajuste do reteste — moodboard e pessoa fora da cena', () => {
+  const GUARDA = 'Do not add people the scene does not call for.';
+  const base = { scene: 'bakery storefront in the morning', format: 'carousel', framing: 'FRAMING: x.', familyEnglish: 'Use warm window light, soft shadows and subtle grain.' };
+
+  it('as regras fixas proíbem pessoa que a cena não pede, com ou sem ficha visual', () => {
+    expect(IMAGE_PROMPT_TEXT.hardRules).toContain(GUARDA);
+    expect(buildImagePrompt(base, { route: 'sjinn' }).prompt).toContain(GUARDA);
+    const painel = buildImagePrompt({ ...base, format: 'presentation', presentationPanel: true }, { route: 'sjinn' });
+    expect(painel.prompt).toContain(GUARDA);
+    expect(painel.prompt).not.toContain('PROJECT SUBJECTS');
+  });
+
+  it('com moodboard, a referência manda no visual: paleta, contraste e luz', () => {
+    const plano = buildImagePrompt({ ...base, referenceCount: 1, styleMoodboard: true }, { route: 'sjinn' });
+    expect(IMAGE_PROMPT_TEXT.moodboardOnly.startsWith('STYLE REFERENCE (moodboard): ')).toBe(true);
+    expect(plano.prompt).toContain(IMAGE_PROMPT_TEXT.moodboardOnly);
+    for (const trecho of ['palette (including black and white or a limited palette)', 'contrast, lighting and texture', 'overrides any colour, light or mood mentioned elsewhere in this request', 'not their subject']) expect(IMAGE_PROMPT_TEXT.moodboardOnly).toContain(trecho);
+  });
+
+  it('com moodboard, o tratamento de luz da família não entra para não disputar com a referência', () => {
+    const comMood = buildImagePrompt({ ...base, referenceCount: 1, styleMoodboard: true }, { route: 'sjinn' });
+    expect(comMood.prompt).not.toContain('VISUAL TREATMENT');
+    expect(comMood.prompt).not.toContain('DEFAULT ART DIRECTION');
+    const semMood = buildImagePrompt(base, { route: 'sjinn' });
+    expect(semMood.prompt).toContain('VISUAL TREATMENT: Use warm window light');
+    const soAncora = buildImagePrompt({ ...base, referenceCount: 1, styleMoodboard: false, identityAnchor: 'IDENTITY ANCHOR: x.' }, { route: 'sjinn' });
+    expect(soAncora.prompt).toContain('VISUAL TREATMENT: Use warm window light');
+  });
+});

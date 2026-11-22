@@ -69,11 +69,12 @@ export const IMAGE_PROMPT_TEXT = Object.freeze({
   // I15 — apresentação com direção estética ou referência.
   canvasPresentation: CANVAS_PRESENTATION,
   // I16 — todo pedido do editor, antes do conteúdo opcional.
-  hardRules: 'HARD RULES: No lettering, captions, logos or watermarks anywhere in the image. Keep factual claims, charts and interface content in editable layers. Deliver the image only. Keep the subject’s identifying geometry and materials consistent with the scene. In photographs, retain natural anatomy, skin texture and coherent lighting.',
+  hardRules: 'HARD RULES: No lettering, captions, logos or watermarks anywhere in the image. Keep factual claims, charts and interface content in editable layers. Deliver the image only. Keep the subject’s identifying geometry and materials consistent with the scene. In photographs, retain natural anatomy, skin texture and coherent lighting. Do not add people the scene does not call for.',
   // I17 — só com anexos efetivamente enviados.
   referenceRoles: 'REFERENCE ROLES: Use moodboard images for medium, palette, lighting and composition. Follow a named product or subject reference only for its assigned role. A separate identity anchor governs identity only. Create the scene in this request. Exclude lettering, logos and watermarks from every role.',
   // I18 — moodboard de estilo sem direção estética escrita.
-  moodboardOnly: 'Match the visual medium, palette, materials and composition of the attached references in a new scene aligned with this card.',
+  // Reteste de 22/11: a frase curta do catálogo perdia para a luz quente da família e para as cores da ficha.
+  moodboardOnly: 'STYLE REFERENCE (moodboard): the attached reference images define the look of this image. Match their medium, palette (including black and white or a limited palette), contrast, lighting and texture. This look overrides any colour, light or mood mentioned elsewhere in this request. Take only the look from the references, not their subject: create the new scene described above.',
   // I19 — cabeçalho do estilo escrito de projeto ou slide.
   styleHeader: 'PROJECT OR SLIDE STYLE: Apply the requested medium, palette, materials and lighting below. Use natural subject colours unless the project specifies otherwise.',
   // I22 — mapa dos anexos realmente enviados.
@@ -272,7 +273,8 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
   } else if (!agente) {
     add('medium', presentation ? T.mediumPresentation : T.mediumCarousel, 'optional');
   }
-  add('treatment', composeFamilyTreatment(parts.familyEnglish), 'optional');
+  // Com moodboard de estilo, a luz da família disputaria com a referência.
+  if (!styleMoodboard) add('treatment', composeFamilyTreatment(parts.familyEnglish), 'optional');
   if (!agente && !styleBody && !styleMoodboard) add('defaultArtDirection', T.defaultArtDirection, 'optional');
 
   let ativos = blocos;

@@ -28,7 +28,7 @@ it('plano envia todos os uploads locais na mesma geração, sem descartá-los', 
   expect(body.imageList).toEqual(refs);
   // Anexos sem papel declarado valem como moodboard de estilo: sem estética padrão.
   expect(body.prompt).toContain('REFERENCE ROLES: Use moodboard images for medium, palette, lighting and composition.');
-  expect(body.prompt).toContain('Match the visual medium, palette, materials and composition of the attached references');
+  expect(body.prompt).toContain('STYLE REFERENCE (moodboard): the attached reference images define the look of this image.');
   expect(body.prompt).not.toContain('DEFAULT ART DIRECTION');
   expect(body.prompt).not.toContain('use editorial photography');
 });
@@ -61,7 +61,7 @@ it('direção expressiva não recebe imposição de fotografia realista', () => 
   const prompt = buildGptImageFullPrompt('floating 3D world', null, 'PROJECT VISUAL STYLE BIBLE: expressive 3D, orange graphic accents', { route: 'sjinn', withReference: true });
   expect(prompt).toContain('REFERENCE ROLES:');
   expect(prompt).toContain('expressive 3D');
-  expect(prompt).not.toMatch(/DEFAULT ART DIRECTION|use editorial photography|Match the visual medium/i);
+  expect(prompt).not.toMatch(/DEFAULT ART DIRECTION|use editorial photography|STYLE REFERENCE \(moodboard\)/i);
   expect(prompt.length).toBeLessThanOrEqual(4000);
   expect(prompt).toContain('HARD RULES: No lettering, captions, logos or watermarks anywhere in the image.');
 });
