@@ -325,3 +325,76 @@ describe('trocar o padrão num projeto já gerado', () => {
     expect(result).toEqual([{ id: 'a', title: 'T', overlay: 20, textShadow: false, bgImageId: 'x', layout: 'bc' }]);
   });
 });
+
+import {
+  applySocialVisualComposition as composeSocial,
+  charWidthEm,
+  heroNumberText,
+  SOCIAL_LOGO_SIZE_DEFAULT,
+} from '../../src/utils/social-visual-composition.js';
+import { formatFrame } from '../../src/utils/social-families.js';
+
+describe('biblioteca v4 — card de número herói', () => {
+  const preset = VISUAL_PRESETS.find((p) => p.id === 'viral_hype_dark');
+  const brand = applyVisualPreset(MARCAS.completa, preset.id);
+  const opts = { preset, brand, formato: 'carrossel' };
+  const deck = (titulo) => [
+    { id: 'a', title: 'Uma ideia clara', subtitle: 'Apoio curto.', imageQuery: 'cena' },
+    { id: 'b', title: 'Outra ideia', subtitle: 'Apoio curto.', imageQuery: '' },
+    { id: 'c', title: titulo, subtitle: 'Apoio curto.', imageQuery: '' },
+    { id: 'd', title: 'Mais uma ideia', subtitle: 'Apoio curto.', imageQuery: '' },
+    { id: 'e', title: 'Fecho', subtitle: 'Apoio curto.', imageQuery: 'cena' },
+  ];
+
+  it('reconhece números curtos e recusa frases', () => {
+    for (const t of ['**$399**', '40%', '3x', '10', 'R$ 49']) expect(heroNumberText(t)).not.toBeNull();
+    for (const t of ['Only 10 spots', 'Uma ideia clara', '$1.234.567', '']) expect(heroNumberText(t)).toBeNull();
+  });
+
+  it('"**$399**" vira herói: 2,2× o título normal e numa linha só', () => {
+    const hero = composeSocial(deck('**$399**'), opts)[2];
+    const normal = composeSocial(deck('Uma ideia clara'), opts)[2];
+    expect(hero.socialArt.heroNumber).toBe(true);
+    expect(hero.socialFunction).toBe(normal.socialFunction);
+    expect(hero.titleSize / normal.titleSize).toBeGreaterThanOrEqual(2.2);
+    const { typo } = hero.socialArt;
+    const cw = charWidthEm(typo.titleFont, typo.titleCase === 'upper');
+    const largura = (hero.canvas.zones.title.w / 100) * formatFrame('carrossel').w - 64;
+    expect(hero.socialArt.heroTitlePx * 4 * cw).toBeLessThanOrEqual(largura);
+  });
+
+  it('título em frase não é herói', () => {
+    const card = composeSocial(deck('Uma ideia clara'), opts)[2];
+    expect(card.socialArt.heroNumber).toBeUndefined();
+    expect(card.socialArt.heroTitlePx).toBeUndefined();
+  });
+
+  it('"Only 10 spots" não é herói', () => {
+    const card = composeSocial(deck('Only 10 spots'), opts)[2];
+    expect(card.socialArt.heroNumber).toBeUndefined();
+  });
+});
+
+describe('biblioteca v4 — tamanho padrão da logo', () => {
+  const preset = VISUAL_PRESETS.find((p) => p.id === 'viral_hype_dark');
+  const { logoSize: _semTamanho, ...marca } = applyVisualPreset(MARCAS.completa, preset.id);
+  const comLogo = { ...marca, logo: 'data:image/png;base64,AAAA', logoPosition: 'tr' };
+  const deck = [
+    { id: 'a', title: 'Uma ideia clara', subtitle: 'Apoio curto.', imageQuery: 'cena' },
+    { id: 'b', title: 'Outra ideia', subtitle: 'Apoio curto.', imageQuery: '' },
+    { id: 'c', title: 'Fecho', subtitle: 'Apoio curto.', imageQuery: 'cena' },
+  ];
+
+  it('sem logoSize na marca usa o padrão menor dos cards sociais', () => {
+    const result = composeSocial(deck, { preset, brand: comLogo, formato: 'carrossel' });
+    expect(SOCIAL_LOGO_SIZE_DEFAULT).toBe(150);
+    for (const slide of result) expect(slide.socialArt.logo).toEqual({ pos: 'tr', size: SOCIAL_LOGO_SIZE_DEFAULT });
+  });
+
+  it('logoSize definido pela marca ou pelo card é respeitado', () => {
+    const result = composeSocial(deck, { preset, brand: { ...comLogo, logoSize: 320 }, formato: 'carrossel' });
+    for (const slide of result) expect(slide.socialArt.logo.size).toBe(320);
+    const porCard = composeSocial(deck.map((s) => ({ ...s, logoSize: 200 })), { preset, brand: comLogo, formato: 'carrossel' });
+    for (const slide of porCard) expect(slide.socialArt.logo.size).toBe(200);
+  });
+});

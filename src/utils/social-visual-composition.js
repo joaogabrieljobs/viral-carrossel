@@ -258,6 +258,22 @@ const hasPhoto = (s) => !!(s?.imageQuery || s?.bgImage || s?.bgImageId || s?.bgI
 const chars = (v) => Array.from(visibleSocialText(v || '')).length;
 const FOOTER_FORMATS = ['carrossel', 'quadrado', 'stories'];
 
+/** Logo nos cards da biblioteca quando a marca não definiu tamanho (260 cobria título e contador). */
+export const SOCIAL_LOGO_SIZE_DEFAULT = 150;
+
+/** Título que é só um número curto (preço, porcentagem, multiplicador) vira o herói do card. */
+const HERO_NUMBER_RE = /^(?:[$€£]|R\$)?\s?\d[\d.,]*\s?(?:%|x|k|K)?$/;
+const HERO_NUMBER_MAX_CHARS = 7;
+/** Escala mínima pedida é 2,2×; 2,25 dá folga para o arredondamento do tamanho salvo. */
+const HERO_NUMBER_SCALE = 2.25;
+
+/** Texto do número herói (sem marcadores de destaque) ou null. */
+export function heroNumberText(title) {
+  const t = String(title || '').replace(/\*\*/g, '').trim();
+  if (!t || Array.from(t).length > HERO_NUMBER_MAX_CHARS) return null;
+  return HERO_NUMBER_RE.test(t) ? t : null;
+}
+
 /**
  * Largura média do caractere (em), medida no Chrome com as faces do app numa
  * frase de ensaio em português (espaços incluídos). Fonte desconhecida: 0,52.
@@ -268,7 +284,7 @@ const CHAR_WIDTH = [
   [/inter\b/, 0.5], [/ibm plex sans/, 0.49], [/fraunces/, 0.49], [/bodoni/, 0.48], [/figtree/, 0.47],
   [/oswald/, 0.48], [/anton/, 0.43], [/jost|dm sans/, 0.45], [/instrument serif/, 0.36], [/mono/, 0.6],
 ];
-function charWidthEm(font = '', upper = false) {
+export function charWidthEm(font = '', upper = false) {
   const f = String(font).toLowerCase();
   const hit = CHAR_WIDTH.find(([re]) => re.test(f));
   const w = hit ? hit[1] : 0.52;
@@ -476,6 +492,28 @@ export function socialFormatPatch(slide, formato = 'carrossel') {
       }
     }
   }
+  // Card de número (preço, porcentagem): o número é o herói, bem maior que o
+  // título normal, mas sempre numa linha só dentro da caixa do título.
+  const hero = heroNumberText(slide.title);
+  if (hero) {
+    const widthPx = (fit.title.w / 100) * F.w - 64;
+    const cw = charWidthEm(typo.titleFont, typo.titleCase === 'upper');
+    const maxPx = Math.floor(widthPx / (chars(hero) * cw * 1.08));
+    let px = Math.max(fit.titlePx, Math.min(Math.ceil(L.titlePx * HERO_NUMBER_SCALE), maxPx));
+    while (px > fit.titlePx && linesFor(hero, px, widthPx, cw) > 1) px -= 1;
+    const needPct = ((px * ((typo.titleLeading ?? 104) / 100) + px * 0.44 + 16) / F.h) * 100;
+    if (needPct > fit.title.h) {
+      // A caixa cresce para cima, sem entrar na foto acima, no cabeçalho ou na logo.
+      const P = fit.photo || L.photo;
+      const photoAbove = P && !L.onPhoto && P.w > 2 && P.y + P.h <= fit.title.y + 0.5;
+      const floorY = photoAbove ? P.y + P.h + 0.5 : Math.max(F.t + 1, logoTopReserve(art.logo, F));
+      const up = Math.max(0, Math.min(needPct - fit.title.h, fit.title.y - floorY));
+      fit.title.y = round2(fit.title.y - up);
+      fit.title.h = round2(fit.title.h + up);
+    }
+    fit.titlePx = px;
+    fit.titleUsed = round2(Math.min(fit.title.h, needPct));
+  }
   const finalL = { ...L, photo: fit.photo || L.photo, title: fit.title, subtitle: fit.subtitle, hasSub, subUsed: fit.subUsed, titleUsed: fit.titleUsed };
   const guarded = guardChrome({ ...finalL, chrome: socialDevices(art.family, art.fn, finalL, formato, { photo: !!L.photo, topReserve: logoTopReserve(art.logo, F) }) }, F,
     { footerPct: art.footer?.[F.key] || 0, logoCorner: art.logoCorner });
@@ -497,6 +535,14 @@ export function socialFormatPatch(slide, formato = 'carrossel') {
   const textTop = titleAnchor === 'end' ? fit.title.y + fit.title.h - titleUsedPct
     : titleAnchor === 'center' ? fit.title.y + (fit.title.h - titleUsedPct) / 2 : fit.title.y;
   const scrimTop = L.scrim && L.onPhoto ? round2(Math.max(0, textTop - 5)) : undefined;
+  const socialArt = { ...art, ground: L.ground, chrome: guarded.chrome, archetype: L.archetype, density: fit.over ? 'over' : 'ok', formato: F.key, titleUsed: fit.titleUsed };
+  if (hero) {
+    socialArt.heroNumber = true;
+    socialArt.heroTitlePx = fit.titlePx;
+  } else {
+    delete socialArt.heroNumber;
+    delete socialArt.heroTitlePx;
+  }
   return {
     layout: L.align === 'center' ? 'tc' : 'tl',
     align: L.align,
@@ -512,7 +558,7 @@ export function socialFormatPatch(slide, formato = 'carrossel') {
     titleItalic: L.titleItalic && art.ownType === true,
     socialZoneAnchors: L.anchors,
     socialComposition: `v4:${L.archetype}`,
-    socialArt: { ...art, ground: L.ground, chrome: guarded.chrome, archetype: L.archetype, density: fit.over ? 'over' : 'ok', formato: F.key, titleUsed: fit.titleUsed },
+    socialArt,
     canvas: { enabled: false, applied: true, variant: 'classic', source: 'social-preset', preserveZones: true, zones },
   };
 }
@@ -524,7 +570,7 @@ export function socialFormatPatch(slide, formato = 'carrossel') {
  */
 function logoTopReserve(logo, F) {
   if (!logo || !String(logo.pos || '').startsWith('t')) return 0;
-  const size = Number(logo.size) || 260;
+  const size = Number(logo.size) || SOCIAL_LOGO_SIZE_DEFAULT;
   // Logos pequenas costumam ser marcas quadradas (lado inteiro); as grandes,
   // horizontais (cerca de 60% do lado).
   return round2(((F.w * 0.045 + size * (size <= 180 ? 1 : 0.6)) / F.h) * 100 + 1.5);
@@ -587,7 +633,7 @@ function composeSocialLibrary(slides, { preset, brand, formato, narrative }) {
     const structured = normalizePresentationBlocks(slide.presentationBlocks).length > 0;
     const art = {
       family: familyKey, fn, variant: variants[index], structured, typo, footer,
-      logoCorner: logoCornerFor(base), logo: logoCornerFor(base) ? { pos: logoCornerFor(base), size: base.logoSize ?? 260 } : null, labelFont: ownType ? (family.type.label || null) : null, ownType, viral,
+      logoCorner: logoCornerFor(base), logo: logoCornerFor(base) ? { pos: logoCornerFor(base), size: slide.logoSize ?? base.logoSize ?? SOCIAL_LOGO_SIZE_DEFAULT } : null, labelFont: ownType ? (family.type.label || null) : null, ownType, viral,
       signatureOnPhoto: viral && luminance(base.titleColor) != null && luminance(base.titleColor) < 0.6,
     };
     const patch = socialFormatPatch({ ...slide, socialArt: art }, formato);
