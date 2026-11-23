@@ -12,7 +12,7 @@ Implementação e publicação em 28/09/2026, commit `450e84d`. Domínio `viralc
 ## Configuração para produção
 
 1. No Resend, verificar um domínio de envio controlado pelo projeto e configurar os registros DNS solicitados.
-2. Na Vercel, neste projeto, definir **RESEND_API_KEY** como segredo de servidor com permissão de envio e **AUTH_EMAIL_FROM** como `Viral Carrossel <remetente@dominio-verificado>`. Não usar prefixo `VITE_` nem colocar a chave no chat/repositório.
+2. Na Vercel, neste projeto, definir **RESEND_API_KEY** como segredo de servidor com permissão de envio e **AUTH_EMAIL_FROM** como `Moont <nao-responda@moont.ai>` (em produção desde 23/11/2026; a chave do Resend precisa ter permissão de envio para o domínio moont.ai). Não usar prefixo `VITE_` nem colocar a chave no chat/repositório.
 3. Configurar `APP_URL=https://moont.ai`; manter `STRIPE_SECRET_KEY` e `ACCESS_COOKIE_SECRET`. O remetente verificado no Resend pode continuar no domínio anterior até que um novo domínio de envio seja verificado.
 4. Publicar e solicitar um link para uma conta de teste controlada. Confirmar recebimento (inclusive spam), redefinição, login novo, rejeição da senha antiga e do link usado. Não alterar senha de cliente durante smoke tests.
 
