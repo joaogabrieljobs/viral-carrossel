@@ -348,3 +348,37 @@ test('"Conte sobre sua marca" mantém espaços e quebras de linha ao digitar', a
   await expect(bio).toHaveValue('Sou designer de marcas\nAtendo cafés, padarias e bares');
   await expect.poll(async () => (await savedDoc(page)).brand?.bio).toBe('Sou designer de marcas\nAtendo cafés, padarias e bares');
 });
+
+// Auditoria 23/11 (FE-02): "Este card" voltava sozinho para "Todos" ao trocar
+// de aba e o clique seguinte mudava o projeto inteiro sem dizer o que mudava.
+test('"Este card" continua escolhido ao trocar de aba; "Todos" diz antes o que muda e depois quantos tinham ajuste', async ({ page }) => {
+  await openQuickProject(page);
+  await openAdjustments(page);
+  const scope = page.getByRole('group', { name: 'Onde aplicar o estilo' });
+  const hint = page.locator('[data-vc-style-scope-hint]');
+  await expect(hint).toHaveText('O estilo escolhido vale para os 3 cards e substitui ajustes de estilo feitos card a card.');
+  await scope.getByRole('button', { name: 'Este card', exact: true }).click();
+  await expect(hint).toHaveText('O estilo escolhido vale só para o card 1.');
+  // Sair da aba desmonta o painel; ao voltar, a escolha explícita permanece.
+  await page.getByRole('tab', { name: 'Início', exact: true }).click();
+  await expect(page.getByRole('group', { name: 'Quantidade de cards', exact: true })).toBeVisible();
+  await openAdjustments(page);
+  await expect(scope.getByRole('button', { name: 'Este card', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  const before = await savedDoc(page);
+  await page.getByRole('button', { name: 'Estilo Bold Promo Pink', exact: true }).click();
+  await expect.poll(async () => (await savedDoc(page)).slides[0].visualPresetId).toBe('bold_promo_rosa');
+  const afterCard = await savedDoc(page);
+  expect(afterCard.slides.slice(1)).toEqual(before.slides.slice(1));
+  expect(afterCard.visualPreset ?? null).toBe(before.visualPreset ?? null);
+  await expect(page.locator('.toast-stack').getByText('Padrão aplicado ao card 1.')).toBeVisible();
+  // Agora em "Todos": o aviso conta o card que tinha estilo próprio.
+  await scope.getByRole('button', { name: 'Todos', exact: true }).click();
+  await page.getByRole('button', { name: 'Estilo Meu estilo salvo, salvo por você', exact: true }).click();
+  await expect.poll(async () => (await savedDoc(page)).visualPreset).toBe('custom_quick_test');
+  await expect(page.locator('.toast-stack').getByText('Padrão aplicado a todos os 3 cards. 1 tinha ajuste próprio, que foi substituído.')).toBeVisible();
+  // Recarregar a página volta ao padrão "Todos".
+  await page.reload();
+  await enterEditorFromHome(page);
+  await openAdjustments(page);
+  await expect(scope.getByRole('button', { name: 'Todos', exact: true })).toHaveAttribute('aria-pressed', 'true');
+});

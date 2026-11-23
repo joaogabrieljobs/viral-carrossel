@@ -6,6 +6,7 @@ import { REMIX_TONES } from '../../utils/carousel-remix.js';
 import { brandLogoReplacementPatch, storeSlideLogo } from '../../utils/slide-logo.js';
 import { remapDestaqueSpansOnEdit } from '../../utils/text-spans.js';
 import '../../styles/quick-adjustments.css';
+import { readStyleScope, writeStyleScope } from '../../utils/style-scope-memory.js';
 
 /** Saved styles stay visible even when the built-in catalog is collapsed. */
 export function quickVisiblePresets(presets, expanded = false, selectedId = '') {
@@ -63,8 +64,11 @@ export function QuickAdjustmentsPanel({
   editorFocus = null, toast,
 }) {
   const [stylesExpanded, setStylesExpanded] = useState(false);
-  // Trocar de estilo muda o projeto inteiro por padrão; "Este card" é a exceção.
-  const [styleScope, setStyleScope] = useState('all');
+  // Trocar de estilo muda o projeto inteiro por padrão; "Este card" é a exceção
+  // e fica lembrada no projeto enquanto a aba está aberta: este painel desmonta
+  // ao trocar de aba e ao fechar a gaveta do celular.
+  const [styleScope, setStyleScopeState] = useState(() => readStyleScope(projectId));
+  const setStyleScope = (scope) => setStyleScopeState(writeStyleScope(projectId, scope));
   const [toneId, setToneId] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -114,7 +118,7 @@ export function QuickAdjustmentsPanel({
   }, [targetKey]);
 
   useEffect(() => {
-    setStyleScope('all');
+    setStyleScopeState(readStyleScope(projectId));
     setStylesExpanded(false);
     setToneId('');
   }, [projectId]);
@@ -198,6 +202,11 @@ export function QuickAdjustmentsPanel({
           <button type="button" aria-pressed={styleScope === 'all'} onClick={() => setStyleScope('all')} disabled={disabled}>Todos</button>
           <button type="button" aria-pressed={styleScope === 'card'} onClick={() => setStyleScope('card')} disabled={disabled}>Este {itemLabel}</button>
         </div>
+        <p className="vc-quick-adjustments-scope-hint" data-vc-style-scope-hint={styleScope}>
+          {styleScope === 'card'
+            ? `O estilo escolhido vale só para o ${itemLabel} ${activeIdx + 1}.`
+            : `O estilo escolhido vale para ${cardCount > 1 ? `os ${cardCount} ${itemLabel}s` : `o ${itemLabel}`} e substitui ajustes de estilo feitos ${itemLabel} a ${itemLabel}.`}
+        </p>
         <div className="vc-quick-adjustments-presets">
           {visiblePresets.map((preset) => {
             const selected = preset.id === selectedPresetId || preset.sourceId === selectedPresetId;

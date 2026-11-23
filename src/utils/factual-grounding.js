@@ -12,7 +12,10 @@ export function factualEvidenceText(source) {
 }
 
 const COMMERCIAL_RULES = [
-  { category: 'garantia', regex: /\b(?:garanti(?:a|do|mos)|resultado garantido|sem risco|guaranteed|risk.free)\b[^.!?\n]{0,90}/giu },
+  // Qualquer forma do verbo ou do nome (auditoria 23/11, IA-05): antes só
+  // "garantia", "garantido" e "garantimos" eram vistos, e "A encomenda garante
+  // seu pão", exemplo da própria instrução ao modelo, passava.
+  { category: 'garantia', regex: /\b(?:garant(?:ias?|id[oa]s?|imos|indo|ir(?:a|ao|emos)?|iu|em|es|am|a|e|o)|sem risco|guarantee[ds]?|risk.free)\b[^.!?\n]{0,90}/giu },
   { category: 'prazo', regex: /\b(?:pronto|entregue|resultado|receba|comece)\s+(?:em|dentro de)\s+\d+\s*(?:hora|dia|semana|m[eê]s)(?:s|es)?\b[^.!?\n]{0,70}/giu },
   { category: 'preço', regex: /(?:R\$|US\$|\$|€)\s*\d(?:[\d.,]*\d)?|\b(?:gr[aá]tis|gratuito|sem taxas?(?: escondidas?)?|sem custo|sem compromisso|no hidden fees|free of charge|no obligation)\b/giu },
   { category: 'item incluso', regex: /\b(?:inclui|inclus[oa]s?|vem com|acompanha|includes?)\b[^.!?\n]{1,100}/giu },
@@ -92,7 +95,9 @@ function derivedQuantityKeys(text) {
   for (const a of years) for (const b of years) if (b > a) keys.push(`${b - a}years`);
   return keys;
 }
-const YEAR_IN_CONTEXT = /\b(?:em|de|desde|ate|no|na|do|da|a|ano|in|since|from|to|until|year)\s+((?:19|20)\d{2})\b/g;
+// "mais de 2000 clientes em 2024": depois de um quantificador o número é
+// quantidade, não data (resto do MOO-12, auditoria 23/11).
+const YEAR_IN_CONTEXT = /(?<!\b(?:mais|menos|cerca|perto|acima|abaixo|quase|uns|umas|more|less|over|under|about|almost)\s+(?:de\s+|than\s+)?)\b(?:em|de|desde|ate|no|na|do|da|a|ano|in|since|from|to|until|year)\s+((?:19|20)\d{2})\b(?!\s+(?:clientes?|pacientes?|paes|unidades|pessoas|sites|pedidos|alunos|seguidores|customers?|people|orders|units)\b)/g;
 const quantityKeys = text => new Set([
   ...[...String(text).matchAll(QUANTITY), ...String(text).matchAll(PERCENTAGE)].map(match => canonicalQuantity(match[0])),
   ...derivedQuantityKeys(text),
@@ -103,15 +108,18 @@ const quantityKeys = text => new Set([
 const ABSOLUTES = /\b(?:a maioria d(?:e|as|os) [a-z]+|most (?:people|customers|visitors|[a-z]+ (?:brands|companies|bakeries|stores))|unicos? argumentos? que convertem|adaptacao perfeita|friccao zero|friction.free|vai (?:aumentar|converter|garantir)|(?:desiste e )?vai para o concorrente|site desatualizado e pior que nenhum)\b/giu;
 // Rotina e feitura que o material não informa: o QA viu passar "à mão,
 // todos os dias" e "pão fresco toda manhã" (MF-04). Só vale quando o material
-// não traz a expressão.
-const ROUTINES = /\b(?:feit[oa]s? a mao|a mao|todos os dias|todo dia|toda manha|todas as manhas|diariamente|producao diaria|quentinh[oa]s?|fresquinh[oa]s?|saindo do forno|recem-said[oa]s? do forno)\b/gu;
+// não traz a expressão. "à mão" sozinho saiu (auditoria 23/11, IA-04): "tenha o
+// contato sempre à mão" não fala de feitura.
+const ROUTINES = /\b(?:feit[oa]s? a mao|todos os dias|todo dia|toda manha|todas as manhas|diariamente|producao diaria|quentinh[oa]s?|fresquinh[oa]s?|saindo do forno|recem-said[oa]s? do forno)\b/gu;
 // Escassez, disponibilidade e superioridade que o material não traz (MF-16,
 // reteste 21/11: "quem pede no dia pode ficar sem", "pode não encontrar o
 // pão", "no horário que você escolher", "nenhuma prensa industrial consegue
 // imitar"). Não usa a exceção do condicional: a escassez vem justamente com
 // "pode".
-// Reteste 0b1cb62 (D07): "depende do que sobra na vitrine", "o que restou na vitrine".
-const AVAILABILITY = /\b(?:pode(?:m)?\s+(?:ficar|sair)\s+sem|pode(?:m)?\s+nao\s+encontrar|quem\s+chega\s+(?:cedo|tarde|primeiro|sem)|acaba(?:m)?\s+(?:cedo|rapido|logo)|esgota(?:m|do|dos|da|das)?|estoque\s+limitado|ultimas\s+unidades|antes\s+que\s+acabe|vagas?\s+limitadas?|no\s+horario\s+que\s+(?:voce|preferir|quiser|escolher)|quando\s+(?:voce\s+)?quiser|a\s+qualquer\s+hora|(?:ja\s+)?reserva(?:m)?\s+o\s+seu|nenhum[a]?\s+(?:\S+\s+){0,3}(?:consegue|pode)\s+(?:imitar|copiar|igualar)|pouca\s+gente\s+(?:imagina|sabe|conhece)|o\s+que\s+(?:sobra|sobrar|sobrou|sobrarem|resta|restar|restou)|vitrines?|(?:pode|podem|vai|vao|antes\s+de|ate)\s+acabar)\b/gu;
+// Reteste 0b1cb62 (D07): "depende do que sobra na vitrine", "o que restou na
+// vitrine": quem marca é "o que sobra/restou". A palavra "vitrine" sozinha saiu
+// (auditoria 23/11, IA-04): "seu site é a vitrine do seu negócio" é metáfora.
+const AVAILABILITY = /\b(?:pode(?:m)?\s+(?:ficar|sair)\s+sem|pode(?:m)?\s+nao\s+encontrar|quem\s+chega\s+(?:cedo|tarde|primeiro|sem)|acaba(?:m)?\s+(?:cedo|rapido|logo)|esgota(?:m|do|dos|da|das)?|estoque\s+limitado|ultimas\s+unidades|antes\s+que\s+acabe|vagas?\s+limitadas?|no\s+horario\s+que\s+(?:voce|preferir|quiser|escolher)|quando\s+(?:voce\s+)?quiser|a\s+qualquer\s+hora|(?:ja\s+)?reserva(?:m)?\s+o\s+seu|nenhum[a]?\s+(?:\S+\s+){0,3}(?:consegue|pode)\s+(?:imitar|copiar|igualar)|pouca\s+gente\s+(?:imagina|sabe|conhece)|d?o\s+que\s+(?:sobra|sobrar|sobrou|sobrarem|resta|restar|restou)|(?:pode|podem|vai|vao|antes\s+de|ate)\s+acabar)\b/gu;
 // Reteste 21/11 (T02, T06): regra geral e atributo sensorial do produto que o
 // material não traz ("costuma levar", "crosta firme e miolo que rende").
 const GENERALIZATION = /\b(?:costuma(?:m)?|geralmente|normalmente|em geral|a maioria d[oa]s?|quase sempre|tipicamente|muit[oa]s\s+(?:acham|pensam|acreditam|dizem|imaginam)|tod[oa]\s+mundo\s+(?:acha|pensa|sabe)|most\s+people|many\s+(?:people\s+)?(?:think|believe|assume)|everyone\s+(?:knows|thinks)|usually|typically)\b/gu;
@@ -120,8 +128,25 @@ const GENERALIZATION = /\b(?:costuma(?:m)?|geralmente|normalmente|em geral|a mai
 // ownership").
 const ADVANTAGE = /\b(?:aparece(?:m)?\s+primeiro|sai(?:em)?\s+na\s+frente|fica(?:m)?\s+na\s+frente|primeiro\s+lugar\s+no\s+google|show(?:s)?\s+up\s+first|ranks?\s+(?:first|higher)|stand(?:s)?\s+out\s+from\s+(?:the\s+)?competition)\b/gu;
 const OWNERSHIP = /\b(?:full\s+ownership|you\s+own\s+(?:it|everything|the\s+site)|(?:é|e)\s+(?:todo\s+)?(?:seu|sua)\s+para\s+sempre|tod[oa]\s+seu|propriedade\s+(?:total|completa)|seu\s+para\s+sempre|forever\s+yours)\b/gu;
-const SENSORY = /\b(?:crosta|casca|crocante|crocantes|miolo|macio|macia|aerad[oa]|umid[oa]|sabor|sabores|aroma|perfumad[oa]|textura|derrete(?:m)?)\b/gu;
-const CHANNELS = /\b(?:whatsapp|DM|direct|coment[aá]rios|agendamento|agende (?:uma )?consulta|patients?|pacientes?)\b/giu;
+// Atributo físico do produto marca sozinho. "Sabor", "aroma" e "textura"
+// também são linguagem figurada ("um cardápio com mais sabor"): só marcam em
+// par ou ao lado de um atributo físico (auditoria 23/11, IA-04).
+const SENSORY = /\b(?:crosta|casca|crocante|crocantes|miolo|macio|macia|aerad[oa]|umid[oa]|perfumad[oa]|derrete(?:m)?)\b/gu;
+const SENSORY_LOOSE = /\b(?:sabor|sabores|aroma|aromas|textura|texturas)\b/gu;
+// "Direct" e "comentários" só são canal em construção de contato ("chame no
+// direct", "nos comentários"). "A direct line" e "os comentários dos clientes"
+// não são (auditoria 23/11, IA-04).
+const CHANNELS = /\b(?:whatsapp|DM|(?:no|pelo|por|via|meu|nosso|um)\s+direct|direct\s+do\s+instagram|(?:nos|pelos)\s+coment[aá]rios|agendamento|agende (?:uma )?consulta|patients?|pacientes?)\b/giu;
+// No material basta a palavra: quem informa "atendemos pelo direct" autoriza
+// "chame no direct".
+const CHANNEL_WORDS = /\b(?:whatsapp|DM|direct|coment[aá]rios|agendamento|agende (?:uma )?consulta|patients?|pacientes?)\b/giu;
+const channelKey = match => {
+  const value = normalize(match);
+  if (value.includes('direct')) return 'direct';
+  if (value.includes('comentarios')) return 'comentarios';
+  if (value.startsWith('agende')) return 'agende consulta';
+  return value;
+};
 const CONDITIONAL = /\b(?:pode|podem|poderia|talvez|se (?:voce|sua|seu|ja)|por exemplo|uma opcao|may|might|could|if (?:you|your)|for example|an option)\b/;
 const negatedGuarantee = (text, index) => /\b(?:nao|nem|no|not|never|without)\b(?:\s+[\p{L}]+){0,4}\s*$/u.test(normalize(text.slice(0, index).split(/[.!?;\n]/u).pop()));
 // An explicit exclusion is not a positive promise of an included service.
@@ -206,6 +231,62 @@ function inclusionCovered(claim, sourceText) {
   return stems.filter(stem => sourceStems.has(stem)).length / stems.length >= 0.8;
 }
 
+/**
+ * Números em algarismos (auditoria 23/11, V4-X1). A conferência de quantidade
+ * só conhecia uma lista de unidades; "Vendemos 41.200 pães", "12 lojas em 4
+ * cidades" e "Fundada em 1998" saíam como revisados. Agora todo número de dois
+ * ou mais algarismos, ou com casa decimal, precisa estar no material. Um
+ * algarismo sozinho fica de fora: é quase sempre enumeração ("3 passos").
+ */
+const NUMBER_TOKEN = /\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?/g;
+const MULTIPLIER = /^\s*(mil(?:h[õo]es|h[ãa]o)?|k|thousand|million)\b/iu;
+function numbersIn(text) {
+  const source = String(text || '');
+  const found = [];
+  for (const match of source.matchAll(NUMBER_TOKEN)) {
+    const raw = match[0];
+    const before = source.slice(0, match.index);
+    // Minutos de um horário ("13:00", "7h30") não são dado próprio.
+    if (/\d[:h]$/iu.test(before) && /^\d{2}$/.test(raw)) continue;
+    // Algarismo colado a letra, @ ou # é nome ("@padaria2019", "#bf2026", "MP3").
+    if (/[\p{L}_@#]$/u.test(before)) continue;
+    const thousands = /^\d{1,3}(?:\.\d{3})+/.test(raw);
+    let value = Number((thousands ? raw.replace(/\./g, '') : raw).replace(',', '.'));
+    if (!Number.isFinite(value)) continue;
+    const scale = source.slice(match.index + raw.length).match(MULTIPLIER)?.[1]?.toLowerCase();
+    if (scale) value *= /^(?:mil|k|thousand)$/.test(scale) ? 1_000 : 1_000_000;
+    const decimal = !thousands && /[.,]\d/.test(raw);
+    if (value < 10 && !decimal) continue;
+    found.push({ raw, index: match.index, value });
+  }
+  return found;
+}
+const MONTHS = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const MONTHS_EN = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+/** Tudo o que o material sustenta como número: algarismos, por extenso e mês citado ("25 de novembro" = 25/11). */
+function evidenceNumbers(evidence) {
+  const values = new Set(numbersIn(evidence).map(number => number.value));
+  const text = normalize(evidence);
+  for (const [word, digits] of Object.entries(NUMBERS)) {
+    if (Number(digits) >= 10 && new RegExp(`\\b${word}\\b`).test(text)) values.add(Number(digits));
+  }
+  for (const [word, tens] of Object.entries(TENS)) {
+    if (new RegExp(`\\b${word}\\b`).test(text)) values.add(tens);
+  }
+  for (const match of text.matchAll(new RegExp(`\\b(${Object.keys(TENS).join('|')})(?:\\s+e\\s+|[ -])(${SINGLE})\\b`, 'g'))) {
+    values.add(TENS[match[1]] + Number(NUMBERS[normalize(match[2])] || 0));
+  }
+  [MONTHS, MONTHS_EN].forEach(list => list.forEach((month, index) => {
+    if (index >= 9 && new RegExp(`\\b${month}\\b`).test(text)) values.add(index + 1);
+  }));
+  // "dez mil" e "10 mil" no material valem 10.000.
+  for (const match of text.matchAll(/\b([a-z]+)\s+mil\b/g)) {
+    const base = NUMBERS[match[1]] ? Number(NUMBERS[match[1]]) : TENS[match[1]];
+    if (base) values.add(base * 1_000);
+  }
+  return values;
+}
+
 export function auditDraftFactuality(draft, config = {}) {
   // Never treat the fully expanded generation prompt (examples, templates,
   // narrative recipes) as evidence. Callers pass raw user material explicitly.
@@ -218,7 +299,10 @@ export function auditDraftFactuality(draft, config = {}) {
   const sourceEquivalent = equivalent(sourceText);
   const countedSpots = COUNTED_SPOTS.test(sourceText);
   const quantities = quantityKeys(evidence);
-  const channels = new Set([...evidence.matchAll(CHANNELS)].map(match => normalize(match[0])));
+  const channels = new Set([...evidence.matchAll(CHANNEL_WORDS)].map(match => channelKey(match[0])));
+  const numbers = evidenceNumbers(evidence);
+  const enumerationLimit = Math.max(Array.isArray(draft?.slides) ? draft.slides.length : 0, Number(config.count) || 0);
+  const currentYear = Number(config.currentYear) || new Date().getFullYear();
   const prices = sourcePrices(evidence);
   const violations = [];
   for (const { slideIndex, field, text } of textFields(draft)) {
@@ -237,10 +321,22 @@ export function auditDraftFactuality(draft, config = {}) {
         if (!sourceText.includes(normalize(claim)) && !sourceEquivalent.includes(equivalent(normalize(claim)))) add(rule.category, claim);
       }
     }
+    // Trechos que a regra de preço e a de quantidade já avaliaram: o número
+    // dentro deles não é conferido de novo pela regra geral abaixo.
+    const judged = [...text.matchAll(/(?:R\$|US\$|\$|€)\s*\d(?:[\d.,]*\d)?/gu)].map(match => [match.index, match.index + match[0].length]);
     for (const match of [...text.matchAll(QUANTITY), ...text.matchAll(PERCENTAGE)]) {
+      judged.push([match.index, match.index + match[0].length]);
       // "um cliente", "uma vez", "uma paciente": artigo, não contagem (lote B 21/11).
       if (/^(?:um|uma)\s+(?:clientes?|customers?|pacientes?|patients?|vez|vezes)$/iu.test(match[0].trim())) continue;
       if (!quantities.has(canonicalQuantity(match[0]))) add('dado sem fonte', match[0]);
+    }
+    for (const number of numbersIn(text)) {
+      if (judged.some(([from, to]) => number.index < to && number.index + number.raw.length > from)) continue;
+      if (numbers.has(number.value)) continue;
+      // "12 erros" num carrossel de 12 cards é a própria enumeração.
+      if (Number.isInteger(number.value) && number.value <= enumerationLimit) continue;
+      if (number.value === currentYear || number.value === currentYear + 1) continue;
+      add('dado sem fonte', number.raw);
     }
     for (const sentence of text.split(/(?<=[.!?])\s+|\n/u)) {
       const normalized = normalize(sentence);
@@ -257,8 +353,10 @@ export function auditDraftFactuality(draft, config = {}) {
       for (const match of normalized.matchAll(GENERALIZATION)) {
         if (!sourceText.includes(match[0])) add('generalização sem fonte', match[0]);
       }
-      for (const match of normalized.matchAll(SENSORY)) {
-        if (!sourceText.includes(match[0])) add('atributo sensorial sem fonte', match[0]);
+      const sensory = [...normalized.matchAll(SENSORY)].filter(match => !sourceText.includes(match[0]));
+      const loose = [...normalized.matchAll(SENSORY_LOOSE)].filter(match => !sourceText.includes(match[0]));
+      for (const match of sensory.length || loose.length > 1 ? [...sensory, ...loose] : []) {
+        add('atributo sensorial sem fonte', match[0]);
       }
       for (const match of normalized.matchAll(ADVANTAGE)) {
         if (!sourceText.includes(match[0])) add('vantagem sem fonte', match[0]);
@@ -267,7 +365,7 @@ export function auditDraftFactuality(draft, config = {}) {
         if (!sourceText.includes(match[0])) add('propriedade ou posse sem fonte', match[0]);
       }
       for (const match of sentence.matchAll(CHANNELS)) {
-        if (!channels.has(normalize(match[0])) && !CONDITIONAL.test(normalized)) add('canal ou serviço não informado', match[0]);
+        if (!channels.has(channelKey(match[0])) && !CONDITIONAL.test(normalized)) add('canal ou serviço não informado', match[0]);
       }
     }
   }

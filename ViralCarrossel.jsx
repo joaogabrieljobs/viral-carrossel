@@ -132,6 +132,7 @@ import { clearReplacedSlideAssets, mergeConfirmedAssetIds, mergeHydratedBrandMed
 import * as projectCloudSync from './src/utils/projects-cloud-sync.js';
 import * as librarySync from './src/utils/library-sync.js';
 import * as projectOutbox from './src/utils/projects-outbox.js';
+import { countSlidesWithOwnVisuals } from './src/utils/style-scope-memory.js';
 import * as projectClient from './src/utils/projects-client.js';
 import * as accountLibraryMeta from './src/utils/account-library-meta.js';
 
@@ -1414,8 +1415,12 @@ export default function App() {
     // Família da biblioteca v4 muda só a forma: pacote criativo e modo
     // narrativo do projeto continuam como estavam.
     const fromPreset = preset?.socialFamily ? null : (preset?.creativePreset || suggestCreativePresetForVisual(resolvedPresetId));
+    let replacedOwnVisuals = 0;
+    let totalCards = 0;
     history.set((d) => {
       if (scope === 'card') return applyVisualPresetToCard(d, index, preset, visualPresets);
+      totalCards = Array.isArray(d.slides) ? d.slides.length : 0;
+      replacedOwnVisuals = countSlidesWithOwnVisuals(d.slides);
       d = transformFormatVisuals(d, items => items.map(item => ({ ...item, visualBrand:null, visualPresetId:null, visualCreativePreset:null })));
       if (isPresentationVisual) {
         return preserveVisualPresetContent(applyPresentationVisualPresetToDoc(d, resolvedPresetId, visualPresets, {
@@ -1442,7 +1447,9 @@ export default function App() {
     });
     // O aviso leva o próprio Desfazer: no celular não há atalho de teclado e a
     // troca vale para o projeto inteiro por padrão.
-    toast(scope === 'card' ? `Padrão aplicado ao card ${index + 1}.` : 'Padrão aplicado a todos os cards.', 'success', 10000, {
+    const allMessage = `Padrão aplicado a todos os ${totalCards > 1 ? `${totalCards} ` : ''}cards.${replacedOwnVisuals
+      ? ` ${replacedOwnVisuals === 1 ? '1 tinha ajuste próprio, que foi substituído.' : `${replacedOwnVisuals} tinham ajustes próprios, que foram substituídos.`}` : ''}`;
+    toast(scope === 'card' ? `Padrão aplicado ao card ${index + 1}.` : allMessage, 'success', 10000, {
       action: { label: 'Desfazer', onClick: () => history.undo() },
     });
     trackEvent('visual_preset_applied', { preset: resolvedPresetId, creativePreset: fromPreset || null });

@@ -22,6 +22,7 @@ import { ProjectStyleKitPanel } from './panels/ProjectStyleKitPanel.jsx';
 import { NarrativaStudioPanels, BTN_CAPS } from './panels/NarrativaStudioPanels.jsx';
 import { CriarRapidoHome, PostGenerateActions } from './panels/CriarRapidoHome.jsx';
 import { QuickAdjustmentsPanel } from './panels/QuickAdjustmentsPanel.jsx';
+import { readStyleScope, writeStyleScope } from '../utils/style-scope-memory.js';
 import { ImportTextModal } from './panels/ImportTextModal.jsx';
 import { TeamSharePanel } from './panels/TeamSharePanel.jsx';
 import { BrandWorkspacePanel } from './panels/BrandWorkspacePanel.jsx';
@@ -354,7 +355,10 @@ function SidebarContent({
   const [selectedSlideIds, setSelectedSlideIds] = React.useState([]);
   const [imageBatchConfirmOpen, setImageBatchConfirmOpen] = React.useState(false);
   const [objectiveTemplateId, setObjectiveTemplateId] = React.useState(null);
-  const [visualScope, setVisualScope] = React.useState('all');
+  // Mesmo alcance dos Ajustes rápidos, lembrado por projeto (FE-02).
+  const [visualScope, setVisualScopeState] = React.useState(() => readStyleScope(activeEntry?.id));
+  const setVisualScope = (scope) => setVisualScopeState(writeStyleScope(activeEntry?.id, scope));
+  React.useEffect(() => { setVisualScopeState(readStyleScope(activeEntry?.id)); }, [activeEntry?.id, tab]);
   const [customPresetName, setCustomPresetName] = React.useState('');
   const [importTextOpen, setImportTextOpen] = React.useState(false);
   const [importTextBusy, setImportTextBusy] = React.useState(false);
