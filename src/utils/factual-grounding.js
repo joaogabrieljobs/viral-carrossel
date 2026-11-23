@@ -431,9 +431,15 @@ const BRIEFING_NOTE = /\b(?:n[ãa]o\s+(?:foi|foram|est[áa]|est[ãa]o|ser[áa]|c
 // tipo "não há entrega fora do bairro" continuam no card.
 const BRIEFING_NOTE_MORE = /\b(?:n[ãa]o\s+h[áa]\s+(?:dados?|informa[çc](?:[ãa]o|[õo]es)|registros?|n[úu]meros?)\s+(?:de|sobre|do|da|dos|das)\b|n[ãa]o\s+(?:foi|foram|est[áa]|est[ãa]o)?\s*documentad[oa]s?\b|^\s*faltam?\s+\p{L}+\s+(?:o|a|os|as)?\s*(?:n[úu]mero|endere[çc]o|contato|telefone|forma\s+de\s+pagamento|dados|informa[çc])|\bfalta(?:m)?\s+(?:o|a|os|as)?\s*(?:n[úu]mero\s+de\s+(?:contato|telefone|whatsapp)|endere[çc]o|forma\s+de\s+pagamento))/iu;
 
+// Auditoria 23/11 (B2): as duas regras acima só entendiam português. Em
+// apresentação em inglês (BLK FROGDAY) saíram no slide do cliente "No portfolio
+// or case studies were shared", "...were not specified", "...not detailed" e
+// "not available in the material provided". "Your data is not shared" fica.
+const BRIEFING_NOTE_EN = /\b(?:(?:was|were)\s+not\s+(?:specified|provided|detailed|shared|included|mentioned|given|stated|documented)\b|(?:is|are)\s+not\s+(?:specified|detailed|mentioned|stated|documented)\b|not\s+(?:specified|provided|detailed|mentioned|stated|available)\s+in\s+the\s+(?:material|brief|briefing)\b|(?:in|from)\s+the\s+(?:material|brief|briefing)\s+(?:provided|supplied|shared)\b)|^\s*no\s+[^.!?]{0,60}\b(?:was|were)\s+(?:shared|provided|given)\b/iu;
+
 export function isBriefingNote(sentence) {
   const text = String(sentence || '');
-  return BRIEFING_NOTE.test(text) || BRIEFING_NOTE_MORE.test(text);
+  return BRIEFING_NOTE.test(text) || BRIEFING_NOTE_MORE.test(text) || BRIEFING_NOTE_EN.test(text);
 }
 
 /** Remove frases inteiras que comentam o briefing. Preserva o resto do texto. */
