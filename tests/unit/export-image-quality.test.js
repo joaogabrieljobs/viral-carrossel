@@ -35,12 +35,34 @@ describe('enquadramento das imagens no PNG', () => {
   });
 });
 
-function environment(styles = {}) {
-  const node = (tag, style = {}) => ({
-    tagName: tag.toUpperCase(), style, children: [], textContent: '',
-    setAttribute: vi.fn(), getAttribute: function (key) { return this[key]; },
-    appendChild(child) { this.children.push(child); child.parentElement = this; },
-  });
+// `imageLoad` simula quando o <img> inserido no clone termina de carregar:
+// 'microtask' (Chromium resolve data:/blob: quase na hora), 'macrotask'
+// (WebKit/Safari do iPhone carrega data: de forma assíncrona) ou 'error'.
+function environment(styles = {}, { imageLoad = 'microtask' } = {}) {
+  const loadable = (item) => {
+    let src; const listeners = { load: [], error: [] };
+    item.complete = false; item.naturalWidth = 0; item.naturalHeight = 0;
+    item.addEventListener = (type, fn) => { listeners[type]?.push(fn); };
+    item.removeEventListener = (type, fn) => { if (listeners[type]) listeners[type] = listeners[type].filter(other => other !== fn); };
+    Object.defineProperty(item, 'src', { enumerable: true, get: () => src, set: (value) => {
+      src = value;
+      const settle = () => {
+        item.complete = true;
+        if (imageLoad !== 'error') { item.naturalWidth = 4000; item.naturalHeight = 2000; }
+        [...listeners[imageLoad === 'error' ? 'error' : 'load']].forEach(fn => fn());
+      };
+      if (imageLoad === 'microtask') queueMicrotask(settle); else setTimeout(settle, 5);
+    } });
+    return item;
+  };
+  const node = (tag, style = {}) => {
+    const item = {
+      tagName: tag.toUpperCase(), style, children: [], textContent: '',
+      setAttribute: vi.fn(), getAttribute: function (key) { return this[key]; },
+      appendChild(child) { this.children.push(child); child.parentElement = this; },
+    };
+    return tag === 'img' ? loadable(item) : item;
+  };
   const source = node('div', styles);
   const root = node('div');
   root.children = [source];
@@ -116,5 +138,50 @@ describe('clone usa pixels originais, sem o resize CSS de html2canvas', () => {
       width: '1000px', height: '500px', top: '375px', left: '0px',
     } });
     expect(doc.createElement.mock.calls.map(([tag]) => tag)).toEqual(['div', 'img']);
+  });
+});
+
+// No Safari do iPhone o PNG saía sem a foto: o <img> com a foto tratada
+// (data: novo) ainda não tinha carregado quando o html2canvas lia
+// naturalWidth, logo depois do onclone. Tamanho 0 = imagem não desenhada.
+describe('clone só é entregue ao html2canvas com as imagens inseridas já carregadas', () => {
+  // Função: o clone altera o estilo do nó, então cada caso recebe o seu.
+  const photoStyles = () => ({
+    backgroundImage: 'url("blob:original")', backgroundSize: 'cover', backgroundPosition: '50% 50%',
+    backgroundRepeat: 'no-repeat', width: '1000px', height: '1000px', position: 'absolute', filter: 'grayscale(1)',
+  });
+  const withFilterCanvas = (doc) => {
+    const canvas = { getContext: () => ({ filter: 'none', drawImage: vi.fn() }), toDataURL: () => 'data:image/png;base64,filtered' };
+    const create = doc.createElement;
+    doc.createElement = tag => tag === 'canvas' ? canvas : create(tag);
+  };
+
+  it('espera a foto tratada carregar quando o navegador carrega data: de forma assíncrona', async () => {
+    const { doc, root, source } = environment(photoStyles(), { imageLoad: 'macrotask' });
+    withFilterCanvas(doc);
+    await vcFixHtml2CanvasBackgroundImages(doc, root);
+    expect(source.children[0]).toMatchObject({ src: 'data:image/png;base64,filtered', complete: true, naturalWidth: 4000 });
+  });
+
+  it('espera a logo escura carregar antes de devolver o clone', async () => {
+    const { doc, root, node } = environment({}, { imageLoad: 'macrotask' });
+    const logo = node('img', { width: '200px', height: '100px', objectFit: 'contain', objectPosition: '50% 50%', position: 'absolute', display: 'block' });
+    logo.src = 'blob:logo-original';
+    logo['data-vc-logo-tone'] = 'dark';
+    const parent = { replaceChild: vi.fn() };
+    logo.parentElement = parent;
+    root.querySelectorAll = () => [logo];
+    const canvas = { getContext: () => ({ drawImage: vi.fn(), fillRect: vi.fn() }), toDataURL: () => 'data:image/png;base64,dark' };
+    const create = doc.createElement;
+    doc.createElement = tag => tag === 'canvas' ? canvas : create(tag);
+    await vcFixHtml2CanvasImages(doc, root);
+    const [wrapper] = parent.replaceChild.mock.calls[0];
+    expect(wrapper.children[0]).toMatchObject({ src: 'data:image/png;base64,dark', complete: true, naturalWidth: 4000 });
+  });
+
+  it('falha com mensagem clara em vez de exportar o card sem a foto', async () => {
+    const { doc, root } = environment(photoStyles(), { imageLoad: 'error' });
+    withFilterCanvas(doc);
+    await expect(vcFixHtml2CanvasBackgroundImages(doc, root)).rejects.toThrow('Não foi possível carregar a imagem para exportar.');
   });
 });

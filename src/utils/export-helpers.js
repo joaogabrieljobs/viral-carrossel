@@ -63,6 +63,27 @@ function positionedExportImage(clonedDoc, src, geometry) {
 }
 
 /**
+ * html2canvas lê `naturalWidth` do <img> logo depois do `onclone` e pula a
+ * imagem se ainda for 0. O WebKit (Safari do iPhone) carrega `data:` de forma
+ * assíncrona, então a foto tratada e a logo escura, que são `data:` novos,
+ * sumiam do PNG. O clone só volta ao html2canvas com o <img> carregado.
+ */
+function exportImageElementReady(image) {
+  if (image.complete && image.naturalWidth) return Promise.resolve(image);
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => finish(new Error('A imagem não carregou a tempo para exportar.')), 15000);
+    const onLoad = () => finish();
+    const onError = () => finish(new Error('Não foi possível carregar a imagem para exportar.'));
+    const finish = (error) => {
+      clearTimeout(timer);
+      image.removeEventListener('load', onLoad); image.removeEventListener('error', onError);
+      if (error) reject(error); else resolve(image);
+    };
+    image.addEventListener('load', onLoad); image.addEventListener('error', onError);
+  });
+}
+
+/**
  * html2canvas 1.4 ignora `filter: brightness(0)` da logo. Desenha a imagem
  * original em resolução nativa e troca apenas o RGB por preto, mantendo cada
  * pixel de alfa. O bitmap original e a árvore do editor não são modificados.
@@ -129,8 +150,10 @@ async function vcFixHtml2CanvasImages(clonedDoc, clonedSlideRoot) {
     stub.style.borderRadius = computed.borderRadius;
     stub.style.pointerEvents = 'none';
     stub.style.overflow = 'hidden';
-    stub.appendChild(positionedExportImage(clonedDoc, renderSrc, geometry));
+    const exported = positionedExportImage(clonedDoc, renderSrc, geometry);
+    stub.appendChild(exported);
     parent.replaceChild(stub, img);
+    await exportImageElementReady(exported);
   }));
 }
 
@@ -163,7 +186,9 @@ async function vcFixHtml2CanvasBackgroundImages(clonedDoc, clonedSlideRoot) {
     node.style.backgroundImage = 'none';
     node.style.overflow = 'hidden';
     node.setAttribute('data-vc-html2canvas-photo', '');
-    node.appendChild(positionedExportImage(clonedDoc, filtered || src, geometry));
+    const exported = positionedExportImage(clonedDoc, filtered || src, geometry);
+    node.appendChild(exported);
+    await exportImageElementReady(exported);
   }));
 }
 
