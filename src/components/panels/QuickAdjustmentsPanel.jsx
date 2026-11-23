@@ -63,7 +63,8 @@ export function QuickAdjustmentsPanel({
   editorFocus = null, toast,
 }) {
   const [stylesExpanded, setStylesExpanded] = useState(false);
-  const [styleScope, setStyleScope] = useState('card');
+  // Trocar de estilo muda o projeto inteiro por padrão; "Este card" é a exceção.
+  const [styleScope, setStyleScope] = useState('all');
   const [toneId, setToneId] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -92,7 +93,8 @@ export function QuickAdjustmentsPanel({
     : null;
   const itemLabel = isPresentation ? 'slide' : 'card';
   const itemHeading = isPresentation ? 'Slide' : 'Card';
-  const selectedPresetId = styleScope === 'all' ? visualPreset : slide.visualPresetId || visualPreset;
+  // Marca o estilo que o card aberto está usando, qualquer que seja o alcance escolhido.
+  const selectedPresetId = slide.visualPresetId || visualPreset;
   const visiblePresets = quickVisiblePresets(presets, stylesExpanded, selectedPresetId);
   const catalogCount = quickVisiblePresets(presets, true).length;
   const hasPhoto = !!(slide.bgImage || slide.bgImageId || slide.bgImageAssetId);
@@ -112,7 +114,7 @@ export function QuickAdjustmentsPanel({
   }, [targetKey]);
 
   useEffect(() => {
-    setStyleScope('card');
+    setStyleScope('all');
     setStylesExpanded(false);
     setToneId('');
   }, [projectId]);
@@ -193,8 +195,8 @@ export function QuickAdjustmentsPanel({
       <section className="vc-quick-adjustments-styles" aria-label="Estilos prontos" data-vc-editor-section="ajustes-estilos">
         <div className="vc-quick-adjustments-section-title"><Palette size={16} aria-hidden="true" /><h3>Estilos prontos</h3></div>
         <div className="vc-quick-adjustments-segment" role="group" aria-label="Onde aplicar o estilo">
-          <button type="button" aria-pressed={styleScope === 'card'} onClick={() => setStyleScope('card')} disabled={disabled}>Este {itemLabel}</button>
           <button type="button" aria-pressed={styleScope === 'all'} onClick={() => setStyleScope('all')} disabled={disabled}>Todos</button>
+          <button type="button" aria-pressed={styleScope === 'card'} onClick={() => setStyleScope('card')} disabled={disabled}>Este {itemLabel}</button>
         </div>
         <div className="vc-quick-adjustments-presets">
           {visiblePresets.map((preset) => {

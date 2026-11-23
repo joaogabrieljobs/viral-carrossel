@@ -38,6 +38,15 @@ describe('Criar rápido: ajustes essenciais', () => {
     expect(html).not.toContain('Viral Trends');
   });
 
+  it('estilo pronto vale para todos por padrão e "Todos" vem antes de "Este card"', () => {
+    const html = renderToStaticMarkup(React.createElement(QuickAdjustmentsPanel, {
+      slide: { id: 'one', title: 'Título' }, activeIdx: 0, cardCount: 3, presets: builtins,
+    }));
+    const group = html.slice(html.indexOf('aria-label="Onde aplicar o estilo"'));
+    const buttons = [...group.slice(0, group.indexOf('</div>')).matchAll(/<button[^>]*aria-pressed="(true|false)"[^>]*>([^<]+)<\/button>/g)].map((m) => [m[2], m[1]]);
+    expect(buttons).toEqual([['Todos', 'true'], ['Este card', 'false']]);
+  });
+
   it('uses slide wording and preserves explicit nonstandard size values', () => {
     const html = renderToStaticMarkup(React.createElement(QuickAdjustmentsPanel, {
       isPresentation: true,

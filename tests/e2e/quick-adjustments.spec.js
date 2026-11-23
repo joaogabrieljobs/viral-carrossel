@@ -113,6 +113,11 @@ test('Criar rápido reúne presets e texto; mantém dois destinos e outros modos
   const original = await savedDoc(page);
   const custom = page.getByRole('button', { name: 'Estilo Meu estilo salvo, salvo por você', exact: true });
   await expect(custom).toBeVisible();
+  // Padrão é "Todos", que vem primeiro; o alcance de um card só é escolha explícita.
+  const scope = page.getByRole('group', { name: 'Onde aplicar o estilo' });
+  expect(await scope.getByRole('button').allTextContents()).toEqual(['Todos', 'Este card']);
+  await expect(scope.getByRole('button', { name: 'Todos', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await scope.getByRole('button', { name: 'Este card', exact: true }).click();
   await custom.click();
   await expect.poll(async () => (await savedDoc(page)).slides[0].visualPresetId).toBe('custom_quick_test');
   await expect(custom).toHaveAttribute('aria-pressed', 'true');

@@ -7,7 +7,7 @@ Implementação de 20/10/2026 sobre `59ef95d`, a partir da revisão do primeiro 
 - Biblioteca vazia até criar ou importar um projeto. Criar uma peça pede cliente/marca e nome do projeto na mesma janela. Uma nova marca não herda referências de outro cliente. Excluir o último projeto mantém a biblioteca vazia.
 - Boas-vindas em três passos. Tour disponível pela Ajuda, sem abrir automaticamente sobre formulários. Texto disponível em todos os modos; “Ajustar texto” leva o foco ao campo.
 - Cabeçalho móvel identifica cliente, projeto e estado de salvamento. “Salvo na conta” exige confirmação remota correspondente ao conteúdo atual e à mesma conta; alterações posteriores ficam pendentes.
-- Escolha explícita entre gerar texto ou texto e imagens, com quantidade de cards. Padrões visuais indicam “Este card” ou “Todos os cards”, com desfazer. Estilos individuais continuam editáveis e não trocam os textos, fotos ou identidade da marca.
+- Escolha explícita entre gerar texto ou texto e imagens, com quantidade de cards. Padrões visuais indicam “Todos os cards” (padrão, primeiro) ou “Este card”, com desfazer. Estilos individuais continuam editáveis e não trocam os textos, fotos ou identidade da marca.
 - Legenda única da publicação, revisável e igual à entregue pelo menu de exportação. Notas por slide continuam separadas nas apresentações.
 - Exportação móvel e desktop com o conjunto completo primeiro, imagem individual identificada, PDF e legenda. Download não marca o projeto como publicado.
 - Aprovação separada do convite para editar: PDF para envio manual, situação da aprovação e registro do retorno. Não há envio automático, portal público ou captura automática de comentários do cliente nesta versão.

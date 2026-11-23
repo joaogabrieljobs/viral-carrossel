@@ -2274,7 +2274,7 @@ function SidebarContent({
           <>
             <S title="Padrão visual" hint={`Paleta, fontes e tipografia de uma vez. Não altera o texto dos ${itemsLabel}.`}>
               <div role="group" aria-label="Aplicar padrão visual em" style={{ display:'flex', gap:6, marginBottom:12 }}>
-                {[['card', `Este ${itemLabel}`], ['all', `Todos os ${itemsLabel}`]].map(([scope, label]) => <button key={scope} type="button" className="vc-btn vc-btn-ghost" aria-pressed={visualScope === scope} onClick={() => setVisualScope(scope)} style={{ flex:1, minHeight:44, borderColor:visualScope === scope ? 'var(--accent)' : undefined }}>{label}</button>)}
+                {[['all', `Todos os ${itemsLabel}`], ['card', `Este ${itemLabel}`]].map(([scope, label]) => <button key={scope} type="button" className="vc-btn vc-btn-ghost" aria-pressed={visualScope === scope} onClick={() => setVisualScope(scope)} style={{ flex:1, minHeight:44, borderColor:visualScope === scope ? 'var(--accent)' : undefined }}>{label}</button>)}
               </div>
               <VisualStylePicker
                 value={visualScope === 'card' ? (slide.visualPresetId || visualPreset) : visualPreset}
