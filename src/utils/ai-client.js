@@ -82,7 +82,7 @@ function enhanceNetworkError(err, label) {
   // Auditoria 23/11 (B5): com status 5xx a resposta chegou; a falha é do
   // serviço, não da conexão de quem usa ("verifique sua internet" era errado).
   if (Number.isInteger(err?.status) && err.status >= 500) {
-    const s = new Error(`${label}: o serviço de IA falhou (HTTP ${err.status}). Nada foi perdido. Tente de novo em alguns segundos.`);
+    const s = new Error(`${label}: o serviço de IA falhou (HTTP ${err.status}). Nada foi perdido. Tente novamente em alguns segundos.`);
     s.status = err.status;
     s.isNetwork = true;
     return s;
