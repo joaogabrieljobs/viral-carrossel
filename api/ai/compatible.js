@@ -1,4 +1,4 @@
-import { consumeTextCredit } from '../lib/text-quota.js';
+import { consumeTextCredit, textDailyLimit } from '../lib/text-quota.js';
 const PROVIDERS = {
   zai: {
     chat: 'https://api.z.ai/api/paas/v4/chat/completions',
@@ -116,16 +116,19 @@ export default async function handler(req, res) {
     payload.max_tokens = Number.isFinite(requested) && requested > 0
       ? Math.min(requested, PLATFORM_MAX_TOKENS)
       : Math.min(4096, PLATFORM_MAX_TOKENS);
-    // Cota diária por conta do texto incluso (MOO-11). Falha do banco não
-    // derruba a geração: o limite por IP continua valendo.
+    // Cota diária por conta do texto incluso (MOO-11), com teto por plano.
+    // Sem contador não há teto: falha do banco recusa antes de chamar o
+    // provedor, como na imagem e no OCR (auditoria Ingrid 23/11, D-3).
     if (process.env.LIBRARY_SYNC_BACKEND === 'postgres') {
+      let quota;
       try {
-        const quota = await consumeTextCredit({ customerId: access.customerId });
-        if (!quota.allowed) {
-          return res.status(429).json({ error: { message: `Você atingiu o limite diário de ${quota.limit} pedidos de texto incluídos no plano. Ele volta à meia-noite, ou use sua própria chave em Configurar IA.` } });
-        }
+        quota = await consumeTextCredit({ customerId: access.customerId, limit: textDailyLimit(access.tier) });
       } catch (error) {
         console.error('[compatible] text_quota_unavailable', error?.message || error);
+        return res.status(503).json({ error: { message: 'Não foi possível conferir seu limite diário de texto agora. Tente novamente em instantes, ou use sua própria chave em Configurar IA.' } });
+      }
+      if (!quota.allowed) {
+        return res.status(429).json({ error: { message: `Você atingiu o limite diário de ${quota.limit} pedidos de texto incluídos no plano. Ele volta à meia-noite, ou use sua própria chave em Configurar IA.` } });
       }
     }
   }

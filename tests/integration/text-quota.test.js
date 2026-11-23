@@ -3,7 +3,7 @@
 import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
-import { createTextQuota } from '../../api/lib/text-quota.js';
+import { createTextQuota, textDailyLimit } from '../../api/lib/text-quota.js';
 
 vi.setConfig({ testTimeout: 30_000 });
 let db; let quota;
@@ -31,5 +31,27 @@ describe('MOO-11 — cota diária de texto por conta', () => {
   it('no dia seguinte (Brasília) a cota volta', async () => {
     const amanha = Date.parse('2026-11-22T00:30:00-03:00');
     expect((await quota.consume({ customerId: 'cus_texto', limit: 3, now: amanha })).allowed).toBe(true);
+  });
+});
+
+// Auditoria Ingrid 23/11 (D-3): 800 pedidos por dia valiam para qualquer plano.
+describe('teto diário de texto por plano', () => {
+  it('padrão 150/400/800/800 e plano desconhecido cai no menor', () => {
+    expect(['essential', 'creator', 'pro', 'max', undefined, 'free'].map((t) => textDailyLimit(t, {})))
+      .toEqual([150, 400, 800, 800, 150, 150]);
+  });
+
+  it('variável por plano ajusta só aquele plano', () => {
+    const env = { TEXT_DAILY_LIMIT_ESSENTIAL: '200', TEXT_DAILY_LIMIT_MAX: 'abc' };
+    expect(textDailyLimit('essential', env)).toBe(200);
+    expect(textDailyLimit('max', env)).toBe(800);
+  });
+
+  it('conta Essencial é recusada no pedido 151', async () => {
+    const now = Date.parse('2026-11-23T10:00:00-03:00');
+    const limit = textDailyLimit('essential', {});
+    let last;
+    for (let i = 0; i < 151; i += 1) last = await quota.consume({ customerId: 'cus_essencial', limit, now });
+    expect(last).toMatchObject({ allowed: false, limit: 150 });
   });
 });

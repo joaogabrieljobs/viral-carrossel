@@ -36,7 +36,7 @@ export function invalidateActiveAccessForCustomer(customerId) {
 }
 
 /**
- * @returns {Promise<null | { customerId?: string, email?: string, billingDisabled?: boolean }>}
+ * @returns {Promise<null | { customerId?: string, email?: string, tier?: string, billingDisabled?: boolean }>}
  *   null se já respondeu 401/402.
  */
 export async function requireActiveSubscription(req, res, opts = {}) {
@@ -81,6 +81,9 @@ export async function requireActiveSubscription(req, res, opts = {}) {
       fail(402, 'Assinatura inativa. Renove o plano para continuar.');
       return null;
     }
+    // Plano vigente para tetos por plano (texto incluso). Sem plano, quem usa
+    // o valor deve tratar como o menor.
+    access = { ...access, tier: entitlement.tier };
   } catch (e) {
     console.error('[requireActiveSubscription]', e?.message || e);
     fail(503, 'Não foi possível verificar a assinatura. Tente de novo.');

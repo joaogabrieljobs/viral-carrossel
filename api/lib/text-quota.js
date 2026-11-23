@@ -1,14 +1,30 @@
 import { getPostgresConnection } from './postgres-connection.js';
 import { ocrQuotaDay } from './ocr-quota.js';
 
-// Cota diária do texto incluso no plano, por conta (MOO-11). Generosa: uma
-// geração completa faz dezenas de pedidos; o objetivo é limitar abuso da
-// chave da plataforma, não o uso normal. Ajustável por TEXT_DAILY_LIMIT.
-export const DEFAULT_TEXT_DAILY_LIMIT = 800;
+// Cota diária do texto incluso no plano, por conta (MOO-11). Uma geração
+// completa faz dezenas de pedidos; o objetivo é limitar abuso da chave da
+// plataforma, não o uso normal. O teto acompanha o plano (auditoria Ingrid
+// 23/11, D-3): 800 por dia valiam até no Essencial. Ajustável por plano com
+// TEXT_DAILY_LIMIT_ESSENTIAL, _CREATOR, _PRO e _MAX.
+export const DEFAULT_TEXT_DAILY_LIMITS = Object.freeze({
+  essential: 150,
+  creator: 400,
+  pro: 800,
+  max: 800,
+});
 
-export function textDailyLimit(env = process.env) {
-  const value = Number(env.TEXT_DAILY_LIMIT);
-  return Number.isSafeInteger(value) && value > 0 ? value : DEFAULT_TEXT_DAILY_LIMIT;
+const TEXT_LIMIT_ENV = Object.freeze({
+  essential: 'TEXT_DAILY_LIMIT_ESSENTIAL',
+  creator: 'TEXT_DAILY_LIMIT_CREATOR',
+  pro: 'TEXT_DAILY_LIMIT_PRO',
+  max: 'TEXT_DAILY_LIMIT_MAX',
+});
+
+/** Plano desconhecido ou ausente recebe o menor teto, nunca o maior. */
+export function textDailyLimit(tier, env = process.env) {
+  const plan = Object.hasOwn(DEFAULT_TEXT_DAILY_LIMITS, tier) ? tier : 'essential';
+  const value = Number(env[TEXT_LIMIT_ENV[plan]]);
+  return Number.isSafeInteger(value) && value > 0 ? value : DEFAULT_TEXT_DAILY_LIMITS[plan];
 }
 
 export function createTextQuota({ sql: injectedSql } = {}) {
