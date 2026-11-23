@@ -164,7 +164,16 @@ function ToastStack({ toasts, onDismiss }) {
             aria-live={isUrgent ? 'assertive' : 'polite'}
           >
             <span style={{ flex:1 }}>{t.message}</span>
-            <button onClick={()=>onDismiss(t.id)} aria-label="Fechar notificação">
+            {t.action ? (
+              <button
+                type="button"
+                className="toast-action"
+                onClick={() => { onDismiss(t.id); t.action.onClick(); }}
+              >
+                {t.action.label}
+              </button>
+            ) : null}
+            <button type="button" onClick={()=>onDismiss(t.id)} aria-label="Fechar notificação">
               <X size={12}/>
             </button>
           </div>

@@ -1155,6 +1155,9 @@ export const GLOBAL_STYLE = `
     border-radius: 8px;
     pointer-events: auto;
   }
+  .toast-item button.toast-action {
+    padding: 10px 14px; font: inherit; font-weight: 600; white-space: nowrap;
+  }
   .toast-item.toast-info button { background: rgba(23,19,30,0.08); }
   .toast-item button:hover { background: rgba(255,255,255,0.24); }
   .toast-item.toast-info button:hover { background: rgba(23,19,30,0.16); }

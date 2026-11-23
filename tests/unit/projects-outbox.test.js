@@ -3,7 +3,8 @@ import { bindAccountDataWriteOwner, SK } from '../../src/utils/storage.js';
 import { originalImageAssetId } from '../../src/utils/cloud-image-assets.js';
 import {
   acknowledgeProjectOp, conflictCopyEntry, conflictCopyId, flushProjectOutbox, getPendingProjectOp,
-  listPendingProjectOps, queueProjectDelete, queueProjectPut,
+  listDeletedProjectEdits, listPendingProjectOps, queueProjectDelete, queueProjectPut,
+  resolveDeletedProjectEdit,
 } from '../../src/utils/projects-outbox.js';
 
 const ALICE = 'email:alice@example.test';
@@ -527,6 +528,79 @@ describe('outbox durável por projeto', () => {
     fetch.mockResolvedValueOnce(session());
     expect((await flushProjectOutbox(ALICE)).needsReview).toHaveLength(1);
     expect(fetch).toHaveBeenCalledTimes(4);
+  });
+
+  // Auditoria 23/11 (DB-02): a edição retida não tinha tela de revisão e
+  // travava Sync, salvamento automático e Sair para sempre naquele navegador.
+  describe('revisão de edição de projeto excluído em outro dispositivo', () => {
+    async function holdDeletedEdit(entry = { id: 'janine', name: 'Clínica', doc: { title: 'Edição do celular' } }) {
+      await queueProjectPut(ALICE, entry, { baseVersion: 2 });
+      fetch.mockResolvedValueOnce(session())
+        .mockResolvedValueOnce(json({ error: 'Excluído', code: 'project_deleted', cloudVersion: 3 }, 409));
+      await flushProjectOutbox(ALICE);
+      return entry;
+    }
+
+    it('lista só as edições retidas por exclusão, com nome e data, sem expor o conteúdo', async () => {
+      await holdDeletedEdit();
+      await queueProjectPut(ALICE, { id: 'outro', name: 'Normal', doc: {} });
+      const reviews = await listDeletedProjectEdits(ALICE);
+      expect(reviews).toHaveLength(1);
+      expect(reviews[0]).toMatchObject({ projectId: 'janine', projectName: 'Clínica', copyName: 'Clínica (cópia de conflito)' });
+      expect(reviews[0].updatedAt).toEqual(expect.any(Number));
+      expect(reviews[0]).not.toHaveProperty('entry');
+    });
+
+    it('descartar remove a operação e a fila volta a ficar vazia, sem falar com a nuvem', async () => {
+      await holdDeletedEdit();
+      const calls = fetch.mock.calls.length;
+      expect(await resolveDeletedProjectEdit(ALICE, 'janine', 'discard')).toEqual({ resolved: true, discarded: true });
+      expect(fetch).toHaveBeenCalledTimes(calls);
+      expect(await listPendingProjectOps(ALICE)).toEqual([]);
+      fetch.mockResolvedValueOnce(session());
+      expect(await flushProjectOutbox(ALICE)).toEqual({ sent: 0, pending: 0 });
+    });
+
+    it('manter grava a edição como projeto novo na conta e só então libera a fila', async () => {
+      const entry = await holdDeletedEdit();
+      fetch.mockResolvedValueOnce(session())
+        .mockResolvedValueOnce(json({ ok: true, project: { id: 'conflict-janine', version: 1 } }));
+      const result = await resolveDeletedProjectEdit(ALICE, 'janine', 'copy');
+      expect(result).toMatchObject({
+        resolved: true,
+        recoveredCopy: { sourceProjectId: 'janine', copyProjectId: 'conflict-janine', copyName: 'Clínica (cópia de conflito)' },
+      });
+      expect(result.copyEntry).toMatchObject({ id: 'conflict-janine', doc: entry.doc, conflictSourceId: 'janine' });
+      const put = fetch.mock.calls.at(-1);
+      expect(put[1].method).toBe('PUT');
+      expect(JSON.parse(put[1].body)).toMatchObject({ baseVersion: 0, entry: { id: 'conflict-janine' } });
+      expect(await listPendingProjectOps(ALICE)).toEqual([]);
+    });
+
+    it('se a nuvem falhar ao gravar a cópia, a edição continua retida para nova tentativa', async () => {
+      await holdDeletedEdit();
+      fetch.mockResolvedValueOnce(session()).mockResolvedValueOnce(json({ error: 'Indisponível' }, 503));
+      await expect(resolveDeletedProjectEdit(ALICE, 'janine', 'copy')).rejects.toBeTruthy();
+      expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({ kind: 'review_put_deleted' });
+      expect(await listDeletedProjectEdits(ALICE)).toHaveLength(1);
+    });
+
+    it('não toca em operação comum nem aceita ação desconhecida', async () => {
+      await queueProjectPut(ALICE, { id: 'normal', doc: {} });
+      expect(await resolveDeletedProjectEdit(ALICE, 'normal', 'discard')).toEqual({ resolved: false });
+      expect(await getPendingProjectOp(ALICE, 'normal')).toMatchObject({ kind: 'put' });
+      await expect(resolveDeletedProjectEdit(ALICE, 'normal', 'apagar-tudo')).rejects.toMatchObject({ code: 'project_bad_review_action' });
+      expect(await resolveDeletedProjectEdit(ALICE, 'inexistente', 'discard')).toEqual({ resolved: false });
+    });
+
+    it('outra conta não lista nem resolve a edição retida', async () => {
+      await holdDeletedEdit();
+      setOwner(BOB);
+      expect(await listDeletedProjectEdits(BOB)).toEqual([]);
+      await expect(resolveDeletedProjectEdit(ALICE, 'janine', 'discard')).rejects.toBeTruthy();
+      setOwner(ALICE);
+      expect(await listDeletedProjectEdits(ALICE)).toHaveLength(1);
+    });
   });
 
   it('servidor antigo com 409 genérico e GET 404 também não cria cópia de projeto excluído', async () => {

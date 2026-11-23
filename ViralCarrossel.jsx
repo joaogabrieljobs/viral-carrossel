@@ -610,6 +610,7 @@ const ModesIntroModal = lazy(() => import('./src/components/ModesIntroModal.jsx'
 const OnboardingTour = lazy(() => import('./src/components/OnboardingTour.jsx'));
 const HelpModal = lazy(() => import('./src/components/HelpModal.jsx'));
 const BrandsModal = lazy(() => import('./src/components/BrandsModal.jsx'));
+const DeletedProjectEditReview = lazy(() => import('./src/components/DeletedProjectEditReview.jsx'));
 const LibraryModal = lazy(() => import('./src/components/LibraryModal.jsx'));
 const ImageCropModal = lazy(() => import('./src/components/ImageCropModal.jsx'));
 const PhotoPositionModal = lazy(() => import('./src/components/PhotoPositionModal.jsx'));
@@ -1439,7 +1440,11 @@ export default function App() {
           };
       return preserveVisualPresetContent(fromPreset ? { ...next, creativePreset: fromPreset } : next, d);
     });
-    toast(scope === 'card' ? `Padrão aplicado ao card ${index + 1}. Use Desfazer para voltar.` : 'Padrão aplicado a todos. Use Desfazer para voltar.', 'success', 4000);
+    // O aviso leva o próprio Desfazer: no celular não há atalho de teclado e a
+    // troca vale para o projeto inteiro por padrão.
+    toast(scope === 'card' ? `Padrão aplicado ao card ${index + 1}.` : 'Padrão aplicado a todos os cards.', 'success', 10000, {
+      action: { label: 'Desfazer', onClick: () => history.undo() },
+    });
     trackEvent('visual_preset_applied', { preset: resolvedPresetId, creativePreset: fromPreset || null });
   }, [history, visualPresets]);
   const setSlideTextDensity = useCallback(next => history.set(d => ({
@@ -2222,7 +2227,10 @@ export default function App() {
         flushed = await outbox.flushProjectOutbox(owner, { onConfirmed });
         const stillPending = await outbox.getPendingProjectOp(owner, entry.id);
         if (stillPending?.kind === 'review_put_deleted') {
-          throw new Error('Este projeto foi excluído em outro dispositivo. Sua edição continua neste navegador e precisa de revisão antes de salvar.');
+          throw Object.assign(
+            new Error('Este projeto foi excluído em outro dispositivo. Sua edição continua guardada neste navegador: escolha entre manter como projeto novo ou descartar.'),
+            { code: 'project_deleted_elsewhere' },
+          );
         }
         if (stillPending?.kind === 'review_put_billing') {
           throw new Error('A assinatura não confirmou este envio. A edição continua neste editor.');
@@ -2320,6 +2328,34 @@ export default function App() {
     return { saved: true };
   }, []);
 
+  // Edições que ficaram só neste navegador porque o projeto foi excluído em
+  // outro dispositivo. A fila as retém; esta lista alimenta a tela de escolha.
+  const [deletedEditReviews, setDeletedEditReviews] = useState([]);
+  const [deletedEditReviewOpen, setDeletedEditReviewOpen] = useState(false);
+  const [deletedEditBusyId, setDeletedEditBusyId] = useState(null);
+  const deletedEditPromptedRef = useRef(new Set());
+  const refreshDeletedEditReviews = useCallback(async ({ open = false } = {}) => {
+    if (!PROJECTS_V2 || accessSessionRef.current?.free) return [];
+    const owner = readDataOwner();
+    if (!owner) return [];
+    try {
+      const reviews = await projectOutbox.listDeletedProjectEdits(owner);
+      if (readDataOwner() !== owner) return [];
+      setDeletedEditReviews(reviews);
+      // Abre sozinha uma vez por edição; depois, só quando a pessoa pede
+      // para salvar, sincronizar ou sair.
+      const unseen = reviews.some((review) => !deletedEditPromptedRef.current.has(review.projectId));
+      if (reviews.length && (open || unseen)) {
+        for (const review of reviews) deletedEditPromptedRef.current.add(review.projectId);
+        setDeletedEditReviewOpen(true);
+      }
+      if (!reviews.length) setDeletedEditReviewOpen(false);
+      return reviews;
+    } catch {
+      return [];
+    }
+  }, []);
+
   const finishCloudSync = useCallback(() => {
     cloudSyncInFlightRef.current = false;
     setCloudSyncBusy(false);
@@ -2372,11 +2408,21 @@ export default function App() {
           throw new Error('Selecione um projeto antes de salvar.');
         }
         const recoveredCopies = new Set();
+        let deletedElsewhere = false;
         for (const entry of entries) {
           // Cada card é salvo com a versão que esta aba observou no último pull.
           // O servidor devolve 409 se outro dispositivo o alterou primeiro.
-          // eslint-disable-next-line no-await-in-loop
-          const result = await persistProjectV2(entry, pending, { owner });
+          let result;
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            result = await persistProjectV2(entry, pending, { owner });
+          } catch (error) {
+            // Um projeto excluído em outro lugar fica retido para a escolha da
+            // pessoa; ele não pode impedir o envio dos demais projetos.
+            if (error?.code !== 'project_deleted_elsewhere' || source === 'salvar') throw error;
+            deletedElsewhere = true;
+            continue;
+          }
           if (result?.recoveredCopy) recoveredCopies.add(result.recoveredCopy);
         }
         await persistAccountMetadataV2(pending, { owner, expectedOwnerId });
@@ -2415,8 +2461,14 @@ export default function App() {
         if (outbox.pending > reviewCount) {
           throw new Error('Há projetos ainda aguardando envio. Sincronize novamente antes de sair da conta.');
         }
-        if (source !== 'salvar' && outbox.needsReview?.some((item) => item.kind === 'put_deleted')) {
-          throw new Error('Uma edição local pertence a um projeto excluído em outro dispositivo. Revise essa edição antes de sincronizar ou sair da conta.');
+        if (deletedElsewhere || outbox.needsReview?.some((item) => item.kind === 'put_deleted')) {
+          // Sync e salvamento automático seguem; a edição retida vira uma
+          // escolha na tela. Só a saída da conta espera a decisão, porque
+          // sair apagaria a única cópia.
+          void refreshDeletedEditReviews({ open: source !== 'auto' });
+          if (source === 'logout') {
+            throw new Error('Há uma edição de projeto excluído em outro dispositivo. Escolha entre manter como projeto novo ou descartar antes de sair da conta.');
+          }
         }
         const continuation = cloudSaveContinuation({
           source, current: pending.isCurrent(), sameOwner: readDataOwner() === owner,
@@ -2528,6 +2580,7 @@ export default function App() {
           ...(newerChanges ? { pendingChanges: true } : {}) };
       } catch (error) {
         setCloudUnsaved(true);
+        if (error?.code === 'project_deleted_elsewhere') void refreshDeletedEditReviews({ open: true });
         if (source !== 'logout') {
           toast(
             cloudSyncFailureMessage(error, { localSaved, cloudSaved }),
@@ -2596,7 +2649,59 @@ export default function App() {
     }
   }, [flushPersistNow, applyCloudLibrarySnapshot, stopCloudAutoPush, toast,
     persistProjectV2, persistAccountMetadataV2, observeCloudProjectsV2, observeCloudMetadataV2,
-    finishCloudSync]);
+    finishCloudSync, refreshDeletedEditReviews]);
+
+  // Abertura da conta: se já havia edição retida de um projeto excluído em
+  // outro dispositivo, a escolha aparece em vez de ficar só num aviso.
+  useEffect(() => {
+    if (accountLibraryReady) void refreshDeletedEditReviews();
+  }, [accountLibraryReady, refreshDeletedEditReviews]);
+
+  const syncProjectLibraryRef = useRef(syncProjectLibrary);
+  syncProjectLibraryRef.current = syncProjectLibrary;
+  const resolveDeletedEditReview = useCallback(async (projectId, action) => {
+    const owner = readDataOwner();
+    if (!owner || !accountLibraryReadyRef.current || areAccountDataWritesLocked()) {
+      toast('Aguarde a sincronização terminar e tente de novo.', 'warning', 5000);
+      return false;
+    }
+    setDeletedEditBusyId(projectId);
+    try {
+      const result = await projectOutbox.resolveDeletedProjectEdit(owner, projectId, action);
+      if (readDataOwner() !== owner) return false;
+      if (!result?.resolved && !result?.recoveredCopy) {
+        toast('Essa edição mudou enquanto você decidia. Confira a lista de novo.', 'warning', 6000);
+        await refreshDeletedEditReviews({ open: true });
+        return false;
+      }
+      // O projeto já não existe na conta: sai da lista deste navegador sem
+      // gerar uma exclusão nova, e antes de qualquer envio para não voltar à fila.
+      if ((libraryPersistRef.current || []).some((entry) => entry?.id === projectId)) {
+        flushSync(() => deleteDocLocal(projectId));
+      }
+      const remaining = await refreshDeletedEditReviews();
+      if (action === 'copy') {
+        toast(`Edição guardada na sua conta como “${result.recoveredCopy?.copyName || 'cópia'}”.`, 'success', 6000);
+        // Traz o projeto novo para a lista deste navegador. Espera a lista
+        // local assentar: sincronizar no mesmo instante da remoção acima é
+        // recusado como "a biblioteca mudou durante a sincronização".
+        if (!remaining.length) {
+          setTimeout(() => {
+            if (readDataOwner() === owner) void syncProjectLibraryRef.current?.('sync');
+          }, 900);
+        }
+      } else {
+        toast('Edição descartada.', 'info', 4000);
+      }
+      return true;
+    } catch (error) {
+      toast(`${error?.message || 'Não foi possível concluir.'} A edição continua guardada neste navegador.`, 'warning', 7000);
+      return false;
+    } finally {
+      setDeletedEditBusyId(null);
+    }
+  }, [deleteDocLocal, refreshDeletedEditReviews, toast]);
+
 
   const salvarProjeto = useCallback(() => syncProjectLibrary('salvar'), [syncProjectLibrary]);
 
@@ -4040,6 +4145,35 @@ export default function App() {
       <Sparkles size={14} color={appMode === 'criador' ? 'var(--accent)' : undefined} />
       {isMobile ? 'Gerar' : (appMode === 'criador' ? 'Assistente IA' : 'Gerar com IA')}
     </button>
+  );
+
+  /* Celular: desfazer/refazer ao lado das miniaturas dos cards (as duas
+     linhas do topo não têm folga a 360 px). Vários avisos mandam "usar
+     Desfazer" e no telefone não existe atalho de teclado. */
+  const mobileHistoryGroup = (
+    <div style={{ display:'flex', alignItems:'center', gap:2, flexShrink:0 }}>
+      {[
+        { label:'Desfazer', run: history.undo, enabled: history.canUndo, path: <><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7L3 9"/></> },
+        { label:'Refazer', run: history.redo, enabled: history.canRedo, path: <><path d="M21 7v6h-6"/><path d="M21 13a9 9 0 1 1-3-7l3 3"/></> },
+      ].map(({ label, run, enabled, path }) => (
+        <button
+          key={label}
+          type="button"
+          onClick={() => run()}
+          disabled={!enabled}
+          title={label}
+          aria-label={label}
+          style={{
+            width: 40, height: 40, borderRadius: 9999, border: '1px solid var(--border)', background: 'var(--bg-card)',
+            color: 'var(--text-muted)', cursor: enabled ? 'pointer' : 'not-allowed',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            opacity: enabled ? 1 : 0.35,
+          }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{path}</svg>
+        </button>
+      ))}
+    </div>
   );
 
   /* Histórico (desfazer/refazer) + formato de exportação. No desktop largo
@@ -8141,9 +8275,10 @@ Retorne APENAS JSON: ${refineAllWantsBody
             transition: 'max-height 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s, padding 0.32s, transform 0.32s, border-color 0.22s',
           }}
           >
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
             <div
               ref={thumbnailStripRef}
-              style={{ display:'flex', alignItems:'center', gap:6, overflowX:'auto', paddingBottom:2, scrollPaddingInline:8 }}
+              style={{ display:'flex', alignItems:'center', gap:6, overflowX:'auto', paddingBottom:2, scrollPaddingInline:8, flex:'1 1 auto', minWidth:0 }}
             >
               {displaySlides.map((s, i) => {
                 const stripThumbFil = slideStoredPresentationCssFilter(s);
@@ -8192,6 +8327,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
               onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--accent)';e.currentTarget.style.color='var(--accent)';}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--border)';e.currentTarget.style.color='var(--text-muted)';}}
               ><Plus size={14}/></button>
+            </div>
+            {isMobile && mobileHistoryGroup}
             </div>
           </div>
 
@@ -9473,6 +9610,18 @@ Retorne APENAS JSON: ${refineAllWantsBody
         style={{ display:'none' }}
         onChange={handleImportFile}
       />
+      {deletedEditReviewOpen && deletedEditReviews.length > 0 && (
+        <Suspense fallback={null}>
+          <DeletedProjectEditReview
+            open
+            reviews={deletedEditReviews}
+            busyId={deletedEditBusyId}
+            onKeep={(projectId) => resolveDeletedEditReview(projectId, 'copy')}
+            onDiscard={(projectId) => resolveDeletedEditReview(projectId, 'discard')}
+            onClose={() => setDeletedEditReviewOpen(false)}
+          />
+        </Suspense>
+      )}
       <BrandsModal
         open={brandsOpen}
         onClose={()=>setBrandsOpen(false)}

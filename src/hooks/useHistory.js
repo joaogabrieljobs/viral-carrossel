@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { lsGet } from '../utils/telemetry.js';
 import { lsSet } from '../utils/storage.js';
+import { createHistoryStore } from '../utils/history-store.js';
 
 // Hook: state que sincroniza com localStorage (debounced) + sync entre abas
 // via evento `storage` (que só dispara em OUTRAS abas — não na que escreveu).
@@ -36,87 +37,34 @@ function usePersistedState(key, initial) {
 
 // Hook: histórico para undo/redo. Mudanças muito próximas no tempo
 // (ex: digitar em um input) são agrupadas em um único snapshot.
-// canUndo e canRedo são booleanos reativos — mudam de valor quando o histórico muda,
-// o que permite que botões de undo/redo reflitam o estado corretamente sem polling.
+// canUndo e canRedo acompanham o histórico e servem direto aos botões.
+// A regra vive em `history-store.js`; o hook só espelha o estado no React.
 function useHistory(initialState, { limit = 100, coalesceMs = 600 } = {}) {
-  const [state, setStateInternal] = React.useState(initialState);
-  const past = React.useRef([]);
-  const future = React.useRef([]);
-  const lastPushAt = React.useRef(0);
-  // Guards contra StrictMode double-invoke: React 18 roda o updater 2× em dev
-  // pra detectar side-effects. Sem isso, push duplica entradas e undo/redo pulam steps.
-  const lastPushedPrev = React.useRef(null);
-  const lastUndoPrev = React.useRef(null);
-  const lastRedoPrev = React.useRef(null);
-  // Versão incremental: muda sempre que o histórico muda → permite derivar canUndo/canRedo reativos
-  const [histVer, setHistVer] = React.useState(0);
-  const bumpHist = React.useCallback(() => setHistVer(v => v + 1), []);
-
-  const push = React.useCallback((updater) => {
-    setStateInternal((prev) => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      if (next === prev) return prev;
-      // Guard StrictMode: se já empurramos exatamente este prev no último ciclo, é re-invoke
-      if (lastPushedPrev.current === prev) return next;
-      lastPushedPrev.current = prev;
-      const now = Date.now();
-      const coalesce = (now - lastPushAt.current) < coalesceMs;
-      lastPushAt.current = now;
-      if (!coalesce) {
-        past.current.push(prev);
-        if (past.current.length > limit) past.current.shift();
-        future.current = [];
-        Promise.resolve().then(bumpHist);
-      } else {
-        future.current = [];
-      }
-      return next;
+  const storeRef = React.useRef(null);
+  if (!storeRef.current) storeRef.current = createHistoryStore(initialState, { limit, coalesceMs });
+  const store = storeRef.current;
+  const snapshot = () => ({ state: store.getState(), canUndo: store.canUndo(), canRedo: store.canRedo() });
+  const [view, setView] = React.useState(snapshot);
+  React.useEffect(() => {
+    const sync = () => setView((current) => {
+      const next = snapshot();
+      return current.state === next.state && current.canUndo === next.canUndo && current.canRedo === next.canRedo
+        ? current : next;
     });
-  }, [limit, coalesceMs, bumpHist]);
+    // Uma gravação feita entre o render e este efeito não pode ficar de fora.
+    sync();
+    return store.subscribe(sync);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store]);
 
+  const set = React.useCallback((updater) => store.set(updater), [store]);
   // setState que NÃO grava no histórico (uso interno)
-  const setSilent = React.useCallback((updater) => {
-    setStateInternal(updater);
-  }, []);
+  const setSilent = React.useCallback((updater) => store.setSilent(updater), [store]);
+  const undo = React.useCallback(() => store.undo(), [store]);
+  const redo = React.useCallback(() => store.redo(), [store]);
+  const reset = React.useCallback((next) => store.reset(next), [store]);
 
-  const undo = React.useCallback(() => {
-    setStateInternal((prev) => {
-      if (lastUndoPrev.current === prev) return prev; // StrictMode guard
-      if (!past.current.length) return prev;
-      lastUndoPrev.current = prev;
-      const previous = past.current.pop();
-      future.current.push(prev);
-      Promise.resolve().then(bumpHist);
-      return previous;
-    });
-  }, [bumpHist]);
-
-  const redo = React.useCallback(() => {
-    setStateInternal((prev) => {
-      if (lastRedoPrev.current === prev) return prev; // StrictMode guard
-      if (!future.current.length) return prev;
-      lastRedoPrev.current = prev;
-      const next = future.current.pop();
-      past.current.push(prev);
-      Promise.resolve().then(bumpHist);
-      return next;
-    });
-  }, [bumpHist]);
-
-  const reset = React.useCallback((next) => {
-    past.current = [];
-    future.current = [];
-    setStateInternal(next);
-    bumpHist();
-  }, [bumpHist]);
-
-  // Valores reativos derivados da versão do histórico
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const canUndo = React.useMemo(() => past.current.length > 0, [histVer]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const canRedo = React.useMemo(() => future.current.length > 0, [histVer]);
-
-  return { state, set: push, setSilent, undo, redo, reset, canUndo, canRedo };
+  return { state: view.state, set, setSilent, undo, redo, reset, canUndo: view.canUndo, canRedo: view.canRedo };
 }
 
 export {

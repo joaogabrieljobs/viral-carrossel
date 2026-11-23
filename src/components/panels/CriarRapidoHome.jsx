@@ -106,7 +106,8 @@ export function CriarRapidoHome({
   const generationPrompt = promptTrim
     || (explicitCardScript ? 'Siga exatamente o roteiro explícito por card do material de apoio.' : '');
   const displayedQuickCardCount = explicitCardScript?.count ?? quickCardCount;
-  const shortBio = String(brand?.bio || '').trim();
+  // Valor cru: aparar aqui devolvia o texto sem o espaço recém-digitado a cada tecla.
+  const bioDraft = String(brand?.bio || '');
   const countPresets = isPresentation ? ['auto', 6, 8, 10, 12, 14, 16] : ['auto', 3, 5, 6, 8, 10];
   const maxCustomCount = isPresentation ? 24 : 24;
   const numericQuickCount = displayedQuickCardCount === 'auto' ? null : Number(displayedQuickCardCount);
@@ -348,7 +349,7 @@ export function CriarRapidoHome({
         <textarea
           className="vc-input vc-textarea"
           rows={3}
-          value={shortBio}
+          value={bioDraft}
           onChange={(e) => {
             const value = e.target.value;
             setBrand?.((current) => ({ ...current, bio: value }));

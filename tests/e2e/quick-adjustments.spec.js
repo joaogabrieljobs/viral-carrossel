@@ -268,3 +268,83 @@ test('logo e foto dos ajustes persistem sem mudar a marca salva nem os textos', 
     return Array.from(ctx.getImageData(0, 0, 1, 1).data);
   })).toEqual([225, 75, 39, 255]);
 });
+
+// Auditoria 23/11 (FE-01): o histórico perdia o passo quando a pessoa
+// desfazia e editava de novo, e desfazer → refazer → desfazer travava.
+test('desfazer volta um passo por vez depois de desfazer e editar de novo', async ({ page }) => {
+  await openQuickProject(page);
+  await openAdjustments(page);
+  const header = page.locator('header');
+  const undo = header.getByRole('button', { name: 'Desfazer', exact: true });
+  const redo = header.getByRole('button', { name: 'Refazer', exact: true });
+  const preset = async () => (await savedDoc(page)).visualPreset ?? null;
+  const original = await preset();
+  await page.getByRole('button', { name: 'Estilo Bold Promo Pink', exact: true }).click();
+  await expect.poll(preset).toBe('bold_promo_rosa');
+  await undo.click();
+  await expect.poll(preset).toBe(original);
+  await page.getByRole('button', { name: 'Estilo Meu estilo salvo, salvo por você', exact: true }).click();
+  await expect.poll(preset).toBe('custom_quick_test');
+  await expect(undo).toBeEnabled();
+  await undo.click();
+  await expect.poll(preset).toBe(original);
+  // O ramo abandonado (Bold Promo) não pode voltar pelo refazer.
+  await redo.click();
+  await expect.poll(preset).toBe('custom_quick_test');
+  await undo.click();
+  await expect.poll(preset).toBe(original);
+  await expect(undo).toBeDisabled();
+});
+
+// Auditoria 23/11 (UX-01): no celular o aviso mandava "usar Desfazer" e não
+// havia botão na tela; a troca de estilo do projeto inteiro ficava sem volta.
+for (const width of [390, 360]) test(`no celular (${width} px), estilo aplicado a todos tem Desfazer no aviso e junto dos cards`, async ({ page }, testInfo) => {
+  await openQuickProject(page, width);
+  await openAdjustments(page, true);
+  const summary = async () => {
+    const doc = await savedDoc(page);
+    return [doc.visualPreset ?? null, doc.slides.map(card => card.visualPresetId ?? null), doc.brand?.bg ?? null];
+  };
+  const before = await summary();
+  await page.getByRole('button', { name: 'Estilo Bold Promo Pink', exact: true }).click();
+  await expect.poll(async () => (await summary())[0]).toBe('bold_promo_rosa');
+  const toastUndo = page.locator('.toast-stack').getByRole('button', { name: 'Desfazer', exact: true });
+  await expect(toastUndo).toBeVisible();
+  await expect(toastUndo).toBeInViewport();
+  await page.screenshot({ path: testInfo.outputPath(`estilo-todos-aviso-desfazer-${width}.png`) });
+  await toastUndo.click();
+  await expect.poll(summary).toEqual(before);
+  await expect(toastUndo).toHaveCount(0);
+  // Depois que o aviso some, a faixa de cards do celular continua oferecendo a volta.
+  await page.getByRole('button', { name: 'Estilo Bold Promo Pink', exact: true }).click();
+  await expect.poll(async () => (await summary())[0]).toBe('bold_promo_rosa');
+  await page.getByRole('button', { name: 'Fechar editor', exact: true }).click();
+  const strip = page.locator('[data-vc-tour="thumbnails"]');
+  const headerUndo = strip.getByRole('button', { name: 'Desfazer', exact: true });
+  await expect(headerUndo).toBeVisible();
+  await expect(headerUndo).toBeInViewport();
+  await expect(strip.getByRole('button', { name: 'Refazer', exact: true })).toBeInViewport();
+  // As duas linhas do topo continuam inteiras: os quatro formatos e as ações.
+  for (const name of ['Feed 4:5', 'Quadrado', 'Stories', 'Apresentação 16:9', 'Abrir biblioteca', 'Configurar IA']) {
+    await expect(page.locator('header').getByRole('button', { name, exact: true })).toBeInViewport({ ratio: 1 });
+  }
+  await page.screenshot({ path: testInfo.outputPath(`topo-celular-desfazer-${width}.png`) });
+  await headerUndo.click();
+  await expect.poll(summary).toEqual(before);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)).toBe(false);
+});
+
+// Auditoria 23/11 (GB-01): o campo devolvia o valor aparado a cada tecla e
+// "Sou designer de marcas" virava "Soudesignerdemarcas".
+test('"Conte sobre sua marca" mantém espaços e quebras de linha ao digitar', async ({ page }) => {
+  await openQuickProject(page);
+  const bio = page.getByPlaceholder(/O que você faz\?/);
+  if (!await bio.isVisible()) await page.getByRole('button', { name: 'Editar', exact: true }).first().click();
+  await bio.click();
+  await bio.pressSequentially('Sou designer de marcas');
+  await expect(bio).toHaveValue('Sou designer de marcas');
+  await bio.press('Enter');
+  await bio.pressSequentially('Atendo cafés, padarias e bares');
+  await expect(bio).toHaveValue('Sou designer de marcas\nAtendo cafés, padarias e bares');
+  await expect.poll(async () => (await savedDoc(page)).brand?.bio).toBe('Sou designer de marcas\nAtendo cafés, padarias e bares');
+});

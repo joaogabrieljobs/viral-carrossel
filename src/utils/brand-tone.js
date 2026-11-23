@@ -180,6 +180,15 @@ function isLegacyGeneratedMethod(method) {
   return /voz e narrativa próprias|não use fórmulas de outros modos|arco narrativo preferido|slide 1 · hook/i.test(method);
 }
 
+/** Texto do campo "Traços (separados por vírgula)" → lista guardada. */
+export function parseBrandToneTraitsInput(raw) {
+  return String(raw || '')
+    .split(/[,;\n]/)
+    .map((item) => asString(item, 80))
+    .filter(Boolean)
+    .slice(0, TRAIT_MAX);
+}
+
 /** Normaliza o objeto persistido em `brand.brandTone`. */
 export function normalizeBrandTone(raw) {
   if (!raw || typeof raw !== 'object') return null;

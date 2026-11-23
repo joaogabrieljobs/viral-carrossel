@@ -63,6 +63,11 @@ async function mockV2(page, cloud, session = SESSAO_ATIVA) {
           cloud.putStarted = true;
           await gate;
         }
+        if (request.method() === 'PUT' && cloud.tombstones?.has(id)) {
+          return route.fulfill({ status: 409, json: {
+            error: 'Este projeto foi excluído.', code: 'project_deleted', cloudVersion: cloud.tombstones.get(id),
+          } });
+        }
         const previous = cloud.rows.get(id);
         if (body.baseVersion !== (previous?.version || 0)) {
           return route.fulfill({ status: 409, json: { error: 'Projeto mudou.', code: 'project_conflict', cloudVersion: previous?.version || 0 } });
@@ -442,4 +447,94 @@ test('boot V2 com leitura pendurada mostra retry sem apagar a cópia local', asy
   await expect(page.getByRole('button', { name: 'Tentar novamente' })).toBeVisible();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vc_library') || '[]')[0]?.name))
     .toBe('Projeto local protegido');
+});
+
+// Auditoria 23/11 (DB-02): a edição de um projeto excluído em outro
+// dispositivo ficava retida "para revisão" sem tela de revisão; Sync,
+// salvamento automático e Sair falhavam para sempre naquele navegador.
+async function holdEditOfProjectDeletedElsewhere(page, cloud, name, testInfo) {
+  await page.goto('/?app=1');
+  await openProjectLibrary(page);
+  await expect(page.getByRole('button', { name:'Abrir Projeto A', exact:true }).first()).toBeVisible();
+  await createTextProject(page, { name });
+  await page.getByRole('button', { name: 'Salvar projeto agora' }).click();
+  await expect.poll(() => cloud.puts.filter((item) => item.id !== 'p-a').length).toBe(1);
+  const id = cloud.puts.find((item) => item.id !== 'p-a').id;
+  // Outro dispositivo exclui o projeto enquanto este navegador segue editando.
+  cloud.tombstones = new Map([[id, cloud.rows.get(id).version + 1]]);
+  cloud.rows.delete(id);
+  cloud.deletes.push(id);
+  const title = page.locator('main h1[data-vc-inline-editable="true"]').first();
+  await expect(title).toBeVisible();
+  // O duplo clique leva ao campo de texto do painel, já focado no título.
+  await title.dblclick();
+  const field = page.locator('textarea:focus');
+  await expect(field).toHaveValue(`Conteúdo de ${name}`);
+  await field.fill('Edição que só existe neste navegador');
+  await expect(title).toHaveText('Edição que só existe neste navegador');
+  const dialog = page.getByRole('dialog', { name: 'Edição de um projeto excluído' });
+  const save = page.getByRole('button', { name: 'Salvar projeto agora' });
+  await expect(async () => {
+    // O salvamento automático pode chegar antes do clique e abrir a escolha sozinho.
+    if (!await dialog.isVisible()) await save.click({ timeout: 1_000 });
+    await expect(dialog).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
+  await expect(dialog.getByText(name, { exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('revisao-edicao-retida.png') });
+  return { id, dialog };
+}
+
+test('edição de projeto excluído em outro dispositivo: manter grava como projeto novo e a fila segue', async ({ page }, testInfo) => {
+  const cloud = accountSeed();
+  await mockV2(page, cloud);
+  const { id, dialog } = await holdEditOfProjectDeletedElsewhere(page, cloud, 'Projeto retido', testInfo);
+  await dialog.getByRole('button', { name: 'Manter como projeto novo', exact: true }).click();
+  await expect.poll(() => cloud.rows.has(`conflict-${id}`)).toBe(true);
+  await expect(dialog).toHaveCount(0);
+  // O id original não é recriado; a edição local está na cópia.
+  expect(cloud.rows.has(id)).toBe(false);
+  expect(JSON.stringify(cloud.rows.get(`conflict-${id}`).entry)).toContain('Edição que só existe neste navegador');
+  await home(page);
+  // A lista se atualiza sozinha logo depois da escolha.
+  await expect(page.getByRole('button', { name:'Abrir Projeto retido (cópia de conflito)', exact:true }).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('button', { name:'Abrir Projeto retido', exact:true })).toHaveCount(0);
+  // Depois da escolha, recarregar não traz aviso de revisão nem o projeto excluído.
+  await page.reload();
+  await home(page);
+  await expect(page.getByRole('button', { name:'Abrir Projeto retido (cópia de conflito)', exact:true }).first()).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Edição de um projeto excluído' })).toHaveCount(0);
+});
+
+test('edição de projeto excluído em outro dispositivo: reaparece ao recarregar, descartar libera Sync e novos envios', async ({ page }, testInfo) => {
+  const cloud = accountSeed();
+  await mockV2(page, cloud);
+  const { id, dialog } = await holdEditOfProjectDeletedElsewhere(page, cloud, 'Projeto sem volta', testInfo);
+  await dialog.getByRole('button', { name: 'Decidir depois', exact: true }).last().click();
+  await expect(dialog).toHaveCount(0);
+  // Recarregar: o projeto sai da lista (não existe na conta), mas a edição
+  // retida volta a pedir decisão em vez de sumir sem controle.
+  await page.reload();
+  const afterReload = page.getByRole('dialog', { name: 'Edição de um projeto excluído' });
+  await expect(afterReload).toBeVisible({ timeout: 20_000 });
+  await afterReload.getByRole('button', { name: 'Descartar edição', exact: true }).click();
+  await expect(afterReload.getByText('Esta é a única cópia dessa edição. Descartar não pode ser desfeito.')).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('revisao-descartar-1280.png') });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: testInfo.outputPath('revisao-descartar-390.png') });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await afterReload.getByRole('button', { name: 'Descartar de vez', exact: true }).click();
+  await expect(afterReload).toHaveCount(0);
+  expect(cloud.rows.has(id)).toBe(false);
+  expect(cloud.rows.has(`conflict-${id}`)).toBe(false);
+  // Fila livre: Sync conclui e um projeto novo sobe normalmente.
+  await home(page);
+  await page.getByRole('button', { name: 'Atualizar da conta', exact: true }).click();
+  await expect(page.getByText(/Lista sincronizada · 1 projeto/)).toBeVisible();
+  await expect(page.getByRole('button', { name:'Abrir Projeto sem volta', exact:true })).toHaveCount(0);
+  const before = cloud.puts.length;
+  await createTextProject(page, { name:'Projeto depois da fila' });
+  await page.getByRole('button', { name: 'Salvar projeto agora' }).click();
+  await expect.poll(() => cloud.puts.length).toBeGreaterThan(before);
+  await expect(page.getByRole('dialog', { name: 'Edição de um projeto excluído' })).toHaveCount(0);
 });

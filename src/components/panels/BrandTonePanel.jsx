@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown, FileImage, Fingerprint, Link2, Loader2, Sparkles, Trash2, X } from 'lucide-react';
-import { brandToneIsReady, normalizeBrandTone, buildBrandToneMethod } from '../../utils/brand-tone.js';
+import { brandToneIsReady, normalizeBrandTone, buildBrandToneMethod, parseBrandToneTraitsInput } from '../../utils/brand-tone.js';
 import {
   collectSocialToneEvidence,
   normalizeSocialUrls,
@@ -34,6 +34,9 @@ export function BrandTonePanel({
   const [openEdit, setOpenEdit] = useState(false);
   const [draft, setDraft] = useState(null);
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  // Texto como a pessoa digita. O tom guardado é normalizado (apara espaços,
+  // separa traços); usá-lo como valor do campo comia espaço, vírgula e Enter.
+  const [editFields, setEditFields] = useState(null);
   const [collectingSources, setCollectingSources] = useState(false);
   const [sourceFeedback, setSourceFeedback] = useState('');
   const [socialLinks, setSocialLinks] = useState(() => (
@@ -177,6 +180,31 @@ export function BrandTonePanel({
       useBrandVoice: current?.useBrandVoice !== false,
       ...(partial.summary != null ? { defaultTone: partial.summary } : {}),
     }));
+  };
+
+  const toneEditFields = (value) => ({
+    summary: value?.summary || '',
+    traits: (value?.traits || []).join(', '),
+    do: value?.do || '',
+    dont: value?.dont || '',
+    ctaStyle: value?.ctaStyle || '',
+  });
+  const brandKey = brand?.id || '';
+  useEffect(() => {
+    setEditFields(openEdit ? toneEditFields(normalizeBrandTone(brand?.brandTone)) : null);
+    // Só ao abrir o formulário ou trocar de marca/projeto: durante a digitação
+    // o campo segue o rascunho, não o valor normalizado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openEdit, brandKey, projectId]);
+  const fields = editFields || toneEditFields(tone);
+  const editTone = (field, raw) => {
+    setEditFields((current) => ({ ...(current || toneEditFields(tone)), [field]: raw }));
+    patchTone({ [field]: field === 'traits' ? parseBrandToneTraitsInput(raw) : raw });
+  };
+  // Ao sair do campo, mostra o que ficou guardado de fato.
+  const settleToneField = (field) => {
+    const saved = toneEditFields(normalizeBrandTone(brand?.brandTone));
+    setEditFields((current) => (current ? { ...current, [field]: saved[field] } : current));
   };
 
   const clearTone = () => {
@@ -546,23 +574,23 @@ export function BrandTonePanel({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div>
             <label className="vc-label-sm">Resumo do tom</label>
-            <input className="vc-input" value={tone.summary || ''} onChange={(e) => patchTone({ summary: e.target.value })} placeholder="Ex.: direto, editorial, sem motivacional" />
+            <input className="vc-input" aria-label="Resumo do tom" value={fields.summary} onChange={(e) => editTone('summary', e.target.value)} onBlur={() => settleToneField('summary')} placeholder="Ex.: direto, editorial, sem motivacional" />
           </div>
           <div>
             <label className="vc-label-sm">Traços (separados por vírgula)</label>
-            <input className="vc-input" value={(tone.traits || []).join(', ')} onChange={(e) => patchTone({ traits: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} />
+            <input className="vc-input" aria-label="Traços do tom, separados por vírgula" value={fields.traits} onChange={(e) => editTone('traits', e.target.value)} onBlur={() => settleToneField('traits')} />
           </div>
           <div>
             <label className="vc-label-sm">Fazer</label>
-            <textarea className="vc-input vc-textarea" rows={3} value={tone.do || ''} onChange={(e) => patchTone({ do: e.target.value })} style={{ resize: 'vertical', minHeight: 64 }} />
+            <textarea className="vc-input vc-textarea" rows={3} aria-label="O que fazer no tom" value={fields.do} onChange={(e) => editTone('do', e.target.value)} onBlur={() => settleToneField('do')} style={{ resize: 'vertical', minHeight: 64 }} />
           </div>
           <div>
             <label className="vc-label-sm">Evitar</label>
-            <textarea className="vc-input vc-textarea" rows={3} value={tone.dont || ''} onChange={(e) => patchTone({ dont: e.target.value })} style={{ resize: 'vertical', minHeight: 64 }} />
+            <textarea className="vc-input vc-textarea" rows={3} aria-label="O que evitar no tom" value={fields.dont} onChange={(e) => editTone('dont', e.target.value)} onBlur={() => settleToneField('dont')} style={{ resize: 'vertical', minHeight: 64 }} />
           </div>
           <div>
             <label className="vc-label-sm">Estilo de CTA</label>
-            <textarea className="vc-input vc-textarea" rows={3} value={tone.ctaStyle || ''} onChange={(e) => patchTone({ ctaStyle: e.target.value })} placeholder="Ex.: convite direto, pergunta curta, salvar pela utilidade — sem urgência artificial." style={{ resize: 'vertical', minHeight: 64 }} />
+            <textarea className="vc-input vc-textarea" rows={3} aria-label="Estilo de CTA" value={fields.ctaStyle} onChange={(e) => editTone('ctaStyle', e.target.value)} onBlur={() => settleToneField('ctaStyle')} placeholder="Ex.: convite direto, pergunta curta, salvar pela utilidade — sem urgência artificial." style={{ resize: 'vertical', minHeight: 64 }} />
           </div>
         </div>
       ) : null}

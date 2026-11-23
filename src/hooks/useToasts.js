@@ -15,9 +15,13 @@ export function useToasts() {
   // é avaliado no momento do useCallback, e const é TDZ até a linha rodar.
   const [toasts, setToasts] = useState([]);
   const dismissToast = useCallback((id) => setToasts(t => t.filter(x => x.id !== id)), []);
-  const toast = useCallback((message, kind='info', ttl=null) => {
+  // `options.action` ({ label, onClick }) põe um botão no próprio aviso: quem
+  // lê "dá para desfazer" precisa do controle ali, inclusive no celular.
+  const toast = useCallback((message, kind='info', ttl=null, options=null) => {
     const id = uid();
-    setToasts(t => [...t, { id, message, kind }]);
+    const action = options?.action?.label && typeof options.action.onClick === 'function'
+      ? { label: String(options.action.label), onClick: options.action.onClick } : null;
+    setToasts(t => [...t, { id, message, kind, ...(action ? { action } : {}) }]);
     const effectiveTtl = toastTtl(kind, ttl);
     if (effectiveTtl > 0) setTimeout(() => dismissToast(id), effectiveTtl);
     return id;

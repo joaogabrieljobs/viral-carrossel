@@ -686,18 +686,17 @@ async function flushProjectOutboxSerial(ownerId, { signal, maxOperations = 100, 
   };
 }
 
-/** Boot, autosave e Salvar não podem transmitir a mesma fila em paralelo. */
-export function flushProjectOutbox(ownerId, options = {}) {
+/** Boot, autosave, Salvar e a revisão não podem mexer na mesma fila em paralelo. */
+function runOutboxExclusive(ownerId, signal, run) {
   const previous = flushFlights.get(ownerId) || Promise.resolve();
   const task = previous.catch(() => {}).then(async () => {
     assertActiveOwner(ownerId);
-    if (options.signal?.aborted) throw outboxError('Sincronização cancelada.', 'project_sync_aborted');
-    const run = () => flushProjectOutboxSerial(ownerId, options);
+    if (signal?.aborted) throw outboxError('Sincronização cancelada.', 'project_sync_aborted');
     // Web Locks também coordena abas. O encadeamento acima atende browsers
     // sem essa API e conserva cancelamento independente de cada chamador.
     if (typeof navigator !== 'undefined' && navigator.locks?.request) {
       return navigator.locks.request(`moont-project-outbox:${ownerId}`, {
-        mode: 'exclusive', ...(options.signal ? { signal: options.signal } : {}),
+        mode: 'exclusive', ...(signal ? { signal } : {}),
       }, run);
     }
     return run();
@@ -705,5 +704,74 @@ export function flushProjectOutbox(ownerId, options = {}) {
   flushFlights.set(ownerId, task);
   return task.finally(() => {
     if (flushFlights.get(ownerId) === task) flushFlights.delete(ownerId);
+  });
+}
+
+export function flushProjectOutbox(ownerId, options = {}) {
+  return runOutboxExclusive(ownerId, options.signal, () => flushProjectOutboxSerial(ownerId, options));
+}
+
+/**
+ * Edições locais de projetos excluídos em outro dispositivo, para a tela de
+ * revisão. Não devolve o conteúdo: só o necessário para a pessoa decidir.
+ */
+export async function listDeletedProjectEdits(ownerId) {
+  const operations = await listPendingProjectOps(ownerId);
+  return operations.filter((op) => op.kind === 'review_put_deleted' && op.entry).map((op) => ({
+    projectId: op.projectId,
+    projectName: String(op.projectName || op.entry?.name || '').slice(0, 160),
+    copyName: conflictCopyEntry(op).name,
+    updatedAt: op.updatedAt || op.createdAt || 0,
+  }));
+}
+
+/**
+ * Escolha explícita da pessoa sobre uma edição retida:
+ *  - `copy`: grava a edição na conta como projeto novo e só então libera a fila;
+ *  - `discard`: apaga a edição retida (é a única cópia; a tela confirma antes).
+ * O projeto excluído nunca é recriado com o id original.
+ */
+export async function resolveDeletedProjectEdit(ownerId, projectId, action, { signal } = {}) {
+  assertActiveOwner(ownerId);
+  assertId(projectId);
+  if (action !== 'copy' && action !== 'discard') {
+    throw outboxError('Escolha manter como projeto novo ou descartar a edição.', 'project_bad_review_action');
+  }
+  const removeIfSame = (op) => transaction('readwrite', (store, setResult, fail) => {
+    const key = operationKey(ownerId, projectId);
+    const read = store.get(key);
+    read.onsuccess = () => {
+      try {
+        assertActiveOwner(ownerId);
+        // Uma edição mais nova que chegou durante a escolha continua retida.
+        if (read.result?.opId === op.opId && read.result.kind === 'review_put_deleted') {
+          store.delete(key);
+          setResult(true);
+        } else {
+          setResult(false);
+        }
+      } catch (error) { fail(error); }
+    };
+  });
+  return runOutboxExclusive(ownerId, signal, async () => {
+    const op = await getPendingProjectOp(ownerId, projectId);
+    if (!op || op.kind !== 'review_put_deleted' || !op.entry) return { resolved: false };
+    if (action === 'discard') {
+      return (await removeIfSame(op)) ? { resolved: true, discarded: true } : { resolved: false };
+    }
+    const expectedOwnerId = await verifyProjectOutboxOwner(ownerId, { signal });
+    if (op.assets?.length) {
+      const uploaded = await uploadAssetsBestEffort(new Map(op.assets), {
+        owner: ownerId, signal, assertCurrent: () => assertActiveOwner(ownerId),
+      });
+      if (uploaded.failed) {
+        throw outboxError('As imagens da edição ainda não foram enviadas. Tente de novo em instantes.', 'project_asset_upload_failed');
+      }
+      assertActiveOwner(ownerId);
+    }
+    const recoveredCopy = await recoverPutAsCopy(op, { signal, expectedOwnerId });
+    assertActiveOwner(ownerId);
+    const copyEntry = conflictCopyEntry(op);
+    return { resolved: await removeIfSame(op), recoveredCopy, copyEntry };
   });
 }
