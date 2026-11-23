@@ -1,14 +1,14 @@
 // Gerado por scripts/build-style-thumbnails.mjs. Não editar à mão.
 // Capa de cada estilo desenhada pelo renderer real (SlideCardInner).
 export const STYLE_THUMBNAILS = Object.freeze({
-  "authority_black": "/style-thumbs/authority_black.jpg?v=be9a980d51",
-  "bold_promo_rosa": "/style-thumbs/bold_promo_rosa.jpg?v=0308801031",
-  "case_study_neon": "/style-thumbs/case_study_neon.jpg?v=991e81a4b2",
-  "cinematic_hybrid": "/style-thumbs/cinematic_hybrid.jpg?v=33beb71d1d",
-  "editorial_magazine": "/style-thumbs/editorial_magazine.jpg?v=75c16ae176",
-  "luxury_hybrid": "/style-thumbs/luxury_hybrid.jpg?v=a26c556881",
-  "minimal_clean": "/style-thumbs/minimal_clean.jpg?v=6f2d246006",
-  "mood_sepia": "/style-thumbs/mood_sepia.jpg?v=30db142d7a",
+  "authority_black": "/style-thumbs/authority_black.jpg?v=0ba9f1db23",
+  "bold_promo_rosa": "/style-thumbs/bold_promo_rosa.jpg?v=c788e9f960",
+  "case_study_neon": "/style-thumbs/case_study_neon.jpg?v=3219ed5ff6",
+  "cinematic_hybrid": "/style-thumbs/cinematic_hybrid.jpg?v=64fb8b5a41",
+  "editorial_magazine": "/style-thumbs/editorial_magazine.jpg?v=be15450bd2",
+  "luxury_hybrid": "/style-thumbs/luxury_hybrid.jpg?v=ff75a3e643",
+  "minimal_clean": "/style-thumbs/minimal_clean.jpg?v=be227ee819",
+  "mood_sepia": "/style-thumbs/mood_sepia.jpg?v=3f999b8d68",
   "presentation_cinematic": "/style-thumbs/presentation_cinematic.jpg?v=6be21412b8",
   "presentation_data_first": "/style-thumbs/presentation_data_first.jpg?v=49308e3ce4",
   "presentation_editorial_magazine": "/style-thumbs/presentation_editorial_magazine.jpg?v=976b96e7c6",
@@ -19,7 +19,7 @@ export const STYLE_THUMBNAILS = Object.freeze({
   "presentation_swiss_grid": "/style-thumbs/presentation_swiss_grid.jpg?v=eae54cc48e",
   "presentation_technical_blueprint": "/style-thumbs/presentation_technical_blueprint.jpg?v=e7c7593404",
   "presentation_typographic_bold": "/style-thumbs/presentation_typographic_bold.jpg?v=2c47337c33",
-  "reflexivo_cream": "/style-thumbs/reflexivo_cream.jpg?v=73e61e494e",
+  "reflexivo_cream": "/style-thumbs/reflexivo_cream.jpg?v=ea98c315bf",
   "social_cinema": "/style-thumbs/social_cinema.jpg?v=2fa4ac23d9",
   "social_documental": "/style-thumbs/social_documental.jpg?v=c878110773",
   "social_ficha": "/style-thumbs/social_ficha.jpg?v=6b68d2ffb4",
@@ -29,7 +29,7 @@ export const STYLE_THUMBNAILS = Object.freeze({
   "social_poster": "/style-thumbs/social_poster.jpg?v=2f8f8a0734",
   "social_produto": "/style-thumbs/social_produto.jpg?v=b861f1d241",
   "social_revista": "/style-thumbs/social_revista.jpg?v=a855abf48c",
-  "sports_editorial": "/style-thumbs/sports_editorial.jpg?v=fe6e1dc9a1",
-  "tabloid_keywords": "/style-thumbs/tabloid_keywords.jpg?v=476c80e047",
-  "viral_hype_dark": "/style-thumbs/viral_hype_dark.jpg?v=8dd5842459"
+  "sports_editorial": "/style-thumbs/sports_editorial.jpg?v=73576dbde7",
+  "tabloid_keywords": "/style-thumbs/tabloid_keywords.jpg?v=6e028869d0",
+  "viral_hype_dark": "/style-thumbs/viral_hype_dark.jpg?v=10a796adb6"
 });

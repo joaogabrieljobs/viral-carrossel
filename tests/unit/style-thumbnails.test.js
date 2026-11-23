@@ -7,7 +7,7 @@ import { STYLE_THUMBNAILS } from '../../src/styles/style-thumbnails.generated.js
 import { VISUAL_PRESETS, renderPresetPreview } from '../../src/styles/visual-presets.jsx';
 import { PRESENTATION_VISUAL_PRESETS, renderPresentationPresetPreview } from '../../src/styles/presentation-presets.jsx';
 import { SOCIAL_FAMILY_KEYS } from '../../src/utils/social-families.js';
-import { SOCIAL_FAMILY_COVER_PHOTO } from '../../scripts/style-thumbnail-photos.mjs';
+import { SOCIAL_FAMILY_COVER_PHOTO, VIRAL_PRESET_COVER_PHOTO } from '../../scripts/style-thumbnail-photos.mjs';
 
 const root = path.resolve(__dirname, '../..');
 const visible = [...VISUAL_PRESETS, ...PRESENTATION_VISUAL_PRESETS].filter((p) => !p.hidden && !p.isCustom);
@@ -42,6 +42,23 @@ describe('miniaturas dos estilos', () => {
     const photos = Object.values(SOCIAL_FAMILY_COVER_PHOTO);
     expect(new Set(photos).size).toBe(photos.length);
     for (const name of photos) expect(name).toMatch(/^[a-z]+-\d+$/);
+  });
+
+  it('cada estilo viral tem a própria foto de exemplo, sem repetir as das famílias', () => {
+    const viral = VISUAL_PRESETS.filter((p) => !p.hidden && !p.isCustom && !p.socialFamily && p.productKind !== 'apresentacao').map((p) => p.id);
+    expect(viral.length).toBe(12);
+    expect(Object.keys(VIRAL_PRESET_COVER_PHOTO).sort()).toEqual([...viral].sort());
+    const photos = [...Object.values(VIRAL_PRESET_COVER_PHOTO), ...Object.values(SOCIAL_FAMILY_COVER_PHOTO)];
+    expect(new Set(photos).size).toBe(photos.length);
+    for (const name of Object.values(VIRAL_PRESET_COVER_PHOTO)) expect(name).toMatch(/^[a-z]+-\d+$/);
+  });
+
+  it('o gerador fotografa a capa com foto também nos estilos virais', () => {
+    const script = fs.readFileSync(path.join(root, 'scripts/build-style-thumbnails.mjs'), 'utf8');
+    expect(script).toContain('VIRAL_PRESET_COVER_PHOTO');
+    expect(script).toContain('VIRAL_PHOTO[preset.id]');
+    // A capa (card 1) vale para todos; o card sem foto deixou de ser a miniatura dos virais.
+    expect(script).not.toContain('const own=composed.findIndex');
   });
 
   it('o gerador usa a foto da família na capa', () => {
