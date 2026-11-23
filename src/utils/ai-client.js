@@ -34,7 +34,16 @@ async function fetchText(url, options) {
     throwIfGenerationCancelled(parent);
     const response = await fetch(url, { ...options, signal: controller.signal });
     // Mantém cancelamento e timeout ativos até terminar de ler o corpo.
-    const raw = await response.text();
+    let raw;
+    try { raw = await response.text(); }
+    catch (error) {
+      // Auditoria 23/11 (B5): o servidor já respondeu (ex.: 503) e o corpo
+      // caiu no meio. Leva o status, para a mensagem não culpar a internet.
+      if (error && typeof error === 'object' && !Number.isInteger(error.status)) {
+        try { error.status = response.status; } catch { /* erro congelado */ }
+      }
+      throw error;
+    }
     return { ok: response.ok, status: response.status, headers: response.headers, text: async () => raw };
   }
   finally { clearTimeout(timer); parent?.removeEventListener('abort', cancel); }
@@ -70,7 +79,15 @@ function enhanceNetworkError(err, label) {
     t.isNetwork = true;
     return t;
   }
-  if (!/failed to fetch|networkerror|load failed|network request failed/i.test(m)) {
+  // Auditoria 23/11 (B5): com status 5xx a resposta chegou; a falha é do
+  // serviço, não da conexão de quem usa ("verifique sua internet" era errado).
+  if (Number.isInteger(err?.status) && err.status >= 500) {
+    const s = new Error(`${label}: o serviço de IA falhou (HTTP ${err.status}). Nada foi perdido. Tente de novo em alguns segundos.`);
+    s.status = err.status;
+    s.isNetwork = true;
+    return s;
+  }
+  if (!/failed to fetch|networkerror|network error|load failed|network request failed/i.test(m)) {
     return err instanceof Error ? err : new Error(m);
   }
   const hosted = typeof window !== 'undefined' && !IS_LOCAL_DEV;
