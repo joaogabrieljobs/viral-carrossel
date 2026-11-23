@@ -42,6 +42,18 @@
       "has": [{ "type": "host", "value": "www.moont.com.br" }],
       "destination": "https://moont.ai/$1",
       "permanent": true
+    },
+    {
+      "source": "/((?!api/cron/cleanup-image-references$)(?!api/cron/reconcile-image-credits$).*)",
+      "has": [{ "type": "host", "value": "viralcarrossel.com.br" }],
+      "destination": "https://moont.ai/$1",
+      "permanent": true
+    },
+    {
+      "source": "/((?!api/cron/cleanup-image-references$)(?!api/cron/reconcile-image-credits$).*)",
+      "has": [{ "type": "host", "value": "www.viralcarrossel.com.br" }],
+      "destination": "https://moont.ai/$1",
+      "permanent": true
     }
   ],
   "rewrites": [

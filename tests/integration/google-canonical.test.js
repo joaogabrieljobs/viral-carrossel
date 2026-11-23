@@ -57,26 +57,13 @@ describe('OAuth Google em domínio canônico', () => {
     expect(res.redirectUrl).toBe(`${canonical}/?login=invalid_state`);
   });
 
-  it('login iniciado no domínio antigo conserva cookie e callback no mesmo host', async () => {
+  it('login pedido no domínio antigo desligado vai para o endereço principal', async () => {
     configure();
-    const legacyOrigin = 'https://viralcarrossel.com.br';
-    const start = makeRes();
-    await startGoogleLogin(makeReq({ headers: { host: 'viralcarrossel.com.br' } }), start);
-    expect(cookieValue(start, 'vc_google_oauth')).toBeTruthy();
-    expect(new URL(start.redirectUrl).searchParams.get('redirect_uri'))
-      .toBe(`${legacyOrigin}/api/auth/google/callback`);
-
-    const callback = makeRes();
-    await googleCallback(makeReq({
-      url: '/api/auth/google/callback?code=abc&state=wrong',
-      cookie: 'vc_google_oauth=expected',
-      headers: { host: 'viralcarrossel.com.br' },
-    }), callback);
-    expect(callback.redirectUrl).toBe(`${legacyOrigin}/?login=invalid_state`);
-
-    const www = makeRes();
-    await startGoogleLogin(makeReq({ headers: { host: 'www.viralcarrossel.com.br' } }), www);
-    expect(www.redirectUrl).toBe(`${legacyOrigin}/api/auth/google`);
-    expect(cookieValue(www, 'vc_google_oauth')).toBeNull();
+    for (const host of ['viralcarrossel.com.br', 'www.viralcarrossel.com.br']) {
+      const start = makeRes();
+      await startGoogleLogin(makeReq({ headers: { host } }), start);
+      expect(start.redirectUrl).toBe(`${canonical}/api/auth/google`);
+      expect(cookieValue(start, 'vc_google_oauth')).toBeNull();
+    }
   });
 });

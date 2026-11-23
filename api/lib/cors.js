@@ -8,9 +8,6 @@ export function allowedOrigins() {
     'https://www.moont.ai',
     'https://moont.com.br',
     'https://www.moont.com.br',
-    // Enquanto o acesso aos dados locais ainda depende do domínio anterior.
-    'https://viralcarrossel.com.br',
-    'https://www.viralcarrossel.com.br',
   ];
   // Localhost só fora de produção (auditoria BE-CORS-LOCAL).
   const vercelEnv = process.env.VERCEL_ENV || '';

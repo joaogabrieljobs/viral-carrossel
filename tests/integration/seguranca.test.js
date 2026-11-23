@@ -39,11 +39,12 @@ describe('RF-12 — CORS allowlist nos endpoints de billing', () => {
     expect(res.headers.vary).toBe('Origin');
   });
 
-  it('domínio antigo permanece na allowlist durante a migração', async () => {
-    const origin = 'https://viralcarrossel.com.br';
-    const res = makeRes();
-    await sessionHandler(makeReq({ headers: { origin } }), res);
-    expect(res.headers['access-control-allow-origin']).toBe(origin);
+  it('domínio antigo desligado (23/11) sai da allowlist', async () => {
+    for (const origin of ['https://viralcarrossel.com.br', 'https://www.viralcarrossel.com.br']) {
+      const res = makeRes();
+      await sessionHandler(makeReq({ headers: { origin } }), res);
+      expect(res.headers['access-control-allow-origin']).toBeUndefined();
+    }
   });
 
   it('domínios novos aceitam pedidos autenticados enquanto o alias redireciona', async () => {

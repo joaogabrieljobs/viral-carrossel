@@ -56,8 +56,6 @@ const BILLING_RETURN_HOSTS = new Set([
   'www.moont.ai',
   'moont.com.br',
   'www.moont.com.br',
-  'viralcarrossel.com.br',
-  'www.viralcarrossel.com.br',
 ]);
 
 export function getBillingReturnUrl(req) {

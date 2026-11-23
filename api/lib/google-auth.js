@@ -25,12 +25,9 @@ export function googleAuthConfigured() {
 
 export function getGoogleRedirectUri(req) {
   // Host / X-Forwarded-Host não entram no redirect_uri (open redirect / OAuth mix-up).
-  // O domínio antigo continua aceitando login enquanto dados locais são migrados;
-  // ele já possui um callback próprio autorizado no Google.
-  const host = String(req?.headers?.host || '').trim().toLowerCase().replace(/:443$/, '');
-  if (host === 'viralcarrossel.com.br' || host === 'www.viralcarrossel.com.br') {
-    return 'https://viralcarrossel.com.br/api/auth/google/callback';
-  }
+  // O domínio antigo viralcarrossel.com.br foi desligado em 23/11/2026 e agora
+  // redireciona para moont.ai; o login acontece só no endereço principal.
+  void req;
   const fromEnv = cleanEnv(process.env.GOOGLE_REDIRECT_URI);
   if (fromEnv) return fromEnv;
   return `${getAppUrl()}/api/auth/google/callback`;

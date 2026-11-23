@@ -81,12 +81,15 @@ describe('getAppUrl (WEB-001/006)', () => {
     expect(uri).not.toContain('evil');
   });
 
-  it('Checkout volta ao host antigo somente quando o Host é um domínio próprio conhecido', () => {
+  it('Checkout volta ao host pedido somente quando ele é um domínio próprio ativo', () => {
     process.env.APP_URL = 'https://moont.ai';
+    expect(getBillingReturnUrl({ headers: { host: 'moont.com.br' } }))
+      .toBe('https://moont.com.br');
+    // Domínio antigo desligado em 23/11: não é mais destino de retorno.
     expect(getBillingReturnUrl({ headers: { host: 'viralcarrossel.com.br' } }))
-      .toBe('https://viralcarrossel.com.br');
+      .toBe('https://moont.ai');
     expect(getBillingReturnUrl({ headers: { host: 'www.viralcarrossel.com.br:443' } }))
-      .toBe('https://www.viralcarrossel.com.br');
+      .toBe('https://moont.ai');
     expect(getBillingReturnUrl({ headers: { host: 'evil.example', 'x-forwarded-host': 'viralcarrossel.com.br' } }))
       .toBe('https://moont.ai');
     expect(getBillingReturnUrl({ headers: { host: 'viralcarrossel.com.br.evil.example' } }))

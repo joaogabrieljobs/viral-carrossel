@@ -1,9 +1,16 @@
 /**
  * Encaminha domínios alternativos ao endereço principal do Moont.
- * O domínio antigo continua servindo o app durante a migração dos dados locais.
+ * O domínio antigo viralcarrossel.com.br foi desligado em 23/11/2026 e só
+ * redireciona para moont.ai.
  */
 const CANONICAL_ORIGIN = 'https://moont.ai';
-const ALTERNATE_HOSTS = new Set(['www.moont.ai', 'moont.com.br', 'www.moont.com.br']);
+const ALTERNATE_HOSTS = new Set([
+  'www.moont.ai',
+  'moont.com.br',
+  'www.moont.com.br',
+  'viralcarrossel.com.br',
+  'www.viralcarrossel.com.br',
+]);
 
 export const config = { runtime: 'nodejs' };
 

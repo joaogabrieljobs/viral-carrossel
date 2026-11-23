@@ -86,8 +86,8 @@ GOOGLE_REDIRECT_URI=https://moont.ai/api/auth/google/callback
 ### Setup Google OAuth
 
 1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → Create credentials → OAuth client ID → **Web application**
-2. Authorized JavaScript origins: `https://moont.ai`; conservar `https://viralcarrossel.com.br` durante a migração.
-3. Authorized redirect URIs: `https://moont.ai/api/auth/google/callback`; conservar `https://viralcarrossel.com.br/api/auth/google/callback` enquanto o domínio antigo estiver ativo.
+2. Authorized JavaScript origins: `https://moont.ai`. O domínio antigo `viralcarrossel.com.br` foi desligado em 23/11/2026 e pode sair da lista.
+3. Authorized redirect URIs: `https://moont.ai/api/auth/google/callback`. O callback do domínio antigo pode sair da lista.
 4. Colar Client ID + Client Secret nas env da Vercel e redeploy
 
 `ZAI_API_KEY` é obrigatória (texto incluso no plano). `ANTHROPIC_API_KEY` **não está configurada em produção por decisão de custo** (removida em 2026-09-15): com ela, qualquer assinante — incluindo o Essencial de R$ 19,90 — podia gastar Opus e `web_search` na conta da plataforma via `/api/anthropic/v1/messages`. Claude e a pesquisa web ao vivo são BYOK: o utilizador põe a própria chave em Configurar IA e ela viaja no header `x-anthropic-key`. `VITE_ANTHROPIC_PROXY=true` continua necessária para o BYOK passar pelo proxy e evitar CORS.
