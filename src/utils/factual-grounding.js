@@ -19,6 +19,10 @@ const COMMERCIAL_RULES = [
   { category: 'prazo', regex: /\b(?:pronto|entregue|resultado|receba|comece)\s+(?:em|dentro de)\s+\d+\s*(?:hora|dia|semana|m[eê]s)(?:s|es)?\b[^.!?\n]{0,70}/giu },
   { category: 'preço', regex: /(?:R\$|US\$|\$|€)\s*\d(?:[\d.,]*\d)?|\b(?:gr[aá]tis|gratuito|sem taxas?(?: escondidas?)?|sem custo|sem compromisso|no hidden fees|free of charge|no obligation)\b/giu },
   { category: 'item incluso', regex: /\b(?:inclui|inclus[oa]s?|vem com|acompanha|includes?)\b[^.!?\n]{1,100}/giu },
+  // Auditoria 23/11 (B3): condição de pagamento trocada passava sem aviso. O
+  // briefing dizia "you only pay when you like it" e o card 1 saiu "pay later"
+  // (soa como parcelamento). Só a expressão é conferida, sem o resto da frase.
+  { category: 'condição de pagamento', regex: /\b(?:buy now,?\s+pay later|pay(?:ing)?\s+later|pay\s+over\s+time|financ(?:ing|ed)|installment plans?|zero\s+down|no\s+upfront(?:\s+(?:cost|payment|fee)s?)?|pague\s+depois|pagamento\s+depois|parcelad[oa]s?|sem\s+entrada|entrada\s+zero)\b/giu },
 ];
 
 const NUMBERS = { um: '1', uma: '1', one: '1', dois: '2', duas: '2', two: '2', tres: '3', three: '3', quatro: '4', four: '4', cinco: '5', five: '5', seis: '6', six: '6', sete: '7', seven: '7', oito: '8', eight: '8', nove: '9', nine: '9', dez: '10', ten: '10', vinte: '20', trinta: '30', cem: '100', hundred: '100',
