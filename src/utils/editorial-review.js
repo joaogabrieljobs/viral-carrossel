@@ -450,8 +450,10 @@ export function buildEditorialReviewPrompt(prompt, draft, config = {}) {
       ? `\nCompare também o roteiro validado com a redação: cada pergunta precisa ser respondida, mas fatos e estágio (fato, proposta ou desconhecido) devem ser conferidos nas fontes originais. Validar a estrutura do roteiro não comprova suas afirmações. Não use o roteiro nem o rascunho como fonte de si mesmos. Não acrescente tração, preço, equipe ou promessa ausentes. Notas complementam a página, sem esconder ali a conclusão essencial.\n${plannedReviewStructure(config.presentationPlan)}\nPreserve o tipo do bloco e a integridade dos valores/unidades/condições; não duplique tabela em parágrafos. ${presentationReviewBlockContract(config.nativeBlocks)}`
       : '';
     const reviewDraft = config.presentationPlan ? {
-      slides: draft.slides.map(slide => Object.fromEntries(['title', 'subtitle', 'bodyAfterImage', 'speakerNotes', 'presentationBlocks']
-        .filter(field => hasOwn(slide, field)).map(field => [field, slide[field]]))),
+      // Auditoria 23/11 (B7): o índice explícito evita a edição contada a partir
+      // de 1 (Relatório 5 e 6, Caso 6 e 8: texto do slide vizinho no slide errado).
+      slides: draft.slides.map((slide, slideIndex) => ({ slideIndex, ...Object.fromEntries(['title', 'subtitle', 'bodyAfterImage', 'speakerNotes', 'presentationBlocks']
+        .filter(field => hasOwn(slide, field)).map(field => [field, slide[field]])) })),
       caption: draft.caption,
     } : draft;
     const editableFields = config.presentationPlan
