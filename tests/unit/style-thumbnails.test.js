@@ -6,6 +6,8 @@ import path from 'node:path';
 import { STYLE_THUMBNAILS } from '../../src/styles/style-thumbnails.generated.js';
 import { VISUAL_PRESETS, renderPresetPreview } from '../../src/styles/visual-presets.jsx';
 import { PRESENTATION_VISUAL_PRESETS, renderPresentationPresetPreview } from '../../src/styles/presentation-presets.jsx';
+import { SOCIAL_FAMILY_KEYS } from '../../src/utils/social-families.js';
+import { SOCIAL_FAMILY_COVER_PHOTO } from '../../scripts/style-thumbnail-photos.mjs';
 
 const root = path.resolve(__dirname, '../..');
 const visible = [...VISUAL_PRESETS, ...PRESENTATION_VISUAL_PRESETS].filter((p) => !p.hidden && !p.isCustom);
@@ -33,5 +35,18 @@ describe('miniaturas dos estilos', () => {
     expect(deck.type).toBe('img');
     const custom = renderPresetPreview({ ...VISUAL_PRESETS.find((p) => p.id === 'sports_editorial'), isCustom: true });
     expect(custom.type).not.toBe('img');
+  });
+
+  it('cada família editorial tem a própria foto de exemplo, sem repetir', () => {
+    expect(Object.keys(SOCIAL_FAMILY_COVER_PHOTO).sort()).toEqual([...SOCIAL_FAMILY_KEYS].sort());
+    const photos = Object.values(SOCIAL_FAMILY_COVER_PHOTO);
+    expect(new Set(photos).size).toBe(photos.length);
+    for (const name of photos) expect(name).toMatch(/^[a-z]+-\d+$/);
+  });
+
+  it('o gerador usa a foto da família na capa', () => {
+    const script = fs.readFileSync(path.join(root, 'scripts/build-style-thumbnails.mjs'), 'utf8');
+    expect(script).toContain("from './style-thumbnail-photos.mjs'");
+    expect(script).toContain('SOCIAL_FAMILY_COVER_PHOTO');
   });
 });

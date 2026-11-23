@@ -196,6 +196,36 @@ async function configure(page, { name = 'Novo trabalho guiado', count = 5, prese
   return wizard;
 }
 
+// No iPhone a miniatura do estilo saía numa faixa estreita e alta: a caixa tinha
+// largura fixa e a altura do cartão, e a imagem 4:5 era cortada dos lados.
+for (const viewport of [{ width: 430, height: 932 }, { width: 1280, height: 800 }]) {
+  test(`miniatura do estilo mantém a proporção do card em ${viewport.width}px`, async ({ page }, testInfo) => {
+    test.setTimeout(60_000);
+    await page.setViewportSize(viewport);
+    await setup(page, { withProject: false });
+    const wizard = await configure(page, { name: 'Miniaturas dos estilos', defaultIdentity: true });
+    await wizard.getByRole('button', { name: 'Alterar visual', exact: true }).click();
+    const group = wizard.getByRole('group', { name: 'Estilos para começar', exact: true });
+    await expect(group).toBeVisible();
+    const thumbs = group.locator('img[data-style-thumb]');
+    await expect(thumbs.first()).toBeVisible();
+    await expect.poll(() => thumbs.evaluateAll(list => list.every(img => img.complete && img.naturalWidth > 0))).toBe(true);
+    const boxes = await thumbs.evaluateAll(list => list.map(img => {
+      const box = img.getBoundingClientRect(); const tile = img.closest('button').getBoundingClientRect();
+      return { id: img.dataset.styleThumb, box: box.width / box.height, natural: img.naturalWidth / img.naturalHeight, share: box.width / tile.width, width: box.width, naturalWidth: img.naturalWidth };
+    }));
+    await group.screenshot({ path: testInfo.outputPath(`estilos-${viewport.width}.png`) });
+    expect(boxes.length).toBeGreaterThan(1);
+    for (const item of boxes) {
+      // A caixa tem a mesma proporção da imagem: nada é cortado.
+      expect(Math.abs(item.box - item.natural), `${item.id} cortada`).toBeLessThan(0.02);
+      expect(item.share, `${item.id} pequena no cartão`).toBeGreaterThan(0.6);
+      // Em tela larga o cartão não pode esticar a miniatura além do arquivo (fica borrada).
+      expect(item.width, `${item.id} ampliada`).toBeLessThanOrEqual(item.naturalWidth);
+    }
+  });
+}
+
 test('design recomendado fica visível, aplica o preset e mantém a narrativa escolhida', async ({ page }, testInfo) => {
   test.setTimeout(60_000);
   await setup(page, { withProject: false, ai: route => {

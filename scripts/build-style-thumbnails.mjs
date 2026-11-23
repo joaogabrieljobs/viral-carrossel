@@ -23,6 +23,7 @@ import { createRequire } from 'node:module';
 import { build } from 'vite';
 import react from '@vitejs/plugin-react';
 import { chromium } from '@playwright/test';
+import { SOCIAL_FAMILY_COVER_PHOTO } from './style-thumbnail-photos.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -54,6 +55,9 @@ await fs.cp(path.join(root, 'public/fonts'), path.join(page, 'fonts'), { recursi
 await fs.mkdir(path.join(page, 'images'), { recursive: true });
 for (const f of await fs.readdir(imagesDir)) if (/^[a-z]+-\d+\.jpg$/.test(f)) await fs.copyFile(path.join(imagesDir, f), path.join(page, 'images', f));
 await fs.copyFile(path.join(root, 'public/landing/hero-creator-photo.jpg'), path.join(page, 'images', 'social-capa.jpg'));
+for (const name of Object.values(SOCIAL_FAMILY_COVER_PHOTO)) {
+  await fs.access(path.join(page, 'images', `${name}.jpg`)).catch(() => { throw new Error(`Foto de exemplo ausente na pasta informada: ${name}.jpg`); });
+}
 const fixture = JSON.parse(await fs.readFile(path.join(root, 'docs/presentation/template-gallery-content.json'), 'utf8'));
 const src = (n) => JSON.stringify(path.join(root, n));
 const entry = path.join(temp, 'thumbs.jsx');
@@ -72,7 +76,9 @@ import {ensurePresentationFonts} from ${src('src/utils/presentation-font-manifes
 import {FORMATS} from ${src('src/utils/formats.js')};
 ensurePresentationFonts(document);
 const fixture=${JSON.stringify(fixture)};
-// Capa social: título curto que mostra a tipografia do estilo, foto do próprio app.
+// Foto de exemplo de cada família editorial (scripts/style-thumbnail-photos.mjs).
+const COVER_PHOTO=${JSON.stringify(SOCIAL_FAMILY_COVER_PHOTO)};
+// Capa social: título curto que mostra a tipografia do estilo e a foto de exemplo da família.
 // Os 12 estilos virais mostram o card de abertura (sem foto): no tamanho do
 // seletor, a capa com foto deixa todos parecidos; cor de chão, tipografia e
 // acento é o que os distingue. As famílias editoriais mostram a capa.
@@ -85,7 +91,7 @@ const SOCIAL=[
 const W_SOCIAL=360, W_DECK=640;
 function Social({preset}){
  const brand=applyVisualPreset({...DEFAULT_BRAND,name:'',handle:'',logo:null,showHandle:false},preset.id);
- const raw=SOCIAL.map((s,i)=>({...mkSlide(i+1,brand),...getSlideOverridesForPreset(preset.id),id:preset.id+'-'+i,title:s.title,subtitle:s.subtitle,bgImage:s.photo?'images/social-capa.jpg':'',imageQuery:s.photo?'pessoa criando conteúdo':''}));
+ const raw=SOCIAL.map((s,i)=>({...mkSlide(i+1,brand),...getSlideOverridesForPreset(preset.id),id:preset.id+'-'+i,title:s.title,subtitle:s.subtitle,bgImage:s.photo?'images/'+(COVER_PHOTO[preset.socialFamily]||'social-capa')+'.jpg':'',imageQuery:s.photo?'foto de exemplo':''}));
  const composed=applySocialVisualComposition(raw,{preset,brand,formato:'carrossel'});
  // Card sem foto no fundo próprio do estilo (o card de afirmação inverte as cores).
  const own=composed.findIndex(s=>!s.bgImage&&(s.socialArt?.ground||'bg')==='bg');
@@ -132,7 +138,8 @@ try {
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const browser = await chromium.launch();
-  const tab = await browser.newPage({ viewport: { width: 1600, height: 1200 }, deviceScaleFactor: 1 });
+  // 1,5x: no celular a miniatura ocupa ~170 px de largura em tela 3x.
+  const tab = await browser.newPage({ viewport: { width: 1600, height: 1200 }, deviceScaleFactor: 1.5 });
   const errors = [];
   tab.on('pageerror', (e) => errors.push(e.message));
   await tab.goto(`http://127.0.0.1:${server.address().port}/index.html`, { waitUntil: 'networkidle' });

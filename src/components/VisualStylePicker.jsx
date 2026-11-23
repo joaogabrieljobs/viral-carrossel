@@ -58,7 +58,9 @@ export default function VisualStylePicker({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+          // Duas colunas no celular e nos painéis; em tela larga entram mais
+          // colunas em vez de esticar a miniatura além do arquivo.
+          gridTemplateColumns: 'repeat(auto-fill, minmax(min(180px, calc(50% - 6px)), 1fr))',
           gap: 12,
         }}
       >
@@ -170,10 +172,11 @@ export default function VisualStylePicker({
                 padding: 10,
                 boxSizing: 'border-box',
               }}>
+                {/* A caixa tem a proporção do card: a miniatura nunca é cortada,
+                    seja o cartão estreito (painel) ou largo (celular, criação). */}
                 <div style={{
                   width: '100%',
-                  height: '100%',
-                  maxWidth: isPresentationPreview ? '100%' : 92,
+                  aspectRatio: previewAspect,
                   borderRadius: 8,
                   overflow: 'hidden',
                   boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
