@@ -25,6 +25,9 @@ const COMMERCIAL_RULES = [
   { category: 'condição de pagamento', regex: /\b(?:buy now,?\s+pay later|pay(?:ing)?\s+later|pay\s+over\s+time|financ(?:ing|ed)|installment plans?|zero\s+down|no\s+upfront(?:\s+(?:cost|payment|fee)s?)?|pague\s+depois|pagamento\s+depois|parcelad[oa]s?|sem\s+entrada|entrada\s+zero)\b/giu },
 ];
 
+const INSTALLMENT_CLAIM = /^(?:parcelad[oa]s?|installment plans?|pay\s+over\s+time)$/;
+const INSTALLMENT_SOURCE = /\b(?:parcelas?|parcelad[oa]s?|installments?|\d+\s*x\s+de)\b/;
+
 const NUMBERS = { um: '1', uma: '1', one: '1', dois: '2', duas: '2', two: '2', tres: '3', three: '3', quatro: '4', four: '4', cinco: '5', five: '5', seis: '6', six: '6', sete: '7', seven: '7', oito: '8', eight: '8', nove: '9', nine: '9', dez: '10', ten: '10', vinte: '20', trinta: '30', cem: '100', hundred: '100',
   onze: '11', doze: '12', treze: '13', catorze: '14', quatorze: '14', quinze: '15', dezesseis: '16', dezessete: '17', dezoito: '18', dezenove: '19',
   eleven: '11', twelve: '12', thirteen: '13', fourteen: '14', fifteen: '15', sixteen: '16', seventeen: '17', eighteen: '18', nineteen: '19' };
@@ -321,6 +324,11 @@ export function auditDraftFactuality(draft, config = {}) {
         if (rule.category === 'garantia' && negatedGuarantee(text, match.index)) continue;
         if (rule.category === 'item incluso' && (negatedInclusion(text, match.index) || inclusionWithoutItem(claim))) continue;
         if (rule.category === 'preço' && derivedPrice(claim, prices)) continue;
+        // "Parcelado" é paráfrase de "3 parcelas" (reteste real 23/11, Proposta
+        // WebExpresso: cabeçalho "Parcelado" de tabela com o material falando em
+        // parcelas). Só a forma parcelada é coberta; "sem entrada" e "pague
+        // depois" continuam exigindo a expressão no material.
+        if (rule.category === 'condição de pagamento' && INSTALLMENT_CLAIM.test(normalize(claim)) && INSTALLMENT_SOURCE.test(sourceText)) continue;
         if (rule.category === 'item incluso' && inclusionCovered(claim, evidence)) continue;
         if (!sourceText.includes(normalize(claim)) && !sourceEquivalent.includes(equivalent(normalize(claim)))) add(rule.category, claim);
       }

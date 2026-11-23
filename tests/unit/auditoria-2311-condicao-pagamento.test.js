@@ -22,4 +22,16 @@ describe('auditoria 23/11 B3: condição de pagamento sem apoio', () => {
     const issues = auditDraftFactuality(deck('Start now, pay later'), { factualSource: `${brief} Start now and pay later in 3 installments.` });
     expect(issues.filter(item => item.category === 'condição de pagamento' && /pay later/i.test(item.claim))).toEqual([]);
   });
+
+  // Reteste real 23/11 (Proposta WebExpresso): tabela com cabeçalho "Parcelado"
+  // e material "3 parcelas de US$ 133, a 1ª na reserva".
+  const parcelas = 'Preço: US$ 399, ou 3 parcelas de US$ 133 (a 1ª na reserva, a 2ª quando o site vai ao ar).';
+  it.each(['Parcelado', 'Pagamento parcelado em três marcos'])('"%s" é paráfrase de parcelas do material', title => {
+    const issues = auditDraftFactuality(deck(title), { factualSource: parcelas });
+    expect(issues.filter(item => item.category === 'condição de pagamento')).toEqual([]);
+  });
+  it.each(['Sem entrada', 'Pague depois'])('"%s" continua marcado mesmo com parcelas no material', title => {
+    const issues = auditDraftFactuality(deck(title), { factualSource: parcelas });
+    expect(issues).toContainEqual(expect.objectContaining({ category: 'condição de pagamento' }));
+  });
 });
