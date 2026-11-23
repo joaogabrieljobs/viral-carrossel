@@ -97,6 +97,14 @@ describe('V4-X1 — número que o material não traz', () => {
     expect(audit(frase, source)).toEqual([]);
   });
 
+  it('arredondamento com "mil" do número do material não é dado novo; outro número continua sendo', () => {
+    const source = `${PADARIA} Em 2025 vendeu 41.200 pães.`;
+    expect(audit('Mais de 41 mil pães em 2025.', source)).toEqual([]);
+    expect(audit('Quase 41 mil pães vendidos em 2025.', source)).toEqual([]);
+    expect(categories('Mais de 60 mil pães em 2025.', source)).toContain('dado sem fonte');
+    expect(categories('Foram 41 pães.', source)).toContain('dado sem fonte');
+  });
+
   it('número da própria enumeração (até a quantidade de cards) não é dado', () => {
     const slides = Array.from({ length: 12 }, (_, index) => ({ title: `Erro ${index + 1}`, subtitle: index === 0 ? '12 erros para rever hoje.' : 'Revise com calma.', bodyAfterImage: '' }));
     expect(auditDraftFactuality({ slides }, { count: 12, presetId: 'livre', factualSource: PADARIA, currentYear: 2026 })).toEqual([]);

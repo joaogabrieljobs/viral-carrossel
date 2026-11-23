@@ -257,7 +257,7 @@ function numbersIn(text) {
     if (scale) value *= /^(?:mil|k|thousand)$/.test(scale) ? 1_000 : 1_000_000;
     const decimal = !thousands && /[.,]\d/.test(raw);
     if (value < 10 && !decimal) continue;
-    found.push({ raw, index: match.index, value });
+    found.push({ raw, index: match.index, value, rounded: Boolean(scale) });
   }
   return found;
 }
@@ -333,6 +333,9 @@ export function auditDraftFactuality(draft, config = {}) {
     for (const number of numbersIn(text)) {
       if (judged.some(([from, to]) => number.index < to && number.index + number.raw.length > from)) continue;
       if (numbers.has(number.value)) continue;
+      // "Mais de 41 mil pães" arredonda os 41.200 do material (reteste real
+      // de 22/11, repetido em 23/11): forma com "mil"/"milhões" aceita 5% de folga.
+      if (number.rounded && [...numbers].some(value => value > 0 && Math.abs(value - number.value) / value <= 0.05)) continue;
       // "12 erros" num carrossel de 12 cards é a própria enumeração.
       if (Number.isInteger(number.value) && number.value <= enumerationLimit) continue;
       if (number.value === currentYear || number.value === currentYear + 1) continue;
