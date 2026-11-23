@@ -1062,12 +1062,14 @@ REPARO DE FATOS: edite somente os slides com slideIndex ${indexes.join(', ')}. E
       if (!Array.isArray(repair?.edits) || repair.edits.some(edit => !indexes.includes(edit?.slideIndex))) throw new Error('Reparo fora do escopo');
       const repaired = applyEditorialReview(result, repair, plannedConfig, { deferQualityChecks: true });
       if (factsOf(repaired).length < facts.length && overLimits(repaired.slides).length <= overLimits(result.slides).length) {
-        return finish(repaired, 'repaired', extra);
+        // Auditoria 23/11 (B1): o reparo de fatos encerrava aqui e o de repetição
+        // nunca rodava (Pitch BLK FROGDAY: slides 8 e 9 idênticos).
+        return settleRepetition(repaired, 'repaired', extra);
       }
     } catch (error) {
       if (isGenerationCancelled(error) || aiOptions?.signal?.aborted) throw error;
     }
-    return finish(result, reviewStatus, extra);
+    return settleRepetition(result, reviewStatus, extra);
   };
   let review;
   // Resposta fora do formato ganha uma segunda tentativa; erro da chamada
