@@ -1,6 +1,6 @@
 import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { GLOBAL_STYLE } from './styles/global-style.js';
-import { dismissOnboardingLanding } from './utils/landing-gate.js';
+import { dismissOnboardingLanding, shouldAutoEnterStudio } from './utils/landing-gate.js';
 import { fetchAccessSession } from './lib/billing.js';
 import BootScreen from './components/BootScreen.jsx';
 
@@ -36,7 +36,7 @@ export default function LandingFirst() {
           || q.get('studio') === '1';
         const session = await fetchAccessSession();
         if (cancelled) return;
-        if (session.active && fromAuth) {
+        if ((session.active && fromAuth) || shouldAutoEnterStudio(window.location.search, session.active)) {
           enterStudio();
         }
       } catch { /* landing continua */ }

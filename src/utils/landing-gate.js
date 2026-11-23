@@ -29,6 +29,18 @@ function landingGateDecision(search, dismissed) {
   return !dismissed;
 }
 
+/**
+ * Auditoria 23/11 (B6): com sessão ativa, abrir moont.ai mostrava a landing e
+ * "Entrar" pedia senha de novo; só entrava com ?app=1. O comentário do
+ * LandingFirst já dizia "se já autenticado, abrir studio". O preview forçado
+ * da landing (?landing=1, ?intro=1, ?welcome=1) continua mostrando a landing.
+ */
+function shouldAutoEnterStudio(search, sessionActive) {
+  if (!sessionActive) return false;
+  const q = new URLSearchParams(String(search || '').replace(/^\?/, ''));
+  return !(q.get('landing') === '1' || q.get('intro') === '1' || q.get('welcome') === '1');
+}
+
 function shouldShowOnboardingLanding() {
   if (typeof window === 'undefined') return false;
   try {
@@ -77,6 +89,7 @@ const mkLibEntry = (doc, name = 'Sem título', metadata = {}) => {
 
 export {
   landingGateDecision,
+  shouldAutoEnterStudio,
   shouldShowOnboardingLanding,
   dismissOnboardingLanding,
   mkLibEntry,
