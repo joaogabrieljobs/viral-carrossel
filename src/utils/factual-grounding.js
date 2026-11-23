@@ -341,7 +341,12 @@ export function auditDraftFactuality(draft, config = {}) {
       // de 22/11, repetido em 23/11): forma com "mil"/"milhões" aceita 5% de folga.
       if (number.rounded && [...numbers].some(value => value > 0 && Math.abs(value - number.value) / value <= 0.05)) continue;
       // "12 erros" num carrossel de 12 cards é a própria enumeração.
-      if (Number.isInteger(number.value) && number.value <= enumerationLimit) continue;
+      // Auditoria 23/11 (G1): "Restam 10 vagas" / "Only 10 spots left" num deck
+      // de 12 cards passava como enumeração. Contagem de vaga, lugar ou cliente
+      // não é numeração de card.
+      const countedNoun = /^\s*(?:vagas?|lugares|spots?|seats?|places?|unidades|units?|clientes|clients?|customers?|pessoas|people)\b/iu
+        .test(text.slice(number.index + number.raw.length));
+      if (Number.isInteger(number.value) && number.value <= enumerationLimit && !countedNoun) continue;
       if (number.value === currentYear || number.value === currentYear + 1) continue;
       add('dado sem fonte', number.raw);
     }
