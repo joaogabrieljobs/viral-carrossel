@@ -977,7 +977,11 @@ function buildContentLanguageRule(input) {
   return `
 REGRA DE IDIOMA (obrigatória — definida ${language.source === 'instructions' ? 'pelas instruções do usuário' : language.source === 'brief' ? 'pelo idioma predominante do briefing' : 'pelo padrão do projeto'}):
 - ${instruction}
-- Não misture idiomas nos campos visíveis. Preserve nomes próprios e termos técnicos do material.
+- Não misture idiomas nos campos visíveis. Preserve nomes próprios e termos técnicos do material.${language.code === 'en'
+    ? '\n- Os rótulos de sequência destas regras ("Passo N · …") são escritos no idioma do conteúdo: "Step N · …".'
+    : language.code === 'es'
+      ? '\n- Os rótulos de sequência destas regras ("Passo N · …") são escritos no idioma do conteúdo: "Paso N · …".'
+      : ''}
 - Escreva de modo idiomático e natural para esse idioma. Não traduza expressões literalmente, não invente provérbios e não combine ditados. Se uma metáfora puder soar ambígua ou sem sentido, troque-a por uma frase direta.
 - Exceção: cada "imageQuery" permanece em INGLÊS (8–15 palavras), qualquer que seja o idioma do conteúdo.
 `;
