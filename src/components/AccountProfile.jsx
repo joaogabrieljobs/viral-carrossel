@@ -11,7 +11,7 @@ import {
   saveUserProfile,
 } from '../utils/user-profile.js';
 import { TEXT_PROVIDERS, IMAGE_PROVIDERS } from '../config/ai-providers.js';
-import { normalizeAccountUsage, planImageStatusLabel } from '../utils/account-usage.js';
+import { normalizeAccountUsage, planImageStatusLabel, subscriptionEnding, SUBSCRIPTION_END_AFTERMATH } from '../utils/account-usage.js';
 import AgentAccessPanel from './AgentAccessPanel.jsx';
 import { useModalDialog } from '../hooks/useModalDialog.js';
 import { confirmCurrentPassword } from '../lib/billing.js';
@@ -435,6 +435,11 @@ function subscriptionAccessCopy(access, currentPeriodEnd) {
     if (access.billingExempt === true && access.accessSource === 'exempt') {
       const quotaEnd = access.quotaPeriodEnd ? new Date(access.quotaPeriodEnd) : null;
       return `Conta isenta de cobrança${quotaEnd && Number.isFinite(quotaEnd.getTime()) ? ` · ciclo de créditos até ${quotaEnd.toLocaleDateString('pt-BR')}` : ''}.`;
+    }
+    // MT-04: assinatura cancelada segue ativa até a data, mas não renova.
+    const { ending, endsAt } = subscriptionEnding({ cancelAtPeriodEnd: access.cancelAtPeriodEnd, cancelAt: access.cancelAt, currentPeriodEnd });
+    if (ending) {
+      return `${endsAt ? `Assinatura encerra em ${new Date(endsAt).toLocaleDateString('pt-BR')}.` : 'Assinatura encerra no fim deste ciclo.'} ${SUBSCRIPTION_END_AFTERMATH}`;
     }
     const end = currentPeriodEnd ? new Date(currentPeriodEnd) : null;
     return `Acesso à assinatura confirmado${end && Number.isFinite(end.getTime()) ? ` · período atual até ${end.toLocaleDateString('pt-BR')}` : ''}.`;

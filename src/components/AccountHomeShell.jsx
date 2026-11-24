@@ -176,6 +176,7 @@ function AccountHomeShell({
             <AccountUsage
               imageQuota={imageQuota} planTier={planTier} currentPeriodStart={currentPeriodStart}
               currentPeriodEnd={currentPeriodEnd} useOwnImageKey={useOwnImageKey} isMobile={isMobile}
+              cancelAtPeriodEnd={accessStatus?.cancelAtPeriodEnd === true} cancelAt={accessStatus?.cancelAt || null}
               onRefresh={onRefreshUsage} onOpenSettings={onOpenSettings}
               onManageBilling={accessStatus?.free && onUpgrade ? () => onUpgrade('image')
                 : accessStatus?.billingExempt && accessStatus?.accessSource === 'exempt' ? undefined : onManageBilling}

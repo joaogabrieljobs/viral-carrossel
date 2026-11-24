@@ -84,6 +84,9 @@ export function accessStateFromSession(session = {}, current = {}) {
     quotaPeriodEnd: session.active ? session.quotaPeriodEnd || null : null,
     currentPeriodEnd: session.currentPeriodEnd || null,
     currentPeriodStart: session.currentPeriodStart || null,
+    // MT-04: assinatura cancelada que segue ativa até a data não renova.
+    cancelAtPeriodEnd: session.active === true && session.cancelAtPeriodEnd === true,
+    cancelAt: session.active === true && typeof session.cancelAt === 'string' ? session.cancelAt : null,
     tier: session.tier || null,
     plan: session.plan || null,
     imageQuota: session.imageQuota || null,

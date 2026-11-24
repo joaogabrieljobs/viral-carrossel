@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { ArrowUpRight, CalendarDays, Check, Image as ImageIcon, Info, KeyRound, RefreshCw } from 'lucide-react';
-import { normalizeAccountUsage } from '../utils/account-usage.js';
+import { normalizeAccountUsage, subscriptionEnding, SUBSCRIPTION_END_AFTERMATH } from '../utils/account-usage.js';
 
 const panelStyle = {
   border: '1px solid var(--border)',
@@ -85,6 +85,8 @@ export default function AccountUsage({
   planTier = null,
   currentPeriodStart = null,
   currentPeriodEnd = null,
+  cancelAtPeriodEnd = false,
+  cancelAt = null,
   useOwnImageKey = false,
   isMobile = false,
   onRefresh,
@@ -95,6 +97,8 @@ export default function AccountUsage({
   const [refreshMessage, setRefreshMessage] = useState('');
   const refreshInFlight = useRef(false);
   const usage = normalizeAccountUsage({ imageQuota, planTier, currentPeriodStart, currentPeriodEnd });
+  // MT-04: assinatura cancelada não renova; a tela diz quando ela encerra.
+  const { ending, endsAt } = subscriptionEnding({ cancelAtPeriodEnd, cancelAt, currentPeriodEnd: usage.periodEnd || currentPeriodEnd });
   const activity = Array.isArray(imageQuota?.activity) ? imageQuota.activity : [];
   // Ciclos que atravessam a correção podem ter contadores legados incompletos.
   const hasLegacyCycle = !usage.unlimited && usage.limit > 0 && usage.periodStart?.slice(0, 10) <= '2026-10-14';
@@ -104,7 +108,7 @@ export default function AccountUsage({
     : !usage.hasUsage
       ? 'Uso indisponível'
       : usage.unlimited ? 'Sem limite de imagens'
-        : usage.exhausted ? 'Limite do ciclo atingido' : 'Ciclo em andamento';
+        : usage.exhausted ? 'Limite do ciclo atingido' : ending ? 'Último ciclo da assinatura' : 'Ciclo em andamento';
 
   const refresh = async () => {
     if (refreshInFlight.current || typeof onRefresh !== 'function') return;
@@ -179,8 +183,8 @@ export default function AccountUsage({
                 : usage.unlimited
                   ? 'Esta conta não tem limite de imagens. Cada geração continua registrada aqui.'
                   : usage.exhausted
-                  ? 'Você utilizou todas as imagens disponíveis neste ciclo. Aguarde a renovação ou consulte as opções do seu plano.'
-                  : 'O saldo considera apenas as imagens geradas com o plano e é renovado a cada ciclo.'}
+                  ? (ending ? 'Você utilizou todas as imagens disponíveis neste ciclo. A assinatura encerra no fim dele.' : 'Você utilizou todas as imagens disponíveis neste ciclo. Aguarde a renovação ou consulte as opções do seu plano.')
+                  : (ending ? 'O saldo considera apenas as imagens geradas com o plano e vale até a assinatura encerrar.' : 'O saldo considera apenas as imagens geradas com o plano e é renovado a cada ciclo.')}
           </p>
           {hasLegacyCycle && <p style={{ margin: 0, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>Neste ciclo, gerações anteriores à correção do contador em 14/10/2026 podem não estar incluídas.</p>}
           {(usage.noIncludedImages || usage.exhausted) && onManageBilling && (
@@ -239,7 +243,7 @@ export default function AccountUsage({
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: isMobile ? 16 : 18 }}>
         <section style={{ ...panelStyle, padding, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}><CalendarDays size={17} aria-hidden="true" style={{ color: 'var(--text-muted)' }} /><h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Período e renovação</h3></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}><CalendarDays size={17} aria-hidden="true" style={{ color: 'var(--text-muted)' }} /><h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>{ending ? 'Período e encerramento' : 'Período e renovação'}</h3></div>
           <dl style={{ margin: 0, display: 'grid', gap: 17 }}>
             <div>
               <dt style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>Ciclo atual</dt>
@@ -248,8 +252,10 @@ export default function AccountUsage({
               </dd>
             </div>
             <div>
-              <dt style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>Renovação do ciclo</dt>
-              <dd style={{ margin: 0, fontSize: 13, lineHeight: 1.6 }}>{usage.periodEnd ? <time dateTime={usage.periodEnd}>{formatDate(usage.periodEnd)}</time> : 'Data indisponível'}</dd>
+              <dt style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>{ending ? 'Fim da assinatura' : 'Renovação do ciclo'}</dt>
+              {ending
+                ? <dd style={{ margin: 0, fontSize: 13, lineHeight: 1.6 }}>{endsAt ? <>Assinatura encerra em <time dateTime={endsAt}>{formatDate(endsAt)}</time>.</> : 'Assinatura encerra no fim deste ciclo.'} {SUBSCRIPTION_END_AFTERMATH}</dd>
+                : <dd style={{ margin: 0, fontSize: 13, lineHeight: 1.6 }}>{usage.periodEnd ? <time dateTime={usage.periodEnd}>{formatDate(usage.periodEnd)}</time> : 'Data indisponível'}</dd>}
             </div>
           </dl>
           {onManageBilling && <div style={{ marginTop: 'auto', paddingTop: 2 }}><button type="button" onClick={onManageBilling} style={buttonStyle}>Gerenciar assinatura <ArrowUpRight size={13} aria-hidden="true" /></button></div>}

@@ -155,6 +155,13 @@ export async function handleSession(req, res) {
       console.warn('[auth/session] quota', qe?.message || qe);
     }
 
+    // MT-04: assinatura cancelada no portal segue `active` até a data. A tela
+    // precisa saber que ela não renova. Só vale para acesso pago pelo Stripe.
+    const paidSubscription = entitlement.accessSource === 'stripe' ? entitlement.subscription : null;
+    const cancelAtSec = Number(paidSubscription?.cancel_at);
+    const cancelAt = Number.isSafeInteger(cancelAtSec) && cancelAtSec > 0 && cancelAtSec <= 8_640_000_000_000
+      ? new Date(cancelAtSec * 1000).toISOString() : null;
+
     return res.status(200).json({
       active: true,
       email: access.email,
@@ -162,6 +169,8 @@ export async function handleSession(req, res) {
       status: entitlement.status,
       accessSource: entitlement.accessSource,
       billingExempt: entitlement.billingExempt,
+      cancelAtPeriodEnd: paidSubscription?.cancel_at_period_end === true,
+      cancelAt,
       quotaPeriodStart: bounds.periodStart,
       quotaPeriodEnd: bounds.periodEnd,
       currentPeriodEnd: bounds.periodEnd,

@@ -61,6 +61,15 @@ export function normalizeAccountUsage({
   };
 }
 
+/** MT-04: assinatura cancelada segue ativa até a data, mas não renova. */
+export const SUBSCRIPTION_END_AFTERMATH = 'Depois disso a conta volta ao plano grátis e os projetos ficam só neste aparelho.';
+
+export function subscriptionEnding({ cancelAtPeriodEnd = false, cancelAt = null, currentPeriodEnd = null } = {}) {
+  const scheduled = isoDateOrNull(cancelAt);
+  if (cancelAtPeriodEnd !== true && !scheduled) return { ending: false, endsAt: null };
+  return { ending: true, endsAt: scheduled || isoDateOrNull(currentPeriodEnd) };
+}
+
 /** Rótulo curto do saldo de imagens do plano no Perfil (sem chave própria). */
 export function planImageStatusLabel(usage) {
   if (usage.noIncludedImages) return 'não inclusas no plano';
