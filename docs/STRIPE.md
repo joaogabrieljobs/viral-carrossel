@@ -1,4 +1,4 @@
-# Stripe — assinatura individual do Moont
+# Stripe: assinatura individual do Moont
 
 > **Estado atual (2026-09-29):** **4 planos mensais** (Essencial R$ 19,90 · Criador R$ 97 · Pro R$ 197 · Max R$ 297), com saldo de **0 · 50 · 150 · 300 imagens**, respectivamente. Texto incluso via Z.ai no servidor; chave própria opcional. Preços e quotas: `shared/plans.js`. [PRD de planos, documento histórico](./product/PRD-planos-imagem-sjinn.md). A landing usa a mesma configuração; o antigo anual de R$ 790 não é anunciado para estes quatro planos.
 
@@ -38,7 +38,7 @@ usa Resend e um link de uso único com validade de 30 minutos. Configuração,
 contratos e testes: [Recuperação de senha](engineering/recuperacao-senha.md).
 
 1. Landing → **Entrar** → e-mail + senha **ou** Google
-2. `POST /api/auth/login` (ou `/api/auth/register`) — senha em hash scrypt. Com `ACCOUNT_IDENTITY_BACKEND=postgres` (produção), o hash e o salt ficam em `moont.account_password_credentials`, uma credencial por conta. Sem a flag, vale o armazenamento antigo, no metadata do cliente Stripe (`vc_pw_salt` / `vc_pw_hash`); na primeira vez que o servidor encontra a conta, ele copia essa senha para o banco
+2. `POST /api/auth/login` (ou `/api/auth/register`): senha em hash scrypt. Com `ACCOUNT_IDENTITY_BACKEND=postgres` (produção), o hash e o salt ficam em `moont.account_password_credentials`, uma credencial por conta. Sem a flag, vale o armazenamento antigo, no metadata do cliente Stripe (`vc_pw_salt` / `vc_pw_hash`); na primeira vez que o servidor encontra a conta, ele copia essa senha para o banco
 3. Senha correta → cookie `vc_access`, com ou sem assinatura
 4. Conta nova ou senha correta com assinatura inativa → `{ active: false, free: true }` → editor no plano grátis. A prova curta de identidade continua sendo emitida para assinar esse mesmo customer. O cadastro público não pode definir senha sobre customer Stripe preexistente sem autenticação.
 
