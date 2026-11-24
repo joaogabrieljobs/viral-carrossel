@@ -532,8 +532,8 @@ export function imageJobHash({ projectId: id, baseVersion: base, slideIds }) {
  * outro card muda, mas nunca quando o prompt ou as referências do próprio
  * card foram editados durante a geração.
  */
-function imageInputFingerprint(slide) {
-  return requestHash({
+function imageInputFields(slide) {
+  return {
     imageQuery:String(slide?.imageQuery || '').trim().slice(0, 4000),
     refImage:slide?.refImage ?? null,
     refImageId:slide?.refImageId ?? null,
@@ -542,7 +542,28 @@ function imageInputFingerprint(slide) {
     refImageName:slide?.refImageName ?? null,
     refImageFailed:slide?.refImageFailed === true,
     imageReferences:Array.isArray(slide?.imageReferences) ? slide.imageReferences : [],
+  };
+}
+
+/**
+ * Auditoria 23/11 (IA-08): a direção escrita do card (`imgExtraPrompt`) entra
+ * no pedido da imagem (agent-image-generation.js) e ficava fora daqui; mudar a
+ * direção durante o job aplicava a imagem feita com a direção antiga.
+ */
+export function imageInputFingerprint(slide) {
+  return requestHash({
+    ...imageInputFields(slide),
+    imgExtraPrompt:String(slide?.imgExtraPrompt || '').trim().slice(0, 1200),
   });
+}
+
+/**
+ * Formato de antes da mudança acima. Um job criado antes do deploy guarda este
+ * valor e fecha depois; recusá-lo descartaria uma imagem já paga. Pode sair
+ * quando não houver mais job pendente daquela versão (prazo em `isImageJobStale`).
+ */
+export function legacyImageInputFingerprint(slide) {
+  return requestHash(imageInputFields(slide));
 }
 
 /**
@@ -661,7 +682,8 @@ export async function finishAgentImageJob(ownerValue, requestIdValue, outcomes) 
       if (slideHasPhoto(current)) return { ...slide, status: 'failed', errorCode: 'image_already_present' };
       const expectedFingerprint = slide.inputFingerprint
         || (beforeSlides.has(slide.slideId) ? imageInputFingerprint(beforeSlides.get(slide.slideId)) : null);
-      if (!expectedFingerprint || expectedFingerprint !== imageInputFingerprint(current)) {
+      if (!expectedFingerprint || (expectedFingerprint !== imageInputFingerprint(current)
+        && expectedFingerprint !== legacyImageInputFingerprint(current))) {
         return { ...slide, status: 'failed', errorCode: 'image_input_changed' };
       }
       return slide;

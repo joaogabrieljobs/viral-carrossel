@@ -9,7 +9,7 @@ vi.mock('../../api/lib/library-sync-postgres.js', () => ({
 
 import {
   createAgentImageJob, expireAgentImageJob, finishAgentImageJob, getAgentVisualJob,
-  isImageJobStale, listAgentImageJobsForSettlement, markAgentImageJobCreditsSettled,
+  imageInputFingerprint, legacyImageInputFingerprint, isImageJobStale, listAgentImageJobsForSettlement, markAgentImageJobCreditsSettled,
   selectImageSlides, undoAgentVisualBatch,
 } from '../../api/lib/agent-visual-batch.js';
 
@@ -278,6 +278,41 @@ describe('agent image jobs store', () => {
       { slideId:'s2', assetId:'original_old_reference' },
     ]);
     expect(refsChanged.slides[0]).toMatchObject({ status:'failed', errorCode:'image_input_changed' });
+  });
+
+  // Auditoria 23/11 (IA-08): a direção escrita do card entra no pedido da
+  // imagem e ficava fora da conferência; mudar a direção durante o job aplicava
+  // a imagem feita com a direção antiga.
+  it('recusa a imagem pronta quando a direção do card mudou durante a geração', async () => {
+    rows.get(owner).get(id).entry.doc.slides[1].imgExtraPrompt = 'luz quente de fim de tarde';
+    await start();
+    rows.get(owner).get(id).version = 5;
+    rows.get(owner).get(id).entry.doc.slides[1].imgExtraPrompt = 'estúdio com fundo branco';
+    const finished = await finishAgentImageJob(owner, 'image-job-01', [{ slideId:'s2', assetId:'original_direcao_antiga' }]);
+    expect(finished.slides[0]).toMatchObject({ slideId:'s2', status:'failed', errorCode:'image_input_changed' });
+    expect(rows.get(owner).get(id).entry.doc.slides[1].bgImageAssetId).toBeUndefined();
+  });
+
+  it('direção igual (ou só espaço a mais) não recusa a imagem', async () => {
+    rows.get(owner).get(id).entry.doc.slides[1].imgExtraPrompt = 'luz quente de fim de tarde';
+    await start();
+    rows.get(owner).get(id).version = 5;
+    rows.get(owner).get(id).entry.doc.slides[1].imgExtraPrompt = 'luz quente de fim de tarde  ';
+    const finished = await finishAgentImageJob(owner, 'image-job-01', [{ slideId:'s2', assetId:'original_abc' }]);
+    expect(finished.slides[0]).toMatchObject({ slideId:'s2', status:'done' });
+  });
+
+  it('job criado antes da mudança (conferência no formato antigo) ainda aplica a imagem', async () => {
+    await start();
+    const job = jobs.get(owner).get('image-job-01');
+    const current = rows.get(owner).get(id).entry.doc.slides;
+    job.slides = job.slides.map(slide => ({
+      ...slide, inputFingerprint: legacyImageInputFingerprint(current.find(item => item.id === slide.slideId)),
+    }));
+    expect(job.slides[0].inputFingerprint).not.toBe(imageInputFingerprint(current[1]));
+    const finished = await finishAgentImageJob(owner, 'image-job-01', [{ slideId:'s2', assetId:'original_abc' }]);
+    expect(finished.slides[0]).toMatchObject({ slideId:'s2', status:'done', assetId:'original_abc' });
+    expect(rows.get(owner).get(id).entry.doc.slides[1].bgImageAssetId).toBe('original_abc');
   });
 
   it('preserva pending antigo na poda e bloqueia a conta com 500 jobs ativos', async () => {
