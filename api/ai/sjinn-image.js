@@ -5,6 +5,7 @@
  * Body: { prompt: string, aspectRatio?: '2:3'|'1:1'|..., imageList?: (HTTPS | data URL)[] }
  * Resposta: { b64_json, mime, quota: { used, limit, remaining, tier } }
  */
+import { waitUntil } from '@vercel/functions';
 import { randomUUID } from 'node:crypto';
 import { applyCors } from '../lib/cors.js';
 import { requireActiveSubscription } from '../lib/require-access.js';
@@ -299,6 +300,10 @@ export default async function handler(req, res) {
         : { used: null, limit, remaining: null, tier, status: 'unavailable', available: false, allowed: false, code: 'quota_store_unavailable' },
     });
   } finally {
-    await cleanupReferences?.();
+    // A resposta já saiu. Na Vercel, o que roda depois dela só é garantido
+    // quando entregue ao `waitUntil` (IA-06): sem isso a instância podia ser
+    // suspensa e a foto de referência ficava no Blob até a limpeza diária.
+    const cleanup = cleanupReferences?.();
+    if (cleanup) waitUntil(cleanup);
   }
 }

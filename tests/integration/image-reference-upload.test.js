@@ -2,11 +2,13 @@ import { it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { stripeMock, resetStripeMock, subAtiva } from '../helpers/stripe-mock.js';
 vi.mock('stripe', () => ({ default: class { constructor() { return stripeMock; } } }));
 vi.mock('@vercel/blob', () => ({ put: vi.fn(), del: vi.fn(), list: vi.fn(), issueSignedToken: vi.fn(), presignUrl: vi.fn() }));
+vi.mock('@vercel/functions', () => ({ waitUntil: vi.fn() }));
 vi.mock('../../api/lib/sjinn.js', () => ({
   isSjinnConfigured: () => true, SJINN_DEADLINE_MS: 240000,
   createGptImage2Task: vi.fn(), waitForSjinnTask: vi.fn(), extractSjinnOutputUrl: () => 'https://example.com/result.png', downloadImageAsBase64: vi.fn(),
 }));
 import { put, del, list, issueSignedToken, presignUrl } from '@vercel/blob';
+import { waitUntil } from '@vercel/functions';
 import { createGptImage2Task, waitForSjinnTask, downloadImageAsBase64 } from '../../api/lib/sjinn.js';
 import { parseImageReferences, stageImageReferences, cleanupStaleImageReferences, REFERENCE_PREFIX, REFERENCE_URL_TTL_MS } from '../../api/lib/image-references.js';
 import { MAX_REFERENCE_BYTES } from '../../shared/image-references.js';
@@ -102,6 +104,30 @@ it('falha na geração limpa os anexos e reembolsa; falha na limpeza não perde 
   del.mockRejectedValueOnce(new Error('storage temporarily down'));
   const ok = await generate([PNG]);
   expect(ok.statusCode).toBe(200); expect(ok.body.b64_json).toBe('fake-image');
+});
+
+// IA-06 (auditoria 23/11): a limpeza rodava depois da resposta sem `waitUntil`,
+// e o erro era registrado sem causa. Na Vercel, trabalho depois da resposta só
+// é garantido quando entregue ao `waitUntil`.
+it('a limpeza dos anexos é entregue ao waitUntil', async () => {
+  const res = await generate([PNG]);
+  expect(res.statusCode).toBe(200);
+  expect(waitUntil).toHaveBeenCalledTimes(1);
+  expect(waitUntil.mock.calls[0][0]).toBeInstanceOf(Promise);
+  await waitUntil.mock.calls[0][0];
+  expect(del).toHaveBeenCalledTimes(1);
+});
+
+it('falha na limpeza registra o nome do erro, sem o caminho do arquivo', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  del.mockRejectedValue(Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError', status: 504 }));
+  const staged = await stageImageReferences(parseImageReferences([PNG]));
+  await staged.cleanup();
+  const line = log.mock.calls.map(call => call.join(' ')).find(text => text.includes('cleanup_failed'));
+  expect(line).toContain('TimeoutError');
+  expect(line).toContain('504');
+  expect(line).not.toContain(REFERENCE_PREFIX);
+  log.mockRestore();
 });
 
 it('sem autenticação ou plano sem imagens não faz upload', async () => {

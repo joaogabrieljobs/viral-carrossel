@@ -52,7 +52,11 @@ export async function stageImageReferences(refs) {
   const cleanup = async () => {
     if (!paths.length) return;
     try { await del(paths, { abortSignal: AbortSignal.timeout(8000) }); }
-    catch { console.error('[image-references] cleanup_failed; daily cleanup will retry'); }
+    catch (error) {
+      // Só nome e status: o caminho do arquivo e o endereço assinado ficam fora do log.
+      const status = Number(error?.status || error?.statusCode) || 'sem status';
+      console.error(`[image-references] cleanup_failed (${String(error?.name || 'Error').slice(0, 60)}, ${status}); daily cleanup will retry`);
+    }
   };
   const signal = AbortSignal.timeout(20_000);
   const validUntil = Date.now() + REFERENCE_URL_TTL_MS;
