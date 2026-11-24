@@ -8166,6 +8166,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           hasOpenAI={hasOpenAI}
           hasAnthropic={hasAnyAI}
           imageQuota={access.imageQuota}
+          useOwnImageKey={useOwnImageKey}
           onOpenKeys={openKeys}
           onCreate={createAndGenerateProject}
           onCreateBlank={createBlankProject}

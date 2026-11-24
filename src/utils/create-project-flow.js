@@ -23,6 +23,16 @@ export const CREATION_DENSITIES = [
   { id: '1_1', label: 'Detalhado', desc: 'Mais desenvolvimento, mantendo o texto organizado.' },
 ];
 
+/**
+ * Linha "Antes de gerar" da revisão. Com chave própria a geração não desconta
+ * o plano (MT-08), então a frase não fala em crédito nem em saldo.
+ */
+export function creationImageConsumptionLabel({ wantImages = false, hasImageAI = false, count = 0, imageQuota = null, useOwnImageKey = false } = {}) {
+  if (!wantImages || !hasImageAI) return 'nenhum crédito de imagem';
+  if (useOwnImageKey) return 'imagens pela sua chave, sem usar o saldo do plano';
+  return `até ${count} crédito${Number(count) === 1 ? '' : 's'} de imagem${imageQuota?.unlimited ? ' · conta sem limite' : Number.isFinite(imageQuota?.remaining) ? ` · saldo atual: ${imageQuota.remaining}` : ''}`;
+}
+
 export const CREATION_MATERIAL_LIMITS = Object.freeze({
   carrossel:Object.freeze({ content:8000, sources:2000, context:1500 }),
   apresentacao:Object.freeze({ content:200000, sources:50000, context:PRESENTATION_INSTRUCTIONS_MAX_CHARS }),

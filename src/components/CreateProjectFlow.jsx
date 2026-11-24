@@ -16,7 +16,7 @@ import { normalizeStyleKit, MAX_REF_IMAGES, CONTEXT_MD_MAX, STYLE_PROMPT_MAX } f
 import { storeProjectReference } from '../utils/style-kit-storage.js';
 import { projectLogoFromStored, storeSlideLogo } from '../utils/slide-logo.js';
 import { canAutoApplyExplicitCardScript, parseExplicitCardScript } from '../utils/structured-card-script.js';
-import { CREATION_STEPS, NARRATIVE_CHOICES, CREATION_DENSITIES, cloneCreationBrand, validCreationCount, creationMaterialHasContent, readCreationTextFile, neutralCreationIdentity, creationIdentitySummary, captureCreationVisualIdentity, applyCreationVisualChoice, creationMaterialForSubmission, creationMaterialLimits, creationMaterialOverageMessage } from '../utils/create-project-flow.js';
+import { CREATION_STEPS, NARRATIVE_CHOICES, CREATION_DENSITIES, creationImageConsumptionLabel, cloneCreationBrand, validCreationCount, creationMaterialHasContent, readCreationTextFile, neutralCreationIdentity, creationIdentitySummary, captureCreationVisualIdentity, applyCreationVisualChoice, creationMaterialForSubmission, creationMaterialLimits, creationMaterialOverageMessage } from '../utils/create-project-flow.js';
 import { resolveCreationVisualSelection } from '../utils/generation-visual-choice.js';
 import '../styles/create-project-flow.css';
 
@@ -46,7 +46,7 @@ export default function CreateProjectFlow({
   onCreate, onCreateBlank, onCancel, onCancelGeneration, onOpenDraft, hasDraft = false,
   freePlan = false, onUpgrade,
   brandRoster = [], activeBrandId, defaultBrand = {}, initialName = '', initialProductKind = 'carrossel',
-  hasOpenAI = false, hasAnthropic = false, onOpenKeys, visualPresets = [], progress, previewSlides = [], previewPhase = 'draft', imageQuota = null,
+  hasOpenAI = false, hasAnthropic = false, onOpenKeys, visualPresets = [], progress, previewSlides = [], previewPhase = 'draft', imageQuota = null, useOwnImageKey = false,
   generationPlan = null, previewCompletedCount, previewTotalCount,
 }) {
   const initial = useRef(neutralCreationIdentity(defaultBrand));
@@ -136,9 +136,7 @@ export default function CreateProjectFlow({
   const estimatedMinutes = wantImages
     ? `${Math.max(4, Math.ceil(Number(count || 1) * 0.8))}–${Math.max(8, Math.ceil(Number(count || 1) * 1.8))} min`
     : '2–5 min';
-  const imageConsumption = wantImages && hasOpenAI
-    ? `até ${count} crédito${Number(count) === 1 ? '' : 's'} de imagem${imageQuota?.unlimited ? ' · conta sem limite' : Number.isFinite(imageQuota?.remaining) ? ` · saldo atual: ${imageQuota.remaining}` : ''}`
-    : 'nenhum crédito de imagem';
+  const imageConsumption = creationImageConsumptionLabel({ wantImages, hasImageAI: hasOpenAI, count, imageQuota, useOwnImageKey });
   useEffect(() => { alive.current = true; return () => { alive.current = false; asyncVersion.current++; }; }, []);
   useEffect(() => {
     mainRef.current?.focus({ preventScroll:true });
