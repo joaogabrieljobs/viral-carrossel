@@ -22,7 +22,7 @@ import {
 } from './src/utils/editorial-review.js';
 import { buildFactualGroundingPrompt, auditDraftFactuality } from './src/utils/factual-grounding.js';
 import { normalizePresentationBlocks, repairPresentationLayouts, auditRenderedPresentationLayout } from './src/utils/presentation-quality.js';
-import { repairRenderedPresentation, overflowFallbackPatches, movedToNotesNotice } from './src/utils/presentation-render-review.js';
+import { repairRenderedPresentation, overflowFallbackPatches, movedToNotesNotice, waitForRenderedSlides } from './src/utils/presentation-render-review.js';
 import { presentationPhotoAspectRatio } from './src/utils/presentation-composition.js';
 import { buildPerformanceGuidance, savePublicationResult, removePublicationResult } from './src/utils/publication-results.js';
 import { PublicationResultsModal } from './src/components/panels/PublicationResultsModal.jsx';
@@ -6638,10 +6638,24 @@ ${jsonShapeLine}`;
       checkActive();
       if (isPresentationGeneration && generationPlan) {
         setGenProgress({ phase: 'text', current: 5, total: 5, label: 'Conferindo a apresentação renderizada…' });
-        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        // Dois quadros não garantem que o React já desenhou os slides gravados;
+        // a conferência lia a árvore antiga e era pulada sem registro.
+        const renderedRoots = () => waitForRenderedSlides({
+          slides: newSlides,
+          getRoot: id => slideRefs.current[id],
+          isCommitted: () => slidesLiveRef.current === history.getState().slides,
+          nextFrame: () => new Promise(resolve => requestAnimationFrame(resolve)),
+        });
+        const roots = await renderedRoots();
         checkActive();
-        const roots = newSlides.map(slide => slideRefs.current[slide.id]).filter(Boolean);
-        if (roots.length === newSlides.length) {
+        if (!roots) {
+          history.set(d => ({ ...d, presentationQuality: {
+            ...d.presentationQuality,
+            renderCheckStatus: 'unavailable',
+            renderRepairStatus: 'unavailable',
+            renderedIssues: [{ code: 'render-not-mounted', severity: 'warning', message: 'A conferência visual não foi concluída porque os slides não terminaram de ser desenhados.' }],
+          } }));
+        } else {
           try {
           await runAIJob(() => waitForExportReadiness({ slides: newSlides, roots }), job.signal);
           checkActive();
@@ -6666,9 +6680,8 @@ ${jsonShapeLine}`;
                 ) === JSON.stringify(value));
                 return unchanged ? { ...current, ...candidate.patch } : current;
               }) }));
-              await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+              const repairedRoots = await renderedRoots() || roots;
               checkActive();
-              const repairedRoots = newSlides.map(slide => slideRefs.current[slide.id]).filter(Boolean);
               await runAIJob(() => waitForExportReadiness({ slides: newSlides, roots: repairedRoots }), job.signal);
               checkActive();
               rendered = auditRenderedPresentationLayout(repairedRoots);
@@ -6689,9 +6702,8 @@ ${jsonShapeLine}`;
               movedToNotesIds.add(current.id);
               return { ...current, ...candidate.patch };
             }) }));
-            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            const fallbackRoots = await renderedRoots() || roots;
             checkActive();
-            const fallbackRoots = newSlides.map(slide => slideRefs.current[slide.id]).filter(Boolean);
             await runAIJob(() => waitForExportReadiness({ slides: newSlides, roots: fallbackRoots }), job.signal);
             checkActive();
             rendered = auditRenderedPresentationLayout(fallbackRoots);

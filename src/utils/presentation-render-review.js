@@ -79,6 +79,29 @@ function targetContext(slide, index, plan) {
 /** One optional semantic repair after measured overflow. It returns content-only
  * patches with an optimistic-concurrency snapshot; the caller must compare that
  * snapshot before applying and measure the rendered result again. */
+/**
+ * Espera o React desenhar os slides que acabaram de ser gravados e devolve as
+ * raízes deles. Dois quadros de animação não garantem isso: os dois podem rodar
+ * antes do render agendado, e a conferência lia a árvore do documento anterior
+ * (ou era pulada inteira). `isCommitted` diz se o que está na tela já é o
+ * estado gravado; sem isso raízes de um render anterior passariam por atuais.
+ * Devolve `null` se o prazo acabar, para o chamador registrar a pendência.
+ */
+export async function waitForRenderedSlides({
+  slides, getRoot, isCommitted, nextFrame, now = () => Date.now(), timeoutMs = 3_000,
+} = {}) {
+  const startedAt = now();
+  for (let frame = 1; ; frame += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    await nextFrame();
+    if (frame >= 2 && isCommitted()) {
+      const roots = slides.map((slide) => getRoot(slide.id));
+      if (roots.every(Boolean)) return roots;
+    }
+    if (now() - startedAt >= timeoutMs) return null;
+  }
+}
+
 export async function repairRenderedPresentation({ slides, plan, issues, presentationPath = 'auto', aiOptions = {} } = {}, callAI) {
   const unavailable = () => ({ patches: [], status: 'unavailable' });
   throwIfGenerationCancelled(aiOptions.signal);
