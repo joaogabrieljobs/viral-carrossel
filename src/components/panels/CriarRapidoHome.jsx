@@ -12,6 +12,7 @@ import {
   normalizePresentationPath,
 } from '../../utils/presentation.js';
 import { MOONT_NARRATIVES } from '../../config/moont-brand.js';
+import { imageBatchSelection } from '../../utils/image-generation-readiness.js';
 import { canAutoApplyExplicitCardScript, parseExplicitCardScript } from '../../utils/structured-card-script.js';
 
 const QUICK_PRODUCTS = [
@@ -626,9 +627,9 @@ export function CriarRapidoHome({
               setSelectedIds={setSelectedImageIds}
               busy={imagesBusy}
               onClose={() => setShowImagePicker(false)}
-              onGenerate={async () => {
-                if (!selectedImageIds.length) return;
-                await onGenerateImages?.(selectedImageIds);
+              onGenerate={async (chosenIds) => {
+                if (!chosenIds?.length) return;
+                await onGenerateImages?.(chosenIds);
                 setShowImagePicker(false);
               }}
               itemLabel={isPresentation ? 'slides' : 'cards'}
@@ -724,8 +725,13 @@ export function PostGenerateActions({
   );
 }
 
-function ImageBatchPicker({ slides, selectedIds, setSelectedIds, busy, onClose, onGenerate, itemLabel = 'cards' }) {
-  const eligible = slides.filter((s) => String(s.imageQuery || '').trim());
+export function ImageBatchPicker({ slides, selectedIds, setSelectedIds, busy, onClose, onGenerate, itemLabel = 'cards' }) {
+  // GB-08: mesma regra do lote. Card com foto não entra; trocar a foto de um
+  // card continua sendo feito no próprio card.
+  const batch = imageBatchSelection(slides, selectedIds);
+  const eligible = batch.eligible.map(({ slide }) => slide);
+  const cardNumberById = new Map(batch.eligible.map(({ slide, index }) => [slide.id, index + 1]));
+  const chosenIds = batch.selectedIds;
   const allSelected = eligible.length > 0 && eligible.every((s) => selectedIds.includes(s.id));
   const toggle = (id) => setSelectedIds((current) => (
     current.includes(id) ? current.filter((x) => x !== id) : [...current, id]
@@ -740,16 +746,22 @@ function ImageBatchPicker({ slides, selectedIds, setSelectedIds, busy, onClose, 
         </div>
         <button type="button" className="vc-btn vc-btn-ghost" aria-label="Fechar seleção" onClick={onClose} style={{ width: 44, minWidth: 44, height: 44, padding: 0 }}><X size={16} /></button>
       </div>
-      <button
-        type="button"
-        className="vc-btn vc-btn-ghost"
-        onClick={() => setSelectedIds(allSelected ? [] : eligible.map((s) => s.id))}
-        style={{ minHeight: 40, fontSize: 11 }}
-      >
-        {allSelected ? 'Desmarcar todos' : `Selecionar todos os ${itemLabel}`}
-      </button>
+      {eligible.length ? (
+        <button
+          type="button"
+          className="vc-btn vc-btn-ghost"
+          onClick={() => setSelectedIds(allSelected ? [] : eligible.map((s) => s.id))}
+          style={{ minHeight: 40, fontSize: 11 }}
+        >
+          {allSelected ? 'Desmarcar todos' : `Selecionar todos os ${itemLabel}`}
+        </button>
+      ) : (
+        <p role="status" style={{ margin: 0, fontSize: 11, lineHeight: 1.45, color: 'var(--text-muted)' }}>
+          Os {itemLabel} com descrição de imagem já têm foto. Para trocar uma foto, abra o {itemLabel === 'slides' ? 'slide' : 'card'} e gere a imagem de novo.
+        </p>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
-        {eligible.map((s, index) => {
+        {eligible.map((s) => {
           const selected = selectedIds.includes(s.id);
           return (
             <button
@@ -760,19 +772,19 @@ function ImageBatchPicker({ slides, selectedIds, setSelectedIds, busy, onClose, 
               style={{ minHeight: 78, position: 'relative', overflow: 'hidden', borderRadius: 10, border: `2px solid ${selected ? 'var(--accent)' : 'var(--hairline)'}`, background: s.bgImage ? '#111' : 'var(--bg-pearl)', padding: 0, cursor: 'pointer' }}
             >
               {s.bgImage ? <img src={s.bgImage} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} /> : null}
-              <span style={{ position: 'absolute', left: 6, bottom: 5, color: '#fff', fontSize: 10, fontWeight: 700, textShadow: '0 1px 3px #000' }}>{index + 1}</span>
+              <span style={{ position: 'absolute', left: 6, bottom: 5, color: '#fff', fontSize: 10, fontWeight: 700, textShadow: '0 1px 3px #000' }}>{cardNumberById.get(s.id)}</span>
               <span style={{ position: 'absolute', right: 5, top: 5, width: 22, height: 22, borderRadius: 999, background: selected ? 'var(--accent)' : 'rgba(0,0,0,0.55)', color: '#fff', display: 'grid', placeItems: 'center' }}>{selected ? <Check size={12} /> : null}</span>
             </button>
           );
         })}
       </div>
       <div style={{ fontSize: 11, lineHeight: 1.45, color: 'var(--text-muted)' }}>
-        Usa 1 crédito por imagem. Ao confirmar, esta ação consumirá até <strong>{selectedIds.length} crédito{selectedIds.length === 1 ? '' : 's'} de imagem</strong>.
+        Usa 1 crédito por imagem. Ao confirmar, esta ação consumirá até <strong>{chosenIds.length} crédito{chosenIds.length === 1 ? '' : 's'} de imagem</strong>.
       </div>
-      <button type="button" className="vc-btn vc-btn-primary" disabled={busy || !selectedIds.length} onClick={onGenerate} style={{ minHeight: 46 }}>
+      <button type="button" className="vc-btn vc-btn-primary" disabled={busy || !chosenIds.length} onClick={() => onGenerate(chosenIds)} style={{ minHeight: 46 }}>
         {busy
           ? <><Loader2 size={15} style={{ animation: 'spin 0.8s linear infinite' }} /> Gerando…</>
-          : `Confirmar: gerar ${selectedIds.length || ''} ${selectedIds.length === 1 ? 'imagem' : 'imagens'} · ${selectedIds.length || 0} ${selectedIds.length === 1 ? 'crédito' : 'créditos'}`}
+          : `Confirmar: gerar ${chosenIds.length || ''} ${chosenIds.length === 1 ? 'imagem' : 'imagens'} · ${chosenIds.length || 0} ${chosenIds.length === 1 ? 'crédito' : 'créditos'}`}
       </button>
     </section>
   );

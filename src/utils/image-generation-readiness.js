@@ -96,3 +96,15 @@ export function slidesPendingImageGeneration(slides, selectedSlideIds = null) {
     .filter(({ slide }) => text(slide?.imageQuery) && !slide?.bgImage && !slide?.bgImageAssetId
       && (!selected || selected.has(slide.id)));
 }
+
+/**
+ * Seletor "Quais cards terão imagem?" (auditoria 23/11, GB-08). Lista só o que
+ * o lote vai gerar e conta só o que está marcado entre eles, para o botão não
+ * prometer imagem e crédito de card que a geração pula por já ter foto.
+ */
+export function imageBatchSelection(slides, selectedSlideIds = []) {
+  const eligible = slidesPendingImageGeneration(slides);
+  const eligibleIds = new Set(eligible.map(({ slide }) => slide.id));
+  const selectedIds = (Array.isArray(selectedSlideIds) ? selectedSlideIds : []).filter((id) => eligibleIds.has(id));
+  return { eligible, selectedIds };
+}
