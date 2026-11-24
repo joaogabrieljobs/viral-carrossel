@@ -552,8 +552,9 @@ import {
 import { appModeLabel } from './src/utils/ui-depth-labels.js';
 import {
   accountMetadataContentKey, cloudSaveContinuation, combinedProjectSyncError, decideCloudAutoPush, decideProjectOpen,
-  isProjectOutboxUnavailable, persistProjectsIndependently, putProjectDirectly, queueUnsentProjectEdits,
+  isProjectOutboxUnavailable, persistProjectsIndependently, putProjectDirectly,
 } from './src/utils/project-sync-control.js';
+import { buildUnsentProjectMarker, writeUnsentProjectMarker } from './src/utils/unsent-project-marker.js';
 import CloudPhotoProgress from './src/components/CloudPhotoProgress.jsx';
 
 // A rota por projeto só é ativada depois do banco, importação e API estarem
@@ -1107,8 +1108,23 @@ export default function App() {
   }, []);
   const docAutosaveTimerRef = useRef(null);
   const libraryPersistTimerRef = useRef(null);
-  const queueUnsentEditsRef = useRef(null);
-  const queueUnsentEditsFlightRef = useRef(false);
+  // DB-05: junto de cada gravação do cache local vai, na mesma escrita
+  // síncrona, o marcador dos projetos ainda não enviados (id, versão observada
+  // e resumo do conteúdo). O boot seguinte os põe na fila durável antes de
+  // trocar a lista pela da conta. Nada aqui depende de terminar antes do unload.
+  const writeUnsentMarkerRef = useRef(null);
+  writeUnsentMarkerRef.current = () => {
+    const session = accessSessionRef.current;
+    if (!PROJECTS_V2 || !session?.active || session.free) return;
+    const owner = readDataOwner();
+    // Antes de a conta ser observada nesta aba o marcador é o da sessão
+    // anterior e pertence ao boot; não é regravado.
+    if (!owner || v2ObservedOwnerRef.current !== owner || areAccountDataWritesLocked()) return;
+    writeUnsentProjectMarker(buildUnsentProjectMarker({
+      owner, library: libraryPersistRef.current, baselines: v2BaselinesRef.current,
+      versions: v2VersionsRef.current, fingerprint: projectCacheFingerprint,
+    }));
+  };
 
   // Após sync/pull: o reload pode disparar pagehide que regrava a biblioteca
   // React (stale) por cima da nuvem. O lock impede isso; aqui libertamos no boot.
@@ -1128,8 +1144,7 @@ export default function App() {
       if (!accountLibraryReadyRef.current || areAccountDataWritesLocked()) return;
       if (flushPersistRef.current) {
         flushPersistRef.current();
-        // DB-05: o cache local não sobrevive ao boot seguinte; a fila durável sim.
-        void queueUnsentEditsRef.current?.();
+        writeUnsentMarkerRef.current?.();
         return;
       }
       lsSet(SK.library, semImagensDeRuntime(libraryPersistRef.current));
@@ -1173,6 +1188,7 @@ export default function App() {
       // A synchronous save may have already advanced this snapshot. Never
       // replay the library captured before generation or project creation.
       if (!lsSet(SK.library, semImagensDeRuntime(libraryPersistRef.current))) return;
+      writeUnsentMarkerRef.current?.();
       if (firstSaveRef.current) { firstSaveRef.current = false; return; }
       setLastSavedAt(Date.now());
     }, 100);
@@ -2382,38 +2398,6 @@ export default function App() {
     return { saved: true, adoptedFolders: saved.adoptedFolders };
   }, []);
 
-  // DB-05: chamado quando a aba é ocultada ou fechada. O envio em curso já
-  // cuida da própria fila; aqui entram as edições que ainda esperavam os 4 s.
-  queueUnsentEditsRef.current = async () => {
-    const session = accessSessionRef.current;
-    if (!PROJECTS_V2 || !session?.active || session.free || queueUnsentEditsFlightRef.current
-      || cloudSyncInFlightRef.current || v2OutboxUnavailableRef.current) return;
-    const owner = readDataOwner();
-    if (!owner || v2ObservedOwnerRef.current !== owner) return;
-    queueUnsentEditsFlightRef.current = true;
-    try {
-      const library = libraryPersistRef.current || [];
-      const snapshot = {
-        brandRoster: brandRosterPersistRef.current, libraryFolders: libraryFoldersPersistRef.current,
-        activeBrandId: editorSyncStateRef.current.activeBrandId,
-      };
-      const result = await queueUnsentProjectEdits({
-        library, baselines: v2BaselinesRef.current, versions: v2VersionsRef.current,
-        fingerprint: projectCacheFingerprint,
-        prepare: (entry) => projectCloudSync.prepareProjectCloudPayload(entry, {
-          snapshot, ownerId: owner,
-          isCurrent: () => readDataOwner() === owner
-            && (libraryPersistRef.current || []).some((item) => item?.id === entry.id),
-        }),
-        queue: (entry, options) => projectOutbox.queueProjectPut(owner, entry, options),
-      });
-      // A aba pode só ter ido para segundo plano: adianta o envio.
-      if (result.queued) cloudAutoPushScheduleRef.current?.({ immediate: true });
-    } catch { /* o cache local continua gravado */ } finally {
-      queueUnsentEditsFlightRef.current = false;
-    }
-  };
-
   // Edições que ficaram só neste navegador porque o projeto foi excluído em
   // outro dispositivo. A fila as retém; esta lista alimenta a tela de escolha.
   const [deletedEditReviews, setDeletedEditReviews] = useState([]);
@@ -2487,6 +2471,8 @@ export default function App() {
   const finishCloudSync = useCallback(() => {
     cloudSyncInFlightRef.current = false;
     setCloudSyncBusy(false);
+    // DB-05: o que acabou de ser confirmado sai do marcador.
+    writeUnsentMarkerRef.current?.();
     void refreshRetainedProjectEditsRef.current?.();
     if (cloudAutoPushAfterFlightRef.current) {
       cloudAutoPushAfterFlightRef.current = false;

@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bindAccountDataWriteOwner, SK } from '../../src/utils/storage.js';
 import { originalImageAssetId } from '../../src/utils/cloud-image-assets.js';
 import { flushProjectOutboxForBoot } from '../../src/hooks/useAccess.js';
-import { queueUnsentProjectEdits } from '../../src/utils/project-sync-control.js';
+import {
+  buildUnsentProjectMarker, readUnsentProjectMarker, requeueUnsentCachedProjects, writeUnsentProjectMarker,
+} from '../../src/utils/unsent-project-marker.js';
 import {
   acknowledgeProjectOp, conflictCopyEntry, conflictCopyId, flushProjectOutbox, getPendingProjectOp,
   listDeletedProjectEdits, listPendingProjectOps, listRetainedProjectEdits, overlayRetainedProjectEdits,
@@ -917,60 +919,106 @@ describe('DB-03: o boot não esconde projeto que só existe na fila', () => {
 });
 
 // DB-05 (auditoria 23/11): a edição só entrava na fila durável dentro do envio,
-// 4 s depois da última alteração. Trocar de aplicativo antes disso deixava a
+// 4 s depois da última alteração. Recarregar ou fechar antes disso deixava a
 // edição só no cache local, e o boot seguinte a trocava pela versão da nuvem.
-describe('DB-05: ao ocultar a aba, a edição ainda não enviada entra na fila durável', () => {
+// O marcador síncrono leva o projeto do cache para a fila no boot; quem decide
+// conflito continua sendo a versão no servidor.
+describe('DB-05: no boot, o projeto marcado como não enviado vai do cache para a fila', () => {
   const fingerprint = (entry) => JSON.stringify(entry.doc);
-  const prepare = async (entry) => ({ entry: structuredClone(entry), assets: new Map() });
-  const queue = (entry, options) => queueProjectPut(ALICE, entry, options);
+  const saved = { id: 'janine', name: 'Clínica', doc: { slides: [{ id: 's1', title: 'Titulo com ero' }] } };
+  const edited = { ...saved, doc: { slides: [{ id: 's1', title: 'Título corrigido' }] } };
 
-  it('o título corrigido há menos de 4 s fica na fila e é enviado antes da lista no boot seguinte', async () => {
-    const saved = { id: 'janine', name: 'Clínica', doc: { slides: [{ id: 's1', title: 'Titulo com ero' }] } };
-    const edited = { ...saved, doc: { slides: [{ id: 's1', title: 'Título corrigido' }] } };
-    const untouched = { id: 'outro', name: 'Outro', doc: { slides: [] } };
-    const baselines = new Map([['janine', fingerprint(saved)], ['outro', fingerprint(untouched)]]);
-    const versions = new Map([['janine', 7], ['outro', 2]]);
-
-    expect(await queueUnsentProjectEdits({
-      library: [edited, untouched], baselines, versions, fingerprint, prepare, queue,
-    })).toEqual({ queued: 1, failed: 0 });
-    expect(await getPendingProjectOp(ALICE, 'outro')).toBeNull();
-    expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({ kind: 'put', baseVersion: 7, entry: edited });
-
-    // Boot seguinte: a fila é enviada antes do GET da lista, com a versão observada.
-    const calls = [];
-    fetch.mockImplementation(async (url, request) => {
-      if (url === '/api/auth/session') return session();
-      calls.push(JSON.parse(request.body));
-      return json({ ok: true, project: { id: 'janine', version: 8, entry: edited } });
-    });
-    const boot = await flushProjectOutboxForBoot(ALICE, flushProjectOutbox);
-    expect(boot.receipt).toEqual({ sent: 1, pending: 0 });
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).toMatchObject({ baseVersion: 7, entry: { doc: { slides: [{ title: 'Título corrigido' }] } } });
+  /** O que a aba anterior deixou: cache local com a edição e o marcador (versão 7). */
+  function closedTabWith(library, { version = 7 } = {}) {
+    writeUnsentProjectMarker(buildUnsentProjectMarker({
+      owner: ALICE, library, fingerprint,
+      baselines: new Map([['janine', fingerprint(saved)]]), versions: new Map([['janine', version]]),
+    }), localStorage);
+    return structuredClone(library);
+  }
+  const boot = (cache) => requeueUnsentCachedProjects({
+    owner: ALICE, storage: localStorage, library: cache, fingerprint,
+    getPendingOp: (id) => getPendingProjectOp(ALICE, id),
+    prepare: async (entry) => ({ entry: structuredClone(entry), assets: new Map() }),
+    queue: (entry, options) => queueProjectPut(ALICE, entry, options),
   });
 
-  it('projeto criado e ainda nunca enviado entra com versão 0; falha em um não impede os outros', async () => {
-    const novo = { id: 'novo', name: 'Novo', doc: { slides: [{ id: 's1', title: 'A' }] } };
-    const quebrado = { id: 'quebrado', name: 'X', doc: { slides: [] } };
-    const result = await queueUnsentProjectEdits({
-      library: [quebrado, novo], baselines: new Map(), versions: new Map(), fingerprint,
-      prepare: async (entry) => {
-        if (entry.id === 'quebrado') throw new Error('imagem grande demais');
-        return { entry: structuredClone(entry), assets: new Map() };
-      },
-      queue,
+  it('a edição feita logo antes do reload é enviada antes da lista, com a versão observada', async () => {
+    const cache = closedTabWith([edited]);
+    expect(await boot(cache)).toEqual({ queued: 1, skipped: 0, failed: 0 });
+    expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({ kind: 'put', baseVersion: 7, entry: edited });
+    expect(readUnsentProjectMarker(ALICE, localStorage)).toBeNull();
+
+    const puts = [];
+    fetch.mockImplementation(async (url, request) => {
+      if (url === '/api/auth/session') return session();
+      puts.push(JSON.parse(request.body));
+      return json({ ok: true, project: { id: 'janine', version: 8, entry: edited } });
     });
-    expect(result).toEqual({ queued: 1, failed: 1 });
+    expect((await flushProjectOutboxForBoot(ALICE, flushProjectOutbox)).receipt).toEqual({ sent: 1, pending: 0 });
+    expect(puts).toHaveLength(1);
+    expect(puts[0]).toMatchObject({ baseVersion: 7, entry: { doc: { slides: [{ title: 'Título corrigido' }] } } });
+  });
+
+  it('projeto criado e nunca enviado entra com versão 0', async () => {
+    const novo = { id: 'novo', name: 'Rascunho', doc: { slides: [{ id: 's1', title: 'A' }] } };
+    expect(await boot(closedTabWith([novo]))).toEqual({ queued: 1, skipped: 0, failed: 0 });
     expect(await getPendingProjectOp(ALICE, 'novo')).toMatchObject({ kind: 'put', baseVersion: 0 });
   });
 
-  it('sem edição pendente não grava nada', async () => {
-    const saved = { id: 'janine', doc: { slides: [] } };
-    expect(await queueUnsentProjectEdits({
-      library: [saved], baselines: new Map([['janine', fingerprint(saved)]]), versions: new Map([['janine', 3]]),
-      fingerprint, prepare, queue,
-    })).toEqual({ queued: 0, failed: 0 });
-    expect(await listPendingProjectOps(ALICE)).toEqual([]);
+  it('marcador velho não sobrescreve versão mais nova da conta: vira cópia de conflito', async () => {
+    await boot(closedTabWith([edited]));
+    const remote = { id: 'janine', name: 'Clínica', doc: { slides: [{ id: 's1', title: 'Editado no celular' }] } };
+    const requests = [];
+    fetch.mockImplementation(async (url, request) => {
+      if (url === '/api/auth/session') return session();
+      const method = request?.method || 'GET';
+      const body = request?.body ? JSON.parse(request.body) : null;
+      requests.push({ method, id: body?.entry?.id || new URL(url, 'https://moont.test').searchParams.get('id'), baseVersion: body?.baseVersion });
+      if (method === 'GET') return json({ ok: true, project: { id: 'janine', version: 9, entry: remote } });
+      if (body.entry.id === 'janine') {
+        return json({ error: 'Conflito', code: 'project_conflict', cloudVersion: 9 }, 409);
+      }
+      return json({ ok: true, project: { id: body.entry.id, version: 1, entry: body.entry } });
+    });
+    const receipt = await flushProjectOutbox(ALICE);
+    expect(receipt).toMatchObject({ sent: 1, pending: 0, recoveries: [{ sourceProjectId: 'janine' }] });
+    // O único PUT no projeto original foi o recusado (versão 7); a edição foi para a cópia.
+    expect(requests.filter((item) => item.method === 'PUT' && item.id === 'janine'))
+      .toEqual([{ method: 'PUT', id: 'janine', baseVersion: 7 }]);
+    expect(requests.some((item) => item.method === 'PUT' && item.id === conflictCopyId('janine'))).toBe(true);
+  });
+
+  it('DB-02: projeto excluído em outro aparelho continua indo para a escolha da pessoa', async () => {
+    await boot(closedTabWith([edited]));
+    fetch.mockResolvedValueOnce(session())
+      .mockResolvedValueOnce(json({ error: 'Excluído', code: 'project_deleted', cloudVersion: 8 }, 409));
+    expect(await flushProjectOutbox(ALICE)).toMatchObject({ sent: 0, pending: 1, needsReview: [{ kind: 'put_deleted' }] });
+    expect(await listDeletedProjectEdits(ALICE)).toMatchObject([{ projectId: 'janine' }]);
+    expect(fetch.mock.calls.filter(([url]) => url === '/api/projects')).toHaveLength(1);
+  });
+
+  it('DB-02: edição já retida para escolha não é trocada pelo cache marcado', async () => {
+    await queueProjectPut(ALICE, saved, { baseVersion: 6 });
+    fetch.mockResolvedValueOnce(session())
+      .mockResolvedValueOnce(json({ error: 'Excluído', code: 'project_deleted', cloudVersion: 8 }, 409));
+    await flushProjectOutbox(ALICE);
+    const before = await getPendingProjectOp(ALICE, 'janine');
+    expect(await boot(closedTabWith([edited]))).toEqual({ queued: 0, skipped: 1, failed: 0 });
+    expect(await getPendingProjectOp(ALICE, 'janine')).toEqual(before);
+  });
+
+  it('envio já confirmado com marcador velho é reconhecido, sem cópia nem novo PUT aceito', async () => {
+    await boot(closedTabWith([edited]));
+    const requests = [];
+    fetch.mockImplementation(async (url, request) => {
+      if (url === '/api/auth/session') return session();
+      const method = request?.method || 'GET';
+      requests.push(method);
+      if (method === 'GET') return json({ ok: true, project: { id: 'janine', version: 8, entry: { ...edited, updatedAt: 99 } } });
+      return json({ error: 'Conflito', code: 'project_conflict', cloudVersion: 8 }, 409);
+    });
+    expect(await flushProjectOutbox(ALICE)).toEqual({ sent: 1, pending: 0 });
+    expect(requests).toEqual(['PUT', 'GET']);
   });
 });

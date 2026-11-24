@@ -182,6 +182,40 @@ function readLoginHintEmail() {
   catch { return ''; }
 }
 
+/**
+ * DB-05: põe na fila durável os projetos do cache local que a sessão anterior
+ * marcou como ainda não enviados. Nunca impede o boot: sem fila ou sem cache,
+ * o marcador fica como está e a abertura segue.
+ */
+export async function requeueUnsentProjectsForBoot(owner, { signal, storage = globalThis.localStorage } = {}) {
+  try {
+    const readJson = (key, fallback) => {
+      try { return JSON.parse(storage.getItem(key) || 'null') ?? fallback; } catch { return fallback; }
+    };
+    const [{ requeueUnsentCachedProjects, readUnsentProjectMarker }, { projectCacheFingerprint }] = await Promise.all([
+      import('../utils/unsent-project-marker.js'),
+      import('../utils/project-content-snapshot.js'),
+    ]);
+    if (!readUnsentProjectMarker(owner, storage)) return { queued: 0, skipped: 0, failed: 0 };
+    const [{ getPendingProjectOp, queueProjectPut }, { prepareProjectCloudPayload }] = await Promise.all([
+      import('../utils/projects-outbox.js'),
+      import('../utils/projects-cloud-sync.js'),
+    ]);
+    const snapshot = {
+      brandRoster: readJson(SK.brands, []), libraryFolders: readJson(SK.libraryFolders, []),
+      activeBrandId: readJson(SK.activeBrandId, ''),
+    };
+    return await requeueUnsentCachedProjects({
+      owner, storage, library: readJson(SK.library, []), fingerprint: projectCacheFingerprint,
+      getPendingOp: (projectId) => getPendingProjectOp(owner, projectId),
+      prepare: (entry) => prepareProjectCloudPayload(entry, { snapshot, ownerId: owner, signal }),
+      queue: (entry, options) => queueProjectPut(owner, entry, options),
+    });
+  } catch {
+    return { queued: 0, skipped: 0, failed: 0 };
+  }
+}
+
 /** Falha no IndexedDB não é recibo de fila vazia; outros erros ainda bloqueiam o boot. */
 export async function flushProjectOutboxForBoot(owner, flush) {
   try {
@@ -564,6 +598,12 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
               import('../utils/library-sync.js'),
               import('../utils/account-library-meta.js'),
             ]));
+            // DB-05: a sessão anterior pode ter fechado com edição só no cache
+            // local. O marcador gravado junto do cache diz quais projetos e em
+            // que versão da conta se baseavam; eles entram na fila antes do
+            // envio abaixo e do pull, que trocaria a lista pela da conta.
+            await awaitBoot(requeueUnsentProjectsForBoot(owner, { signal: bootAbort.signal }));
+            if (!sessionStillOwnsData()) return;
             const { receipt: outboxReceipt, unavailable: outboxUnavailable } =
               await awaitBoot(flushProjectOutboxForBoot(owner, flushProjectOutbox));
             if (!sessionStillOwnsData()) return;
