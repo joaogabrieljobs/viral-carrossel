@@ -7,6 +7,7 @@ import { brandLogoReplacementPatch, storeSlideLogo } from '../../utils/slide-log
 import { remapDestaqueSpansOnEdit } from '../../utils/text-spans.js';
 import '../../styles/quick-adjustments.css';
 import { readStyleScope, writeStyleScope } from '../../utils/style-scope-memory.js';
+import { signatureTextSupport } from '../../utils/card-signature-texts.js';
 
 /** Saved styles stay visible even when the built-in catalog is collapsed. */
 export function quickVisiblePresets(presets, expanded = false, selectedId = '') {
@@ -61,7 +62,7 @@ export function QuickAdjustmentsPanel({
   projectId = null, visualPreset = '', presets = [], applyVisualPreset,
   updateSlide, onImportPhotoAt, onOpenPhotoPosition, onSaveBrandLogo,
   onRemix, busy = false, hasTextAI = false, onAutoAdjust, onMoreControl,
-  editorFocus = null, toast,
+  editorFocus = null, toast, creativePreset = 'livre',
 }) {
   const [stylesExpanded, setStylesExpanded] = useState(false);
   // Trocar de estilo muda o projeto inteiro por padrão; "Este card" é a exceção
@@ -83,12 +84,14 @@ export function QuickAdjustmentsPanel({
   if (visibleAuxiliaryRef.current.targetKey !== targetKey) visibleAuxiliaryRef.current = { targetKey, fields: new Set() };
   targetRef.current = targetKey;
   const selectedTextKey = editorFocus?.slideId === slide.id ? editorFocus.key : null;
+  // Só entra o texto de assinatura que o layout atual do card desenha.
+  const signature = signatureTextSupport(slide, { creativePreset });
   const auxiliaryFields = [
     { field: 'bodyAfterImage', key: 'bodyAfterImage', label: 'Texto complementar' },
-    { field: 'eyebrowText', key: 'eyebrow', label: 'Título de apoio' },
-    { field: 'strikethroughText', key: 'offer-strike', label: 'Texto riscado' },
-    { field: 'afterTitleText', key: 'offer', label: 'Oferta' },
-  ];
+    { field: 'eyebrowText', key: 'eyebrow', label: 'Título de apoio', drawn: signature.eyebrow },
+    { field: 'strikethroughText', key: 'offer-strike', label: signature.strike === 'plain' ? 'Texto riscado (sai sem o traço)' : 'Texto riscado', drawn: signature.strike !== 'none' },
+    { field: 'afterTitleText', key: 'offer', label: 'Oferta', drawn: signature.offer },
+  ].filter((item) => item.drawn !== false);
   for (const item of auxiliaryFields) {
     if (String(slide[item.field] || '').trim() || selectedTextKey === item.key) visibleAuxiliaryRef.current.fields.add(item.field);
   }

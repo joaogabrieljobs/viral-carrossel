@@ -23,6 +23,7 @@ import { ProjectStyleKitPanel } from './panels/ProjectStyleKitPanel.jsx';
 import { NarrativaStudioPanels, BTN_CAPS } from './panels/NarrativaStudioPanels.jsx';
 import { CriarRapidoHome, PostGenerateActions } from './panels/CriarRapidoHome.jsx';
 import { QuickAdjustmentsPanel } from './panels/QuickAdjustmentsPanel.jsx';
+import { SignatureTextFields } from './panels/SignatureTextFields.jsx';
 import { readStyleScope, writeStyleScope } from '../utils/style-scope-memory.js';
 import { ImportTextModal } from './panels/ImportTextModal.jsx';
 import { TeamSharePanel } from './panels/TeamSharePanel.jsx';
@@ -784,6 +785,7 @@ function SidebarContent({
             isPresentation={isPresentationProject} projectId={activeDocId || activeEntry?.id}
             visualPreset={visualPreset} presets={productVisualPresets}
             applyVisualPreset={applyVisualPresetCb} updateSlide={updateSlide}
+            creativePreset={creativePreset}
             onImportPhotoAt={onImportPhotoAt} onOpenPhotoPosition={onOpenPhotoPosition}
             onSaveBrandLogo={onSaveBrandLogo}
             onRemix={(hint) => refineAll?.(`Reescreva com tom ${hint}. Preserve os fatos, a ideia, a ordem, a quantidade de cards e o volume aproximado de texto. Não invente informação nem preencha campos vazios.`)}
@@ -1493,38 +1495,7 @@ function SidebarContent({
                 title={`Textos de assinatura deste ${itemLabel}`}
                 hint={`Vêm preenchidos pelos padrões visuais (Bold Promo, Case Study…). São por ${itemLabel} — deixe vazio para esconder.`}
               >
-                <div>
-                  <label className="vc-label-sm">Sobrelinha (acima do título)</label>
-                  <input
-                    value={slide.eyebrowText ?? ''}
-                    onChange={e=>updateSlide({ eyebrowText: e.target.value })}
-                    className="vc-input"
-                    placeholder="Sua categoria"
-                    style={{ fontSize:12 }}
-                  />
-                </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                  <div>
-                    <label className="vc-label-sm">Riscado</label>
-                    <input
-                      value={slide.strikethroughText ?? ''}
-                      onChange={e=>updateSlide({ strikethroughText: e.target.value })}
-                      className="vc-input"
-                      placeholder="De R$00"
-                      style={{ fontSize:12 }}
-                    />
-                  </div>
-                  <div>
-                    <label className="vc-label-sm">Depois do título</label>
-                    <input
-                      value={slide.afterTitleText ?? ''}
-                      onChange={e=>updateSlide({ afterTitleText: e.target.value })}
-                      className="vc-input"
-                      placeholder="por R$00"
-                      style={{ fontSize:12 }}
-                    />
-                  </div>
-                </div>
+                <SignatureTextFields slide={slide} creativePreset={creativePreset} itemLabel={itemLabel} updateSlide={updateSlide} />
               </S>
             )}
 
