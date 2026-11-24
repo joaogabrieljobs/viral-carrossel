@@ -32,7 +32,7 @@ Nada de galeria, publicação ou catálogo entre usuários existe no código nem
 
 **Aplicar.** Reaproveita o caminho atual de aplicar padrão, que já preserva o conteúdo do projeto de destino. Capa vai para o primeiro card, fechamento para o último, conteúdo se repete no meio. Aplicar é uma cópia: mudanças posteriores do autor não alteram projetos já criados.
 
-**Banco.** Duas tabelas novas no esquema `moont`: `published_templates` (id, dono, nome, descrição, formato, conteúdo sanitizado, estado, alcance, nome de exibição do autor, usos, datas) e `template_reports` (denúncias). Sem políticas de linha, como o resto.
+**Banco.** Duas tabelas novas no esquema `moont`: `published_templates` (id, dono, nome, descrição, formato, conteúdo sanitizado, estado, alcance, nome de exibição do autor, usos, datas) e `published_template_reports` (denúncias). Sem políticas de linha, como o resto.
 
 **Servidor.** Uma função só, `api/templates.js`, com listar, ler, publicar, atualizar, despublicar, registrar uso e denunciar. Segue o padrão das rotas atuais: limite de tamanho, limite de chamadas, dono vindo do cookie. Atualizar e despublicar comparam o dono no próprio `UPDATE`; modelo alheio responde 404.
 
@@ -97,7 +97,7 @@ Regras implementadas:
 - O servidor reconstrói o modelo por lista permitida antes de gravar; texto livre de ornamento só passa se for marcador. Limite de 48 KB.
 - Escrita compara o dono no SQL; modelo alheio responde 404. `owner_id` e contagem de denúncias nunca saem na resposta.
 - Limites por conta: 10 modelos publicados e 5 publicações a cada 24 h; 10 publicações por minuto.
-- Denúncia: uma por conta e modelo; ninguém denuncia o próprio; com 3 contas o modelo sai da galeria (`status = 'hidden'`) e a autora vê "em revisão". Revisão do João: pela tabela `moont.published_template_reports` no Supabase.
+- Denúncia: uma por conta e modelo; ninguém denuncia o próprio. Só soma para ocultar a denúncia de conta com assinatura ativa ou isenção (`api/templates.js`, `reportCountsTowardHide`); com 3 dessas o modelo sai da galeria (`status = 'hidden'`) e a autora vê "em revisão". Denúncia de conta grátis fica registrada e aparece na fila da moderação, mas não oculta o modelo. Se a consulta do plano falhar, a denúncia também fica registrada sem somar. Revisão do João: pela tabela `moont.published_template_reports` no Supabase.
 - Despublicar apaga o modelo. Projetos que já o usaram não mudam (aplicar é uma cópia).
 - Aplicar mantém textos, fotos, logo, nome, @ e o formato do projeto; capa no primeiro card, fechamento no último, conteúdo se repete no meio. Dá para desfazer.
 
@@ -110,14 +110,14 @@ Para ativar em produção: aplicar `015_published_templates.sql` no Supabase "Mo
 
 ## 8. Moderação (2026-11-19)
 
-Aba **Moderação** na galeria, visível só para contas listadas em `moont.template_moderators` (migração 016). Para as demais, a fila e a decisão respondem 404, como se não existissem.
+Aba **Moderação** na galeria, visível para contas listadas em `moont.template_moderators` (migração 016) e para quem tem papel sem revogação em `moont.admin_roles` (console admin, migração 018). Para as demais, a fila e a decisão respondem 404, como se não existissem.
 
 - Fila: modelos fora da galeria primeiro, depois os denunciados; com motivo e data de cada denúncia, sem identificar quem denunciou nem a autora (só "N modelos da mesma conta" e "N já removidos/ocultos").
-- Decisões: **Manter** (volta à galeria, zera as denúncias; novas denúncias recomeçam a contagem), **Ocultar** (sai da galeria sem apagar; a autora vê "em revisão"), **Remover** e **Restaurar**.
+- Decisões: **Manter** (volta à galeria e dispensa as denúncias pendentes; elas ficam guardadas, então quem já denunciou não denuncia o mesmo modelo de novo e só denúncias de outras contas voltam a somar; migração 023), **Ocultar** (sai da galeria sem apagar; a autora vê "em revisão"), **Remover** e **Restaurar**.
 - **Remover é reversível** (João, 19/11): o modelo vira `status = 'removed'`, some da galeria e dos "Meus modelos" da autora (ela não edita, não apaga, ninguém denuncia nem aplica), mas fica guardado. A moderação vê os removidos em "Removidos", com a data, e pode **Restaurar**: volta à galeria com as denúncias zeradas. Removido só aceita "restaurar"; as outras decisões respondem 409.
 - Removido não conta no limite de 10 modelos da autora, mas conta no limite de 5 por dia (evita publicar e remover em ciclo).
 - Cada decisão fica em `moont.template_moderation_events`.
-- Incluir ou tirar moderador: `INSERT`/`DELETE` em `moont.template_moderators`, sem novo deploy.
+- Incluir ou tirar moderador: `INSERT`/`DELETE` em `moont.template_moderators`, sem novo deploy. Quem recebe papel de `admin` ou `suporte` no console admin passa a moderar sem precisar entrar nessa tabela; tirar alguém de `template_moderators` não tira a moderação de quem ainda tem papel em `admin_roles`.
 - Testes: `tests/integration/published-templates.test.js` (conta comum recebe 404; fila, decisões e histórico; mutação sem a checagem de moderador faz o teste falhar) e `tests/e2e/publicar-modelo.spec.js`.
 
-Não existe console admin geral no Moont; esta aba é a primeira peça de administração dentro do app.
+Esta aba foi a primeira peça de administração dentro do app. O console admin geral veio depois: `docs/product/console-admin.md`.
