@@ -72,6 +72,28 @@ export function combinedProjectSyncError(failures, { activeId } = {}) {
   });
 }
 
+/**
+ * DB-05: ao ocultar ou fechar a aba, o que ainda não foi enviado entra na
+ * fila durável com a versão que esta aba observou. O boot seguinte envia a
+ * fila antes de baixar a lista, então a edição não é trocada pela da nuvem.
+ * As fotos seguem para a fila junto; o envio à rede continua sendo do Sync.
+ */
+export async function queueUnsentProjectEdits({ library, baselines, versions, fingerprint, prepare, queue }) {
+  let queued = 0;
+  let failed = 0;
+  for (const entry of Array.isArray(library) ? library : []) {
+    if (!entry?.id || baselines.get(entry.id) === fingerprint(entry)) continue;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const prepared = await prepare(entry);
+      // eslint-disable-next-line no-await-in-loop
+      await queue(prepared.entry, { baseVersion: versions.get(entry.id) ?? 0, assets: prepared.assets });
+      queued += 1;
+    } catch { failed += 1; } // o cache local e o próximo envio continuam valendo
+  }
+  return { queued, failed };
+}
+
 const OUTBOX_UNAVAILABLE_CODES = new Set([
   'project_outbox_unavailable', 'project_outbox_timeout', 'project_outbox_failed',
 ]);

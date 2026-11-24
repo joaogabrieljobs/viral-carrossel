@@ -552,7 +552,7 @@ import {
 import { appModeLabel } from './src/utils/ui-depth-labels.js';
 import {
   accountMetadataContentKey, cloudSaveContinuation, combinedProjectSyncError, decideCloudAutoPush, decideProjectOpen,
-  isProjectOutboxUnavailable, persistProjectsIndependently, putProjectDirectly,
+  isProjectOutboxUnavailable, persistProjectsIndependently, putProjectDirectly, queueUnsentProjectEdits,
 } from './src/utils/project-sync-control.js';
 import CloudPhotoProgress from './src/components/CloudPhotoProgress.jsx';
 
@@ -1107,6 +1107,8 @@ export default function App() {
   }, []);
   const docAutosaveTimerRef = useRef(null);
   const libraryPersistTimerRef = useRef(null);
+  const queueUnsentEditsRef = useRef(null);
+  const queueUnsentEditsFlightRef = useRef(false);
 
   // Após sync/pull: o reload pode disparar pagehide que regrava a biblioteca
   // React (stale) por cima da nuvem. O lock impede isso; aqui libertamos no boot.
@@ -1124,7 +1126,12 @@ export default function App() {
     const flushLibrary = () => {
       // Logout/troca de conta: não repor biblioteca no pagehide.
       if (!accountLibraryReadyRef.current || areAccountDataWritesLocked()) return;
-      if (flushPersistRef.current) { flushPersistRef.current(); return; }
+      if (flushPersistRef.current) {
+        flushPersistRef.current();
+        // DB-05: o cache local não sobrevive ao boot seguinte; a fila durável sim.
+        void queueUnsentEditsRef.current?.();
+        return;
+      }
       lsSet(SK.library, semImagensDeRuntime(libraryPersistRef.current));
       lsSet(SK.libraryFolders, libraryFoldersPersistRef.current);
       lsSet(SK.brands, semLogosDeRuntimeDasMarcas(brandRosterPersistRef.current));
@@ -2374,6 +2381,38 @@ export default function App() {
     v2MetaBaselineRef.current = fingerprint;
     return { saved: true, adoptedFolders: saved.adoptedFolders };
   }, []);
+
+  // DB-05: chamado quando a aba é ocultada ou fechada. O envio em curso já
+  // cuida da própria fila; aqui entram as edições que ainda esperavam os 4 s.
+  queueUnsentEditsRef.current = async () => {
+    const session = accessSessionRef.current;
+    if (!PROJECTS_V2 || !session?.active || session.free || queueUnsentEditsFlightRef.current
+      || cloudSyncInFlightRef.current || v2OutboxUnavailableRef.current) return;
+    const owner = readDataOwner();
+    if (!owner || v2ObservedOwnerRef.current !== owner) return;
+    queueUnsentEditsFlightRef.current = true;
+    try {
+      const library = libraryPersistRef.current || [];
+      const snapshot = {
+        brandRoster: brandRosterPersistRef.current, libraryFolders: libraryFoldersPersistRef.current,
+        activeBrandId: editorSyncStateRef.current.activeBrandId,
+      };
+      const result = await queueUnsentProjectEdits({
+        library, baselines: v2BaselinesRef.current, versions: v2VersionsRef.current,
+        fingerprint: projectCacheFingerprint,
+        prepare: (entry) => projectCloudSync.prepareProjectCloudPayload(entry, {
+          snapshot, ownerId: owner,
+          isCurrent: () => readDataOwner() === owner
+            && (libraryPersistRef.current || []).some((item) => item?.id === entry.id),
+        }),
+        queue: (entry, options) => projectOutbox.queueProjectPut(owner, entry, options),
+      });
+      // A aba pode só ter ido para segundo plano: adianta o envio.
+      if (result.queued) cloudAutoPushScheduleRef.current?.({ immediate: true });
+    } catch { /* o cache local continua gravado */ } finally {
+      queueUnsentEditsFlightRef.current = false;
+    }
+  };
 
   // Edições que ficaram só neste navegador porque o projeto foi excluído em
   // outro dispositivo. A fila as retém; esta lista alimenta a tela de escolha.

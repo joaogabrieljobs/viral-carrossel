@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bindAccountDataWriteOwner, SK } from '../../src/utils/storage.js';
 import { originalImageAssetId } from '../../src/utils/cloud-image-assets.js';
 import { flushProjectOutboxForBoot } from '../../src/hooks/useAccess.js';
+import { queueUnsentProjectEdits } from '../../src/utils/project-sync-control.js';
 import {
   acknowledgeProjectOp, conflictCopyEntry, conflictCopyId, flushProjectOutbox, getPendingProjectOp,
   listDeletedProjectEdits, listPendingProjectOps, listRetainedProjectEdits, overlayRetainedProjectEdits,
@@ -912,5 +913,64 @@ describe('DB-03: o boot não esconde projeto que só existe na fila', () => {
       .toBe('O projeto ficou na fila local. Sincronize quando a conexão voltar.');
     expect(retainedProjectMessage({ kind: 'put' }))
       .toBe('O projeto ficou na fila local. Sincronize quando a conexão voltar.');
+  });
+});
+
+// DB-05 (auditoria 23/11): a edição só entrava na fila durável dentro do envio,
+// 4 s depois da última alteração. Trocar de aplicativo antes disso deixava a
+// edição só no cache local, e o boot seguinte a trocava pela versão da nuvem.
+describe('DB-05: ao ocultar a aba, a edição ainda não enviada entra na fila durável', () => {
+  const fingerprint = (entry) => JSON.stringify(entry.doc);
+  const prepare = async (entry) => ({ entry: structuredClone(entry), assets: new Map() });
+  const queue = (entry, options) => queueProjectPut(ALICE, entry, options);
+
+  it('o título corrigido há menos de 4 s fica na fila e é enviado antes da lista no boot seguinte', async () => {
+    const saved = { id: 'janine', name: 'Clínica', doc: { slides: [{ id: 's1', title: 'Titulo com ero' }] } };
+    const edited = { ...saved, doc: { slides: [{ id: 's1', title: 'Título corrigido' }] } };
+    const untouched = { id: 'outro', name: 'Outro', doc: { slides: [] } };
+    const baselines = new Map([['janine', fingerprint(saved)], ['outro', fingerprint(untouched)]]);
+    const versions = new Map([['janine', 7], ['outro', 2]]);
+
+    expect(await queueUnsentProjectEdits({
+      library: [edited, untouched], baselines, versions, fingerprint, prepare, queue,
+    })).toEqual({ queued: 1, failed: 0 });
+    expect(await getPendingProjectOp(ALICE, 'outro')).toBeNull();
+    expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({ kind: 'put', baseVersion: 7, entry: edited });
+
+    // Boot seguinte: a fila é enviada antes do GET da lista, com a versão observada.
+    const calls = [];
+    fetch.mockImplementation(async (url, request) => {
+      if (url === '/api/auth/session') return session();
+      calls.push(JSON.parse(request.body));
+      return json({ ok: true, project: { id: 'janine', version: 8, entry: edited } });
+    });
+    const boot = await flushProjectOutboxForBoot(ALICE, flushProjectOutbox);
+    expect(boot.receipt).toEqual({ sent: 1, pending: 0 });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ baseVersion: 7, entry: { doc: { slides: [{ title: 'Título corrigido' }] } } });
+  });
+
+  it('projeto criado e ainda nunca enviado entra com versão 0; falha em um não impede os outros', async () => {
+    const novo = { id: 'novo', name: 'Novo', doc: { slides: [{ id: 's1', title: 'A' }] } };
+    const quebrado = { id: 'quebrado', name: 'X', doc: { slides: [] } };
+    const result = await queueUnsentProjectEdits({
+      library: [quebrado, novo], baselines: new Map(), versions: new Map(), fingerprint,
+      prepare: async (entry) => {
+        if (entry.id === 'quebrado') throw new Error('imagem grande demais');
+        return { entry: structuredClone(entry), assets: new Map() };
+      },
+      queue,
+    });
+    expect(result).toEqual({ queued: 1, failed: 1 });
+    expect(await getPendingProjectOp(ALICE, 'novo')).toMatchObject({ kind: 'put', baseVersion: 0 });
+  });
+
+  it('sem edição pendente não grava nada', async () => {
+    const saved = { id: 'janine', doc: { slides: [] } };
+    expect(await queueUnsentProjectEdits({
+      library: [saved], baselines: new Map([['janine', fingerprint(saved)]]), versions: new Map([['janine', 3]]),
+      fingerprint, prepare, queue,
+    })).toEqual({ queued: 0, failed: 0 });
+    expect(await listPendingProjectOps(ALICE)).toEqual([]);
   });
 });
