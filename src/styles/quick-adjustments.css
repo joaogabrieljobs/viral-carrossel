@@ -49,7 +49,7 @@
 .vc-quick-adjustments-preset-name small { font-size: 10px; color: var(--text-muted); font-weight: 400; }
 /* UX-04: fundo, título e acento reais do estilo, que a miniatura com foto esconde. */
 .vc-quick-adjustments-swatches { display: flex; align-items: center; gap: 4px; padding-top: 4px; }
-.vc-quick-adjustments-swatches i { display: block; flex-shrink: 0; width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--border, rgba(127, 127, 127, .5)); }
+.vc-quick-adjustments-swatches i { display: block; flex-shrink: 0; width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .42); }
 .vc-quick-adjustments-selected { position: absolute; top: 5px; right: 5px; background: var(--accent, #8b7cff); color: var(--text-on-accent, #fff); border-radius: 50%; padding: 2px; width: 19px; height: 19px; }
 .vc-quick-adjustments-link { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; width: 100%; border: 0; background: transparent; padding: 7px 4px; font-size: 12px !important; text-decoration: underline; text-underline-offset: 3px; }
 .vc-quick-adjustments-disclosure { min-width: 0; border: 1px solid var(--hairline, var(--border)); border-radius: 13px; background: var(--bg-card); }
