@@ -63,8 +63,10 @@ function useHistory(initialState, { limit = 100, coalesceMs = 600 } = {}) {
   const undo = React.useCallback(() => store.undo(), [store]);
   const redo = React.useCallback(() => store.redo(), [store]);
   const reset = React.useCallback((next) => store.reset(next), [store]);
+  // Estado atual sem esperar o render (operações assíncronas conferem o alvo).
+  const getState = React.useCallback(() => store.getState(), [store]);
 
-  return { state: view.state, set, setSilent, undo, redo, reset, canUndo: view.canUndo, canRedo: view.canRedo };
+  return { state: view.state, getState, set, setSilent, undo, redo, reset, canUndo: view.canUndo, canRedo: view.canRedo };
 }
 
 export {

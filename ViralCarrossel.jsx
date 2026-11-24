@@ -52,6 +52,7 @@ import {
   applyPersistedImagePatches,
   applySlidePatchIfImageCurrent,
   applySlideImageToStoredProject,
+  imageBatchSkipReason,
   slideImageIdentity,
   imageGet,
   imageDelete,
@@ -6354,6 +6355,14 @@ ${jsonShapeLine}`;
         for (const { slideId, i, q, expectedImageIdentity } of slidesWithImage) {
           if (abort.cancelled || activeProjectRef.current !== generationProjectId) break;
           attemptedImageSlideIds.add(slideId);
+          // FE-10: confere o alvo antes de pagar. Card apagado, com foto nova ou
+          // com imagem avulsa em andamento sai do lote sem chamada e sem falha.
+          if (imageBatchSkipReason({ slides: history.getState()?.slides, slideId, expectedImageIdentity, generatingIds: slideImgGenIdsRef.current })) {
+            doneImgs++;
+            continue;
+          }
+          slideImgGenIdsRef.current.add(slideId);
+          setSlideImgGenBusy(prev => ({ ...prev, [slideId]:true }));
           setGenProgress({
             phase: 'images',
             current: doneImgs,
@@ -6368,6 +6377,11 @@ ${jsonShapeLine}`;
             const anchorPlan = anchorPerson
               ? planPersonAnchor({ visualBible: generationVisualBible, imageQuery: q, anchorUrl: personAnchor.url, refCount: baseRefs.length })
               : { refImages: [], direction: '', canBecomeAnchor: false, excludeEntityIds: [] };
+            // As referências podem demorar; a foto do card pode ter mudado nesse tempo.
+            if (imageBatchSkipReason({ slides: history.getState()?.slides, slideId, expectedImageIdentity })) {
+              doneImgs++;
+              continue;
+            }
             const url = await generateDALLEWithRetry(q, openaiKey, effectiveAxes, {
               signal: job.signal,
               refImages: [...baseRefs, ...anchorPlan.refImages],
@@ -6438,6 +6452,9 @@ ${jsonShapeLine}`;
               });
               break;
             }
+          } finally {
+            slideImgGenIdsRef.current.delete(slideId);
+            setSlideImgGenBusy(prev => { const next = { ...prev }; delete next[slideId]; return next; });
           }
           doneImgs++;
           setGenProgress({ phase: 'images', current: doneImgs, total: totalImgs, label: `Gerando imagens (${doneImgs}/${totalImgs})…` });
@@ -7427,6 +7444,11 @@ Retorne APENAS JSON: ${refineAllWantsBody
       try {
         for (const { index:i, q, slideId, expectedImageIdentity } of targets) {
           if (abort.cancelled || activeProjectRef.current !== projectId) break;
+          // FE-10: mesma conferência do lote da geração, antes de pagar.
+          if (imageBatchSkipReason({ slides: history.getState()?.slides, slideId, expectedImageIdentity, generatingIds: slideImgGenIdsRef.current })) {
+            completed += 1;
+            continue;
+          }
           slideImgGenIdsRef.current.add(slideId);
           setSlideImgGenBusy(prev => ({ ...prev, [slideId]:true }));
           setGenProgress({ phase:'template_images', current:completed, total:targets.length, label:`Gerando imagem do card ${i + 1} (${completed + 1}/${targets.length})…` });
@@ -7435,6 +7457,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
             const anchorPlan = fmt !== 'apresentacao'
               ? planPersonAnchor({ visualBible: doc.visualBible, imageQuery: q, anchorUrl: templateAnchor.url, refCount: baseRefs.length })
               : { refImages: [], direction: '', canBecomeAnchor: false, excludeEntityIds: [] };
+            if (imageBatchSkipReason({ slides: history.getState()?.slides, slideId, expectedImageIdentity })) continue;
             const url = await generateDALLEWithRetry(q, openaiKey, imgParams, {
               signal: templateJob.signal,
               refImages: [...baseRefs, ...anchorPlan.refImages],

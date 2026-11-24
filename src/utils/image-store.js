@@ -450,6 +450,20 @@ export function applySlidePatchIfImageCurrent(slides = [], {
 }
 
 /**
+ * Lote de imagens: antes de pagar pela imagem de um card, confere se ele ainda
+ * é o alvo. Devolve o motivo para pular ou `null` para seguir.
+ *  - 'already_generating': há uma geração avulsa em andamento nesse card;
+ *  - 'slide_missing': o card foi apagado (ou a geração foi desfeita);
+ *  - 'image_changed': o card ganhou outra foto desde o início do lote.
+ */
+export function imageBatchSkipReason({ slides, slideId, expectedImageIdentity, generatingIds } = {}) {
+  if (generatingIds?.has?.(slideId)) return 'already_generating';
+  const live = (slides || []).find((slide) => slide?.id === slideId);
+  if (!live) return 'slide_missing';
+  return slideImageIdentity(live) === expectedImageIdentity ? null : 'image_changed';
+}
+
+/**
  * MOO-06: imagem paga que chega depois de a pessoa trocar de projeto vai para
  * o card de origem no projeto de origem, se a foto desse card não mudou.
  */
