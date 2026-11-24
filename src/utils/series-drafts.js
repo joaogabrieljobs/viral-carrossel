@@ -98,6 +98,8 @@ export function buildSeriesDraftSeed({
     publicationDate: publicationDate || '',
     seedDoc: {
       mode: objective.narrativeMode,
+      // O Criar rápido lê este campo, não `mode` (auditoria 23/11, GB-12).
+      quickNarrativeMode: objective.narrativeMode,
       creativePreset: 'livre',
       ...(brand && typeof brand === 'object' ? { brand: cloneSeriesBrand(brand) } : {}),
       styleKit: styleKit
