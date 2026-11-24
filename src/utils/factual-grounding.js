@@ -105,8 +105,20 @@ function derivedQuantityKeys(text) {
 // "mais de 2000 clientes em 2024": depois de um quantificador o número é
 // quantidade, não data (resto do MOO-12, auditoria 23/11).
 const YEAR_IN_CONTEXT = /(?<!\b(?:mais|menos|cerca|perto|acima|abaixo|quase|uns|umas|more|less|over|under|about|almost)\s+(?:de\s+|than\s+)?)\b(?:em|de|desde|ate|no|na|do|da|a|ano|in|since|from|to|until|year)\s+((?:19|20)\d{2})\b(?!\s+(?:clientes?|pacientes?|paes|unidades|pessoas|sites|pedidos|alunos|seguidores|customers?|people|orders|units)\b)/g;
+// "Um segundo idioma", "um segundo site": ordinal seguido de substantivo, não
+// um segundo de tempo (reteste real 23/11, Pitch WebExpresso). Continua tempo
+// quando a frase acaba ali ou segue com palavra de ligação ("um segundo para
+// pedir", "um segundo de atraso", "um segundo e meio").
+const ORDINAL_SECOND = /^(?:um|one)\s+(?:segundo|second)$/;
+const AFTER_TIME = new Set('para pra por que apenas mais menos antes depois ate com sem voce nao nem cada inteiro sequer meio and for before after later more less the you your not'.split(' '));
+function ordinalSecond(text, match) {
+  if (!ORDINAL_SECOND.test(normalize(match[0]))) return false;
+  const next = /^[^\S\n]+([\p{L}]{3,})/u.exec(String(text).slice(match.index + match[0].length));
+  return Boolean(next) && !AFTER_TIME.has(normalize(next[1]));
+}
+const quantityMatches = text => [...String(text).matchAll(QUANTITY)].filter(match => !ordinalSecond(text, match));
 const quantityKeys = text => new Set([
-  ...[...String(text).matchAll(QUANTITY), ...String(text).matchAll(PERCENTAGE)].map(match => canonicalQuantity(match[0])),
+  ...[...quantityMatches(text), ...String(text).matchAll(PERCENTAGE)].map(match => canonicalQuantity(match[0])),
   ...derivedQuantityKeys(text),
 ]);
 
@@ -165,6 +177,13 @@ const negatedInclusion = (text, index) => /\b(?:nao|nem|not|never|without|don['�
 // remains subject to the same evidence check as the rest of the copy.
 const inclusionWithoutItem = claim => /^(?:inclui|inclus[oa]s?|includes?)(?:\s+(?:e\s+exclui|and\s+excludes?))?\s*[?:—–-]?$/u.test(normalize(claim));
 
+// "Acompanha" também é seguir: "o pagamento acompanha a entrega", "acompanha o
+// avanço do projeto" (reteste real 23/11, Pitch e Caso WebExpresso). Item que a
+// oferta traz chega sem artigo definido ("acompanha manual", "acompanha um
+// brinde"); depois de artigo definido, possessivo, "cada" ou "todo", o verbo é
+// seguir e não há item a conferir.
+const followsNotIncludes = claim => /^acompanha\s+(?:o|a|os|as|seus?|suas?|teus?|tuas?|noss[oa]s?|voces?|cada|tod[oa]s?|ess[ea]s?|est[ea]s?|aquel[ea]s?|quem|tudo|de perto)\b/.test(normalize(claim));
+
 function textFields(draft) {
   const result = (Array.isArray(draft?.slides) ? draft.slides : []).flatMap((slide, slideIndex) =>
     ['title', 'subtitle', 'bodyAfterImage'].map(field => ({ slideIndex, field, text: String(slide?.[field] || '') })));
@@ -181,7 +200,7 @@ export function auditUnsupportedCommercialClaims(slides, source) {
       for (const match of text.matchAll(rule.regex)) {
         const claim = match[0].trim();
         if (rule.category === 'garantia' && negatedGuarantee(text, match.index)) continue;
-        if (rule.category === 'item incluso' && (negatedInclusion(text, match.index) || inclusionWithoutItem(claim))) continue;
+        if (rule.category === 'item incluso' && (negatedInclusion(text, match.index) || inclusionWithoutItem(claim) || followsNotIncludes(claim))) continue;
         // Mesma equivalência da auditoria de fatos (reteste 22/11).
         if (rule.category === 'item incluso' && inclusionCovered(claim, source)) continue;
         if (!sourceText.includes(normalize(claim)) && !equivalent(sourceText).includes(equivalent(normalize(claim)))) violations.push({ slideIndex, category: rule.category, claim });
@@ -322,7 +341,7 @@ export function auditDraftFactuality(draft, config = {}) {
       for (const match of text.matchAll(rule.regex)) {
         const claim = match[0].trim();
         if (rule.category === 'garantia' && negatedGuarantee(text, match.index)) continue;
-        if (rule.category === 'item incluso' && (negatedInclusion(text, match.index) || inclusionWithoutItem(claim))) continue;
+        if (rule.category === 'item incluso' && (negatedInclusion(text, match.index) || inclusionWithoutItem(claim) || followsNotIncludes(claim))) continue;
         if (rule.category === 'preço' && derivedPrice(claim, prices)) continue;
         // "Parcelado" é paráfrase de "3 parcelas" (reteste real 23/11, Proposta
         // WebExpresso: cabeçalho "Parcelado" de tabela com o material falando em
@@ -336,7 +355,7 @@ export function auditDraftFactuality(draft, config = {}) {
     // Trechos que a regra de preço e a de quantidade já avaliaram: o número
     // dentro deles não é conferido de novo pela regra geral abaixo.
     const judged = [...text.matchAll(/(?:R\$|US\$|\$|€)\s*\d(?:[\d.,]*\d)?/gu)].map(match => [match.index, match.index + match[0].length]);
-    for (const match of [...text.matchAll(QUANTITY), ...text.matchAll(PERCENTAGE)]) {
+    for (const match of [...quantityMatches(text), ...text.matchAll(PERCENTAGE)]) {
       judged.push([match.index, match.index + match[0].length]);
       // "um cliente", "uma vez", "uma paciente": artigo, não contagem (lote B 21/11).
       if (/^(?:um|uma)\s+(?:clientes?|customers?|pacientes?|patients?|vez|vezes)$/iu.test(match[0].trim())) continue;

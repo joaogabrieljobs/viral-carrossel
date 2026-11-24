@@ -133,3 +133,51 @@ describe('MOO-12 (resto) — quantidade não vira ano', () => {
     expect(audit('Há seis anos no bairro.', 'Fundada em 2019. Em 2025 abriu a segunda loja.')).toEqual([]);
   });
 });
+
+// Reteste real de 23/11 (14 gerações em produção): dois falsos positivos
+// antigos derrubaram Pitch e Caso da WebExpresso para "Rascunho preservado".
+// "O pagamento acompanha a entrega" e "acompanha o avanço do projeto" foram
+// lidos como item incluso; "um segundo idioma" foi lido como um segundo de tempo.
+describe('reteste 23/11 — "acompanha" que segue não é item incluso', () => {
+  it.each([
+    'O pagamento acompanha a entrega.',
+    'Cada parcela acompanha o avanço do projeto.',
+    'O site acompanha seu negócio.',
+    'O pagamento acompanha cada etapa.',
+  ])('não marca: %s', (frase) => {
+    expect(audit(frase, SITES)).toEqual([]);
+  });
+
+  it.each([
+    'O pacote acompanha manual impresso e brinde.',
+    'Acompanha suporte por telefone.',
+    'O plano acompanha um domínio próprio.',
+    'Acompanha 2 revisões de layout.',
+  ])('continua marcando item que o material não traz: %s', (frase) => {
+    expect(categories(frase, SITES)).toContain('item incluso');
+  });
+});
+
+describe('reteste 23/11 — "um segundo idioma" é ordinal, não tempo', () => {
+  it.each([
+    'Escolha um segundo idioma para o site.',
+    'Na Black Friday, um segundo idioma entra no site.',
+    'Vale abrir um segundo site para a filial?',
+  ])('não marca: %s', (frase) => {
+    expect(audit(frase, SITES)).toEqual([]);
+  });
+
+  it.each([
+    'O site carrega em um segundo.',
+    'Leva um segundo para pedir.',
+    'O pedido sai em um segundo e meio.',
+    'A página abre em dois segundos.',
+    'Um segundo de atraso derruba a venda.',
+  ])('continua marcando tempo que o material não traz: %s', (frase) => {
+    expect(categories(frase, SITES)).toContain('dado sem fonte');
+  });
+
+  it('"um segundo idioma" no material não vira prova de "em um segundo"', () => {
+    expect(categories('O site abre em um segundo.', `${SITES} Você pode pedir um segundo idioma.`)).toContain('dado sem fonte');
+  });
+});
