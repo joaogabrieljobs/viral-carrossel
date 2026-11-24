@@ -16,7 +16,7 @@ import {
   clearLogoOffsetOnSlide,
   clearLogoOffsetOnSlides,
 } from '../../utils/slide-logo.js';
-import { applyFormatEditToAll, applyLogoToCards } from '../../utils/format-view.js';
+import { applyFormatEditToAll, applyLogoToCards, followLogoDefaultOnAllCards } from '../../utils/format-view.js';
 import { origemParaBlob } from '../../utils/image-store.js';
 import { Slider } from '../ui/primitives.jsx';
 
@@ -30,7 +30,7 @@ const POS = [
 
 /**
  * Único painel de logo: padrão da marca + overrides do card ativo.
- * - Ajustes “padrão” escrevem na marca e limpam override do card ativo
+ * - Ajustes “padrão” escrevem na marca e soltam o mesmo ajuste em todos os cards
  * - “Ocultar neste card” usa logoHidden (não apaga a marca)
  * - “Inserir logo em todos os cards” promove projeto→marca e deixa todos visíveis
  */
@@ -67,8 +67,10 @@ export function SlideLogoPanel({
     if (!setBrand) return;
     // Reteste 22/11: tamanho escolhido no controle sobrevive a duplicar/reabrir.
     setBrand((current) => ({ ...current, ...partial, ...(partial.logoSize != null ? { logoSizeChosen: true } : {}) }));
-    // Card ativo deixa de travar o padrão antigo
-    updateSlide(clearSlideLogoLayout());
+    // Nenhum card trava o padrão antigo. Depois de "Aplicar em todos" só o
+    // card aberto mudava, porque cada card guardava o ajuste copiado.
+    if (editDoc) editDoc((d) => followLogoDefaultOnAllCards(d, partial));
+    else updateSlide(clearSlideLogoLayout());
   };
 
   const setCardLayout = (partial) => {

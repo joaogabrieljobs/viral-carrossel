@@ -332,6 +332,38 @@ export function applyLogoToCards(doc, {
   return { ...next, slides: clearReplacedSlideAssets(before, next.slides) };
 }
 
+const LOGO_DEFAULT_KEYS = ['logoPosition', 'logoSize', 'logoOpacity'];
+
+/**
+ * Controles de "Padrão em todos os cards" da logo. Depois de "Aplicar em
+ * todos", cada card guardava o ajuste copiado e só o card aberto seguia o
+ * padrão novo. Aqui nenhum card fica preso ao valor antigo da propriedade
+ * mexida: no Feed o card volta a herdar a marca; noutra proporção, se a base
+ * ainda traz ajuste próprio, a vista repete o padrão novo.
+ */
+export function followLogoDefaultOnAllCards(doc, partial) {
+  if (!doc || !partial || typeof partial !== 'object') return doc;
+  const keys = LOGO_DEFAULT_KEYS.filter(key => partial[key] != null);
+  if (!keys.length) return doc;
+  return (Array.isArray(doc.slides) ? doc.slides : []).reduce((next, slide, index) => {
+    if (!isDerivedView(next, slide)) {
+      if (!keys.some(key => slide[key] != null)) return next;
+      const freed = { ...slide };
+      for (const key of keys) delete freed[key];
+      return { ...next, slides: next.slides.map((item, i) => (i === index ? freed : item)) };
+    }
+    const saved = viewEntry(next.formatViews, next.fmt, slide.id);
+    const entry = { ...(saved || {}) };
+    for (const key of keys) delete entry[key];
+    const freed = saved && keys.some(key => saved[key] != null) ? withViewEntry(next, slide.id, entry) : next;
+    const shown = slideForFormatDisplay(slide, freed.fmt, freed.formatViews, freed.creativePreset);
+    const stuck = keys.filter(key => shown?.[key] != null);
+    if (!stuck.length) return freed;
+    for (const key of stuck) entry[key] = partial[key];
+    return withViewEntry(next, slide.id, entry);
+  }, doc);
+}
+
 /** Ferramentas de composição operam sobre o que está na tela, inclusive em lote. */
 export function transformFormatVisuals(doc, transform) {
   const displayed = (doc.slides || []).map(slide => slideForFormatDisplay(
