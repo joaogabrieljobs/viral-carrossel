@@ -765,6 +765,17 @@ const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => 
     aspectRatio: requestedAspectRatio,
     referenceCount: refs.length,
   });
+  // IA-02: quem chamou vê o que saiu ou encolheu antes de o crédito ser
+  // reservado. `false` desiste do envio; a retentativa não insiste.
+  if (typeof options.onPromptPlan === 'function') {
+    const proceed = await options.onPromptPlan({
+      route: 'sjinn', chars: plan.chars, limit: plan.limit, dropped: plan.dropped, trimmed: plan.trimmed,
+    });
+    throwIfGenerationCancelled(signal);
+    if (proceed === false) {
+      throw Object.assign(new Error('Imagem não gerada. Nenhum crédito foi usado.'), { code: 'image_prompt_declined', platformImage: true });
+    }
+  }
   let res;
   try {
     res = await fetch('/api/ai/sjinn-image', {

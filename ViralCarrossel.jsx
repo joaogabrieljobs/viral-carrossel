@@ -257,6 +257,7 @@ import { buildProjectDesignInstructions, explicitBrandColorsFromKit, projectDesi
 import { buildExplicitCardScriptPrompt, canAutoApplyExplicitCardScript, parseExplicitCardScript } from './src/utils/structured-card-script.js';
 import { resolveImageReferences, migrateProjectReferences } from './src/utils/style-kit-storage.js';
 import { imageGenerationAccess, slideImageGenerationState, slidesPendingImageGeneration } from './src/utils/image-generation-readiness.js';
+import { createImagePromptCutGate } from './src/utils/image-prompt-budget.js';
 import { GLOBAL_STYLE } from './src/styles/global-style.js';
 import { useExport, waitForExportReadiness } from './src/hooks/useExport.js';
 import { useAccess } from './src/hooks/useAccess.js';
@@ -5169,6 +5170,9 @@ export default function App() {
     toast('Ajustes da foto gravados no projeto.', 'success');
   }, [setSlides, toast]);
 
+  // IA-02: aviso antes do crédito quando o gerador do plano encurta o pedido.
+  const imagePromptCutGateRef = useRef(null);
+  if (!imagePromptCutGateRef.current) imagePromptCutGateRef.current = createImagePromptCutGate({ ask: message => window.confirm(message) });
   const generateSlideImageAt = useCallback(async (idx, parentSignal = null, target = null) => {
     if (accessSessionRef.current?.free) {
       openUpgradeRef.current?.('image');
@@ -5226,6 +5230,7 @@ export default function App() {
           presentationPanel: fmt === 'apresentacao' && [2, 3].includes(generationSnap.presentationCompositionVersion),
         }),
         aspectRatio: imageAspectRatioForSlide(generationSnap, fmt),
+        onPromptPlan: plan => imagePromptCutGateRef.current(plan, generationProjectId),
         usageContext: {
           projectId: generationProjectId,
           projectName: activeEntry?.name || '',
@@ -5276,6 +5281,8 @@ export default function App() {
       return { ok: true, slideId };
     } catch (e) {
       if (isGenerationCancelled(e)) throw e;
+      // IA-02: a pessoa não quis gerar com o pedido encurtado. Não é falha.
+      if (e?.code === 'image_prompt_declined') return { ok: false, reason: 'image_prompt_declined', slideId };
       if (activeProjectRef.current === generationProjectId) {
         setSlides(prev => applySlidePatchIfImageCurrent(prev, {
           id: slideId,
@@ -6411,6 +6418,7 @@ ${jsonShapeLine}`;
                 ? presentationPhotoAspectRatio(newSlides[i])
                 : isPresentationGeneration ? '16:9'
                   : imageAspectRatioForSlide(newSlides[i], fmt && fmt !== 'apresentacao' ? fmt : 'carrossel'),
+              onPromptPlan: plan => imagePromptCutGateRef.current(plan, generationProjectId),
               usageContext: {
                 projectId: generationProjectId,
                 projectName: activeEntry?.name || '',
@@ -6441,6 +6449,8 @@ ${jsonShapeLine}`;
             }
           } catch(e) {
             if (isGenerationCancelled(e) || job.signal.aborted) throw e;
+            // IA-02: sem o sim para o pedido encurtado, o lote para sem marcar falha.
+            if (e?.code === 'image_prompt_declined') break;
             imgFailCount++;
             console.warn(`Image gen slide ${i+1}:`, e.message);
             if (!abort.cancelled && activeProjectRef.current === generationProjectId)
@@ -7492,6 +7502,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                 anchorPlan, baseReferenceCount: baseRefs.length,
               }),
               aspectRatio: imageAspectRatioForSlide(newSlides[i], fmt === 'apresentacao' ? 'carrossel' : fmt),
+              onPromptPlan: plan => imagePromptCutGateRef.current(plan, projectId),
               usageContext: {
                 projectId,
                 projectName: activeEntry?.name || '',
@@ -7515,6 +7526,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
             }
           } catch (e) {
             if (isGenerationCancelled(e)) break;
+            if (e?.code === 'image_prompt_declined') break;
             failCount++;
             console.warn(`Template imagem slide ${i + 1}:`, e.message);
             if (!abort.cancelled && activeProjectRef.current === projectId)
@@ -7865,6 +7877,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
             projectId: generationProjectId,
             slideId: s.id,
           });
+          if (result?.reason === 'image_prompt_declined') break;
           if (result?.ok) generated++;
           else {
             failed++;
