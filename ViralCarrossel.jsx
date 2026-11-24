@@ -2264,7 +2264,7 @@ export default function App() {
           throw new Error('A assinatura não confirmou este envio. A edição continua neste editor.');
         }
         if (stillPending) {
-          throw new Error('O projeto ficou na fila local. Sincronize quando a conexão voltar.');
+          throw new Error(outbox.retainedProjectMessage(stillPending));
         }
       } catch (error) {
         if (!isProjectOutboxUnavailable(error)) throw error;
@@ -2384,9 +2384,52 @@ export default function App() {
     }
   }, []);
 
+  // DB-03: projeto cujo envio a conta recusou continua só na fila deste
+  // navegador. Ele volta para a lista ao abrir a conta (e depois de um Sync),
+  // em vez de sumir atrás da versão da nuvem, e aparece como "não enviado".
+  const [unsentProjects, setUnsentProjects] = useState({});
+  const refreshRetainedProjectEdits = useCallback(async ({ overlay = false } = {}) => {
+    if (!PROJECTS_V2 || accessSessionRef.current?.free) return;
+    const owner = readDataOwner();
+    if (!owner) return;
+    try {
+      const retained = await projectOutbox.listRetainedProjectEdits(owner);
+      if (readDataOwner() !== owner || v2ObservedOwnerRef.current !== owner) return;
+      const current = libraryPersistRef.current || [];
+      const editor = editorSyncStateRef.current;
+      // Só troca o que ainda é a versão recebida da conta: uma edição feita
+      // nesta sessão é mais nova que a retida e continua valendo.
+      const untouched = (entry) => {
+        const baseline = v2BaselinesRef.current.get(entry.id);
+        const live = entry.id === editor.activeDocId ? { ...entry, doc: editor.doc } : entry;
+        return baseline === projectCacheFingerprint(entry) && baseline === projectCacheFingerprint(live);
+      };
+      const replaceable = !overlay || areAccountDataWritesLocked() ? [] : retained.filter((item) => {
+        const existing = current.find((entry) => entry.id === item.projectId);
+        return existing ? untouched(existing) : true;
+      }).map((item) => ({ ...item, entry: normalizeLibraryEntry({
+        ...item.entry, doc: ensureDocShape(item.entry.doc || {}),
+      }, libraryFoldersPersistRef.current) }));
+      const result = projectOutbox.overlayRetainedProjectEdits(current, replaceable);
+      if (result.changed) {
+        const activeEntry = result.library.find((entry) => entry.id === editor.activeDocId);
+        flushSync(() => {
+          libraryPersistRef.current = result.library;
+          setLibrary(result.library);
+          if (activeEntry && result.unsent[activeEntry.id]) history.reset(activeEntry.doc);
+        });
+      }
+      const unsent = Object.fromEntries(retained.map((item) => [item.projectId, { message: item.message }]));
+      setUnsentProjects((before) => (JSON.stringify(before) === JSON.stringify(unsent) ? before : unsent));
+    } catch { /* a fila continua guardando a edição; a lista segue como está */ }
+  }, [history.reset]);
+  const refreshRetainedProjectEditsRef = useRef(refreshRetainedProjectEdits);
+  refreshRetainedProjectEditsRef.current = refreshRetainedProjectEdits;
+
   const finishCloudSync = useCallback(() => {
     cloudSyncInFlightRef.current = false;
     setCloudSyncBusy(false);
+    void refreshRetainedProjectEditsRef.current?.();
     if (cloudAutoPushAfterFlightRef.current) {
       cloudAutoPushAfterFlightRef.current = false;
       queueMicrotask(() => cloudAutoPushScheduleRef.current?.({ immediate: true }));
@@ -2581,6 +2624,7 @@ export default function App() {
           const count = applyCloudLibrarySnapshot(snapshot, restored);
           observeCloudProjectsV2(owner, projects, snapshot);
           observeCloudMetadataV2(owner, metadata, snapshot);
+          await refreshRetainedProjectEdits({ overlay: true });
           toast(recoveredCopies.size
             ? `Este projeto mudou em outro lugar. Sua edição ficou na cópia “${[...recoveredCopies][0]}”. Lista atualizada · ${count} projeto(s).`
             : reviewCount
@@ -2677,13 +2721,16 @@ export default function App() {
     }
   }, [flushPersistNow, applyCloudLibrarySnapshot, stopCloudAutoPush, toast,
     persistProjectV2, persistAccountMetadataV2, observeCloudProjectsV2, observeCloudMetadataV2,
-    finishCloudSync, refreshDeletedEditReviews]);
+    finishCloudSync, refreshDeletedEditReviews, refreshRetainedProjectEdits]);
 
   // Abertura da conta: se já havia edição retida de um projeto excluído em
   // outro dispositivo, a escolha aparece em vez de ficar só num aviso.
   useEffect(() => {
     if (accountLibraryReady) void refreshDeletedEditReviews();
   }, [accountLibraryReady, refreshDeletedEditReviews]);
+  useEffect(() => {
+    if (accountLibraryReady) void refreshRetainedProjectEdits({ overlay: true });
+  }, [accountLibraryReady, refreshRetainedProjectEdits]);
 
   const syncProjectLibraryRef = useRef(syncProjectLibrary);
   syncProjectLibraryRef.current = syncProjectLibrary;
@@ -8103,6 +8150,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           cloudSyncBusy={cloudSyncBusy || !accountLibraryReady}
           photoLoad={photoLoad}
           openingDocId={openingDocId}
+          unsentProjects={unsentProjects}
           onOpenBrands={() => setBrandsOpen(true)}
           accessEmail={access.email}
           accessStatus={access}

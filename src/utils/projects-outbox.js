@@ -143,7 +143,8 @@ function persistOperation(ownerId, projectId, kind, entry, baseVersion, projectN
         ])].filter(([id]) => entryJson.includes(JSON.stringify(id))) : [];
         // Preparar fotos e transmitir usam a mesma operação. Reenfileirar o
         // mesmo snapshot não cria uma nova escrita nem invalida seu recibo.
-        if (kind === 'put' && previous?.kind === 'put'
+        if (kind === 'put' && (previous?.kind === 'put'
+          || (previous?.kind === 'review_put_failed' && !isRetryableReview(previous)))
           && sameSavedEntry(previous.entry, entry)) {
           const beforeAssets = previous.assets || [];
           const assetsChanged = beforeAssets.length !== pendingAssets.length
@@ -157,10 +158,11 @@ function persistOperation(ownerId, projectId, kind, entry, baseVersion, projectN
         // Uma edição de projeto já excluído só pode voltar à nuvem como um
         // projeto novo após uma escolha explícita da pessoa. Salvar de novo
         // atualiza a cópia durável, mas não a retira da revisão.
+        // DB-03: já a recusa do servidor (4xx) vale para o conteúdo recusado.
+        // Uma edição nova é um envio novo; se for recusada de novo, volta à
+        // revisão sem parar a fila. O mesmo conteúdo não é reenviado (acima).
         const effectiveKind = previous?.kind === 'review_put_deleted' && kind === 'put'
-          ? 'review_put_deleted'
-          : previous?.kind === 'review_put_failed' && kind === 'put' && !isRetryableReview(previous)
-            ? 'review_put_failed' : kind;
+          ? 'review_put_deleted' : kind;
         const keepsEntry = effectiveKind === 'put'
           || effectiveKind === 'review_put_deleted'
           || effectiveKind === 'review_put_billing'
@@ -379,6 +381,9 @@ function markOperationForFailure(ownerId, sentOp, error) {
           projectName: String(current.entry?.name || current.projectName || '').slice(0, 160),
           reviewCode: String(error?.code || 'project_sync_failed').slice(0, 100),
           reviewStatus: Number.isInteger(error?.status) ? error.status : null,
+          // DB-03: a frase do servidor (limite da conta, por exemplo) é o que
+          // a pessoa precisa ler; antes ela era trocada por "a conexão".
+          reviewMessage: String(error?.message || '').slice(0, 300),
           updatedAt: Date.now(),
         });
         setResult(true);
@@ -749,6 +754,55 @@ function runOutboxExclusive(ownerId, signal, run) {
 
 export function flushProjectOutbox(ownerId, options = {}) {
   return runOutboxExclusive(ownerId, options.signal, () => flushProjectOutboxSerial(ownerId, options));
+}
+
+/**
+ * DB-03: projetos cujo envio foi recusado e que continuam só nesta fila. A
+ * biblioteca usa esta lista para não esconder o projeto ao abrir a conta.
+ */
+export async function listRetainedProjectEdits(ownerId) {
+  const operations = await listPendingProjectOps(ownerId);
+  return operations.filter((op) => op.kind === 'review_put_failed' && op.entry).map((op) => ({
+    projectId: op.projectId, entry: op.entry, baseVersion: op.baseVersion,
+    code: op.reviewCode || 'project_sync_failed',
+    status: Number.isInteger(op.reviewStatus) ? op.reviewStatus : null,
+    message: String(op.reviewMessage || ''),
+  }));
+}
+
+/**
+ * Sobrepõe à lista da conta as edições retidas na fila. Projeto que nunca
+ * chegou à conta entra no topo; projeto que existe mostra a edição retida no
+ * lugar da versão antiga. `unsent` alimenta a marca de "não enviado".
+ */
+export function overlayRetainedProjectEdits(library, retained) {
+  const list = Array.isArray(library) ? library : [];
+  const rows = (Array.isArray(retained) ? retained : []).filter((item) => item?.entry?.id === item?.projectId);
+  if (!rows.length) return { library: list, unsent: {}, changed: false };
+  const byId = new Map(rows.map((item) => [item.projectId, item]));
+  const present = new Set();
+  const merged = list.map((entry) => {
+    const item = byId.get(entry?.id);
+    if (!item) return entry;
+    present.add(entry.id);
+    return item.entry;
+  });
+  return {
+    library: [...rows.filter((item) => !present.has(item.projectId)).map((item) => item.entry), ...merged],
+    unsent: Object.fromEntries(rows.map((item) => [item.projectId, {
+      onlyHere: !present.has(item.projectId), code: item.code, status: item.status, message: item.message,
+    }])),
+    changed: true,
+  };
+}
+
+/** Mensagem para quem acabou de salvar um projeto que continuou na fila. */
+export function retainedProjectMessage(op) {
+  const refused = op?.kind === 'review_put_failed' && Number.isInteger(op.reviewStatus)
+    && op.reviewStatus >= 400 && op.reviewStatus < 500 && op.reviewMessage;
+  return refused
+    ? `${op.reviewMessage} A edição continua salva neste navegador e será enviada na próxima alteração do projeto.`
+    : 'O projeto ficou na fila local. Sincronize quando a conexão voltar.';
 }
 
 /**

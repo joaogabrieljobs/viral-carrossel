@@ -4,8 +4,8 @@ import { originalImageAssetId } from '../../src/utils/cloud-image-assets.js';
 import { flushProjectOutboxForBoot } from '../../src/hooks/useAccess.js';
 import {
   acknowledgeProjectOp, conflictCopyEntry, conflictCopyId, flushProjectOutbox, getPendingProjectOp,
-  listDeletedProjectEdits, listPendingProjectOps, queueProjectDelete, queueProjectPut,
-  resolveDeletedProjectEdit,
+  listDeletedProjectEdits, listPendingProjectOps, listRetainedProjectEdits, overlayRetainedProjectEdits,
+  queueProjectDelete, queueProjectPut, resolveDeletedProjectEdit, retainedProjectMessage,
 } from '../../src/utils/projects-outbox.js';
 
 const ALICE = 'email:alice@example.test';
@@ -796,5 +796,121 @@ describe('DB-01: 5xx repetido num projeto não trava os demais nem o boot', () =
     expect(await flushProjectOutbox(ALICE)).toMatchObject({ sent: 1, pending: 1 });
     serve((id) => json({ ok: true, project: { id, version: 3, deleted: true } }));
     expect(await flushProjectOutbox(ALICE)).toEqual({ sent: 1, pending: 0 });
+  });
+});
+
+// DB-03 (auditoria 23/11): um 4xx do servidor (por exemplo o limite de 250
+// projetos) virava "falha permanente" sem saída. A edição seguinte não era
+// enviada e, ao recarregar, o projeto que só existia na fila sumia da lista.
+describe('DB-03: 4xx do servidor não prende o projeto para sempre', () => {
+  const limit = () => json({
+    error: 'Sua conta atingiu o limite de 250 projetos. Exclua um projeto antes de criar outro.',
+    code: 'project_account_limit', limit: 250,
+  }, 413);
+
+  it('depois do 413 de limite, a edição seguinte é enviada quando o servidor aceita', async () => {
+    await queueProjectPut(ALICE, { id: 'novo', name: 'Projeto 251', doc: { title: 'A' } });
+    fetch.mockResolvedValueOnce(session()).mockResolvedValueOnce(limit());
+    expect(await flushProjectOutbox(ALICE)).toMatchObject({ sent: 0, pending: 1, needsReview: [{
+      projectId: 'novo', kind: 'sync_failed', code: 'project_account_limit', status: 413,
+    }] });
+    // A frase do servidor fica guardada para a tela, em vez de "a conexão".
+    expect(await getPendingProjectOp(ALICE, 'novo')).toMatchObject({
+      kind: 'review_put_failed',
+      reviewMessage: 'Sua conta atingiu o limite de 250 projetos. Exclua um projeto antes de criar outro.',
+    });
+
+    const edited = { id: 'novo', name: 'Projeto 251', doc: { title: 'B' } };
+    expect(await queueProjectPut(ALICE, edited)).toMatchObject({ kind: 'put', baseVersion: 0 });
+    const puts = [];
+    fetch.mockReset();
+    fetch.mockImplementation(async (url, request) => {
+      if (url === '/api/auth/session') return session();
+      puts.push(JSON.parse(request.body));
+      return json({ ok: true, project: { id: 'novo', version: 1, entry: edited } });
+    });
+    expect(await flushProjectOutbox(ALICE)).toEqual({ sent: 1, pending: 0 });
+    expect(puts.map((body) => body.entry.doc.title)).toEqual(['B']);
+  });
+
+  it('sem edição nova o projeto recusado continua retido e não gera pedidos repetidos', async () => {
+    const entry = { id: 'novo', doc: { title: 'A' } };
+    await queueProjectPut(ALICE, entry);
+    fetch.mockResolvedValueOnce(session()).mockResolvedValueOnce(limit());
+    await flushProjectOutbox(ALICE);
+    // Reenfileirar o mesmo conteúdo (Sync, salvamento automático) não é edição nova.
+    expect(await queueProjectPut(ALICE, entry)).toMatchObject({ kind: 'review_put_failed' });
+    fetch.mockReset();
+    fetch.mockImplementation(async (url) => (url === '/api/auth/session' ? session() : limit()));
+    expect(await flushProjectOutbox(ALICE)).toMatchObject({ sent: 0, pending: 1 });
+    expect(fetch.mock.calls.some(([url]) => url === '/api/projects')).toBe(false);
+  });
+
+  it('edição de projeto excluído em outro dispositivo continua exigindo a escolha da pessoa', async () => {
+    await queueProjectPut(ALICE, { id: 'janine', doc: { title: 'A' } }, { baseVersion: 2 });
+    fetch.mockResolvedValueOnce(session())
+      .mockResolvedValueOnce(json({ error: 'Excluído', code: 'project_deleted', cloudVersion: 3 }, 409));
+    await flushProjectOutbox(ALICE);
+    expect(await queueProjectPut(ALICE, { id: 'janine', doc: { title: 'B' } }, { baseVersion: 2 }))
+      .toMatchObject({ kind: 'review_put_deleted' });
+  });
+
+  it('lista para a biblioteca os projetos retidos, com o conteúdo e o motivo', async () => {
+    await queueProjectPut(ALICE, { id: 'novo', name: 'Projeto 251', doc: { title: 'A' } });
+    await queueProjectPut(ALICE, { id: 'comum', doc: { title: 'B' } });
+    fetch.mockImplementation(async (url, request) => {
+      if (url === '/api/auth/session') return session();
+      return JSON.parse(request.body).entry.id === 'novo'
+        ? limit() : json({ ok: true, project: { id: 'comum', version: 1 } });
+    });
+    await flushProjectOutbox(ALICE);
+    expect(await listRetainedProjectEdits(ALICE)).toEqual([{
+      projectId: 'novo', entry: { id: 'novo', name: 'Projeto 251', doc: { title: 'A' } },
+      baseVersion: 0, code: 'project_account_limit', status: 413,
+      message: 'Sua conta atingiu o limite de 250 projetos. Exclua um projeto antes de criar outro.',
+    }]);
+    setOwner(BOB);
+    expect(await listRetainedProjectEdits(BOB)).toEqual([]);
+  });
+});
+
+describe('DB-03: o boot não esconde projeto que só existe na fila', () => {
+  const retained = (projectId, title) => ({
+    projectId, entry: { id: projectId, name: title, doc: { title } }, baseVersion: 0,
+    code: 'project_account_limit', status: 413, message: 'Limite.',
+  });
+
+  it('projeto que nunca chegou à conta volta para a lista, marcado como não enviado', () => {
+    const cloud = [{ id: 'a', name: 'Da conta', doc: { title: 'A' } }];
+    const result = overlayRetainedProjectEdits(cloud, [retained('novo', 'Só neste navegador')]);
+    expect(result.library.map((entry) => entry.id)).toEqual(['novo', 'a']);
+    expect(result.library[0]).toMatchObject({ name: 'Só neste navegador' });
+    expect(result.unsent).toEqual({ novo: { onlyHere: true, code: 'project_account_limit', status: 413, message: 'Limite.' } });
+    expect(result.changed).toBe(true);
+  });
+
+  it('projeto que existe na conta mostra a edição retida no lugar da versão antiga', () => {
+    const cloud = [{ id: 'a', name: 'Antiga', doc: { title: 'Antiga' } }, { id: 'b', name: 'B', doc: {} }];
+    const result = overlayRetainedProjectEdits(cloud, [retained('a', 'Edição retida')]);
+    expect(result.library.map((entry) => entry.name)).toEqual(['Edição retida', 'B']);
+    expect(result.library[1]).toBe(cloud[1]);
+    expect(result.unsent.a).toMatchObject({ onlyHere: false });
+  });
+
+  it('sem nada retido devolve a mesma lista', () => {
+    const cloud = [{ id: 'a' }];
+    expect(overlayRetainedProjectEdits(cloud, [])).toEqual({ library: cloud, unsent: {}, changed: false });
+    expect(overlayRetainedProjectEdits(cloud, []).library).toBe(cloud);
+  });
+
+  it('a mensagem ao salvar usa a frase do servidor e diz o que acontece com a edição', () => {
+    expect(retainedProjectMessage({ kind: 'review_put_failed', reviewStatus: 413,
+      reviewMessage: 'Sua conta atingiu o limite de 250 projetos. Exclua um projeto antes de criar outro.' }))
+      .toBe('Sua conta atingiu o limite de 250 projetos. Exclua um projeto antes de criar outro. A edição continua salva neste navegador e será enviada na próxima alteração do projeto.');
+    // Sem frase do servidor (falha de upload, 5xx) continua a mensagem de fila local.
+    expect(retainedProjectMessage({ kind: 'review_put_failed', reviewStatus: 503, reviewMessage: 'Indisponível.' }))
+      .toBe('O projeto ficou na fila local. Sincronize quando a conexão voltar.');
+    expect(retainedProjectMessage({ kind: 'put' }))
+      .toBe('O projeto ficou na fila local. Sincronize quando a conexão voltar.');
   });
 });

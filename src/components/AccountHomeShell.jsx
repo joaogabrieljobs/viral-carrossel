@@ -61,6 +61,7 @@ function AccountHomeShell({
   cloudSyncBusy = false,
   photoLoad = null,
   openingDocId = null,
+  unsentProjects = null,
   onOpenBrands,
   accessEmail,
   accessStatus,
@@ -394,6 +395,12 @@ function AccountHomeShell({
                   </div>
                   {openingDocId === entry.id && (
                     <span role="status" style={{ fontSize: 11, color: 'var(--accent)' }}>Abrindo projeto…</span>
+                  )}
+                  {unsentProjects?.[entry.id] && (
+                    <span data-testid="projeto-nao-enviado" title={unsentProjects[entry.id].message || undefined}
+                      style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      Não enviado à conta · salvo só neste navegador
+                    </span>
                   )}
                 </div>
                 </div>
