@@ -346,13 +346,17 @@ export async function handleCheckout(req, res) {
       entry?.mode === 'subscription'
       && entry?.metadata?.product === 'viral-carrossel'
     ));
+    // AUTH-07: sessão criada antes de um logout (versão antiga da conta) não é
+    // reaproveitada: a confirmação recusaria depois do pagamento.
     let session = ownOpenSessions.find((entry) => (
       entry?.metadata?.tier === tier
+      && String(entry?.metadata?.vc_identity_epoch || '') === identityEpoch
       && typeof entry?.url === 'string'
       && entry.url.startsWith('https://')
     ));
-    // AUTH-02: a sessão de pagamento de outro plano não pode continuar aberta.
-    // Pagar as duas criaria duas assinaturas no mesmo cliente.
+    // AUTH-02: a sessão de pagamento que não será usada (outro plano ou versão
+    // antiga da conta) não pode continuar aberta. Pagar as duas criaria duas
+    // assinaturas no mesmo cliente.
     const closedSessionIds = [];
     for (const stale of ownOpenSessions) {
       if (stale === session || !stale?.id) continue;
