@@ -40,6 +40,8 @@ describe('MOO-11 — texto incluso com cota por conta', () => {
     const res = await call(body());
     expect(res.statusCode).toBe(429);
     expect(res.body.error.message).toMatch(/limite diário/);
+    // IA-01 (auditoria 23/11): código próprio, para o app não tratar como sobrecarga.
+    expect(res.body.error.code).toBe('text_quota_exhausted');
     expect(fetch).not.toHaveBeenCalled();
     expect(textQuota.consume).toHaveBeenCalledWith(expect.objectContaining({ customerId: 'cus_ok' }));
   });

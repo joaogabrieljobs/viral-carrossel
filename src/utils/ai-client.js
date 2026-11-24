@@ -401,6 +401,15 @@ const callCompatibleChat = async (
         const gate = sessionGateError(res.status, data);
         if (gate) throw gate;
       }
+      // Limite diário do texto incluso (auditoria 23/11, IA-01): quem recusou
+      // foi o Moont, não o provedor. Trocar de modelo só repetia a recusa, e a
+      // frase do servidor (quando volta, chave própria) era descartada.
+      if (res.status === 429 && data?.error?.code === 'text_quota_exhausted') {
+        throw Object.assign(
+          new Error(String(data.error.message || '').trim() || 'Você atingiu o limite diário de texto incluído no plano. Ele volta à meia-noite, ou use sua própria chave em Configurar IA.'),
+          { status: 429, code: 'text_quota_exhausted' },
+        );
+      }
       lastError = new Error(translateProviderError(provider, res.status, data, raw));
       // Flash/grátis em overload → tenta modelo pago seguinte.
       if (provider === 'zai' && isZaiOverloadError(res.status, data, raw) && i < modelCandidates.length - 1) {

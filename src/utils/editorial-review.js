@@ -891,9 +891,10 @@ ${attempt > 1 ? `A resposta anterior deste lote não pôde ser utilizada. Refaç
       } catch (error) {
         if (isGenerationCancelled(error) || textOptions.signal?.aborted) throw error;
         // Session/subscription errors must not trigger another paid request.
-        const accessError = error?.isSessionGate || ['session_required', 'subscription_required', 'subscription_inactive', 'session_expired', 'unauthorized', 'payment_required', 'access_denied', 'rate_limited'].includes(error?.code) || [401, 402, 403, 429].includes(error?.status);
+        const accessError = error?.isSessionGate || ['session_required', 'subscription_required', 'subscription_inactive', 'session_expired', 'unauthorized', 'payment_required', 'access_denied', 'rate_limited', 'text_quota_exhausted'].includes(error?.code) || [401, 402, 403, 429].includes(error?.status);
         const interruptionReason = ['subscription_required', 'subscription_inactive', 'payment_required'].includes(error?.code) || error?.status === 402 ? 'subscription_required'
           : ['session_required', 'session_expired', 'unauthorized'].includes(error?.code) || error?.status === 401 ? 'session_required'
+            : error?.code === 'text_quota_exhausted' ? 'text_quota_exhausted'
             : error?.status === 429 || error?.code === 'rate_limited' ? 'rate_limited'
               : accessError ? 'access_denied' : 'writing_failed';
         const safeCodes = ['ai_output_truncated', 'ai_invalid_json', 'presentation_batch_invalid', 'presentation_title_missing', 'presentation_blocks_invalid', 'presentation_blocks_not_allowed', 'presentation_notes_invalid', 'presentation_notes_too_long'];

@@ -128,7 +128,9 @@ export default async function handler(req, res) {
         return res.status(503).json({ error: { message: 'Não foi possível conferir seu limite diário de texto agora. Tente novamente em instantes, ou use sua própria chave em Configurar IA.' } });
       }
       if (!quota.allowed) {
-        return res.status(429).json({ error: { message: `Você atingiu o limite diário de ${quota.limit} pedidos de texto incluídos no plano. Ele volta à meia-noite, ou use sua própria chave em Configurar IA.` } });
+        // `code` próprio (auditoria 23/11, IA-01): o app não pode confundir a
+        // cota do dia com sobrecarga do provedor e repetir o pedido.
+        return res.status(429).json({ error: { message: `Você atingiu o limite diário de ${quota.limit} pedidos de texto incluídos no plano. Ele volta à meia-noite, ou use sua própria chave em Configurar IA.`, code: 'text_quota_exhausted' } });
       }
     }
   }

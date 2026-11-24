@@ -5,6 +5,7 @@ export function presentationInterruptionMessage(reason) {
   switch (reason) {
     case 'subscription_required': return 'O serviço pediu a confirmação da assinatura para continuar. Confira o acesso da sua conta antes de tentar novamente.';
     case 'session_required': return 'A sessão não pôde ser confirmada. Entre novamente na sua conta antes de tentar continuar.';
+    case 'text_quota_exhausted': return 'Você atingiu o limite diário de texto incluído no plano. Ele volta à meia-noite; para continuar agora, use sua própria chave em Configurar IA.';
     case 'rate_limited': return 'O serviço limitou novas solicitações. Aguarde um pouco antes de tentar novamente.';
     case 'access_denied': return 'O serviço não autorizou a continuação. Confira o acesso da sua conta.';
     case 'writing_failed': return 'Não foi possível concluir a redação do próximo grupo de slides.';
