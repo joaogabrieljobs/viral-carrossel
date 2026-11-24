@@ -23,6 +23,25 @@ import {
 
 export const config = { maxDuration: 60 };
 
+// DB-06: a resposta de uma função da Vercel tem teto de 4,5 MB e o boot ainda
+// lê a biblioteca inteira de uma vez. Enquanto a leitura em páginas não chega,
+// o tamanho fica no log para sabermos quão perto a maior conta está.
+export const FULL_MANIFEST_LOG_BYTES = 1_000_000;
+export const FULL_MANIFEST_WARN_BYTES = 3_500_000;
+
+function logFullManifestSize(payload) {
+  try {
+    const bytes = Buffer.byteLength(JSON.stringify(payload));
+    if (bytes < FULL_MANIFEST_LOG_BYTES) return;
+    const projects = Array.isArray(payload.manifest?.docs) ? payload.manifest.docs.length : null;
+    if (bytes >= FULL_MANIFEST_WARN_BYTES) {
+      console.warn('[library-sync] full_manifest_near_limit', bytes, 'projects', projects);
+    } else {
+      console.info('[library-sync] full_manifest_bytes', bytes, 'projects', projects);
+    }
+  } catch { /* medir nunca pode impedir a leitura da biblioteca */ }
+}
+
 function parseBody(req) {
   if (typeof req.body === 'string') {
     try { return JSON.parse(req.body); } catch { return {}; }
@@ -122,7 +141,9 @@ export default async function handler(req, res) {
         if (!manifest) {
           return res.status(404).json({ error: 'Nenhuma biblioteca na nuvem para esta conta.', empty: true });
         }
-        return res.status(200).json({ ok: true, manifest });
+        const payload = { ok: true, manifest };
+        logFullManifestSize(payload);
+        return res.status(200).json(payload);
       }
       const meta = await getLibrarySyncMeta(customerId);
       if (!meta) {
