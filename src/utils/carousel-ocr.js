@@ -81,6 +81,28 @@ export async function readCarouselImageText(dataUrl, { fetchImpl = fetch, signal
   return String(payload.text || '').trim().slice(0, 18_000);
 }
 
+/** Texto de ajuda do envio de prints: só fala da leitura no aparelho quando
+ * ela pode rodar neste navegador. */
+export function carouselOcrHelpText({ localAvailable = false } = {}) {
+  return [
+    `Até ${CAROUSEL_OCR_MAX_IMAGES} imagens PNG/JPG.`,
+    localAvailable ? 'Se a leitura online falhar, o app tenta ler o texto no seu aparelho.' : '',
+    'Os arquivos não ficam no projeto; só o texto extraído é salvo para reanálise.',
+  ].filter(Boolean).join(' ');
+}
+
+/** A leitura online falhou e a do aparelho não subiu: o motivo junta os dois,
+ * sem repetir a promessa de "tentar no aparelho". */
+function localFallbackUnavailableError(serverError, localError) {
+  const status = Number(serverError?.status || 0);
+  // 422 (sem texto legível) e 429 (limite) já dizem o que a pessoa precisa saber.
+  const online = !serverError ? ''
+    : (status === 422 || status === 429) && serverError.message ? serverError.message
+      : 'A leitura online falhou.';
+  const local = localError?.message || 'A leitura no aparelho não está disponível neste navegador.';
+  return new Error([online, local].filter(Boolean).join(' '));
+}
+
 export async function extractCarouselImageEvidence(files, {
   fetchImpl,
   signal,
@@ -91,6 +113,7 @@ export async function extractCarouselImageEvidence(files, {
   const evidence = [];
   const failures = [];
   let browserOcr = null;
+  let browserOcrStartError = null;
   let preferBrowserOcr = false;
   let localCount = 0;
   try {
@@ -112,16 +135,25 @@ export async function extractCarouselImageEvidence(files, {
         if (!text) {
           if (serverError && !shouldUseBrowserOcrFallback(serverError)) throw serverError;
           if (!browserOcr) {
-            browserOcr = await browserOcrFactory({
-              signal,
-              onProgress: (message) => onProgress?.({
-                current: index + 1,
-                total: valid.length,
-                name: file.name,
-                stage: 'local',
-                progress: Number(message?.progress || 0),
-              }),
-            });
+            // Leitor que não subiu (WebAssembly recusado, prazo esgotado) não
+            // sobe na imagem seguinte: não repete a espera a cada arquivo.
+            if (browserOcrStartError) throw localFallbackUnavailableError(serverError, browserOcrStartError);
+            try {
+              browserOcr = await browserOcrFactory({
+                signal,
+                onProgress: (message) => onProgress?.({
+                  current: index + 1,
+                  total: valid.length,
+                  name: file.name,
+                  stage: 'local',
+                  progress: Number(message?.progress || 0),
+                }),
+              });
+            } catch (error) {
+              if (error?.name === 'AbortError') throw error;
+              browserOcrStartError = error;
+              throw localFallbackUnavailableError(serverError, error);
+            }
           }
           browserOcr.setProgress?.((message) => onProgress?.({
             current: index + 1,

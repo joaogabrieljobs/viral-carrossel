@@ -8,9 +8,11 @@ import {
 } from '../../utils/social-tone.js';
 import {
   CAROUSEL_OCR_MAX_IMAGES,
+  carouselOcrHelpText,
   extractCarouselImageEvidence,
   normalizeCarouselImageEvidence,
 } from '../../utils/carousel-ocr.js';
+import { browserOcrCanRun } from '../../utils/browser-ocr.js';
 import { getAIGenerationCount, startAIJob } from '../../utils/generation-control.js';
 
 /**
@@ -48,6 +50,8 @@ export function BrandTonePanel({
   ));
   const [readingImages, setReadingImages] = useState(false);
   const [imageProgress, setImageProgress] = useState('');
+  // Conferido uma vez: a política de segurança da página não muda com ela aberta.
+  const [localOcrAvailable] = useState(browserOcrCanRun);
   const imageInputRef = useRef(null);
   const operationRef = useRef({ version: 0, job: null });
   const projectRef = useRef(projectId);
@@ -398,7 +402,7 @@ export function BrandTonePanel({
                   : <><FileImage size={14} /> Ler texto de prints/PNGs dos carrosséis</>}
               </button>
               <div style={{ fontSize: 10.5, color: 'var(--text-muted)', lineHeight: 1.45 }}>
-                Até 10 imagens PNG/JPG. Se a leitura online falhar, o texto é extraído no seu aparelho. Os arquivos não ficam no projeto; só o texto extraído é salvo para reanálise.
+                {carouselOcrHelpText({ localAvailable: localOcrAvailable })}
               </div>
               {imageEvidence.length ? (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }} aria-label={`${imageEvidence.length} imagens lidas`}>
