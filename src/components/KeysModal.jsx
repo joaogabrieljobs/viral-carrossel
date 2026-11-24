@@ -4,6 +4,7 @@ import {
   Settings, Sparkles, Type, X,
 } from 'lucide-react';
 import {
+  AI_KEY_PRIVACY_NOTE,
   DEFAULT_AI_SETTINGS,
   IMAGE_PROVIDERS,
   normalizeAISettings,
@@ -612,7 +613,7 @@ export default function KeysModal({
 
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, color: 'var(--text-muted)', fontSize: 10, lineHeight: 1.5 }}>
                 <Lock size={12} style={{ flexShrink: 0, marginTop: 1 }} />
-                <span>As chaves não entram na nossa base de dados. Elas só são enviadas ao provedor escolhido durante a geração.</span>
+                <span>{AI_KEY_PRIVACY_NOTE}</span>
               </div>
             </div>
           )}

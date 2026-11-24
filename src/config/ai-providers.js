@@ -104,6 +104,14 @@ export const DEFAULT_AI_SETTINGS = {
   persistKeys: false,
 };
 
+/**
+ * Aviso de privacidade das chaves em Configurar IA (auditoria 23/11, GB-06).
+ * Só a OpenAI é chamada direto do navegador; Claude e Kimi passam pelo proxy do
+ * Moont, que repassa a chave sem gravar. O texto antigo dizia que as chaves
+ * "só são enviadas ao provedor escolhido".
+ */
+export const AI_KEY_PRIVACY_NOTE = 'Não guardamos suas chaves. Na geração, a chave da OpenAI vai direto do seu navegador para a OpenAI; as outras passam pelo nosso servidor só para chegar ao provedor escolhido.';
+
 /** Provedores de texto que o servidor cobre sem chave do utilizador. */
 export const PLATFORM_TEXT_PROVIDERS = new Set(['zai']);
 
