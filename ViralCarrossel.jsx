@@ -228,6 +228,7 @@ import {
   getPresentationPath,
   clampPresentationSlideCount,
   narrativeModeMaterialNotice,
+  materialNoticeSourceText,
 } from './src/utils/presentation.js';
 import {
   applyBatchPhotosToSlides,
@@ -6103,7 +6104,7 @@ ${jsonShapeLine}`;
     // Reteste 22/11: vale também para o carrossel (Contar uma história, Ir a
     // fundo) e para a Aula; checa o material, com ou sem revisão.
     const pathMaterialNotice = !remix
-      ? narrativeModeMaterialNotice(isPresentationGeneration ? presentationPathId : effectiveMode, [topic, materialFactualSource].filter(Boolean).join('\n'))
+      ? narrativeModeMaterialNotice(isPresentationGeneration ? presentationPathId : effectiveMode, materialNoticeSourceText(topic, { factualSource: materialFactualSource, presentationSources }))
       : '';
     if (reviewStatus === 'needs_attention') {
       toast(generationIncomplete

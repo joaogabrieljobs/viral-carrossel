@@ -447,6 +447,20 @@ const STORY_MARKERS = /\b(?:fund(?:ou|ad[oa])|abriu|come[cç]ou|quando|hist[oó]
 const TEACHING_MARKERS = /\b(?:como\s+(?:fazer|usar|escolher|montar)|passo|etapa|porque|por que|erro|exemplo|m[eé]todo|t[eé]cnica|conceito|exerc[ií]cio|how\s+to|step|why|mistake|example|method|technique|concept)\b/i;
 const DEEP_MIN_WORDS = 150;
 
+/**
+ * Texto que o aviso de material confere (auditoria 23/11, IA-03). No carrossel
+ * a base factual vem em `factualSource`; na apresentação, em
+ * `presentationSources`. Ler só o tema dava aviso falso em Caso e Aula mesmo
+ * com o material completo no Conteúdo base.
+ */
+export function materialNoticeSourceText(topic, { factualSource = '', presentationSources = [] } = {}) {
+  const sources = Array.isArray(presentationSources) ? presentationSources : [];
+  const sourceTexts = sources.flatMap(source => (
+    Array.isArray(source?.chunks) && source.chunks.length ? source.chunks.map(chunk => chunk?.text) : [source?.text]
+  ));
+  return [topic, factualSource, ...sourceTexts].filter(text => typeof text === 'string' && text.trim()).join('\n');
+}
+
 export function narrativeModeMaterialNotice(modeId, sourceText) {
   const text = String(sourceText || '');
   const id = String(modeId || '');
