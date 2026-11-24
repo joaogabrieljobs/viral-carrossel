@@ -26,7 +26,7 @@ flowchart LR
 
 ## Modelo de dados
 
-As migrações estão em `db/migrations/001_account_library.sql` a `011_image_quota_metadata.sql`.
+As migrações estão em `db/migrations/`, de `001_account_library.sql` a `023_template_report_dismissal.sql`. A tabela abaixo foi escrita com as onze primeiras e ganhou em 24/11/2026 as linhas das migrações 012 a 023.
 
 | Tabela | Função | Chave e proteção principal |
 | --- | --- | --- |
@@ -42,6 +42,12 @@ As migrações estão em `db/migrations/001_account_library.sql` a `011_image_qu
 | `moont.ocr_daily_quotas` e `moont.ocr_daily_operations` | Teto diário de OCR por conta e reembolso idempotente | `(owner_id, quota_day)` e identificador de operação |
 | `moont.agent_tokens` | Chaves pessoais da integração Codex; somente hash, escopo, vencimento e revogação | `token_hash` único; vinculadas à revisão de segurança da conta |
 | `moont.agent_visual_jobs` | Histórico privado para desfazer uma alteração do MCP e estado dos jobs de imagem (`pending`, `applied`, `failed`, `undone`, com `slides` por card) | `(owner_id, request_id)` único; snapshot anterior e versões antes/depois |
+| `moont.billing_events` (012) | Trilha idempotente dos webhooks do Stripe, sem o payload completo | `event_id` único |
+| `moont.account_access_grants` e `moont.account_access_grant_events` (014, 017) | Isenção de cobrança por conta, com plano explícito, opção sem limite de imagens e eventos `granted`/`revoked` | `request_id` único; eventos não aceitam alteração nem exclusão; lida só com `ACCOUNT_ENTITLEMENTS_BACKEND=postgres` |
+| `moont.published_templates`, `moont.published_template_reports` e `moont.published_template_uses` (015, 021, 023) | Galeria de modelos: estrutura visual publicada, denúncias e contagem de usos | Dono conferido no SQL; uma denúncia por `(template_id, reporter_id)`, que fica guardada depois de dispensada |
+| `moont.template_moderators` e `moont.template_moderation_events` (016) | Quem modera a galeria e o histórico de cada decisão | `owner_id`; quem tem papel em `admin_roles` também modera |
+| `moont.admin_roles`, `moont.admin_actions` e `moont.admin_challenges` (018) | Console `/admin`: papéis `admin` e `suporte`, trilha das ações e códigos por e-mail | Trilha recusa `UPDATE`, `DELETE` e `TRUNCATE`; código com hash, 10 minutos, 5 tentativas e uso único |
+| `moont.text_daily_usage` (020) | Pedidos de texto incluso por conta e por dia (dia de Brasília) | `(owner_id, quota_day)`; teto por plano em `api/lib/text-quota.js` |
 
 **Distinção atual de IDs:** a identidade já possui UUID próprio, mas a biblioteca, os assets e a quota ainda usam preferencialmente o `customerId` Stripe como `owner_id`, preservando as chaves legadas. O UUID ainda não substitui essa chave em todos os dados. O cliente local também usa aliases de owner; uma futura troca para UUID exige migração explícita desses aliases e dos caminhos do Blob. Dois customers com o mesmo e-mail não devem ser mesclados automaticamente.
 
@@ -90,7 +96,7 @@ Ainda há gargalos antes de prometer uma biblioteca com milhares de projetos **e
 
 ## Operação e indicadores
 
-O código possui mensagens de erro e alguns logs/telemetria, mas não há um painel operacional completo implementado para esta migração. Instrumentar, por rota e sem dados sensíveis nos logs:
+O código possui mensagens de erro e alguns logs/telemetria. Desde 19/11/2026 existe a aba **Saúde** do console `/admin` (`api/lib/admin-store.js`, `health`): reservas de imagem paradas há mais de 15 minutos, imagens consumidas e devolvidas em 24 horas, jobs do agente com falha ou parados, último aviso recebido do Stripe, acessos de agente ativos e a conferência do preço da tela contra o Stripe. Ela não cobre os indicadores abaixo, que continuam sem painel. Instrumentar, por rota e sem dados sensíveis nos logs:
 
 - taxa de sucesso e latência p50/p95 de login, lista, detalhe, PUT, DELETE, upload e download de asset;
 - `409`, `503`, tamanho e idade da fila IndexedDB, tempo até salvar na nuvem;

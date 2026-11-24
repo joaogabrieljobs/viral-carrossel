@@ -14,7 +14,7 @@ O vínculo usado na consulta é `moont.account_stripe_customers`, com `verified_
 | `ACCOUNT_IDENTITY_BACKEND=postgres` | Backend de identidade utilizado no rollout; manter os vínculos verificados existentes. |
 | `DATABASE_URL` ou `POSTGRES_URL` | Conexão privada já configurada no servidor. Credenciais não entram em exemplos, relatórios ou commits. |
 
-Com a flag de entitlements ausente, o acesso continua seguindo a assinatura Stripe. Com a flag ligada, a fonte de concessões é consultada antes do Stripe; erro nessa leitura resulta em indisponibilidade, sem presumir acesso ativo nem cair silenciosamente no caminho pago.
+Com a flag de entitlements ausente, o acesso continua seguindo a assinatura Stripe. Com a flag ligada, a fonte de concessões é consultada antes do Stripe; erro nessa leitura resulta em indisponibilidade, sem presumir acesso ativo nem cair silenciosamente no caminho pago. Isenção não rebaixa quem já paga: quando a conta tem isenção válida e assinatura ativa, vale o maior dos dois planos (`resolveAccountEntitlement` em `api/lib/account-entitlements.js`). Isenção Max ou sem limite de imagens já é o teto e dispensa a consulta ao Stripe. Nos outros casos o Stripe é consultado; se ele falhar ou não houver assinatura, vale a isenção.
 
 Ordem operacional: **migração 014 → concessão auditada → flag e deploy → verificação**.
 
@@ -28,7 +28,7 @@ O código pode ser publicado previamente com a flag ausente, mas a concessão s�
 
 ## Concessão e idempotência
 
-O módulo [account-entitlements.js](../../api/lib/account-entitlements.js) exporta `grantAccountAccess` e `revokeAccountAccess`. São helpers administrativos internos; não há endpoint público para conceder ou revogar isenção.
+O módulo [account-entitlements.js](../../api/lib/account-entitlements.js) exporta `grantAccountAccess` e `revokeAccountAccess`. O console admin chama esses helpers por `POST /api/admin`, ações `grant` e `revoke` (`api/admin.js`): só o papel `admin` escreve, com motivo, código enviado por e-mail e trilha em `moont.admin_actions` na mesma transação. A rota recusa conceder isenção à própria conta e mexer na isenção de outra conta da equipe (403). Para quem não tem papel a rota responde 404; não há outro endpoint para conceder ou revogar. Ver `docs/product/console-admin.md`.
 
 Exemplo de formato, com valores fornecidos por um contexto administrativo privado:
 
