@@ -245,6 +245,36 @@ export function listPendingProjectOps(ownerId) {
   });
 }
 
+/**
+ * DB-12: "Sair e apagar deste aparelho" também apaga a fila da conta que pediu
+ * (cada operação guarda o documento inteiro e as fotos). Só saem as linhas dos
+ * donos informados: a fila de outra conta neste navegador pode ser a única
+ * cópia das edições dela. Não confere o dono ativo de propósito: a limpeza
+ * roda quando as chaves da conta já saíram do navegador.
+ */
+export async function wipeProjectOutboxForOwners(ownerIds) {
+  const owners = [...new Set((Array.isArray(ownerIds) ? ownerIds : [])
+    .filter((id) => typeof id === 'string' && id))];
+  if (!owners.length || typeof indexedDB === 'undefined') return 0;
+  return transaction('readwrite', (store, setResult, fail) => {
+    let removed = 0;
+    setResult(0);
+    for (const owner of owners) {
+      const read = store.index('owner').getAllKeys(owner);
+      read.onsuccess = () => {
+        for (const key of read.result || []) {
+          store.delete(key);
+          removed += 1;
+        }
+        setResult(removed);
+      };
+      read.onerror = () => fail(read.error || outboxError(
+        'Não foi possível apagar as alterações pendentes deste aparelho.', 'project_outbox_failed',
+      ));
+    }
+  });
+}
+
 /** Nunca remove uma edição nova que chegou enquanto a antiga estava em trânsito. */
 export function acknowledgeProjectOp(ownerId, sentOp, version) {
   assertActiveOwner(ownerId);

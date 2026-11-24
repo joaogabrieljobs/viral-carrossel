@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { bindAccountDataWriteOwner, SK } from '../../src/utils/storage.js';
+import { bindAccountDataWriteOwner, SK, unlockAccountDataWrites } from '../../src/utils/storage.js';
 import { originalImageAssetId } from '../../src/utils/cloud-image-assets.js';
 import { flushProjectOutboxForBoot } from '../../src/hooks/useAccess.js';
 import {
@@ -9,7 +9,9 @@ import {
   acknowledgeProjectOp, conflictCopyEntry, conflictCopyId, flushProjectOutbox, getPendingProjectOp,
   listDeletedProjectEdits, listPendingProjectOps, listRetainedProjectEdits, overlayRetainedProjectEdits,
   queueProjectDelete, queueProjectPut, resolveDeletedProjectEdit, retainedProjectMessage,
+  wipeProjectOutboxForOwners,
 } from '../../src/utils/projects-outbox.js';
+import { clearAccountLocalData, OUTBOX_WIPE_OWNERS_KEY } from '../../src/utils/clear-account-data.js';
 
 const ALICE = 'email:alice@example.test';
 const BOB = 'email:bob@example.test';
@@ -88,8 +90,12 @@ function fakeIndexedDB() {
             }); },
             delete(key) { return request(() => staged.delete(key)); },
             index() {
-              return { getAll(owner) { return request(() => [...staged.values()]
-                .filter((row) => row.owner === owner).map((row) => structuredClone(row))); } };
+              return {
+                getAll(owner) { return request(() => [...staged.values()]
+                  .filter((row) => row.owner === owner).map((row) => structuredClone(row))); },
+                getAllKeys(owner) { return request(() => [...staged.values()]
+                  .filter((row) => row.owner === owner).map((row) => row.key)); },
+              };
             },
           };
         },
@@ -1020,5 +1026,124 @@ describe('DB-05: no boot, o projeto marcado como não enviado vai do cache para 
     });
     expect(await flushProjectOutbox(ALICE)).toEqual({ sent: 1, pending: 0 });
     expect(requests).toEqual(['PUT', 'GET']);
+  });
+});
+
+// DB-12 (auditoria 23/11): "Sair e apagar deste aparelho" deixava a fila de
+// projetos no IndexedDB, com o documento e as fotos das operações retidas.
+describe('DB-12: apagar os dados deste aparelho apaga a fila da conta que pediu', () => {
+  const ALICE_ID = 'id:cus_alice';
+  const photo = 'data:image/png;base64,Zm90by1kZS1jbGllbnRl';
+
+  /** Deixa uma edição da Alice retida para revisão, com a foto dentro da operação. */
+  async function retainAliceEdit() {
+    const assetId = await originalImageAssetId(photo);
+    const entry = { id: 'retido', doc: { slides: [{ id: 's1', title: 'Texto do cliente', bgImageAssetId: assetId }] } };
+    await queueProjectPut(ALICE, entry, { assets: new Map([[assetId, photo]]) });
+    fetch.mockImplementation(async (url) => url === '/api/auth/session'
+      ? session() : json({ error: 'Upload indisponível.' }, 503));
+    await flushProjectOutbox(ALICE);
+    expect(await getPendingProjectOp(ALICE, 'retido')).toMatchObject({ kind: 'review_put_failed' });
+  }
+
+  function setOwnerWithAliases(owner, aliases) {
+    setOwner(owner);
+    localStorage.setItem(SK.dataOwnerAliases, JSON.stringify([owner, ...aliases]));
+  }
+
+  /** Os bancos de imagens, vídeos e cofre confirmam a exclusão. */
+  function allowDeleteDatabase() {
+    idb.deleteDatabase = () => {
+      const request = {};
+      queueMicrotask(() => request.onsuccess?.());
+      return request;
+    };
+  }
+
+  const ownersLeft = () => [...new Set([...idb.records.values()].map((row) => row.owner))].sort();
+
+  afterEach(() => { unlockAccountDataWrites(); });
+
+  it('com uma operação retida, a limpeza do aparelho termina e a fila da conta fica vazia', async () => {
+    setOwnerWithAliases(ALICE, [ALICE_ID]);
+    await retainAliceEdit();
+    await queueProjectPut(ALICE, { id: 'pendente', doc: { title: 'Ainda não enviado' } });
+    allowDeleteDatabase();
+
+    await expect(clearAccountLocalData({ wipeMedia: true })).resolves.toBeUndefined();
+
+    expect(idb.records.size).toBe(0);
+    expect(JSON.stringify([...idb.records.values()])).not.toContain('Texto do cliente');
+    expect(sessionStorage.getItem(OUTBOX_WIPE_OWNERS_KEY)).toBeNull();
+    unlockAccountDataWrites();
+    setOwner(ALICE);
+    expect(await listPendingProjectOps(ALICE)).toEqual([]);
+  });
+
+  it('a fila de outra conta no mesmo navegador não é tocada', async () => {
+    setOwner(BOB);
+    const bobOp = await queueProjectPut(BOB, { id: 'do-bob', doc: { title: 'Edição do Bob' } });
+    setOwnerWithAliases(ALICE, [ALICE_ID]);
+    await retainAliceEdit();
+    allowDeleteDatabase();
+
+    await clearAccountLocalData({ wipeMedia: true });
+
+    expect(ownersLeft()).toEqual([BOB]);
+    unlockAccountDataWrites();
+    setOwner(BOB);
+    expect(await listPendingProjectOps(BOB)).toEqual([bobOp]);
+  });
+
+  it('operação guardada no outro nome da mesma conta (id do cliente) também sai', async () => {
+    setOwner(ALICE_ID);
+    await queueProjectPut(ALICE_ID, { id: 'antigo', doc: { title: 'Guardado pelo id' } });
+    setOwnerWithAliases(ALICE, [ALICE_ID]);
+    await queueProjectPut(ALICE, { id: 'novo', doc: { title: 'Guardado pelo e-mail' } });
+    allowDeleteDatabase();
+
+    await clearAccountLocalData({ wipeMedia: true });
+
+    expect(idb.records.size).toBe(0);
+  });
+
+  it('sair da conta sem apagar o aparelho mantém a fila (a edição retida é a única cópia)', async () => {
+    setOwnerWithAliases(ALICE, [ALICE_ID]);
+    await retainAliceEdit();
+
+    await clearAccountLocalData();
+
+    expect(ownersLeft()).toEqual([ALICE]);
+  });
+
+  it('se a fila não confirma a exclusão, a limpeza avisa a falha e a nova tentativa ainda sabe de quem apagar', async () => {
+    setOwnerWithAliases(ALICE, [ALICE_ID]);
+    await retainAliceEdit();
+    setOwner(BOB);
+    await queueProjectPut(BOB, { id: 'do-bob', doc: { title: 'Edição do Bob' } });
+    setOwnerWithAliases(ALICE, [ALICE_ID]);
+    allowDeleteDatabase();
+    const open = idb.open;
+    idb.open = () => { throw new DOMException('Banco bloqueado', 'InvalidStateError'); };
+
+    await expect(clearAccountLocalData({ wipeMedia: true })).rejects.toBeTruthy();
+    // As chaves da conta já saíram; o que falta apagar fica anotado nesta aba.
+    expect(localStorage.getItem(SK.dataOwner)).toBeNull();
+    expect(JSON.parse(sessionStorage.getItem(OUTBOX_WIPE_OWNERS_KEY)).sort()).toEqual([ALICE, ALICE_ID].sort());
+    expect(ownersLeft()).toEqual([ALICE, BOB].sort());
+
+    idb.open = open;
+    await expect(clearAccountLocalData({ wipeMedia: true })).resolves.toBeUndefined();
+    expect(ownersLeft()).toEqual([BOB]);
+    expect(sessionStorage.getItem(OUTBOX_WIPE_OWNERS_KEY)).toBeNull();
+  });
+
+  it('wipeProjectOutboxForOwners sem dono informado não apaga nada', async () => {
+    await queueProjectPut(ALICE, { id: 'fica', doc: { title: 'Fica' } });
+    expect(await wipeProjectOutboxForOwners([])).toBe(0);
+    expect(await wipeProjectOutboxForOwners([null, ''])).toBe(0);
+    expect(idb.records.size).toBe(1);
+    expect(await wipeProjectOutboxForOwners([ALICE, ALICE])).toBe(1);
+    expect(idb.records.size).toBe(0);
   });
 });

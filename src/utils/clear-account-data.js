@@ -29,6 +29,44 @@ const PRESERVE_KEYS = new Set([
   'vc_account_write_lock_token',
 ]);
 
+/**
+ * DB-12: donos cuja fila de projetos ainda falta apagar depois de um "sair e
+ * apagar deste aparelho" que não confirmou. Fica só nesta aba e some na
+ * tentativa que der certo. Como começa por `vc_`, conta como resto de conta e
+ * mantém a limpeza pendente até a fila sair.
+ */
+export const OUTBOX_WIPE_OWNERS_KEY = 'vc_outbox_wipe_owners';
+
+function storedOwnerIds(store, key) {
+  try {
+    const raw = store?.getItem(key);
+    if (!raw) return [];
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch { parsed = raw; }
+    return (Array.isArray(parsed) ? parsed : [parsed]).filter((id) => typeof id === 'string' && id);
+  } catch { return []; }
+}
+
+/** Lido ANTES de as chaves da conta saírem: depois não há como saber de quem era a fila. */
+function outboxOwnersToWipe() {
+  const local = typeof localStorage !== 'undefined' ? localStorage : null;
+  const session = typeof sessionStorage !== 'undefined' ? sessionStorage : null;
+  // Mesma regra das imagens: a cópia da aba só vale quando a do navegador falta.
+  const localAliases = storedOwnerIds(local, SK.dataOwnerAliases);
+  return [...new Set([
+    ...storedOwnerIds(local, SK.dataOwner),
+    ...(localAliases.length ? localAliases : storedOwnerIds(session, SK.dataOwnerAliases)),
+    ...storedOwnerIds(session, OUTBOX_WIPE_OWNERS_KEY),
+  ])];
+}
+
+async function wipeOutboxForOwners(owners) {
+  if (!owners.length || typeof indexedDB === 'undefined') return;
+  // Import sob demanda: a fila importa o dono da conta, que importa este módulo.
+  const { wipeProjectOutboxForOwners } = await import('./projects-outbox.js');
+  await wipeProjectOutboxForOwners(owners);
+}
+
 function removeKnownKeys(store) {
   if (!store) return;
   const known = new Set([...Object.values(SK), ...EXTRA_KEYS]);
@@ -55,12 +93,16 @@ function removeKnownKeys(store) {
  * @param {{ timeoutMs?: number, wipeMedia?: boolean }} [opts]
  *   wipeMedia: limpeza explícita de TODAS as contas deste browser. No logout e
  *   na troca de conta fica false: o cofre usa IDs que apontam para estes blobs.
- *   Quando true, apaga também o cofre de todas as contas deste aparelho.
+ *   Quando true, apaga também o cofre de todas as contas deste aparelho e a
+ *   fila de projetos da conta que pediu (a de outras contas fica: DB-12).
  *   A leitura e a limpeza de órfãos são isoladas por owner nos stores.
  */
 export async function clearAccountLocalData({ timeoutMs = 3_000, wipeMedia = false } = {}) {
   // Trava ANTES de apagar — pagehide/beforeunload não podem repor a biblioteca.
   try { lockAccountDataWrites(); } catch { /* */ }
+  // Só a fila de quem pediu para apagar o aparelho. A de outra conta fica.
+  const outboxOwners = wipeMedia ? outboxOwnersToWipe() : [];
+  let outboxWiped = false;
   try { removeKnownKeys(typeof localStorage !== 'undefined' ? localStorage : null); } catch { /* */ }
   try { removeKnownKeys(typeof sessionStorage !== 'undefined' ? sessionStorage : null); } catch { /* */ }
   try { setVideoUrlMap({}); } catch { /* */ }
@@ -75,6 +117,7 @@ export async function clearAccountLocalData({ timeoutMs = 3_000, wipeMedia = fal
       imageWipeDatabase({ strict: true }),
       videoWipeDatabase({ strict: true }),
       wipeDurableVaultDatabase(),
+      wipeOutboxForOwners(outboxOwners).then(() => { outboxWiped = true; }),
     ]);
     try {
       await Promise.race([
@@ -94,6 +137,11 @@ export async function clearAccountLocalData({ timeoutMs = 3_000, wipeMedia = fal
   if (wipeMedia) {
     try { localStorage.removeItem(ACCOUNT_VAULT_KEY); } catch { /* */ }
     try { localStorage.removeItem(OWNER_EMAIL_BINDINGS_KEY); } catch { /* */ }
+    // Fila ainda no aparelho: anota de quem é, para a nova tentativa apagar.
+    try {
+      if (outboxWiped || !outboxOwners.length) sessionStorage.removeItem(OUTBOX_WIPE_OWNERS_KEY);
+      else sessionStorage.setItem(OUTBOX_WIPE_OWNERS_KEY, JSON.stringify(outboxOwners));
+    } catch { /* privado / bloqueado */ }
   }
   if (wipeError) throw wipeError;
 }
