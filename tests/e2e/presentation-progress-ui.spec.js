@@ -191,7 +191,10 @@ test('interrupção de acesso preserva três de seis slides e explica a causa ap
         const batch = presentationBatch(prompt, slides);
         if (batch[0].title !== slides[0].title) {
           stages.push('subscription-required');
-          return route.fulfill({ status:402, json:{ code:'subscription_required', error:'Confirme o acesso da assinatura.' } });
+          // Mesma forma do portão real (api/lib/require-access.js): desde o IA-07 só a
+          // recusa marcada pelo Moont é lida como assinatura; 402 sem marca é do provedor.
+          return route.fulfill({ status:402, headers:{ 'X-Moont-Gate':'subscription' },
+            json:{ error:{ message:'Assinatura inativa.', code:'subscription_inactive' } } });
         }
         stages.push('first-batch');
         data = { slides:batch, caption:'Próximos passos para registrar decisões.' };
