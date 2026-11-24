@@ -100,6 +100,25 @@ describe('logout protege a edição atual antes de limpar a conta', () => {
     expect(mocks.state.locked).toBe(true);
   });
 
+  // GB-05 (auditoria 23/11): o código do convite ficava na aba depois de sair
+  // e a próxima conta a entrar ali entrava sozinha na equipe.
+  it('saída confirmada descarta o convite de equipe pendente', async () => {
+    const removed = [];
+    vi.stubGlobal('sessionStorage', { getItem: () => null, setItem: () => {}, removeItem: (key) => { removed.push(key); } });
+    mocks.vault.mockReturnValue(true);
+    expect(await run()).toBe(true);
+    expect(removed).toContain('vc_pending_share');
+  });
+
+  it('saída não confirmada mantém o convite pendente', async () => {
+    const removed = [];
+    vi.stubGlobal('sessionStorage', { getItem: () => null, setItem: () => {}, removeItem: (key) => { removed.push(key); } });
+    mocks.vault.mockReturnValue(true);
+    mocks.logout.mockResolvedValue({ ok: false });
+    await run();
+    expect(removed).not.toContain('vc_pending_share');
+  });
+
   // MOO-21: a ligação e-mail → cliente fica no navegador depois de sair; não
   // pode ser lida como resíduo de limpeza (o logout ia para ?landing=1).
   it('a ligação de e-mail do MOO-21 não conta como resíduo no logout', async () => {

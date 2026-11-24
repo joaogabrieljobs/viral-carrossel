@@ -323,6 +323,10 @@ export async function logoutWithProtectedLibrary({
       }
       remoteLogoutConfirmed = true;
       revocationWarning = !!result.warning;
+      // GB-05 (auditoria 23/11): o convite pendente era de quem saiu. A limpeza
+      // de conta o preserva (precisa sobreviver ao login); na saída confirmada
+      // ele é descartado, senão a próxima conta nesta aba entrava na equipe.
+      try { sessionStorage.removeItem(PENDING_SHARE_KEY); } catch { /* privado / bloqueado */ }
     } catch (error) {
       throw new Error(error?.message || 'Não foi possível confirmar a saída da conta. Tente novamente.');
     }
