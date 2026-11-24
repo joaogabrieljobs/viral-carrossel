@@ -19,6 +19,7 @@ import {
 import {
   sanitizeCustomVisualPresetBrand,
   sanitizeCustomVisualPresetSlideDefaults,
+  slideDefaultsForAllCards,
 } from './custom-visual-presets.js';
 import { resolvePresentationVisualRole } from './presentation-composition.js';
 import { presentationRoadmap } from './presentation-roadmap.js';
@@ -68,9 +69,15 @@ function applyResolvedPresentationPresetToSlide(slide, preset, normalizedPath, i
     const fallbackComposition = slide.canvas?.zones
       ? {}
       : referenceComposition;
-    const customSlideDefaults = sanitizeCustomVisualPresetSlideDefaults(
+    const savedSlideDefaults = sanitizeCustomVisualPresetSlideDefaults(
       preset.slideDefaults || {},
     );
+    // Em vários slides de uma vez, o recorte da foto do slide de origem não
+    // vai para os outros; num slide só (alcance "Card") ele acompanha.
+    const customSlideDefaults = count > 1
+      ? slideDefaultsForAllCards(savedSlideDefaults)
+      : savedSlideDefaults;
+    const ownPhotoOffset = count > 1 ? slide.elementOffsets?.photo : null;
     const customUsesProfileTokens = !!(
       customSlideDefaults.presentationTypographyByComposition
       || customSlideDefaults.presentationTitleSizeByComposition
@@ -127,7 +134,7 @@ function applyResolvedPresentationPresetToSlide(slide, preset, normalizedPath, i
         ? customSlideDefaults.composition
         : (slide.composition || fallbackComposition.composition),
       elementOffsets: hasSavedOffsets
-        ? customSlideDefaults.elementOffsets
+        ? { ...customSlideDefaults.elementOffsets, ...(ownPhotoOffset ? { photo: ownPhotoOffset } : {}) }
         : (slide.elementOffsets || fallbackComposition.elementOffsets),
     };
   }

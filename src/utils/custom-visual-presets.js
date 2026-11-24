@@ -198,6 +198,26 @@ export function sanitizeCustomVisualPresetSlideDefaults(value) {
   return pick(value, SLIDE_FIELDS);
 }
 
+/** Recorte de uma foto: zoom, espelho e posição valem para a imagem do card de origem. */
+const PHOTO_FRAMING_FIELDS = ['bgX', 'bgY', 'bgZoom', 'bgMirror'];
+
+/**
+ * Parte do padrão que vale para vários cards de uma vez. O recorte e o arrasto
+ * da foto ficam de fora: salvos a partir de um card, eram impostos às fotos de
+ * todos os outros no alcance "Todos". O padrão salvo não é alterado.
+ */
+export function slideDefaultsForAllCards(defaults) {
+  if (!defaults || typeof defaults !== 'object') return {};
+  const shared = { ...defaults };
+  for (const field of PHOTO_FRAMING_FIELDS) delete shared[field];
+  const offsets = shared.elementOffsets;
+  if (offsets && typeof offsets === 'object' && Object.hasOwn(offsets, 'photo')) {
+    shared.elementOffsets = { ...offsets };
+    delete shared.elementOffsets.photo;
+  }
+  return shared;
+}
+
 export function normalizeCustomVisualPresets(value) {
   if (!Array.isArray(value)) return [];
   const ids = new Set();

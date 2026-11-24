@@ -47,7 +47,7 @@ export function applyVisualPresetToCard(doc, index, preset, presets) {
     patch = { ...styled.slides[0] };
     brand = styled.brand;
   } else {
-    patch = getSlideOverridesForPreset(preset.id, presets);
+    patch = getSlideOverridesForPreset(preset.id, presets, { scope: 'card' });
     brand = applyVisualPreset(doc.brand, preset.id, presets);
   }
   // Keep the author's content and photos, including auxiliary copy and CTAs.

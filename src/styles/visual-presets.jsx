@@ -29,6 +29,7 @@
 
 import React from 'react';
 import { clampTitleWeight } from '../utils/slide-design-system.js';
+import { slideDefaultsForAllCards } from '../utils/custom-visual-presets.js';
 import { STYLE_THUMBNAILS } from './style-thumbnails.generated.js';
 import { SOCIAL_FAMILIES, SOCIAL_FAMILY_KEYS, LEGACY_SOCIAL_STYLE_FAMILY, socialCardLayout } from '../utils/social-families.js';
 
@@ -950,9 +951,11 @@ export function applyVisualPreset(brand, presetId, presets = VISUAL_PRESETS) {
  *
  * Uso: `setSlides(slides.map(s => ({ ...s, ...getSlideOverrides(presetId) })))`
  */
-export function getSlideOverridesForPreset(presetId, presets = VISUAL_PRESETS) {
+export function getSlideOverridesForPreset(presetId, presets = VISUAL_PRESETS, { scope = 'all' } = {}) {
   const preset = resolveVisualPreset(presetId, presets);
-  const defaults = preset?.slideDefaults || {};
+  // Recorte da foto salvo num padrão personalizado só acompanha a aplicação
+  // num card; em vários cards cada foto mantém o seu.
+  const defaults = scope === 'card' ? (preset?.slideDefaults || {}) : slideDefaultsForAllCards(preset?.slideDefaults);
   // Zera a assinatura anterior antes de aplicar a nova: sem isto o eyebrow de
   // um preset e o preço riscado de outro sobreviviam ao troca-troca.
   const reset = {};
