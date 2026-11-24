@@ -119,6 +119,21 @@ export function photoBehindHeaderChrome(slide, { imgErr = false } = {}) {
 }
 
 /**
+ * Tintas da barra editorial e do contador no desenho do Cultura (sem
+ * composição, composição com zonas e foto em faixa). Fora da foto eram escuras
+ * fixas e sumiam em marca de fundo escuro (GA-10): aí valem as tintas claras
+ * de quando há foto. Fundo em que o escuro lê melhor continua como era.
+ */
+export function cultureHeaderInks(onPhoto, surface) {
+  const claras = { bar: 'rgba(255,255,255,0.62)', badgeBg: 'rgba(0,0,0,0.32)', badgeFg: '#fff' };
+  if (onPhoto) return claras;
+  const cor = lerCor(surface);
+  const hex = cor ? `#${[cor.r, cor.g, cor.b].map((n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0')).join('')}` : '';
+  if (hex && wcagContrast('#1d1d1f', hex) < wcagContrast(TINTA_CLARA, hex)) return claras;
+  return { bar: 'rgba(29,29,31,0.45)', badgeBg: 'rgba(0,0,0,0.07)', badgeFg: '#1d1d1f' };
+}
+
+/**
  * Mesma reserva em % da altura, arredondada para cima em passos de 0,5.
  * As zonas do canvas são percentuais; arredondar para cima nunca deixa o
  * texto entrar na faixa do ornamento.

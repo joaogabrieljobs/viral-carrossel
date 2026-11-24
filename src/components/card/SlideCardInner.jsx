@@ -23,7 +23,7 @@ import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks, inkI
 import { displayListMarkers } from '../../utils/list-markers.js';
 import { brandPaletteOverrides, groundInks } from '../../utils/presentation-families.js';
 import { resolvePresetChrome, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
-import { footerChromeReservePx, footerGuardApplies, footerPillBottomPx, footerPillColors, photoBehindHeaderChrome, textZonesAboveFooter, STORIES_FOOTER_LIFT } from '../../utils/card-chrome.js';
+import { cultureHeaderInks, footerChromeReservePx, footerGuardApplies, footerPillBottomPx, footerPillColors, photoBehindHeaderChrome, textZonesAboveFooter, STORIES_FOOTER_LIFT } from '../../utils/card-chrome.js';
 import { titleLetterSpacingEm } from '../../utils/title-tracking.js';
 import { photoPlaceholderRect } from '../../utils/photo-placeholder.js';
 import { cultureAccentRenderablePieces } from '../../utils/text-spans.js';
@@ -1261,7 +1261,8 @@ const ClassicCanvasInner = React.forwardRef(({
       {culture && (() => {
         const hasHdr = !!(brand.cultureHeaderLeft || '').trim() || !!(brand.cultureHeaderYear || '').trim();
         const onPhoto = !!(slide.bgImage && imgReady && !imgErr);
-        const barMuted = onPhoto ? 'rgba(255,255,255,0.62)' : 'rgba(29,29,31,0.45)';
+        const hdrInks = cultureHeaderInks(onPhoto, bg);
+        const barMuted = hdrInks.bar;
         return (
           <>
             {hasHdr && (
@@ -1285,8 +1286,8 @@ const ClassicCanvasInner = React.forwardRef(({
             {showCultureIdx && (
               <div style={{
                 position:'absolute', top:f.h*0.032, right:f.w*0.05, zIndex:26,
-                background: onPhoto ? 'rgba(0,0,0,0.32)' : 'rgba(0,0,0,0.07)',
-                color: onPhoto ? '#fff' : '#1d1d1f',
+                background: hdrInks.badgeBg,
+                color: hdrInks.badgeFg,
                 padding:`${f.h*0.006}px ${f.w*0.022}px`, borderRadius:999,
                 fontSize:f.w*0.026, fontWeight:600, fontFamily:getTextFont(slide, 'pageBadge', bodyFF), letterSpacing:'-0.02em',
               }}>{num}/{total}</div>
@@ -1746,7 +1747,8 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
       {sandwichSkin && (() => {
         const hasHdr = !!(brand.cultureHeaderLeft || '').trim() || !!(brand.cultureHeaderYear || '').trim();
         const onPhoto = !!(slide.bgImage && imgReady && !imgErr);
-        const barMuted = onPhoto ? 'rgba(255,255,255,0.62)' : 'rgba(29,29,31,0.45)';
+        const hdrInks = cultureHeaderInks(onPhoto, bg);
+        const barMuted = hdrInks.bar;
         return (
           <>
             {hasHdr && (
@@ -1770,8 +1772,8 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
             {showCultureIdx && (
               <div style={{
                 position: 'absolute', top: f.h * 0.032, right: f.w * 0.05, zIndex: 26,
-                background: onPhoto ? 'rgba(0,0,0,0.32)' : 'rgba(0,0,0,0.07)',
-                color: onPhoto ? '#fff' : '#1d1d1f',
+                background: hdrInks.badgeBg,
+                color: hdrInks.badgeFg,
                 padding: `${f.h * 0.006}px ${f.w * 0.022}px`, borderRadius: 999,
                 fontSize: f.w * 0.026, fontWeight: 600, fontFamily: getTextFont(slide, 'pageBadge', bodyFF), letterSpacing: '-0.02em',
               }}>{num}/{total}</div>
@@ -3539,7 +3541,9 @@ const SlideCardInner = React.forwardRef(({
       )}
       <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
 
-      {brandHeaderChrome}
+      {/* No Cultura a barra e o contador são os do bloco mais abaixo; os dois
+          juntos saíam sobrepostos no mesmo ponto. */}
+      {sandwichSkin ? null : brandHeaderChrome}
 
       {/* Só overlay «GPT» com job real; decode de foto não bloqueia o import. */}
       {(showAiGeneratingOverlay || imgLoading) && (
@@ -3577,11 +3581,12 @@ const SlideCardInner = React.forwardRef(({
       {sandwichSkin && (() => {
         const hasHdr = !!(brand.cultureHeaderLeft || '').trim() || !!(brand.cultureHeaderYear || '').trim();
         const onPhoto = !!(slide.bgImage && imgReady && !imgErr);
-        const barMuted = onPhoto ? 'rgba(255,255,255,0.62)' : 'rgba(29,29,31,0.45)';
+        const hdrInks = cultureHeaderInks(onPhoto, bg);
+        const barMuted = hdrInks.bar;
         return (
           <>
             {hasHdr && (
-              <div style={{
+              <div data-vc-chrome="headerBar" style={{
                 position:'absolute', top:f.h*0.028, left:f.w*0.05, right:f.w*0.16, zIndex:24,
                 display:'flex', justifyContent:'space-between', alignItems:'center', gap:f.w*0.02,
               }}>
@@ -3599,10 +3604,10 @@ const SlideCardInner = React.forwardRef(({
               </div>
             )}
             {showCultureIdx && (
-              <div style={{
+              <div data-vc-chrome="pageBadge" style={{
                 position:'absolute', top:f.h*0.032, right:f.w*0.05, zIndex:26,
-                background: onPhoto ? 'rgba(0,0,0,0.32)' : 'rgba(0,0,0,0.07)',
-                color: onPhoto ? '#fff' : '#1d1d1f',
+                background: hdrInks.badgeBg,
+                color: hdrInks.badgeFg,
                 padding:`${f.h*0.006}px ${f.w*0.022}px`, borderRadius:999,
                 fontSize:f.w*0.026, fontWeight:600, fontFamily:getTextFont(slide, 'pageBadge', bodyFF), letterSpacing:'-0.02em',
               }}>{num}/{total}</div>
