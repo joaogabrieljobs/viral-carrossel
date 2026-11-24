@@ -92,7 +92,8 @@
 .project-entry-choice-title { font: 600 24px/1.2 var(--font-display); letter-spacing: -.025em; }
 .project-entry-choice-description { max-width: 35ch; font-size: 14px; line-height: 1.6; color: var(--text-muted); }
 .project-entry-choice-action { display: inline-flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 6px; font-size: 13px; font-weight: 650; color: var(--text-primary); }
-.project-entry-choice--create .project-entry-choice-action { color: var(--accent); }
+/* UX-07: o roxo da marca não passa de 3,6:1 como texto; texto pequeno usa o acento claro. */
+.project-entry-choice--create .project-entry-choice-action { color: var(--accent-secondary); }
 .project-entry-welcome-note { text-align: center; margin: 0; color: var(--text-muted); font-size: 12px; line-height: 1.5; }
 .project-entry-section-heading { position: relative; }
 .project-entry-section-heading > .vc-eyebrow { margin: 0 0 8px; }

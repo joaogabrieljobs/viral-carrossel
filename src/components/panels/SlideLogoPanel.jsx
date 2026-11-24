@@ -434,7 +434,7 @@ export function SlideLogoPanel({
       }}>
         <div style={{
           fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)',
-          letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--accent)',
+          letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--accent-secondary)',
         }}>
           Só no card {cardN}
         </div>

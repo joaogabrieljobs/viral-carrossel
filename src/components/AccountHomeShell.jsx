@@ -352,7 +352,7 @@ function AccountHomeShell({
                           marginLeft: 8,
                           fontSize: 10,
                           fontWeight: 600,
-                          color: 'var(--accent)',
+                          color: 'var(--accent-secondary)',
                           letterSpacing: '0.06em',
                           textTransform: 'uppercase',
                         }}>
@@ -375,7 +375,7 @@ function AccountHomeShell({
                       style={{
                         padding: '2px 6px',
                         fontSize: 11,
-                        color: 'var(--accent)',
+                        color: 'var(--accent-secondary)',
                         border: 'none',
                         cursor: 'pointer',
                         fontWeight: 600,
@@ -395,7 +395,7 @@ function AccountHomeShell({
                     {entry.updatedAt ? ` · ${fmtDate(entry.updatedAt)}` : ''}
                   </div>
                   {openingDocId === entry.id && (
-                    <span role="status" style={{ fontSize: 11, color: 'var(--accent)' }}>Abrindo projeto…</span>
+                    <span role="status" style={{ fontSize: 11, color: 'var(--accent-secondary)' }}>Abrindo projeto…</span>
                   )}
                   {unsentProjects?.[entry.id] && (
                     <span data-testid="projeto-nao-enviado" title={unsentProjects[entry.id].message || undefined}

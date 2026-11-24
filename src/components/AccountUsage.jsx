@@ -40,7 +40,7 @@ const formatActivityDate = (value) => {
 
 const activityStatus = {
   consumed: { label: 'Crédito utilizado', color: 'var(--text-primary)' },
-  refunded: { label: 'Crédito devolvido', color: 'var(--accent)' },
+  refunded: { label: 'Crédito devolvido', color: 'var(--accent-secondary)' },
   reserved: { label: 'Em processamento', color: 'var(--text-secondary)' },
 };
 

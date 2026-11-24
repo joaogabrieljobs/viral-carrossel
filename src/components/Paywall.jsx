@@ -128,7 +128,7 @@ export default function Paywall({
           fontSize: 11,
           letterSpacing: '0.12em',
           textTransform: 'uppercase',
-          color: 'var(--accent, #5b53e8)',
+          color: 'var(--accent-secondary, #9a94ff)',
           fontWeight: 600,
         }}>
           {freeAccount ? 'Você está no plano grátis' : 'Escolha o plano'}

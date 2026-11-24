@@ -982,7 +982,8 @@ function SidebarContent({
                     // Secundário: composição é opção avançada, o rosa fica para "Gerar com IA".
                     border:`1px solid ${anyCanvasEnabled ? 'var(--success, #16a34a)' : 'var(--border)'}`,
                     background: anyCanvasEnabled ? 'var(--success, #16a34a)' : 'var(--bg-card)',
-                    color: anyCanvasEnabled ? '#fff' : 'var(--text-primary)',
+                    // UX-07: branco sobre o verde dava 3,2:1; o texto escuro passa de 6:1.
+                    color: anyCanvasEnabled ? 'var(--bg-primary)' : 'var(--text-primary)',
                     fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)', letterSpacing:'-0.011em',
                     display:'flex', alignItems:'center', justifyContent:'center', gap:8,
                     transition:'background-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
