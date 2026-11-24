@@ -135,7 +135,10 @@ export default defineConfig(({ mode }) => {
       },
     ],
     server: {
-      host: true,
+      // Só esta máquina por padrão (GB-15): os proxies de IA deste servidor usam
+      // as chaves do .env, e em rede compartilhada qualquer aparelho as gastava.
+      // Para testar pelo celular na mesma rede: DEV_SERVER_LAN=1 npm run dev.
+      host: env.DEV_SERVER_LAN === '1' ? true : 'localhost',
       port: 5173,
       // Se 5173 estiver ocupada por outro programa, o Vite saltava para 5174, 5175…
       // e quem abria http://localhost:5173 via 404. Com strictPort, falha em voz alta
