@@ -1228,6 +1228,16 @@ export const GLOBAL_STYLE = `
     text-transform: none;
   }
 
+  /* UX-11: aviso de gravação do plano grátis. Uma linha para o aviso; se o
+     botão não couber ao lado, ele desce inteiro. No celular vale o texto curto. */
+  .vc-save-device-only { display: inline-flex; flex-wrap: wrap; align-items: center; column-gap: 5px; max-width: 100%; min-width: 0; font-size: 11px; line-height: 1.35; color: var(--text-secondary); }
+  .vc-save-device-only-text { display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: 100%; overflow: hidden; white-space: nowrap; }
+  .vc-save-device-only-short { display: none; }
+  @media (max-width: 767px) {
+    .vc-save-device-only-long { display: none; }
+    .vc-save-device-only-short { display: inline; }
+  }
+
   /* Focus-visible: anel --accent-focus nos controles interativos */
   button:focus-visible,
   [role="button"]:focus-visible,

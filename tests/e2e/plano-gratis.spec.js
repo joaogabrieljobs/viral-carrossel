@@ -481,6 +481,15 @@ test.describe('Plano grátis no celular (390×844)', () => {
     await page.getByRole('button', { name: 'Continuar no plano grátis', exact: true }).click();
     await expect(page.locator('[data-vc-tour="thumbnails"]')).toBeVisible();
     await expect(page.locator('[data-vc-save-device-only]').first()).toContainText('Salvo só neste aparelho');
+    // UX-11: no celular vale o aviso curto em uma linha e o botão aparece inteiro.
+    const aviso = page.locator('[data-vc-save-device-only]:visible').first();
+    await expect(aviso.locator('.vc-save-device-only-short')).toBeVisible();
+    await expect(aviso.locator('.vc-save-device-only-long')).toBeHidden();
+    const caixaAviso = await aviso.locator('.vc-save-device-only-text').boundingBox();
+    expect(caixaAviso.height).toBeLessThanOrEqual(32);
+    const guardar = await aviso.getByRole('button', { name: 'Guardar na conta: ver planos' }).boundingBox();
+    expect(guardar.x).toBeGreaterThanOrEqual(0);
+    expect(guardar.x + guardar.width).toBeLessThanOrEqual(390);
     expect(await semRolagemLateral()).toBe(true);
     expect(chamadas).toEqual([]);
   });

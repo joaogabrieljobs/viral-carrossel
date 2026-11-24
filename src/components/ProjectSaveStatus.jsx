@@ -16,10 +16,18 @@ export function ProjectSaveStatus({ localSavedAt, cloudSavedAt, busy, error, onR
   }, []);
   if (deviceOnly) {
     const hora = localSavedAt ? new Date(localSavedAt).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }) : '';
+    // UX-11: no topo do celular sobram uns 130 px. O aviso fica em uma linha
+    // (versão curta abaixo de 768 px, em global-style.js) e o botão desce
+    // inteiro para a linha de baixo em vez de ser cortado.
     return (
-      <span data-vc-save-device-only style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:11, lineHeight:1.35, color:'var(--text-secondary)', maxWidth:'min(230px, 60vw)', flexShrink:0 }}>
-        <Smartphone size={13} aria-hidden style={{ flexShrink:0 }} />
-        <span role="status" style={{ minWidth:0 }}>{hora ? `Salvo só neste aparelho às ${hora}` : 'Salvo só neste aparelho'}</span>
+      <span data-vc-save-device-only className="vc-save-device-only">
+        <span className="vc-save-device-only-text">
+          <Smartphone size={13} aria-hidden style={{ flexShrink:0 }} />
+          <span role="status">
+            <span className="vc-save-device-only-long">{hora ? `Salvo só neste aparelho às ${hora}` : 'Salvo só neste aparelho'}</span>
+            <span className="vc-save-device-only-short">Só neste aparelho</span>
+          </span>
+        </span>
         {onUpgrade && <button type="button" className="vc-btn vc-btn-ghost" style={{ minHeight:44, padding:'0 8px', fontSize:11, flexShrink:0, whiteSpace:'nowrap' }} onClick={onUpgrade} aria-label="Guardar na conta: ver planos">Guardar na conta</button>}
       </span>
     );
