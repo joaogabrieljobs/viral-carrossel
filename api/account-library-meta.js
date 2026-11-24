@@ -30,6 +30,7 @@ function mapStoreError(cause) {
     case 'account_meta_bad_revision':
     case 'account_meta_bad_data':
     case 'library_bad_owner':
+    case 'library_bad_text':
       return { status: 400, body: { error: 'Dados da conta inválidos.', code: cause.code } };
     case 'account_meta_too_large':
       return { status: 413, body: { error: 'Dados da conta excedem o tamanho permitido.', code: cause.code } };

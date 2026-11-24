@@ -210,4 +210,10 @@ describe('/api/projects', () => {
     expect(options.headers).toContainEqual(['Access-Control-Allow-Methods', 'GET, PUT, DELETE, OPTIONS']);
     expect((await request('POST')).status).toBe(405);
   });
+  it('DB-01: texto que o banco recusa responde 400, não 503', async () => {
+    pg.put.mockRejectedValue(Object.assign(new Error('texto'), { code: 'library_bad_text' }));
+    expect(await request('PUT', {
+      query: { id: 'project-a' }, body: { baseVersion: 0, entry: { id: 'project-a', name: 'A' } },
+    })).toMatchObject({ status: 400, body: { code: 'library_bad_text' } });
+  });
 });

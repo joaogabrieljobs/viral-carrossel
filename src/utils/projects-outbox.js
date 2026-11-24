@@ -186,6 +186,10 @@ function persistOperation(ownerId, projectId, kind, entry, baseVersion, projectN
           // resposta se perdeu. Não são uma autorização para sobrescrever
           // uma edição remota divergente.
           ...(kind === 'put' ? { predecessors: pendingPredecessors(previous) } : {}),
+          // DB-01: a contagem de 5xx seguidos acompanha o projeto até um envio
+          // dar certo; uma edição nova não devolve à fila o poder de travá-la.
+          ...(previous?.serverFailures && previous.kind !== 'delete' && kind !== 'delete'
+            ? { serverFailures: previous.serverFailures } : {}),
           createdAt: previous?.createdAt ?? now,
           updatedAt: now,
         };
@@ -385,10 +389,42 @@ function markOperationForFailure(ownerId, sentOp, error) {
 
 // Falha de upload de foto é passageira (rede, 503, timeout): fica visível
 // como revisão para não travar o boot, mas cada envio tenta de novo e uma
-// edição nova volta a ser envio comum (MOO-01).
+// edição nova volta a ser envio comum (MOO-01). O mesmo vale para o 5xx que
+// se repetiu no mesmo projeto (DB-01).
 const RETRYABLE_REVIEW_CODES = new Set(['project_asset_upload_failed']);
+function isServerFailureStatus(status) {
+  return Number.isInteger(status) && status >= 500 && status <= 599;
+}
 function isRetryableReview(op) {
-  return op?.kind === 'review_put_failed' && RETRYABLE_REVIEW_CODES.has(op.reviewCode);
+  return op?.kind === 'review_put_failed'
+    && (RETRYABLE_REVIEW_CODES.has(op.reviewCode) || isServerFailureStatus(op.reviewStatus));
+}
+function isRetryableDeleteReview(op) {
+  return op?.kind === 'review_delete_failed' && isServerFailureStatus(op.reviewStatus);
+}
+
+// DB-01: um projeto que recebe o mesmo 5xx três vezes seguidas deixa de parar
+// a fila. As duas primeiras falhas continuam tratadas como indisponibilidade
+// geral, para não disparar um pedido por projeto com o servidor fora do ar.
+const SERVER_FAILURE_LIMIT = 3;
+
+/** Conta respostas 5xx seguidas desta operação; devolve o total atualizado. */
+function recordServerFailure(ownerId, sentOp, error) {
+  assertActiveOwner(ownerId);
+  return transaction('readwrite', (store, setResult, fail) => {
+    const read = store.get(operationKey(ownerId, sentOp.projectId));
+    read.onsuccess = () => {
+      try {
+        assertActiveOwner(ownerId);
+        const current = read.result;
+        if (!current || current.opId !== sentOp.opId) { setResult(0); return; }
+        const before = current.serverFailures;
+        const count = before?.status === error.status ? before.count + 1 : 1;
+        store.put({ ...current, serverFailures: { status: error.status, count } });
+        setResult(count);
+      } catch (cause) { fail(cause); }
+    };
+  });
 }
 
 function isPermanentOperationFailure(error) {
@@ -615,7 +651,7 @@ async function flushProjectOutboxSerial(ownerId, { signal, maxOperations = 100, 
   let sent = 0;
   const recoveries = [];
   const heldForReview = new Set(['review_delete', 'review_put_deleted', 'review_put_failed', 'review_delete_failed']);
-  const held = (op) => heldForReview.has(op.kind) && !isRetryableReview(op);
+  const held = (op) => heldForReview.has(op.kind) && !isRetryableReview(op) && !isRetryableDeleteReview(op);
   let queue = (await listPendingProjectOps(ownerId))
     .filter((op) => !held(op));
   for (let round = 0; round < 20 && queue.length; round += 1) {
@@ -631,7 +667,11 @@ async function flushProjectOutboxSerial(ownerId, { signal, maxOperations = 100, 
       try {
         result = await sendOperation(ownerId, op, { signal, expectedOwnerId });
       } catch (error) {
-        if (!isPermanentOperationFailure(error)) throw error;
+        if (!isPermanentOperationFailure(error)) {
+          // Sem resposta do servidor (rede, timeout, conta) a fila para, como antes.
+          if (!isServerFailureStatus(error?.status)
+            || await recordServerFailure(ownerId, op, error) < SERVER_FAILURE_LIMIT) throw error;
+        }
         await markOperationForFailure(ownerId, op, error);
         queue = queue.filter((item) => item.projectId !== op.projectId);
         continue;

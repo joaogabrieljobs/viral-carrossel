@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bindAccountDataWriteOwner, SK } from '../../src/utils/storage.js';
 import { originalImageAssetId } from '../../src/utils/cloud-image-assets.js';
+import { flushProjectOutboxForBoot } from '../../src/hooks/useAccess.js';
 import {
   acknowledgeProjectOp, conflictCopyEntry, conflictCopyId, flushProjectOutbox, getPendingProjectOp,
   listDeletedProjectEdits, listPendingProjectOps, queueProjectDelete, queueProjectPut,
@@ -690,6 +691,110 @@ describe('outbox durável por projeto', () => {
     fetch.mockResolvedValueOnce(session())
       .mockResolvedValueOnce(json({ error: 'Conflito', code: 'project_conflict', cloudVersion: 4 }, 409))
       .mockResolvedValueOnce(json({ error: 'Não encontrado', code: 'project_not_found' }, 404));
+    expect(await flushProjectOutbox(ALICE)).toEqual({ sent: 1, pending: 0 });
+  });
+});
+
+// DB-01 (auditoria 23/11): um 5xx que se repete sempre para o mesmo projeto
+// (por exemplo o banco recusando o documento) parava a fila inteira e o boot.
+describe('DB-01: 5xx repetido num projeto não trava os demais nem o boot', () => {
+  const unavailable = () => json({
+    error: 'O armazenamento de projetos está indisponível. Tente novamente.', code: 'library_storage_unavailable',
+  }, 503);
+  const saved = (id, version = 1) => json({ ok: true, project: { id, version, entry: { id } } });
+  function serve(handlers) {
+    fetch.mockImplementation(async (url, request) => {
+      if (url === '/api/auth/session') return session();
+      const body = request?.body ? JSON.parse(request.body) : null;
+      const id = body?.entry?.id || body?.id;
+      return handlers(id, request);
+    });
+  }
+
+  it('na terceira falha seguida o projeto vai para revisão e o segundo projeto é enviado e confirmado', async () => {
+    await queueProjectPut(ALICE, { id: 'preso', doc: { title: 'A' } });
+    await queueProjectPut(ALICE, { id: 'saudavel', doc: { title: 'B' } });
+    serve((id) => (id === 'preso' ? unavailable() : saved(id)));
+
+    await expect(flushProjectOutbox(ALICE)).rejects.toMatchObject({ status: 503 });
+    await expect(flushProjectOutbox(ALICE)).rejects.toMatchObject({ status: 503 });
+    expect(await getPendingProjectOp(ALICE, 'saudavel')).toMatchObject({ kind: 'put' });
+
+    const receipt = await flushProjectOutbox(ALICE);
+    expect(receipt).toEqual({ sent: 1, pending: 1, needsReview: [{
+      projectId: 'preso', projectName: '', kind: 'sync_failed', operation: 'put',
+      code: 'library_storage_unavailable', status: 503,
+    }] });
+    expect(await getPendingProjectOp(ALICE, 'saudavel')).toBeNull();
+    // A edição presa continua inteira na fila deste navegador.
+    expect(await getPendingProjectOp(ALICE, 'preso')).toMatchObject({
+      kind: 'review_put_failed', entry: { id: 'preso', doc: { title: 'A' } },
+    });
+    // O boot aceita o recibo: só resta a operação em revisão.
+    await expect(flushProjectOutboxForBoot(ALICE, () => receipt)).resolves.toMatchObject({ unavailable: false });
+  });
+
+  it('continua tentando o projeto preso a cada envio e confirma quando o servidor aceita', async () => {
+    await queueProjectPut(ALICE, { id: 'preso', doc: { title: 'A' } }, { baseVersion: 4 });
+    serve(() => unavailable());
+    await expect(flushProjectOutbox(ALICE)).rejects.toMatchObject({ status: 503 });
+    await expect(flushProjectOutbox(ALICE)).rejects.toMatchObject({ status: 503 });
+    expect(await flushProjectOutbox(ALICE)).toMatchObject({ sent: 0, pending: 1 });
+    // Ainda falhando: não lança, segue em revisão.
+    expect(await flushProjectOutbox(ALICE)).toMatchObject({ sent: 0, pending: 1 });
+
+    const puts = [];
+    serve((id, request) => { puts.push(JSON.parse(request.body)); return saved(id, 5); });
+    expect(await flushProjectOutbox(ALICE)).toEqual({ sent: 1, pending: 0 });
+    expect(puts).toHaveLength(1);
+    expect(puts[0]).toMatchObject({ baseVersion: 4, entry: { id: 'preso' } });
+  });
+
+  it('edição nova do projeto preso volta a ser envio comum sem voltar a parar a fila', async () => {
+    await queueProjectPut(ALICE, { id: 'preso', doc: { title: 'A' } });
+    serve(() => unavailable());
+    await expect(flushProjectOutbox(ALICE)).rejects.toMatchObject({ status: 503 });
+    await expect(flushProjectOutbox(ALICE)).rejects.toMatchObject({ status: 503 });
+    await flushProjectOutbox(ALICE);
+
+    expect(await queueProjectPut(ALICE, { id: 'preso', doc: { title: 'A2' } })).toMatchObject({ kind: 'put' });
+    await queueProjectPut(ALICE, { id: 'saudavel', doc: { title: 'B' } });
+    serve((id) => (id === 'preso' ? unavailable() : saved(id)));
+    expect(await flushProjectOutbox(ALICE)).toMatchObject({ sent: 1, pending: 1 });
+    expect(await getPendingProjectOp(ALICE, 'preso')).toMatchObject({
+      kind: 'review_put_failed', entry: { doc: { title: 'A2' } },
+    });
+  });
+
+  it('uma ou duas falhas 5xx continuam sendo falha passageira: a operação segue como envio comum', async () => {
+    const op = await queueProjectPut(ALICE, { id: 'janine', doc: { title: 'A' } });
+    serve(() => unavailable());
+    await expect(flushProjectOutbox(ALICE)).rejects.toMatchObject({ status: 503 });
+    expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({ opId: op.opId, kind: 'put' });
+    serve((id) => saved(id));
+    expect(await flushProjectOutbox(ALICE)).toEqual({ sent: 1, pending: 0 });
+  });
+
+  it('falha de rede (sem resposta do servidor) nunca vira revisão', async () => {
+    await queueProjectPut(ALICE, { id: 'janine', doc: { title: 'A' } });
+    fetch.mockImplementation(async (url) => {
+      if (url === '/api/auth/session') return session();
+      throw new TypeError('Failed to fetch');
+    });
+    for (let i = 0; i < 4; i += 1) {
+      await expect(flushProjectOutbox(ALICE)).rejects.toMatchObject({ code: 'project_network_error' });
+    }
+    expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({ kind: 'put' });
+  });
+
+  it('exclusão com 5xx repetido também deixa de parar a fila e é refeita depois', async () => {
+    await queueProjectDelete(ALICE, 'apagar', { baseVersion: 2, projectName: 'Antigo' });
+    await queueProjectPut(ALICE, { id: 'saudavel', doc: { title: 'B' } });
+    serve((id) => (id === 'apagar' ? unavailable() : saved(id)));
+    await expect(flushProjectOutbox(ALICE)).rejects.toMatchObject({ status: 503 });
+    await expect(flushProjectOutbox(ALICE)).rejects.toMatchObject({ status: 503 });
+    expect(await flushProjectOutbox(ALICE)).toMatchObject({ sent: 1, pending: 1 });
+    serve((id) => json({ ok: true, project: { id, version: 3, deleted: true } }));
     expect(await flushProjectOutbox(ALICE)).toEqual({ sent: 1, pending: 0 });
   });
 });

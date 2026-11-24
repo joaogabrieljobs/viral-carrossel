@@ -63,6 +63,7 @@ function mapStoreError(cause) {
     case 'project_bad_limit':
     case 'project_bad_version':
     case 'library_bad_owner':
+    case 'library_bad_text':
       return error(400, 'Dados do projeto inválidos.', cause.code);
     case 'project_too_large':
       return error(413, 'Este projeto excede o tamanho permitido.', cause.code);

@@ -117,6 +117,24 @@ function serializedBytes(value) {
   return Buffer.byteLength(JSON.stringify(value), 'utf8');
 }
 
+const NUL_CHAR = /\u0000/g;
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+
+/**
+ * DB-01: o jsonb do Postgres recusa `\u0000` e meio par substituto (emoji
+ * cortado ao meio por um limite de caracteres). Troca só o que o banco não
+ * aceita: o nulo sai e o meio par vira U+FFFD. Texto válido não muda.
+ */
+export function jsonbSafeText(value) {
+  if (typeof value === 'string') return value.replace(NUL_CHAR, '').replace(LONE_SURROGATE, '\uFFFD');
+  if (Array.isArray(value)) return value.map(jsonbSafeText);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value)
+      .map(([key, item]) => [jsonbSafeText(key), jsonbSafeText(item)]));
+  }
+  return value;
+}
+
 function assertAccountCapacity({ count, bytes, maxProjects, maxBytes }) {
   if (count > maxProjects) {
     throw fail(`Sua conta atingiu o limite de ${maxProjects} projetos. Exclua um projeto antes de criar outro.`,
@@ -289,7 +307,7 @@ function validAccountMetadataPatch(data) {
   if (Buffer.byteLength(serialized, 'utf8') > MAX_ACCOUNT_META_BYTES) {
     throw fail('Dados globais da conta demasiado grandes.', 'account_meta_too_large');
   }
-  const patch = JSON.parse(serialized);
+  const patch = jsonbSafeText(JSON.parse(serialized));
   for (const [key, value] of Object.entries(patch)) {
     if (!ACCOUNT_META_FIELDS.has(key)) throw fail('Campo global da conta inválido.', 'account_meta_bad_data');
     if ((key === 'brands' || key === 'folders')
@@ -368,6 +386,13 @@ async function guardStorage(work) {
     if (error?.code === '42P01' || error?.code === '3F000' || error?.code === '42703') {
       throw fail('Migração SQL da biblioteca não aplicada.', 'library_storage_unconfigured');
     }
+    // DB-01: texto que o banco não consegue guardar é erro do documento, não
+    // indisponibilidade. Como 503 o navegador reenviava a mesma gravação para sempre.
+    if (error?.code === '22P05' || error?.code === '22021') {
+      console.error('[library-postgres] texto recusado pelo banco', error.code);
+      throw fail('O texto tem caracteres que não podem ser guardados.', 'library_bad_text');
+    }
+    console.error('[library-postgres] falha do banco', error?.code || error?.name || 'desconhecida');
     throw fail('Banco da biblioteca temporariamente indisponível.', 'library_storage_unavailable');
   }
 }
@@ -650,7 +675,7 @@ export function createLibraryPostgresStore({
 
   async function putAccountProject(ownerValue, entryValue, { baseVersion } = {}) {
     const owner = ownerId(ownerValue);
-    const entry = assertEntry(entryValue);
+    const entry = jsonbSafeText(assertEntry(entryValue));
     const id = projectId(entry.id);
     const base = assertBaseVersion(baseVersion);
     return guardStorage(async () => {
