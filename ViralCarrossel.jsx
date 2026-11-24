@@ -6,7 +6,7 @@ import { joinSlideCaptions } from './src/utils/import-text.js';
 import { applyVisualPresetToCard, editCardVisualBrand, preserveVisualPresetContent } from './src/utils/visual-scope.js';
 import { ProjectSaveStatus } from './src/components/ProjectSaveStatus.jsx';
 import CardThumbnail from './src/components/card/CardThumbnail.jsx';
-import { cloudSyncFailureMessage, isModuleLoadError } from './src/utils/cloud-sync-feedback.js';
+import { cloudSyncFailureMessage, freePlanSaveFeedback, isModuleLoadError } from './src/utils/cloud-sync-feedback.js';
 import { CanvasNavigator, MobileScrollRail, useCanvasZoom } from './src/components/CanvasNavigator.jsx';
 import { ProjectContextBanner } from './src/components/ProjectContextBanner.jsx';
 import { startAIJob, runAIJob, cancelAllAIGeneration, getAIGenerationCount, throwIfGenerationCancelled, isGenerationCancelled } from './src/utils/generation-control.js';
@@ -2452,9 +2452,11 @@ export default function App() {
       try {
         const pending = flushPersistNow({ returnSnapshot: true });
         flushSync(() => setLibrary(pending.snapshot.library));
-        setLastSavedAt(Date.now());
-        if (source === 'salvar') toast('Projeto salvo neste aparelho.', 'success', 3000);
-        return { localSaved: true, cloudSaved: false };
+        // FE-19: a hora de "salvo" e o aviso só valem para gravação confirmada.
+        const feedback = freePlanSaveFeedback({ localPersisted: pending.localPersisted });
+        if (feedback.saved) setLastSavedAt(Date.now());
+        if (source === 'salvar' || !feedback.saved) toast(feedback.message, feedback.kind, feedback.duration);
+        return { localSaved: feedback.saved, cloudSaved: false };
       } catch (error) {
         toast(error?.message || 'Não foi possível salvar neste aparelho.', 'error', 5000);
         return { localSaved: false, cloudSaved: false };

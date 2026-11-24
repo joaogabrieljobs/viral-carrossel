@@ -15,3 +15,17 @@ export function cloudSyncFailureMessage(error, { localSaved = false, cloudSaved 
   }
   return `${cloudSaved ? 'O projeto foi salvo, mas a lista não foi atualizada. ' : localSaved ? 'A edição continua neste editor, mas ainda não foi confirmada na conta. ' : ''}${error?.message || 'Não foi possível sincronizar.'}`;
 }
+
+/**
+ * FE-19: no plano grátis a cópia deste aparelho é a única. "Salvar" só pode
+ * anunciar sucesso quando a gravação local foi confirmada.
+ */
+export function freePlanSaveFeedback({ localPersisted } = {}) {
+  if (localPersisted === true) {
+    return { saved: true, kind: 'success', message: 'Projeto salvo neste aparelho.', duration: 3000 };
+  }
+  return {
+    saved: false, kind: 'error', duration: 0,
+    message: 'Não foi possível salvar neste aparelho: o armazenamento deste navegador está cheio. Fontes próprias e fotos grandes ocupam esse espaço. Baixe um backup do projeto antes de fechar ou recarregar esta aba.',
+  };
+}
