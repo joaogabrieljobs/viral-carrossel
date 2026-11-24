@@ -1,4 +1,6 @@
 // Perfil (João, 19/11): "Sair e apagar deste aparelho" fica por último e pede a senha.
+// GB-13 (auditoria 23/11): ao abrir, o diálogo pergunta ao servidor se a conta tem
+// senha (`password: ''`); conta só com Google já abre pedindo o e-mail.
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA, SESSAO_ANONIMA } from './helpers/api-mock.js';
 
@@ -43,7 +45,8 @@ test('pede a senha: errada não apaga, certa apaga e sai', async ({ page }) => {
   let senhaCerta = false;
   const estado = await abrirPerfil(page, { confirm: (route, body) => (body.password === 'SenhaCerta123!'
     ? route.fulfill({ json: { verified: true, hasPassword: true } })
-    : route.fulfill({ status: 401, json: { verified: false, hasPassword: true, error: 'Senha incorreta.' } })) });
+    : body.password === '' ? route.fulfill({ json: { verified: false, hasPassword: true } })
+      : route.fulfill({ status: 401, json: { verified: false, hasPassword: true, error: 'Senha incorreta.' } })) });
   await page.getByRole('button', { name: 'Sair e apagar deste aparelho' }).click();
   const dialogo = page.getByRole('dialog', { name: 'Sair e apagar deste aparelho' });
   await expect(dialogo).toBeVisible();
@@ -64,9 +67,9 @@ test('conta só com Google confirma digitando o próprio e-mail', async ({ page 
   const estado = await abrirPerfil(page, { confirm: (route) => route.fulfill({ json: { verified: false, hasPassword: false } }) });
   await page.getByRole('button', { name: 'Sair e apagar deste aparelho' }).click();
   const dialogo = page.getByRole('dialog', { name: 'Sair e apagar deste aparelho' });
-  await dialogo.locator('input[type="password"]').fill('qualquercoisa');
-  await dialogo.getByRole('button', { name: 'Apagar deste aparelho' }).click();
   await expect(dialogo.getByText('Esta conta entra com Google e não tem senha.')).toBeVisible();
+  await expect(dialogo.locator('input[type="password"]')).toHaveCount(0);
+  expect(estado.confirmacoes).toEqual([{ purpose: 'confirm', password: '' }]);
   await dialogo.locator('input[type="email"]').fill('outra@pessoa.com');
   await dialogo.getByRole('button', { name: 'Apagar deste aparelho' }).click();
   await expect(dialogo.getByRole('alert')).toHaveText('O e-mail digitado não é o desta conta.');
@@ -81,6 +84,7 @@ test('cancelar não apaga nada', async ({ page }) => {
   await page.getByRole('button', { name: 'Sair e apagar deste aparelho' }).click();
   await page.getByRole('dialog', { name: 'Sair e apagar deste aparelho' }).getByRole('button', { name: 'Cancelar' }).click();
   await expect(page.getByRole('dialog', { name: 'Sair e apagar deste aparelho' })).toHaveCount(0);
-  expect(estado.confirmacoes).toEqual([]);
+  // Só a pergunta de abertura, sem senha nenhuma enviada.
+  expect(estado.confirmacoes.filter((c) => c.password)).toEqual([]);
   expect(estado.logout).toBe(false);
 });

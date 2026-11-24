@@ -39,6 +39,9 @@ async function confirmCurrentPassword(req, res, password) {
   }
   const hasPassword = !!(record?.salt && record?.hash);
   if (!hasPassword) return res.status(200).json({ verified: false, hasPassword: false });
+  // GB-13: pergunta sem senha só quer saber se a conta tem senha, para o diálogo
+  // abrir no campo certo. Não há palpite a conferir, então não gasta o limite.
+  if (!String(password || '')) return res.status(200).json({ verified: false, hasPassword: true });
   // Limite por conta (AUTH-05): a confirmação saía antes dos limites do login e,
   // com a sessão de alguém, cada resposta dizia se o palpite conferia, sem teto.
   // A conta vem da sessão, então um terceiro não consegue gastar o balde alheio.

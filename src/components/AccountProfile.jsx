@@ -14,29 +14,38 @@ import { TEXT_PROVIDERS, IMAGE_PROVIDERS } from '../config/ai-providers.js';
 import { normalizeAccountUsage, planImageStatusLabel, subscriptionEnding, SUBSCRIPTION_END_AFTERMATH } from '../utils/account-usage.js';
 import AgentAccessPanel from './AgentAccessPanel.jsx';
 import { useModalDialog } from '../hooks/useModalDialog.js';
-import { confirmCurrentPassword } from '../lib/billing.js';
+import { accountHasPassword, confirmCurrentPassword } from '../lib/billing.js';
 import PasswordField from './PasswordField.jsx';
 
 /**
  * Confirma "Sair e apagar deste aparelho". Pede a senha da conta aberta; conta
  * que entra só com Google (sem senha) confirma digitando o próprio e-mail.
  */
-function WipeDeviceDialog({ open, email, onClose, onConfirmed }) {
+export function WipeDeviceDialog({ open, email, onClose, onConfirmed, hasPassword = null }) {
   const [password, setPassword] = useState('');
   const [typedEmail, setTypedEmail] = useState('');
-  const [needsEmail, setNeedsEmail] = useState(false);
+  const [noPassword, setNoPassword] = useState(false);
+  // GB-13: quem abre o diálogo pergunta ao servidor se a conta tem senha.
+  // `hasPassword` nulo = ainda consultando; o diálogo não pede senha antes de saber.
+  const checking = hasPassword == null;
+  const needsEmail = hasPassword === false || noPassword;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const inputRef = useRef(null);
   const { overlayRef, dialogRef, onDialogKeyDown } = useModalDialog({ open, onClose, initialFocusRef: needsEmail ? inputRef : null });
   useEffect(() => {
     if (!open) return;
-    setPassword(''); setTypedEmail(''); setNeedsEmail(false); setBusy(false); setError('');
+    setPassword(''); setTypedEmail(''); setNoPassword(false); setBusy(false); setError('');
   }, [open]);
+  // Quando a consulta termina, o foco vai para o campo que apareceu.
+  useEffect(() => {
+    if (!open || checking) return;
+    dialogRef.current?.querySelector('input')?.focus?.({ preventScroll: true });
+  }, [open, checking, dialogRef]);
   if (!open) return null;
   const submit = async (event) => {
     event.preventDefault();
-    if (busy) return;
+    if (busy || checking) return;
     setError('');
     if (needsEmail) {
       if (typedEmail.trim().toLowerCase() !== String(email || '').trim().toLowerCase()) {
@@ -51,7 +60,7 @@ function WipeDeviceDialog({ open, email, onClose, onConfirmed }) {
     try {
       const result = await confirmCurrentPassword(password);
       if (result.verified) { onConfirmed(); return; }
-      if (!result.hasPassword) { setNeedsEmail(true); return; }
+      if (!result.hasPassword) { setNoPassword(true); return; }
       setError(result.error || 'Senha incorreta.');
     } catch (err) {
       setError(err?.message || 'Não foi possível confirmar a senha agora.');
@@ -76,7 +85,9 @@ function WipeDeviceDialog({ open, email, onClose, onConfirmed }) {
         <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: 'var(--text-muted)' }}>
           O Moont confirma o salvamento na sua conta e apaga deste aparelho os projetos, imagens e preferências. A conta e os projetos na nuvem continuam.
         </p>
-        {needsEmail ? (
+        {checking ? (
+          <p role="status" style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>Verificando como esta conta entra…</p>
+        ) : needsEmail ? (
           <label style={{ display: 'grid', gap: 6, fontSize: 13, fontWeight: 600 }}>
             Esta conta entra com Google e não tem senha. Digite seu e-mail para confirmar.
             <input ref={inputRef} className="vc-input" type="email" autoComplete="off" value={typedEmail}
@@ -89,7 +100,7 @@ function WipeDeviceDialog({ open, email, onClose, onConfirmed }) {
         {error && <p role="alert" style={{ margin: 0, fontSize: 13, color: 'var(--danger, #d95c5c)' }}>{error}</p>}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
           <button type="button" className="vc-btn vc-btn-ghost" style={{ minHeight: 44 }} onClick={onClose}>Cancelar</button>
-          <button type="submit" disabled={busy} style={{
+          <button type="submit" disabled={busy || checking} style={{
             minHeight: 44, padding: '0 18px', borderRadius: 9999, border: '1px solid var(--danger, #d95c5c)',
             background: 'var(--danger, #d95c5c)', color: '#fff', fontWeight: 600, fontSize: 13, cursor: busy ? 'wait' : 'pointer',
           }}>{busy ? 'Confirmando…' : 'Apagar deste aparelho'}</button>
@@ -481,6 +492,13 @@ export default function AccountProfile({
   const [editing, setEditing] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [wipeOpen, setWipeOpen] = useState(false);
+  // GB-13: null enquanto consulta; se a consulta falhar, pede a senha como antes.
+  const [wipeHasPassword, setWipeHasPassword] = useState(null);
+  const openWipeDialog = () => {
+    setWipeHasPassword(null);
+    setWipeOpen(true);
+    accountHasPassword().then((has) => setWipeHasPassword(has !== false)).catch(() => setWipeHasPassword(true));
+  };
   const [draft, setDraft] = useState(DEFAULT_USER_PROFILE);
 
   useEffect(() => {
@@ -915,7 +933,7 @@ export default function AccountProfile({
           <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: 'var(--text-muted)' }}>
             Sai da conta e apaga deste navegador os projetos, imagens e preferências. A conta e a nuvem continuam.
           </p>
-          <button type="button" disabled={loggingOut} onClick={() => setWipeOpen(true)} style={{
+          <button type="button" disabled={loggingOut} onClick={openWipeDialog} style={{
             minHeight: 44, borderRadius: 9999, border: '1px solid var(--danger, #d95c5c)', background: 'transparent',
             color: 'var(--danger, #d95c5c)', fontWeight: 600, fontSize: 13, cursor: loggingOut ? 'wait' : 'pointer',
           }}>
@@ -925,6 +943,7 @@ export default function AccountProfile({
       )}
       <WipeDeviceDialog
         open={wipeOpen}
+        hasPassword={wipeHasPassword}
         email={email}
         onClose={() => setWipeOpen(false)}
         onConfirmed={async () => {

@@ -177,6 +177,12 @@ export async function confirmCurrentPassword(password) {
   return { verified: data.verified === true, hasPassword: data.hasPassword !== false };
 }
 
+/** GB-13: a conta aberta tem senha? Conta que entra só com Google confirma pelo e-mail. */
+export async function accountHasPassword() {
+  const result = await confirmCurrentPassword('');
+  return result.hasPassword !== false;
+}
+
 export async function loginWithPassword(email, password) {
   const r = await fetch('/api/auth/login', {
     method: 'POST',
