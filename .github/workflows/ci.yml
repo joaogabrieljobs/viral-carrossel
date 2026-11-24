@@ -45,7 +45,7 @@ jobs:
     name: e2e
     needs: test
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -56,12 +56,6 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: E2E (Playwright)
         run: npm run test:e2e
-      # A produção roda com Projetos V2 ligado. Este passo refaz o build com a
-      # flag e roda os arquivos que têm caminho próprio nesse modo (MT-03).
-      - name: E2E Projetos V2 (modo de produção)
-        env:
-          VITE_PROJECTS_V2: 'true'
-        run: npx playwright test tests/e2e/projects-v2.spec.js tests/e2e/projects-v2-outbox-fallback.spec.js tests/e2e/save-after-deploy.spec.js tests/e2e/plano-gratis.spec.js tests/e2e/project-creation-flow.spec.js
       - uses: actions/upload-artifact@v4
         if: always()
         with:

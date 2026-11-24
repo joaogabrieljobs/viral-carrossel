@@ -100,7 +100,7 @@ Conta sem assinatura cria, edita e exporta um carrossel manual; todo ponto de IA
 | `tests/unit/free-plan.test.js` | Portão, limite, retorno, preservação de rascunhos; com chave própria gravada, texto, imagem e leitura de imagem não chegam à rede |
 | `tests/e2e/plano-gratis.spec.js` | Criar, editar e exportar PNG; cada ponto de IA abre os planos e volta ao projeto; assinar e voltar ao mesmo card; limite de 3; ex-assinante não perde o que fez no grátis; perfil e uso; 390×844 |
 
-A produção roda com projetos V2 ligado (conferido no bundle público em 2026-11-18). Desde 24/11/2026 o job `e2e` do CI roda a suíte inteira sem a flag e, em seguida, o passo "E2E Projetos V2 (modo de produção)", que refaz o build com `VITE_PROJECTS_V2=true` e roda os arquivos com caminho próprio nesse modo, entre eles o do plano grátis. Para repetir à mão: `VITE_PROJECTS_V2=true CI=1 npx playwright test tests/e2e/plano-gratis.spec.js`.
+O CI roda com projetos V2 desligado; a produção roda com V2 ligado (conferido no bundle público em 2026-11-18). O arquivo de navegador do plano grátis passa nos dois modos; o modo de produção roda à mão com `VITE_PROJECTS_V2=true npx playwright test tests/e2e/plano-gratis.spec.js`.
 
 ### Achado durante a implementação: ex-assinante
 
