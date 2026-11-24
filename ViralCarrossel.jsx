@@ -255,7 +255,7 @@ import {
 import { buildProjectDesignInstructions, explicitBrandColorsFromKit, projectDesignBrandPatch, PROJECT_DESIGN_SCHEMA } from './src/utils/style-kit-design.js';
 import { buildExplicitCardScriptPrompt, canAutoApplyExplicitCardScript, parseExplicitCardScript } from './src/utils/structured-card-script.js';
 import { resolveImageReferences, migrateProjectReferences } from './src/utils/style-kit-storage.js';
-import { imageGenerationAccess, slideImageGenerationState } from './src/utils/image-generation-readiness.js';
+import { imageGenerationAccess, slideImageGenerationState, slidesPendingImageGeneration } from './src/utils/image-generation-readiness.js';
 import { GLOBAL_STYLE } from './src/styles/global-style.js';
 import { useExport, waitForExportReadiness } from './src/hooks/useExport.js';
 import { useAccess } from './src/hooks/useAccess.js';
@@ -7780,14 +7780,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
     onTeamShareJoined: handleTeamShareJoined,
     historyDoc: doc,
     generateMissingImages: async (targetSlideIds = null) => {
-      const targetSet = Array.isArray(targetSlideIds) && targetSlideIds.length
-        ? new Set(targetSlideIds)
-        : null;
-      const candidates = slides
-        .map((s, i) => ({ s, i }))
-        .filter(({ s }) => String(s.imageQuery || '').trim())
-        .filter(({ s }) => !s.bgImage)
-        .filter(({ s }) => targetSet ? targetSet.has(s.id) : true);
+      // FE-11: mesma regra da contagem do painel; foto que existe na conta não é candidata.
+      const candidates = slidesPendingImageGeneration(slides, targetSlideIds)
+        .map(({ slide, index }) => ({ s: slide, i: index }));
       if (!candidates.length) {
         toast(`Nenhum ${activeProductKind === 'apresentacao' ? 'slide' : 'card'} pendente de imagem (ou sem palavras-chave).`, 'info');
         return;

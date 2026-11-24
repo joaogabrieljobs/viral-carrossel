@@ -78,3 +78,17 @@ export function slideImageGenerationState(slide = {}, accessState = ready, style
   }
   return { ...ready, ...instruction };
 }
+
+/**
+ * Cards que "Gerar imagens" pode gerar em lote: têm pedido de imagem e não têm
+ * foto. Foto que existe na conta (`bgImageAssetId`) conta como foto mesmo
+ * enquanto baixa ou quando o download falhou; gerar por cima gastaria crédito
+ * ou trocaria a foto original. Devolve `{ slide, index }` na ordem dos cards.
+ */
+export function slidesPendingImageGeneration(slides, selectedSlideIds = null) {
+  const selected = Array.isArray(selectedSlideIds) && selectedSlideIds.length ? new Set(selectedSlideIds) : null;
+  return (Array.isArray(slides) ? slides : [])
+    .map((slide, index) => ({ slide, index }))
+    .filter(({ slide }) => text(slide?.imageQuery) && !slide?.bgImage && !slide?.bgImageAssetId
+      && (!selected || selected.has(slide.id)));
+}

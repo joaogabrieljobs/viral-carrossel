@@ -209,7 +209,7 @@ export function CriarRapidoHome({
 
   const openImagePicker = () => {
     const pending = slides
-      .filter((s) => !(s.bgImage || s.bgImageId) && String(s.imageQuery || '').trim())
+      .filter((s) => !(s.bgImage || s.bgImageId || s.bgImageAssetId) && String(s.imageQuery || '').trim())
       .map((s) => s.id);
     setSelectedImageIds(pending);
     setShowImagePicker(true);

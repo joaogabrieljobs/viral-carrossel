@@ -53,7 +53,7 @@ import { normalizeDestaqueSpansForLen, remapDestaqueSpansOnEdit } from '../utils
 import { DEFAULT_SLIDE_TEXT_INSET } from '../utils/canvas-layout.js';
 import { guardarImagemDoSlide } from '../utils/image-store.js';
 import { styleKitHasContent } from '../utils/style-kit.js';
-import { slideImageGenerationState } from '../utils/image-generation-readiness.js';
+import { slideImageGenerationState, slidesPendingImageGeneration } from '../utils/image-generation-readiness.js';
 import { creationMaterialLimits, creationMaterialOverages } from '../utils/create-project-flow.js';
 
 function guessFontFileFormat(file) {
@@ -392,11 +392,7 @@ function SidebarContent({
   const itemsLabel = isPresentationProject ? 'slides' : 'cards';
   const editorTabs = visibleEditorTabs(appMode);
   const storyboardThumb = storyboardThumbDimensions(isPresentationProject);
-  const pendingImageCreditCount = slides.filter((candidate) => (
-    String(candidate?.imageQuery || '').trim()
-    && !candidate?.bgImage
-    && (!selectedSlideIds.length || selectedSlideIds.includes(candidate.id))
-  )).length;
+  const pendingImageCreditCount = slidesPendingImageGeneration(slides, selectedSlideIds).length;
   const editorScrollRef = useRef(null);
   useLayoutEffect(() => {
     if (editorScrollRef.current) editorScrollRef.current.scrollTop = 0;
