@@ -540,6 +540,7 @@ import {
   brandToneFromAnalysis,
   parseBrandToneAnalysisResponse,
   brandToneIsReady,
+  generationToneOrDefault,
 } from './src/utils/brand-tone.js';
 import {
   resolveLogoDataUrl,
@@ -7288,7 +7289,7 @@ ${isPresentationSummary
       const { announcement } = resolved;
       const toneFromBrand = (brandToneIsReady(brand) && brand.useBrandVoice !== false)
         ? (brand.brandTone?.summary || brand.defaultTone || '').trim()
-        : ((brand.defaultTone || '').trim() || 'direto e concreto');
+        : generationToneOrDefault(brand.defaultTone);
       const currentVisualPresetDef = resolvePresentationVisualPresetDefinition(
         visualPreset,
         visualPresets,
@@ -7299,7 +7300,7 @@ ${isPresentationSummary
         niche: styleKit.contextMd.trim() ? '' : (niche || ''),
         tone: styleKit.contextMd.trim() && !(brandToneIsReady(brand) && brand.useBrandVoice !== false)
           ? 'Use a voz do brief do projeto; na ausência, seja direto e concreto no idioma definido para o conteúdo'
-          : (toneFromBrand || 'direto e concreto'),
+          : generationToneOrDefault(toneFromBrand),
         audience: styleKit.contextMd.trim() ? '' : (brand.defaultAudience || ''),
         imgMode: 'dalle',
         imgParams,

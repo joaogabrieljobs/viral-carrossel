@@ -9,6 +9,7 @@ import { TITLE_FONTS } from '../utils/design-data.js';
 import { BODY_FONTS } from '../utils/brand-visuals.js';
 import { sanitizeCustomVisualPresetBrand } from '../utils/custom-visual-presets.js';
 import { CONTENT_OBJECTIVES } from '../utils/editorial-strategy.js';
+import { generationToneOrDefault } from '../utils/brand-tone.js';
 import { PRESENTATION_PATHS, getPresentationPath } from '../utils/presentation.js';
 import { VISUAL_PRESETS, applyVisualPreset } from '../styles/visual-presets.jsx';
 import { PRESENTATION_VISUAL_PRESETS } from '../styles/presentation-presets.jsx';
@@ -284,7 +285,7 @@ export default function CreateProjectFlow({
     try {
       const result = await onCreate({
         name:name.trim(), productKind, formatId, brandId, brand:JSON.parse(JSON.stringify(creationBrand)), styleKit:JSON.parse(JSON.stringify(styleKit)), material:creationMaterialForSubmission(material, productKind),
-        generation:{ topic:resolvedTopic, count:Number(count), niche:brand.niche || '', tone:brand.defaultTone || 'claro e direto', audience:brand.defaultAudience || '', imgMode:'dalle', imgParams:{ ...params }, mode:isPresentation ? 'editorial' : isSpecial ? (quickModes[quickTemplateIdFromPreset(narrative)] || 'editorial') : narrative, creativePreset:isPresentation ? 'apresentacao' : isSpecial ? narrative : 'livre', contentObjective:isPresentation ? 'auto' : objective, presentationPath:isPresentation ? path : undefined, slideTextDensity:density, cardVisualStyle:isPresentation ? 'full' : cardStyle, visualPreset:visualSelection.presetId, preserveBrandIdentity:visualSelection.preserveBrandIdentity || identityVisualEdited, brandVisualOverrides:{ ...brandVisualOverrides }, fetchImagesNow:hasOpenAI && wantImages },
+        generation:{ topic:resolvedTopic, count:Number(count), niche:brand.niche || '', tone:generationToneOrDefault(brand.defaultTone), audience:brand.defaultAudience || '', imgMode:'dalle', imgParams:{ ...params }, mode:isPresentation ? 'editorial' : isSpecial ? (quickModes[quickTemplateIdFromPreset(narrative)] || 'editorial') : narrative, creativePreset:isPresentation ? 'apresentacao' : isSpecial ? narrative : 'livre', contentObjective:isPresentation ? 'auto' : objective, presentationPath:isPresentation ? path : undefined, slideTextDensity:density, cardVisualStyle:isPresentation ? 'full' : cardStyle, visualPreset:visualSelection.presetId, preserveBrandIdentity:visualSelection.preserveBrandIdentity || identityVisualEdited, brandVisualOverrides:{ ...brandVisualOverrides }, fetchImagesNow:hasOpenAI && wantImages },
       });
       if (result?.cancelled && alive.current) setNotice('Geração interrompida. Suas escolhas foram mantidas. Você pode tentar novamente ou abrir o rascunho disponível.');
     } catch (e) { if (alive.current) setError(e.message || 'Não foi possível gerar. Suas escolhas continuam aqui para tentar novamente.'); }

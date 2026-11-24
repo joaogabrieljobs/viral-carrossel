@@ -220,6 +220,17 @@ export function normalizeBrandTone(raw) {
   };
 }
 
+/**
+ * Tom enviado à geração quando a marca não definiu o seu (auditoria 23/11,
+ * GB-11). Cada porta de criação tinha um padrão próprio, e o do assistente era
+ * "direto e provocativo" sem a pessoa ter escolhido.
+ */
+export const DEFAULT_GENERATION_TONE = 'claro e direto';
+
+export function generationToneOrDefault(value) {
+  return String(value || '').trim() || DEFAULT_GENERATION_TONE;
+}
+
 export function brandToneIsReady(brand) {
   return !!normalizeBrandTone(brand?.brandTone)?.method;
 }

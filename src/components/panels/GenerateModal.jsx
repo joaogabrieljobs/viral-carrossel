@@ -11,6 +11,7 @@ import { PhotoRegionMiniIcon } from '../ui/mini-icons.jsx';
 import { CONTENT_OBJECTIVES, normalizeContentObjective } from '../../utils/editorial-strategy.js';
 import { buildPerformanceGuidance } from '../../utils/publication-results.js';
 import { CARD_VISUAL_STYLE_IDS } from '../../utils/doc-schema.js';
+import { generationToneOrDefault } from '../../utils/brand-tone.js';
 import {
   APRESENTACAO_PRESET_ID,
   DEFAULT_PRESENTATION_PATH_ID,
@@ -416,7 +417,7 @@ function GenerateModal({
     }
     setBusy(true); setErr(''); lastGenerationStageRef.current = '';
     try {
-      const toneFromBrand = (defaultTone || '').trim() || 'direto e provocativo';
+      const toneFromBrand = generationToneOrDefault(defaultTone);
       const narrativeForGenerate = isPresentation
         ? 'editorial'
         : (modoPersonalizado ? mode : (narrativeLockedForPack ?? 'editorial'));
