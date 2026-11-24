@@ -8,7 +8,8 @@ import { Check } from 'lucide-react';
 import { renderPresetPreview } from '../styles/visual-presets.jsx';
 import { renderPresentationPresetPreview } from '../styles/presentation-presets.jsx';
 
-function paletteSwatches(preset) {
+/** Fundo, título e acento que o estilo aplica; também usado nos Ajustes rápidos (UX-04). */
+export function paletteSwatches(preset) {
   const b = preset?.brand || {};
   return [b.bg, b.titleColor, b.accent].filter(Boolean).slice(0, 3);
 }

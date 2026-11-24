@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AlignCenter, AlignLeft, AlignRight, Check, ChevronDown, Image as ImageIcon, Move, Palette, SlidersHorizontal, Sparkles, Type, Upload } from 'lucide-react';
 import { renderPresetPreview } from '../../styles/visual-presets.jsx';
 import { renderPresentationPresetPreview } from '../../styles/presentation-presets.jsx';
+import { paletteSwatches } from '../VisualStylePicker.jsx';
 import { REMIX_TONES } from '../../utils/carousel-remix.js';
 import { brandLogoReplacementPatch, storeSlideLogo } from '../../utils/slide-logo.js';
 import { remapDestaqueSpansOnEdit } from '../../utils/text-spans.js';
@@ -213,10 +214,12 @@ export function QuickAdjustmentsPanel({
         <div className="vc-quick-adjustments-presets">
           {visiblePresets.map((preset) => {
             const selected = preset.id === selectedPresetId || preset.sourceId === selectedPresetId;
+            // UX-04: a miniatura com foto esconde o fundo e o acento; as bolinhas mostram as cores que o estilo aplica.
+            const swatches = paletteSwatches(preset);
             return (
               <button type="button" className="vc-quick-adjustments-preset" key={preset.id} aria-pressed={selected} aria-label={`Estilo ${preset.label || 'personalizado'}${preset.isCustom ? ', salvo por você' : ''}`} title={preset.desc || preset.label} disabled={disabled || !applyVisualPreset} onClick={() => applyVisualPreset?.(preset.id, styleScope, activeIdx)}>
                 <span className={`vc-quick-adjustments-preview${isPresentation ? ' is-presentation' : ''}`} aria-hidden="true">{isPresentation ? renderPresentationPresetPreview(preset) : renderPresetPreview(preset)}</span>
-                <span className="vc-quick-adjustments-preset-name">{preset.label || 'Meu estilo'}{preset.isCustom && <small>Seu preset</small>}</span>
+                <span className="vc-quick-adjustments-preset-name">{preset.label || 'Meu estilo'}{preset.isCustom && <small>Seu preset</small>}{swatches.length > 0 && <span className="vc-quick-adjustments-swatches" data-vc-style-swatches aria-hidden="true">{swatches.map((color, index) => <i key={`${preset.id}-${index}`} style={{ background: color }} />)}</span>}</span>
                 {selected && <Check size={15} className="vc-quick-adjustments-selected" aria-hidden="true" />}
               </button>
             );
