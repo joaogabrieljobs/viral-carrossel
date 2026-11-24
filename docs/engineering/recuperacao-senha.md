@@ -1,6 +1,6 @@
 # Recuperação de senha
 
-Implementação e publicação em 28/09/2026, commit `450e84d`. Domínio `viralcarrossel.com.br` verificado no Resend e variáveis de envio configuradas na Vercel. O envio real autorizado foi aceito pelo serviço de e-mail. Isso não confirma chegada à caixa postal; a senha do usuário não foi alterada no teste.
+Implementação e publicação em 28/09/2026, commit `450e84d`, com o domínio `viralcarrossel.com.br` verificado no Resend. Desde 23/11/2026 o envio sai por `moont.ai` e o domínio antigo só redireciona. O envio real autorizado foi aceito pelo serviço de e-mail. Isso não confirma chegada à caixa postal; a senha do usuário não foi alterada no teste.
 
 ## Experiência
 
@@ -13,19 +13,20 @@ Implementação e publicação em 28/09/2026, commit `450e84d`. Domínio `viralc
 
 1. No Resend, verificar um domínio de envio controlado pelo projeto e configurar os registros DNS solicitados.
 2. Na Vercel, neste projeto, definir **RESEND_API_KEY** como segredo de servidor com permissão de envio e **AUTH_EMAIL_FROM** como `Moont <nao-responda@moont.ai>` (em produção desde 23/11/2026; a chave do Resend precisa ter permissão de envio para o domínio moont.ai). Não usar prefixo `VITE_` nem colocar a chave no chat/repositório.
-3. Configurar `APP_URL=https://moont.ai`; manter `STRIPE_SECRET_KEY` e `ACCESS_COOKIE_SECRET`. O remetente verificado no Resend pode continuar no domínio anterior até que um novo domínio de envio seja verificado.
+3. Configurar `APP_URL=https://moont.ai`; manter `STRIPE_SECRET_KEY` e `ACCESS_COOKIE_SECRET`. Sem qualquer uma das quatro (`STRIPE_SECRET_KEY`, `ACCESS_COOKIE_SECRET`, `RESEND_API_KEY`, `AUTH_EMAIL_FROM`) a recuperação responde indisponível.
 4. Publicar e solicitar um link para uma conta de teste controlada. Confirmar recebimento (inclusive spam), redefinição, login novo, rejeição da senha antiga e do link usado. Não alterar senha de cliente durante smoke tests.
 
-Sem as duas configurações de e-mail, o endpoint responde indisponibilidade explícita; a UI não diz que enviou. Os testes automatizados usam credenciais sintéticas e Resend simulado. O smoke de envio em produção foi feito separadamente, com autorização, sem consumir o link para alterar a senha.
+Sem essas configurações, o endpoint responde indisponibilidade explícita; a UI não diz que enviou. Os testes automatizados usam credenciais sintéticas e Resend simulado. O smoke de envio em produção foi feito separadamente, com autorização, sem consumir o link para alterar a senha.
 
 ## Contratos e segurança
 
 - `POST /api/auth/forgot-password`, JSON `{email}`. Resposta genérica igual para conta existente/inexistente. Consulta e envio acontecem com `waitUntil` da Vercel após a resposta, para não revelar a existência da conta por tempo de resposta. Erros de entrega ficam nos logs sem e-mail, chave ou token; aceitação do pedido não confirma entrega na caixa postal.
-- Limite por IP de 5 pedidos/15 minutos, por instância (limitação do rate limiter existente). A chave de idempotência do Resend reduz reenvios para a mesma conta a uma mensagem por janela de 3 minutos, inclusive entre instâncias. Pode haver dois envios próximos na fronteira entre janelas; para volume maior, adicionar WAF/rate limit distribuído.
+- Limite por IP de 5 pedidos/15 minutos (`api/auth/forgot-password.js`). Com `RATE_LIMIT_BACKEND=postgres` (produção) o contador é um só para todas as funções. A rota usa `failClosed`: em produção, se o contador partilhado não responder, o pedido é recusado com 503 em vez de contar por instância. O contador em memória, por instância, só vale em desenvolvimento e teste. A chave de idempotência do Resend reduz reenvios para a mesma conta a uma mensagem por janela de 3 minutos, inclusive entre instâncias. Pode haver dois envios próximos na fronteira entre janelas.
 - `POST /api/auth/reset-password`, JSON `{token,password,confirmPassword}`. 200 após salvar; 400 para link inválido/expirado/usado ou senha inválida; 503 para falha temporária de infraestrutura. Nunca retorna a senha ou autentica automaticamente.
 - Token com HMAC SHA-256, domínio criptográfico `password-reset:v1`, nonce aleatório de 256 bits, finalidade, expiração e vínculo à versão da senha/e-mail da conta. Não é cookie de acesso. Trocar senha ou e-mail invalida todos os links emitidos anteriormente. Rotacionar `ACCESS_COOKIE_SECRET` também invalida os links.
-- Atualização Stripe usa uma chave de idempotência por versão da senha, impedindo que duas submissões concorrentes com parâmetros diferentes consumam a mesma versão. Atualiza somente os três metadados de autenticação, preservando quota/assinatura. Em falhas ambíguas, a Stripe pode conservar a resposta da operação por 24h: consultar logs antes de repetir intervenções administrativas.
-- `vc_session_revoked_before` invalida cookies anteriores na consulta de sessão, portal e recursos protegidos. A verificação consulta o customer Stripe em cada requisição autenticada; não há cache que adie a revogação. Cookies antigos sem `iatMs` usam `iat` em segundos.
+- Com `ACCOUNT_IDENTITY_BACKEND=postgres` (produção), a senha nova é gravada em `moont.account_password_credentials` numa transação que confere o hash e a versão de identidade esperados (`api/lib/account-identity-postgres.js`, `setAccountPassword`). Duas submissões concorrentes do mesmo link não passam as duas: a segunda encontra a credencial mudada e recebe link inválido. A mesma transação troca `identity_epoch` e `agent_epoch` e grava `session_revoked_before` em `moont.accounts`. Nada é escrito no Stripe.
+- A revogação de sessão vale na consulta de sessão, portal e recursos protegidos: `readCurrentAccessCookie` (`api/lib/access.js`) lê a conta no Postgres em cada requisição autenticada e recusa cookie com versão de identidade diferente ou emitido antes de `session_revoked_before`. Não há cache que adie a revogação. Cookies antigos sem `iatMs` usam `iat` em segundos.
+- Sem a flag vale o caminho antigo: a senha e os campos `vc_session_revoked_before`, `vc_identity_epoch` e `vc_agent_epoch` ficam no metadata do cliente Stripe, a atualização usa uma chave de idempotência por versão da senha e a verificação consulta o cliente Stripe em cada requisição. Em falhas ambíguas, a Stripe pode conservar a resposta da operação por 24h: consultar logs antes de repetir intervenções administrativas.
 - E-mail de aviso após a troca, sem senha. Falha no aviso não desfaz uma senha já alterada.
 - Link usa exclusivamente `APP_URL` HTTPS, nunca o Host do pedido. Token em fragmento, API `no-store`, rota `no-referrer` e `noindex`, sem analytics/scripts externos na página de recuperação. Apenas abrir o link não muda a conta.
 
