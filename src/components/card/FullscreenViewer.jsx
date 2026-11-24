@@ -62,6 +62,21 @@ function presentationImgAdjustEquivalent(a, b) {
 }
 
 /**
+ * Slide da prévia com o rascunho dos ajustes aplicado como "Salvar" o grava:
+ * o card resolve o filtro pelo mesmo caminho do valor gravado. A prévia
+ * mandava "sem filtro" no rascunho neutro e, em família com tratamento de
+ * foto (preto e branco do Suíço), a foto aparecia colorida até salvar (GA-06).
+ */
+function fullscreenPreviewSlide(slide, draft) {
+  if (!slide || draft === undefined) return slide;
+  const normalized = normalizePresentationImgAdjust(draft);
+  const next = { ...slide };
+  if (presentationAdjustIsNeutral(normalized)) delete next.presentationImgAdjust;
+  else next.presentationImgAdjust = normalized;
+  return next;
+}
+
+/**
  * O toque ou a tecla nasceu num controle que usa o próprio arrasto e as
  * próprias setas (controle deslizante de "Ajustar foto", caixa de legenda)?
  * Arrastar o "Brilho" trocava de slide ao soltar, e ← → no controle em foco
@@ -136,6 +151,8 @@ function FullscreenViewer({
     if (!open) {
       setPhotoAdjustOpen(false);
       setCaptionOpen(false);
+      // Rascunho não salvo não sobrevive ao fechar: ao reabrir vale o gravado.
+      setImgAdjBySlide((prev) => (Object.keys(prev).length ? {} : prev));
       return;
     }
     const upd = () => setSize({ w: window.innerWidth, h: window.innerHeight });
@@ -173,10 +190,6 @@ function FullscreenViewer({
     overlayDraftFs !== undefined
       ? normalizePresentationImgAdjust(overlayDraftFs)
       : normalizePresentationImgAdjust(activeSlideFs.presentationImgAdjust);
-  const presentationImgFilterFs =
-    hasBgImageFs && !presentationAdjustIsNeutral(adjFs)
-      ? buildPresentationImageFilter(adjFs)
-      : null;
   const fsAdjDirtyUi = !presentationAdjustIsNeutral(adjFs);
 
   const fsPendingPersist =
@@ -230,6 +243,8 @@ function FullscreenViewer({
   const submitFsPersist = () => {
     if (!onSavePresentationAdjust || !fsPendingPersist) return;
     onSavePresentationAdjust(imgAdjBySlide);
+    // Gravado, o rascunho sai: senão ele vencia o valor do projeto depois de um desfazer.
+    setImgAdjBySlide({});
   };
 
   const f = FORMATS[fmt] || FORMATS.carrossel;
@@ -295,13 +310,10 @@ function FullscreenViewer({
       {/* Slide */}
       <div style={{ pointerEvents:'none' }}>
         <SlideCard
-          slide={displaySlides?.[activeIdx] || slideForFormatDisplay(activeSlideFs, fmt, formatViews, creativePreset)} fmt={fmt} brand={brand}
+          slide={fullscreenPreviewSlide(displaySlides?.[activeIdx] || slideForFormatDisplay(activeSlideFs, fmt, formatViews, creativePreset), overlayDraftFs)} fmt={fmt} brand={brand}
           num={activeIdx+1} total={slides.length} scale={realScale}
           creativePreset={creativePreset}
           showCanvasChrome={false}
-          {...(overlayDraftFs !== undefined
-            ? { presentationImgFilter: presentationImgFilterFs }
-            : {})}
         />
       </div>
 
@@ -533,6 +545,7 @@ export {
   buildPresentationImageFilter,
   presentationAdjustIsNeutral,
   presentationImgAdjustEquivalent,
+  fullscreenPreviewSlide,
   fullscreenTargetKeepsOwnInput,
   fullscreenSwipeStep,
   fullscreenArrowStep,
