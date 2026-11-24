@@ -3,6 +3,8 @@ import LegacyPresentationBlocks from './LegacyPresentationBlocks.jsx';
 import { normalizePresentationBlocks } from '../utils/presentation-quality.js';
 import { familyEvidenceStyle, familyFont, normalizeFamilyKey } from '../utils/presentation-families.js';
 import { readTypedText } from '../utils/inline-edit-text.js';
+import { accentInkOnSurface } from '../utils/brand-visuals.js';
+import { wcagContrast } from '../utils/wcag.js';
 
 function EditableCell({ as: Tag = 'span', value, label, onCommit, style = {} }) {
   const [editing, setEditing] = useState(false);
@@ -105,6 +107,26 @@ export function metricRowFit({ values, columnPx, unit, fontFamily, weight }) {
   });
 }
 
+/**
+ * Destaque da marca própria nos blocos (numerais, pílula, fios). A cor ia crua:
+ * amarelo claro sumia no Executivo, azul-escuro no Técnico (GA-09). Mede contra
+ * o fundo onde o marcador aparece (painel da família ou fundo do slide) e
+ * ajusta o mesmo tom até 3:1, como o destaque de texto do card. Destaque que já
+ * lê, e família sem marca própria, saem como estavam. O texto da pílula é
+ * preto ou branco, o que ler melhor sobre ela.
+ */
+export function evidenceStyleForBrand(familyStyle, brandAccent, background) {
+  let st = familyStyle;
+  if (brandAccent) {
+    const own = String(familyStyle.accent || '').toLowerCase();
+    const accent = accentInkOnSurface(brandAccent, familyStyle.panel ? familyStyle.panelColor : background, 3);
+    st = Object.fromEntries(Object.entries(familyStyle)
+      .map(([name, value]) => [name, typeof value === 'string' && value.toLowerCase() === own ? accent : value]));
+  }
+  const pillInk = wcagContrast('#ffffff', st.accent) >= wcagContrast('#000000', st.accent) ? '#ffffff' : '#000000';
+  return { ...st, pillInk };
+}
+
 /** A small, allowlisted set of editable primitives shared by preview and export.
  * React escapes every value; generated content never controls markup or CSS. */
 export default function PresentationBlocks({ blocks: raw, rect, frame, ink, background, fontFamily, family = 'executive', accent, numericTypography, onChange, forExport = false, artDirectionVersion = 2, paletteOverrides = {} }) {
@@ -136,10 +158,7 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, back
   // Tratamento de evidência da família (fios, zebra, painel, numeração).
   const key = normalizeFamilyKey(family);
   // Reteste 22/11: números e fios dos blocos seguem o destaque da marca própria.
-  const familyStyle = familyEvidenceStyle(key);
-  const st = paletteOverrides?.accent ? Object.fromEntries(Object.entries(familyStyle)
-    .map(([name, value]) => [name, typeof value === 'string' && value.toLowerCase() === String(familyStyle.accent || '').toLowerCase() ? paletteOverrides.accent : value]))
-    : familyStyle;
+  const st = evidenceStyleForBrand(familyEvidenceStyle(key), paletteOverrides?.accent, background);
   const panel = st.panel;
   const ruleColor = st.metricRuleColor || accent || ink;
   const headerFont = familyFont(key, st.headerRole === 'display' ? 'display' : st.headerRole === 'label' ? 'label' : 'text');
@@ -204,7 +223,7 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, back
       {block.items.map((item, index) => <li key={index} style={{ minWidth: 0, borderTop: st.metricRule ? `${Math.max(1, (st.metricRule > 4 ? 6 : 2) * unit)}px solid ${ruleColor}` : 'none', padding: panel ? `${22 * unit}px` : `${16 * unit}px 0 0`, borderRadius: st.radius * unit, backgroundColor: panel ? st.panelColor : 'transparent', color: panelInk }}>
         {!/^[A-Z][.)]?$/.test(item.title) && <span aria-hidden style={{ display: st.stepMarker === 'pill' ? 'inline-block' : 'block', fontFamily: numberFont, fontSize: (st.stepMarker === 'pill' ? 20 : 40) * unit, lineHeight: 1, marginBottom: 14 * unit, fontVariantNumeric: 'tabular-nums', color: st.accent,
           fontStyle: st.stepMarker === 'roman' ? 'italic' : 'normal',
-          ...(st.stepMarker === 'pill' ? { backgroundColor: st.accent, color: '#fff', borderRadius: 40 * unit, padding: `${8 * unit}px ${16 * unit}px` } : {}) }}>{marker(index)}</span>}
+          ...(st.stepMarker === 'pill' ? { backgroundColor: st.accent, color: st.pillInk, borderRadius: 40 * unit, padding: `${8 * unit}px ${16 * unit}px` } : {}) }}>{marker(index)}</span>}
         {cell(item.title, ['items', index, 'title'], `etapa ${index + 1}`, { display: 'block', fontWeight: 600, fontSize: 28 * unit, lineHeight: 1.2 })}
         {item.body && cell(item.body, ['items', index, 'body'], `explicação da etapa ${index + 1}`, { display: 'block', marginTop: 8 * unit, opacity: 0.82 })}
       </li>)}
