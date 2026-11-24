@@ -58,6 +58,16 @@ const SQL = {
     WHERE owner_id = $1 AND deleted_at IS NULL
       AND ($2::bigint IS NULL OR (updated_at, sort_order) < ($2::bigint, $3::bigint))
     ORDER BY updated_at DESC, sort_order DESC LIMIT $4`,
+  // DB-09: ordem que não muda quando o projeto é salvo (sort_order é fixo e
+  // único por conta). Usa o índice account_projects_owner_order_idx.
+  pageStable: `/* moont_page_stable */
+    SELECT project_id, entry - 'doc' AS entry, version, updated_at, sort_order,
+      jsonb_array_length(CASE WHEN jsonb_typeof(entry->'doc'->'slides') = 'array'
+        THEN entry->'doc'->'slides' ELSE '[]'::jsonb END) AS slide_count
+    FROM moont.account_projects
+    WHERE owner_id = $1 AND deleted_at IS NULL
+      AND ($2::bigint IS NULL OR sort_order > $2::bigint)
+    ORDER BY sort_order LIMIT $3`,
   upsertProjects: `/* moont_upsert_projects */
     INSERT INTO moont.account_projects
       (owner_id, project_id, entry, version, updated_at, deleted_at, sort_order)
@@ -629,19 +639,31 @@ export function createLibraryPostgresStore({
     });
   }
 
-  async function listAccountProjects(ownerValue, { cursor, limit = 30 } = {}) {
+  // order 'recent' (padrão): editado por último primeiro, para quem mostra a
+  // lista. order 'stable': ordem fixa de criação, para quem precisa percorrer a
+  // biblioteca inteira em várias páginas sem pular projeto salvo no meio (DB-09).
+  async function listAccountProjects(ownerValue, { cursor, limit = 30, order = 'recent' } = {}) {
     const owner = ownerId(ownerValue);
-    if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_PAGE_SIZE) {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_PAGE_SIZE
+      || (order !== 'recent' && order !== 'stable')) {
       throw fail('Tamanho de página inválido.', 'project_bad_limit');
     }
     let position = null;
+    let stable = order === 'stable';
     if (cursor != null && cursor !== '') {
       try {
         if (typeof cursor !== 'string' || cursor.length > 512) throw new Error('cursor');
         const decoded = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
-        if (!Array.isArray(decoded) || decoded.length !== 2
-          || !decoded.every((value) => Number.isSafeInteger(value) && value >= 0)) throw new Error('cursor');
-        position = decoded;
+        const safe = (value) => Number.isSafeInteger(value) && value >= 0;
+        if (Array.isArray(decoded) && decoded.length === 2 && decoded[0] === 's' && safe(decoded[1])) {
+          if (!stable) throw new Error('cursor');
+          position = [decoded[1]];
+        } else if (Array.isArray(decoded) && decoded.length === 2 && decoded.every(safe)) {
+          // Cursor emitido na ordem antiga (aba que começou a listar antes da
+          // troca): termina a paginação do jeito que começou.
+          stable = false;
+          position = decoded;
+        } else throw new Error('cursor');
       } catch { throw fail('Cursor de projetos inválido.', 'project_bad_cursor'); }
     }
     return guardStorage(async () => {
@@ -649,13 +671,16 @@ export function createLibraryPostgresStore({
       await ensureMigrated(sql, owner);
       return sql.begin('isolation level repeatable read read only', async (tx) => {
         const state = (await run(tx, 'state', [owner]))[0];
-        const rows = await run(tx, 'page', [owner, position?.[0] ?? null, position?.[1] ?? null, limit + 1]);
+        const rows = stable
+          ? await run(tx, 'pageStable', [owner, position?.[0] ?? null, limit + 1])
+          : await run(tx, 'page', [owner, position?.[0] ?? null, position?.[1] ?? null, limit + 1]);
         const visible = rows.slice(0, limit).map(toRow);
         const last = visible.at(-1);
         return {
           projects: visible.map(toProject),
           nextCursor: rows.length > limit && last
-            ? Buffer.from(JSON.stringify([last.updated_at, last.sort_order])).toString('base64url') : null,
+            ? Buffer.from(JSON.stringify(stable
+              ? ['s', last.sort_order] : [last.updated_at, last.sort_order])).toString('base64url') : null,
           total: integer(state.project_count),
         };
       });

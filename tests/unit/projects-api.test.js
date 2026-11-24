@@ -65,7 +65,7 @@ describe('/api/projects', () => {
       status: 200,
       body: { ok: true, projects: rows.get('cus_alice'), nextCursor: 'next_1' },
     });
-    expect(pg.list).toHaveBeenCalledWith('cus_alice', { cursor: undefined, limit: 1 });
+    expect(pg.list).toHaveBeenCalledWith('cus_alice', { cursor: undefined, limit: 1, order: 'stable' });
     expect((await request('GET', { query: { id: 'project-b' } })).status).toBe(404);
     expect(pg.get).toHaveBeenCalledWith('cus_alice', 'project-b');
     expect((await request('GET', { query: { id: 'project-a' } })).body.project.entry.name).toBe('Alice');
@@ -73,7 +73,7 @@ describe('/api/projects', () => {
     auth.require.mockResolvedValue({ customerId: 'cus_bob', email: 'bob@example.test' });
     expect((await request('GET', { query: { cursor: 'next_1', limit: '25' } })).body.projects)
       .toEqual(rows.get('cus_bob'));
-    expect(pg.list).toHaveBeenLastCalledWith('cus_bob', { cursor: 'next_1', limit: 25 });
+    expect(pg.list).toHaveBeenLastCalledWith('cus_bob', { cursor: 'next_1', limit: 25, order: 'stable' });
   });
 
   it('grava e exclui por ID somente dentro da conta, sempre com versão base', async () => {

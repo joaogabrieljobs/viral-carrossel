@@ -136,7 +136,9 @@ export default async function handler(req, res) {
       if (cursor !== undefined && (typeof cursor !== 'string' || !cursor || cursor.length > 512)) {
         return res.status(400).json({ error: 'Cursor inválido.', code: 'project_bad_cursor' });
       }
-      const result = await listAccountProjects(owner, { cursor, limit });
+      // DB-09: o aplicativo percorre todas as páginas e confere a contagem.
+      // A ordem fixa não pula projeto salvo entre duas páginas.
+      const result = await listAccountProjects(owner, { cursor, limit, order: 'stable' });
       return res.status(200).json({
         ok: true,
         projects: (result.projects || []).map(projectSummary),
