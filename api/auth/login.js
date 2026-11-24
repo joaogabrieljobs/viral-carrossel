@@ -12,7 +12,7 @@ import {
 import { getStripe } from '../lib/stripe.js';
 import { FREE_PLAN } from '../../shared/plans.js';
 import { resolveAccountEntitlement } from '../lib/account-entitlements.js';
-import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
+import { consumeRateLimit, rateLimitResponse, rateLimitClientIp } from '../lib/rate-limit.js';
 import {
   accountIdentityBackendEnabled, getAccountByStripeCustomerId, getPasswordRecordByStripeCustomerId,
 } from '../lib/account-identity-postgres.js';
@@ -85,12 +85,22 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Informe e-mail e senha.' });
   }
 
-  // Limite por e-mail além do limite por IP (MOO-05): várias origens não
-  // multiplicam as tentativas contra a mesma conta, e cada tentativa barrada
-  // deixa de consultar o Stripe. Google e "Esqueci a senha" seguem livres.
+  // Dois limites por e-mail além do limite por IP (MOO-05, AUTH-01).
+  // 1) Por e-mail + origem, 10 em 15 min: quem erra a senha esgota só o próprio
+  //    balde. Antes o balde era só do e-mail, e 10 tentativas de um terceiro no
+  //    começo de cada janela davam 429 à dona da conta com a senha certa.
+  // 2) Por e-mail, 100 em 15 min: várias origens não multiplicam sem teto as
+  //    tentativas contra a mesma conta. Tentativa barrada em (1) não conta em (2).
+  // Cada tentativa barrada deixa de consultar a senha e o Stripe. Google e
+  // "Esqueci a senha" seguem livres.
+  const emailKey = createHash('sha256').update(cleanEmail).digest('hex').slice(0, 40);
+  const pairKey = createHash('sha256').update(`${cleanEmail}|${rateLimitClientIp(req)}`).digest('hex').slice(0, 40);
+  const perOrigin = await consumeRateLimit(req, {
+    limit: 10, windowMs: 15 * 60_000, keyPrefix: 'login-email-ip', failClosed: true, subject: pairKey,
+  });
+  if (perOrigin) return rateLimitResponse(res, perOrigin.retryAfterSec);
   const perEmail = await consumeRateLimit(req, {
-    limit: 10, windowMs: 15 * 60_000, keyPrefix: 'login-email', failClosed: true,
-    subject: createHash('sha256').update(cleanEmail).digest('hex').slice(0, 40),
+    limit: 100, windowMs: 15 * 60_000, keyPrefix: 'login-email', failClosed: true, subject: emailKey,
   });
   if (perEmail) return rateLimitResponse(res, perEmail.retryAfterSec);
 

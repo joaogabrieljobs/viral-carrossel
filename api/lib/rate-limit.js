@@ -45,6 +45,11 @@ function clientIp(req) {
   return req.socket?.remoteAddress || 'unknown';
 }
 
+/** IP que os limites usam; serve para compor chave por conta + origem. */
+export function rateLimitClientIp(req) {
+  return clientIp(req);
+}
+
 function hasUpstash() {
   if (process.env.UPSTASH_DISABLED === '1') return false;
   const testing = process.env.VITEST === 'true' || process.env.NODE_ENV === 'test';
