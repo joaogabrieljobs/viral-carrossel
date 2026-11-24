@@ -298,9 +298,24 @@ function cutTolerancePx(side) {
 }
 
 /**
+ * Meia-entrelinha da fonte, em px de layout: a faixa acima da primeira linha e
+ * abaixo da última que não tem tinta. Zero quando a entrelinha é menor que a
+ * letra ou não é um número ("normal").
+ */
+function textInkSlack({ fontSize = 0, lineHeight = 0 } = {}) {
+  const size = Number(fontSize);
+  const line = Number(lineHeight);
+  if (!(size > 0) || !(line > size)) return 0;
+  return (line - size) / 2;
+}
+
+/**
  * O bloco passa da área que o recorta? Posição do bloco dentro dela, em px de
  * layout. A folga cobre arredondamento e a sobra de entrelinha, que não tem
- * tinta; passar disso é texto cortado de verdade.
+ * tinta; passar disso é texto cortado de verdade. `inkSlack` é a
+ * meia-entrelinha do texto do bloco: em fonte de título com entrelinha folgada
+ * ela passa da folga fixa (conferência de 24/11: Anton a 118 px, 13 px de sobra
+ * sem nenhuma letra cortada, e o download era recusado).
  */
 function blockOutsideFrame({
   frameWidth = 0,
@@ -309,14 +324,34 @@ function blockOutsideFrame({
   top = 0,
   width = 0,
   height = 0,
+  inkSlack = 0,
 }) {
   if (!(frameWidth > 0) || !(frameHeight > 0)) return false;
-  const tolY = cutTolerancePx(frameHeight);
+  const tolY = Math.max(cutTolerancePx(frameHeight), Number(inkSlack) > 0 ? Number(inkSlack) : 0);
   const tolX = cutTolerancePx(frameWidth);
   return top < -tolY
     || left < -tolX
     || top + height > frameHeight + tolY
     || left + width > frameWidth + tolX;
+}
+
+/** Maior meia-entrelinha entre o primeiro e o último texto do bloco. */
+function blockInkSlack(block) {
+  const read = globalThis.getComputedStyle;
+  if (typeof read !== 'function' || !block) return 0;
+  const candidates = [block, ...(block.querySelectorAll?.('*') || [])]
+    .filter((node) => [...(node.childNodes || [])].some((n) => n.nodeType === 3 && n.textContent.trim()));
+  let slack = 0;
+  for (const node of [candidates[0], candidates[candidates.length - 1]]) {
+    if (!node) continue;
+    try {
+      const style = read(node);
+      slack = Math.max(slack, textInkSlack({
+        fontSize: Number.parseFloat(style.fontSize), lineHeight: Number.parseFloat(style.lineHeight),
+      }));
+    } catch { /* nó destacado: fica a folga fixa */ }
+  }
+  return slack;
 }
 
 /**
@@ -338,6 +373,7 @@ function measureZoneTextCut(el) {
       top: (box.top - zone.top) * ratio,
       width: box.width * ratio,
       height: box.height * ratio,
+      inkSlack: blockInkSlack(child),
     })) return true;
   }
   return false;
@@ -607,6 +643,7 @@ export {
   nextOverflowScale,
   overflowFlagAfterMeasure,
   blockOutsideFrame,
+  textInkSlack,
   measureZoneTextCut,
   observeOverflowInvalidations,
   OverflowScaler,

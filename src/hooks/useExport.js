@@ -246,13 +246,29 @@ function listNumbers(numbers) {
   return numbers.length > 1 ? `${numbers.slice(0, -1).join(', ')} e ${numbers.at(-1)}` : String(numbers[0]);
 }
 
+/**
+ * O que fazer quando a conferência acha texto fora da área. Na apresentação a
+ * medição é exata (área segura fixa) e o download é recusado. No carrossel ela
+ * erra para mais em fonte de título com entrelinha folgada (conferência de
+ * 24/11: Tabloid Keywords, 4 linhas, texto inteiro e download recusado), então
+ * o app avisa e a pessoa decide. Devolve true para seguir; sem o sim, lança o
+ * mesmo aviso, que diz onde corrigir.
+ */
+export function resolveOverflowExport({ numbers = [], hasOverflow = numbers.length > 0, itemLabel = 'slide', ask } = {}) {
+  if (!hasOverflow) return true;
+  const message = overflowExportMessage(numbers, { itemLabel });
+  if (itemLabel === 'card' && typeof ask === 'function'
+    && ask(`${message}\n\nConfira o card antes: se o texto estiver inteiro na tela, pode baixar. Baixar mesmo assim?`) === true) return true;
+  throw exportQualityError(message);
+}
+
 /** Aviso da trava de exportação quando o texto não cabe; `numbers` começa em 1. */
 export function overflowExportMessage(numbers = [], { itemLabel = 'slide' } = {}) {
   if (itemLabel === 'card') {
     const where = numbers.length
       ? `${numbers.length === 1 ? 'Card' : 'Cards'} ${listNumbers(numbers)}`
       : 'Um card';
-    return `${where}: o texto não cabe na área do card e sairia cortado no arquivo. Abra ${numbers.length === 1 ? 'o card' : 'cada card'} e encurte o texto ou diminua o tamanho da letra.`;
+    return `${where}: o texto pode não caber na área do card e sair cortado no arquivo. Abra ${numbers.length === 1 ? 'o card' : 'cada card'} e encurte o texto ou diminua o tamanho da letra.`;
   }
   const where = numbers.length
     ? `${numbers.length === 1 ? 'Slide' : 'Slides'} ${listNumbers(numbers)}`
@@ -303,9 +319,10 @@ export function useExport({
         || root?.closest?.('[data-vc-card-surface]')?.getAttribute?.('data-vc-card-surface') === slide.id)]).length
         ? slides.indexOf(slide) + 1 : null))
       .filter(Boolean);
-    if (overflowSlides.length || presentationOverflowAtFloor(roots).length) {
-      throw exportQualityError(overflowExportMessage(overflowSlides, { itemLabel }));
-    }
+    resolveOverflowExport({
+      numbers: overflowSlides, hasOverflow: overflowSlides.length > 0 || presentationOverflowAtFloor(roots).length > 0,
+      itemLabel, ask: (message) => window.confirm(message),
+    });
     if (isPresentation) assertPresentationExportQuality(scope);
   };
 

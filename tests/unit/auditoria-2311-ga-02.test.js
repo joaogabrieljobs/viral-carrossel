@@ -137,7 +137,7 @@ describe('GA-02: a trava de exportação enxerga o carrossel e diz o card', () =
 
   it('carrossel: fala em card e dá a saída', () => {
     const um = overflowExportMessage([3], { itemLabel: 'card' });
-    expect(um).toMatch(/^Card 3: o texto não cabe/);
+    expect(um).toMatch(/^Card 3: o texto pode não caber/);
     expect(um).toMatch(/Abra o card e encurte o texto ou diminua o tamanho da letra/);
     expect(um).not.toMatch(/slide/i);
     const varios = overflowExportMessage([2, 5, 6], { itemLabel: 'card' });
@@ -149,5 +149,66 @@ describe('GA-02: a trava de exportação enxerga o carrossel e diz o card', () =
   it('apresentação: a mensagem de antes não muda', () => {
     expect(overflowExportMessage([4])).toBe('Slide 4: o texto passa da área segura e seria cortado no arquivo. Abra o slide e reduza o texto na aba Texto, ou aumente a caixa arrastando a borda.');
     expect(overflowExportMessage([1, 2], { itemLabel: 'slide' })).toMatch(/^Slides 1 e 2: .*Abra cada slide/);
+  });
+});
+
+// Conferência visual de 24/11, com as fontes reais: Tabloid Keywords (Anton,
+// 118 px, entrelinha de ~146 px), Stories, título de 4 linhas. O bloco mede
+// 585 px numa coluna de 572 px e nenhuma letra é cortada: os 13 px são sobra de
+// entrelinha, que não tem tinta. A trava recusava o download mesmo assim.
+describe('GA-02 — sobra de entrelinha não é texto cortado', () => {
+  const coluna = { frameWidth: 960, frameHeight: 572, left: 0, width: 960 };
+  it('bloco que passa só a meia-entrelinha da fonte não é barrado', () => {
+    const { blockOutsideFrame } = primitives;
+    // Sem informar a entrelinha, 13 px passam da folga fixa (regra antiga).
+    expect(blockOutsideFrame({ ...coluna, top: 0, height: 585 })).toBe(true);
+    // Meia-entrelinha de (146 − 118) / 2 = 14 px: os 13 px não têm tinta.
+    expect(blockOutsideFrame({ ...coluna, top: 0, height: 585, inkSlack: 14 })).toBe(false);
+    expect(blockOutsideFrame({ ...coluna, top: -13, height: 572, inkSlack: 14 })).toBe(false);
+  });
+  it('corte de verdade continua barrado mesmo com entrelinha folgada', () => {
+    const { blockOutsideFrame } = primitives;
+    // Os cortes reais medidos na mesma conferência: 44 a 89 px.
+    expect(blockOutsideFrame({ ...coluna, top: 0, height: 572 + 44, inkSlack: 14 })).toBe(true);
+    expect(blockOutsideFrame({ ...coluna, top: -89, height: 572, inkSlack: 14 })).toBe(true);
+  });
+  it('meia-entrelinha vem da fonte do texto: nula quando a entrelinha é menor que a letra', () => {
+    const { textInkSlack } = primitives;
+    expect(textInkSlack({ fontSize: 118, lineHeight: 146 })).toBe(14);
+    expect(textInkSlack({ fontSize: 118, lineHeight: 110 })).toBe(0);
+    expect(textInkSlack({ fontSize: 0, lineHeight: 0 })).toBe(0);
+    expect(textInkSlack({ fontSize: 40, lineHeight: NaN })).toBe(0);
+  });
+});
+
+// Conferência visual de 24/11: a detecção de corte do carrossel erra para mais
+// em fonte de título com entrelinha folgada (Tabloid Keywords, 4 linhas: texto
+// inteiro e download recusado). No carrossel a trava avisa e a pessoa decide;
+// na apresentação continua recusando.
+describe('GA-02 — no carrossel a trava avisa e deixa a pessoa decidir', () => {
+  it('apresentação com texto fora da área segura continua recusada, sem pergunta', async () => {
+    const { resolveOverflowExport } = await import('../../src/hooks/useExport.js');
+    const ask = vi.fn(() => true);
+    expect(() => resolveOverflowExport({ numbers: [2], itemLabel: 'slide', ask })).toThrow(/Slide 2: o texto passa da área segura/);
+    expect(ask).not.toHaveBeenCalled();
+  });
+  it('carrossel: pergunta citando o card; com o sim o download segue', async () => {
+    const { resolveOverflowExport } = await import('../../src/hooks/useExport.js');
+    const ask = vi.fn(() => true);
+    expect(resolveOverflowExport({ numbers: [1, 3], itemLabel: 'card', ask })).toBe(true);
+    expect(ask).toHaveBeenCalledTimes(1);
+    expect(ask.mock.calls[0][0]).toMatch(/Cards 1 e 3: o texto pode não caber/);
+    expect(ask.mock.calls[0][0]).toMatch(/Baixar mesmo assim\?/);
+  });
+  it('carrossel: sem o sim nada é baixado e o aviso diz onde corrigir', async () => {
+    const { resolveOverflowExport } = await import('../../src/hooks/useExport.js');
+    expect(() => resolveOverflowExport({ numbers: [1], itemLabel: 'card', ask: () => false }))
+      .toThrow(/Card 1: o texto pode não caber.*encurte o texto ou diminua o tamanho da letra/s);
+  });
+  it('sem transbordo não pergunta nada', async () => {
+    const { resolveOverflowExport } = await import('../../src/hooks/useExport.js');
+    const ask = vi.fn();
+    expect(resolveOverflowExport({ numbers: [], hasOverflow: false, itemLabel: 'card', ask })).toBe(true);
+    expect(ask).not.toHaveBeenCalled();
   });
 });
