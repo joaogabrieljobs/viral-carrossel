@@ -186,3 +186,32 @@ export function overflowFallbackPatches(slides, issues, step = 0) {
     return [];
   });
 }
+
+const listaDeSlides = (numbers) => (numbers.length < 2
+  ? String(numbers[0])
+  : `${numbers.slice(0, -1).join(', ')} e ${numbers[numbers.length - 1]}`);
+
+/**
+ * Aviso do texto que saiu do slide para as notas no reparo de espaço. As notas
+ * não entram no visual exportado, então a pessoa precisa saber onde procurar.
+ * `quality` é `doc.presentationQuality`; `slides` dá a posição atual de cada
+ * slide. Devolve `{ slideNumbers, message }` ou `null` quando não há o que avisar.
+ */
+export function movedToNotesNotice(quality, slides = []) {
+  if (!quality || quality.movedToNotesReviewed) return null;
+  const ids = Array.isArray(quality.movedToNotesSlideIds) ? quality.movedToNotesSlideIds : null;
+  const slideNumbers = (ids || [])
+    .map(id => (slides || []).findIndex(slide => slide?.id === id) + 1)
+    .filter(number => number > 0)
+    .sort((a, b) => a - b);
+  const tail = 'As notas não entram no PDF nem nas imagens exportadas. Leia as notas e devolva ao slide o que precisa aparecer.';
+  if (slideNumbers.length) {
+    const where = slideNumbers.length === 1 ? `No slide ${slideNumbers[0]}` : `Nos slides ${listaDeSlides(slideNumbers)}`;
+    return { slideNumbers, message: `${where}, parte do texto não cabia e foi para as notas do slide. ${tail}` };
+  }
+  // Projeto gerado antes de a lista existir: o estado diz que houve mudança, sem dizer onde.
+  if (!ids && quality.renderRepairStatus === 'moved_to_notes') {
+    return { slideNumbers, message: `Em pelo menos um slide, parte do texto não cabia e foi para as notas do slide. ${tail}` };
+  }
+  return null;
+}

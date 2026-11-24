@@ -1,4 +1,5 @@
 import React from 'react';
+import { movedToNotesNotice } from '../utils/presentation-render-review.js';
 
 export function presentationInterruptionMessage(reason) {
   switch (reason) {
@@ -40,10 +41,22 @@ function MaterialNotice({ text, onDismiss }) {
   </section>;
 }
 
-export default function EditorialReviewNotice({ materialNotice = '', onDismissMaterialNotice, ...props }) {
+/** FE-12: texto que o reparo de espaço tirou do slide e pôs nas notas (`renderRepairStatus`). */
+function MovedToNotesNotice({ quality, slides, onDismiss }) {
+  const notice = movedToNotesNotice(quality, slides);
+  if (!notice) return null;
+  return <section className="vc-editor-review-notice" aria-label="Texto movido para as notas">
+    <strong>Texto movido para as notas</strong>
+    <p>{notice.message}</p>
+    {onDismiss && <button type="button" className="vc-btn vc-btn-ghost" onClick={onDismiss}>Conferi as notas</button>}
+  </section>;
+}
+
+export default function EditorialReviewNotice({ materialNotice = '', onDismissMaterialNotice, presentationQuality = null, slides = [], onDismissMovedToNotes, ...props }) {
   const material = <MaterialNotice text={materialNotice} onDismiss={onDismissMaterialNotice} />;
+  const moved = <MovedToNotesNotice quality={presentationQuality} slides={slides} onDismiss={onDismissMovedToNotes} />;
   const review = <ReviewNotice {...props} />;
-  return materialNotice ? <>{material}{review}</> : review;
+  return materialNotice || presentationQuality ? <>{material}{moved}{review}</> : review;
 }
 
 function ReviewNotice({ status, issues = [], isPresentation = false, onReviewed }) {

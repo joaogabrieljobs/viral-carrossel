@@ -22,7 +22,7 @@ import {
 } from './src/utils/editorial-review.js';
 import { buildFactualGroundingPrompt, auditDraftFactuality } from './src/utils/factual-grounding.js';
 import { normalizePresentationBlocks, repairPresentationLayouts, auditRenderedPresentationLayout } from './src/utils/presentation-quality.js';
-import { repairRenderedPresentation, overflowFallbackPatches } from './src/utils/presentation-render-review.js';
+import { repairRenderedPresentation, overflowFallbackPatches, movedToNotesNotice } from './src/utils/presentation-render-review.js';
 import { presentationPhotoAspectRatio } from './src/utils/presentation-composition.js';
 import { buildPerformanceGuidance, savePublicationResult, removePublicationResult } from './src/utils/publication-results.js';
 import { PublicationResultsModal } from './src/components/panels/PublicationResultsModal.jsx';
@@ -6533,6 +6533,7 @@ ${jsonShapeLine}`;
           // Lote B (21/11): capas que ainda não cabiam barravam o PDF quando o
           // reparo por IA não respondia. Passo final sem apagar nada: linha de
           // apoio e, se preciso, a última frase do subtítulo vão para as notas.
+          const movedToNotesIds = new Set();
           for (let step = 0; step < 2 && rendered.issues.some(issue => issue.code === 'render-overflow'); step += 1) {
             const fallback = overflowFallbackPatches(slidesLiveRef.current, rendered.issues, step);
             if (!fallback.length) continue;
@@ -6540,7 +6541,9 @@ ${jsonShapeLine}`;
               const candidate = fallback.find(item => item.slideId === current.id);
               if (!candidate) return current;
               const unchanged = Object.entries(candidate.before).every(([key, value]) => String(current[key] || '') === String(value || ''));
-              return unchanged ? { ...current, ...candidate.patch } : current;
+              if (!unchanged) return current;
+              movedToNotesIds.add(current.id);
+              return { ...current, ...candidate.patch };
             }) }));
             await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
             checkActive();
@@ -6554,9 +6557,13 @@ ${jsonShapeLine}`;
             ...d.presentationQuality,
             renderedIssues: rendered.issues,
             renderRepairStatus,
+            movedToNotesSlideIds: [...movedToNotesIds],
             renderCheckStatus: rendered.ok ? 'passed' : 'needs_attention',
             renderCheckedAt: new Date().toISOString(),
           } }));
+          // FE-12: as notas não entram no PDF. Quem teve texto movido precisa saber onde ele está.
+          const movedNotice = movedToNotesNotice({ movedToNotesSlideIds: [...movedToNotesIds] }, newSlides);
+          if (movedNotice) toast(movedNotice.message, 'warning', 10000);
           if (!rendered.ok) {
             const indexes = [...new Set(rendered.issues.filter(issue => issue.severity === 'error').map(issue => issue.slideIndex + 1))];
             toast(`Revise a composição dos slides ${indexes.join(', ')} antes de exportar. O texto completo foi preservado.`, 'warning', 8500);
@@ -8426,7 +8433,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
             </div>}
             <EditorialReviewNotice status={doc.editorialReviewStatus} issues={doc.editorialReviewIssues} isPresentation={isPresentationProject} onReviewed={() => history.set(current => ({ ...current, editorialReviewStatus:'reviewed_by_user', editorialReviewIssues:[] }))}
               materialNotice={doc.materialNotice || doc.presentationMaterialNotice || ''}
-              onDismissMaterialNotice={() => history.set(current => ({ ...current, materialNotice: '', presentationMaterialNotice: '' }))}/>
+              onDismissMaterialNotice={() => history.set(current => ({ ...current, materialNotice: '', presentationMaterialNotice: '' }))}
+              presentationQuality={doc.presentationQuality} slides={slides}
+              onDismissMovedToNotes={() => history.set(current => ({ ...current, presentationQuality: { ...current.presentationQuality, movedToNotesReviewed: true } }))}/>
             {empty ? (
               // Empty state
               <div className="empty-grid" style={{
