@@ -28,14 +28,18 @@ const Slider = ({ label, value, min, max, onChange }) => {
   );
 };
 
-// Toggle switch
+// Toggle switch. UX-08: papel de interruptor com estado anunciado, e sem
+// `outline:'none'` para o anel de foco global aparecer no teclado.
 const Toggle = ({ label, value, onChange }) => (
   <button
+    type="button"
+    role="switch"
+    aria-checked={!!value}
     onClick={()=>onChange(!value)}
     style={{
       width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between',
       background:'var(--bg-card)', border:'1px solid var(--border)',
-      borderRadius:8, padding:'8px 12px', cursor:'pointer', outline:'none',
+      borderRadius:8, padding:'8px 12px', cursor:'pointer',
     }}
   >
     <span style={{ fontSize:12, color:'var(--text-secondary)', fontFamily:'var(--font-ui)', fontWeight:500 }}>{label}</span>

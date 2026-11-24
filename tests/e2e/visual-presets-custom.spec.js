@@ -43,7 +43,7 @@ test('glass cria uma superfície visível no card e não só um toggle', async (
   await page.reload();
   await enterEditorFromHome(page);
   await page.getByRole('tab', { name: /^Layout$/i }).click({ force: true });
-  await page.getByRole('button', { name: 'Glass ao redor do conteúdo', exact: true }).click({ force: true });
+  await page.getByRole('switch', { name: 'Glass ao redor do conteúdo', exact: true }).click({ force: true });
   await page.getByRole('slider', { name: 'Opacidade do glass' }).fill('69');
   const surface = await page.evaluate(() => {
     const card = [...document.querySelectorAll('div')]

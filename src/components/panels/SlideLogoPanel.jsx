@@ -20,12 +20,13 @@ import { applyFormatEditToAll, applyLogoToCards, followLogoDefaultOnAllCards } f
 import { origemParaBlob } from '../../utils/image-store.js';
 import { Slider } from '../ui/primitives.jsx';
 
+// UX-08: a seta é só o desenho do botão; `name` é o que o leitor de tela anuncia.
 const POS = [
-  { id: 'tl', label: '↖' },
-  { id: 'tr', label: '↗' },
-  { id: 'c', label: '●' },
-  { id: 'bl', label: '↙' },
-  { id: 'br', label: '↘' },
+  { id: 'tl', label: '↖', name: 'Superior esquerda' },
+  { id: 'tr', label: '↗', name: 'Superior direita' },
+  { id: 'c', label: '●', name: 'Centro' },
+  { id: 'bl', label: '↙', name: 'Inferior esquerda' },
+  { id: 'br', label: '↘', name: 'Inferior direita' },
 ];
 
 /**
@@ -326,6 +327,8 @@ export function SlideLogoPanel({
                       type="button"
                       className={`vc-seg-item${on ? ' active' : ''}`}
                       aria-pressed={on}
+                      aria-label={p.name}
+                      title={p.name}
                       onClick={() => setBrandLogo({ logoPosition: p.id })}
                       style={{ minHeight: 40, fontSize: 14 }}
                     >

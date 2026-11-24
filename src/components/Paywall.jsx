@@ -203,6 +203,7 @@ export default function Paywall({
               <button
                 key={id}
                 type="button"
+                aria-pressed={selected}
                 onClick={() => setTier(id)}
                 style={{
                   textAlign: 'left',

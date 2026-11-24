@@ -507,6 +507,13 @@ export const GLOBAL_STYLE = `
       0 0 0 4px rgba(var(--accent-rgb), 0.08),
       0 8px 24px rgba(var(--accent-rgb), 0.12) !important;
   }
+  /* UX-08: a regra acima vem depois e tem o mesmo peso de textarea:focus-visible,
+     então apagava o contorno. Sobrava só o halo de 8% de opacidade. */
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
 
   /* — REGRESSION FIXES Sessão C — atinge inline-styled patterns globais
        que estavam usando bg-card/bg-pearl/text-primary (light theme).
