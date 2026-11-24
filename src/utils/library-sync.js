@@ -184,17 +184,28 @@ async function packSlideForCloud(slide, assets) {
     || (refDataUrl ? newImageId() : undefined);
   const imageReferences = await packReferenceListForCloud(sl.imageReferences, assets);
 
-  const clean = stripRuntime({
+  // DB-05: o pacote não muda o que não é mídia. Uma chave que o card tinha
+  // como `null` continua `null` e nenhuma chave nova aparece; assim o card que
+  // volta da conta é igual ao que foi salvo.
+  const has = (key) => Object.prototype.hasOwnProperty.call(sl, key);
+  const packed = {
     ...sl,
-    imageReferences,
-    bgImage: null,
-    logoImage: null,
-    refImage: typeof sl.refImage === 'string' && /^https:\/\//i.test(sl.refImage) ? sl.refImage : null,
     bgImageAssetId: bgAssetId || (sl.bgImageForeign ? undefined : sl.bgImageAssetId) || undefined,
     logoImageAssetId: logoAssetId || (sl.logoImageForeign ? undefined : sl.logoImageAssetId) || undefined,
     refImageAssetId: refIdentity,
-  });
-  return clean;
+  };
+  if (has('imageReferences') || imageReferences.length) packed.imageReferences = imageReferences;
+  for (const key of ['bgImage', 'logoImage', 'refImage']) {
+    if (!has(key)) continue;
+    packed[key] = key === 'refImage' && typeof sl.refImage === 'string' && /^https:\/\//i.test(sl.refImage)
+      ? sl.refImage : null;
+  }
+  for (const key of ['bgImageAssetId', 'logoImageAssetId', 'refImageAssetId']) {
+    if (packed[key] !== undefined) continue;
+    if (has(key)) packed[key] = null;
+    else delete packed[key];
+  }
+  return stripRuntime(packed);
 }
 
 async function packBrandForCloud(brand, assets) {
