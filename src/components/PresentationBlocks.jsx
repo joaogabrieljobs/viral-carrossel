@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import LegacyPresentationBlocks from './LegacyPresentationBlocks.jsx';
 import { normalizePresentationBlocks } from '../utils/presentation-quality.js';
 import { familyEvidenceStyle, familyFont, normalizeFamilyKey } from '../utils/presentation-families.js';
+import { readTypedText } from '../utils/inline-edit-text.js';
 
 function EditableCell({ as: Tag = 'span', value, label, onCommit, style = {} }) {
   const [editing, setEditing] = useState(false);
@@ -9,7 +10,7 @@ function EditableCell({ as: Tag = 'span', value, label, onCommit, style = {} }) 
   const ref = useRef(null);
   useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
   const commit = () => {
-    const text = String(ref.current?.innerText ?? ref.current?.textContent ?? '').trim();
+    const text = readTypedText(ref.current).trim();
     if (text !== value && onCommit?.(text) === false) {
       setInvalid(true);
       if (ref.current) ref.current.textContent = value;

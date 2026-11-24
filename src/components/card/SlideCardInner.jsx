@@ -31,6 +31,7 @@ import { elementOffsetStyle, hasElementOffset, getElementOffset, clampPct0a100 }
 import { normalizeOverlays, overlayMoveKey } from '../../utils/card-overlays.js';
 import { getTextFont, normalizeTextFont, resolveSlideTextFonts } from '../../utils/card-text-fonts.js';
 import { splitLeadingUppercaseLabel } from '../../utils/subtitle-label.js';
+import { readTypedText } from '../../utils/inline-edit-text.js';
 import { headerCenterText, dedupeHeaderColumns } from '../../utils/card-header.js';
 import { useElementDrag } from './useElementDrag.js';
 import { slideHasPendingPhotoIntent, inferCanvasDefaults, sandwichPhotoZoneImgStyle } from '../../utils/canvas-zones.js';
@@ -562,7 +563,7 @@ function InlineEditableText({ as: Tag = 'span', value, onCommit, elementProps = 
     }
   }, [editing, autoEdit]);
   const commit = React.useCallback(() => {
-    const raw = String(ref.current?.innerText ?? ref.current?.textContent ?? '');
+    const raw = readTypedText(ref.current);
     const next = preserveWhitespace ? raw : raw.trim();
     const previous = preserveWhitespace ? String(value ?? '') : String(value ?? '').trim();
     setEditing(false);
