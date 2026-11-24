@@ -51,6 +51,7 @@ import { MOONT_NARRATIVES, moontNarrative, moontProjectFormat } from '../config/
 import { Slider, Toggle, ColorRow } from './ui/primitives.jsx';
 import { brandMatchesPalette, BODY_FONTS } from '../utils/brand-visuals.js';
 import { slideAutoAdjustPatch, slideHasPendingPhotoIntent } from '../utils/canvas-zones.js';
+import { REMOVE_CANVAS_LAYOUT_LABEL, canvasLayoutScopeNotice } from '../utils/canvas-layout-copy.js';
 import { normalizeDestaqueSpansForLen, remapDestaqueSpansOnEdit } from '../utils/text-spans.js';
 import { DEFAULT_SLIDE_TEXT_INSET } from '../utils/canvas-layout.js';
 import { guardarImagemDoSlide } from '../utils/image-store.js';
@@ -999,14 +1000,14 @@ function SidebarContent({
                 {/* Reteste 22/11: ativar num card mudava o layout de todos sem avisar. */}
                 {!anyCanvasEnabled && slides.length > 1 && (
                   <p style={{ margin:0, fontSize:11.5, lineHeight:1.45, color:'var(--text-muted)' }}>
-                    Muda o layout dos {slides.length} {itemsLabel} deste projeto. Para desfazer: Cmd+Z ou Desativar.
+                    {canvasLayoutScopeNotice(slides.length, itemsLabel)}
                   </p>
                 )}
                 {anyCanvasEnabled && (
                   <button
                     type="button"
                     onClick={disableCanvasLayout}
-                    aria-label={`Desativar composição em todos os ${itemsLabel}`}
+                    aria-label={`Concluir edição da composição em todos os ${itemsLabel}`}
                     style={{
                       alignSelf:'center', minHeight:32, padding:'0 14px',
                       cursor:'pointer', border:'none', background:'transparent',
@@ -1034,7 +1035,7 @@ function SidebarContent({
                       textUnderlineOffset:'3px', textDecorationColor:'var(--hairline)',
                     }}
                   >
-                    Remover composição (layout padrão)
+                    {REMOVE_CANVAS_LAYOUT_LABEL}
                   </button>
                 )}
               </div>
