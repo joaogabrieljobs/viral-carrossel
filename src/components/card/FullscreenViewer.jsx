@@ -61,6 +61,32 @@ function presentationImgAdjustEquivalent(a, b) {
   return PRESENTATION_IMG_ADJ_KEYS.every((k) => na[k] === nb[k]);
 }
 
+/**
+ * O toque ou a tecla nasceu num controle que usa o próprio arrasto e as
+ * próprias setas (controle deslizante de "Ajustar foto", caixa de legenda)?
+ * Arrastar o "Brilho" trocava de slide ao soltar, e ← → no controle em foco
+ * trocavam de slide em vez de ajustar (GA-05).
+ */
+function fullscreenTargetKeepsOwnInput(target) {
+  for (let el = target; el && el.tagName; el = el.parentElement) {
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable) return true;
+  }
+  return false;
+}
+
+/** Passo de slide de um gesto de toque: +1, −1 ou 0 (não é troca de slide). */
+function fullscreenSwipeStep({ dx, dy, startedOnControl }) {
+  if (startedOnControl) return 0;
+  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) return dx < 0 ? 1 : -1;
+  return 0;
+}
+
+/** Passo de slide de uma tecla: +1, −1 ou 0 (a tecla fica com quem tem o foco). */
+function fullscreenArrowStep({ key, target, captionOpen }) {
+  if (captionOpen || fullscreenTargetKeepsOwnInput(target)) return 0;
+  return key === 'ArrowLeft' ? -1 : key === 'ArrowRight' ? 1 : 0;
+}
+
 function FullscreenViewer({
   open,
   onClose,
@@ -127,8 +153,10 @@ function FullscreenViewer({
         e.preventDefault();
         closeLayer();
       }
-      else if (e.key === 'ArrowLeft' && !captionOpen)  { e.preventDefault(); setActiveIdx(Math.max(0, activeIdx - 1)); }
-      else if (e.key === 'ArrowRight' && !captionOpen) { e.preventDefault(); setActiveIdx(Math.min(slides.length - 1, activeIdx + 1)); }
+      else {
+        const step = fullscreenArrowStep({ key: e.key, target: e.target, captionOpen });
+        if (step) { e.preventDefault(); setActiveIdx(Math.max(0, Math.min(slides.length - 1, activeIdx + step))); }
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -216,14 +244,14 @@ function FullscreenViewer({
     ? scale
     : Math.min(1, Math.max(0.1, ((typeof window !== 'undefined' ? window.innerWidth : 390) - padding * 2) / f.w));
 
-  const onTouchStart = e => { touchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; };
+  const onTouchStart = e => {
+    touchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, onControl: fullscreenTargetKeepsOwnInput(e.target) };
+  };
   const onTouchEnd = e => {
     const dx = e.changedTouches[0].clientX - touchRef.current.x;
     const dy = e.changedTouches[0].clientY - touchRef.current.y;
-    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
-      if (dx < 0) setActiveIdx(Math.min(slides.length - 1, activeIdx + 1));
-      else setActiveIdx(Math.max(0, activeIdx - 1));
-    }
+    const step = fullscreenSwipeStep({ dx, dy, startedOnControl: touchRef.current.onControl });
+    if (step) setActiveIdx(Math.max(0, Math.min(slides.length - 1, activeIdx + step)));
   };
 
   return (
@@ -505,5 +533,8 @@ export {
   buildPresentationImageFilter,
   presentationAdjustIsNeutral,
   presentationImgAdjustEquivalent,
+  fullscreenTargetKeepsOwnInput,
+  fullscreenSwipeStep,
+  fullscreenArrowStep,
   FullscreenViewer,
 };
