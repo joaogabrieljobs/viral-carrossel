@@ -29,6 +29,49 @@ export function cloudSaveContinuation({ source, current, sameOwner }) {
   return source === 'sync' || source === 'logout' ? 'changed_before_restore' : 'send_latest';
 }
 
+/**
+ * FE-18: como abrir um projeto pela biblioteca. Projeto com alteração local
+ * ainda não enviada abre a versão local; pedir "salve antes" era impossível,
+ * porque o Salvar já aponta para o projeto que está no editor. Só o projeto
+ * igual ao confirmado (ou ainda sem confirmação) confere a versão da conta.
+ */
+export function decideProjectOpen({ isActive, baseline, entryFingerprint, editorFingerprint }) {
+  if (!baseline) return 'fetch';
+  if (isActive && (baseline !== entryFingerprint || baseline !== editorFingerprint)) return 'keep_editor';
+  return baseline !== entryFingerprint ? 'open_local' : 'fetch';
+}
+
+/**
+ * FE-18: no Sync e no salvamento automático cada projeto é enviado por conta
+ * própria. O que falha (imagem que não sobe, tamanho) não impede os seguintes.
+ */
+export async function persistProjectsIndependently(entries, persist, { failFast = false } = {}) {
+  const results = [];
+  const failures = [];
+  for (const entry of entries) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      results.push({ entry, result: await persist(entry) });
+    } catch (error) {
+      if (failFast) throw error;
+      failures.push({ entry, error });
+    }
+  }
+  return { results, failures };
+}
+
+/** Junta as falhas de envio num aviso só e diz de qual projeto é a primeira. */
+export function combinedProjectSyncError(failures, { activeId } = {}) {
+  if (!failures?.length) return null;
+  const [first] = failures;
+  if (failures.length === 1 && first.entry?.id === activeId) return first.error;
+  const detail = `Projeto “${first.entry?.name || 'Sem título'}”: ${first.error?.message || 'não foi possível enviar.'}`;
+  return Object.assign(new Error(failures.length > 1
+    ? `${failures.length} projetos não foram enviados à conta. ${detail}` : detail), {
+    code: first.error?.code, cause: first.error,
+  });
+}
+
 const OUTBOX_UNAVAILABLE_CODES = new Set([
   'project_outbox_unavailable', 'project_outbox_timeout', 'project_outbox_failed',
 ]);

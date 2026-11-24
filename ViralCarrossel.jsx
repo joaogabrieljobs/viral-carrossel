@@ -551,7 +551,8 @@ import {
 } from './src/utils/slide-logo.js';
 import { appModeLabel } from './src/utils/ui-depth-labels.js';
 import {
-  accountMetadataContentKey, cloudSaveContinuation, decideCloudAutoPush, isProjectOutboxUnavailable, putProjectDirectly,
+  accountMetadataContentKey, cloudSaveContinuation, combinedProjectSyncError, decideCloudAutoPush, decideProjectOpen,
+  isProjectOutboxUnavailable, persistProjectsIndependently, putProjectDirectly,
 } from './src/utils/project-sync-control.js';
 import CloudPhotoProgress from './src/components/CloudPhotoProgress.jsx';
 
@@ -1584,10 +1585,10 @@ export default function App() {
     const editor = editorSyncStateRef.current;
     const entryFingerprint = projectCacheFingerprint(entry);
     const editorFingerprint = projectCacheFingerprint({ ...entry, doc: editor.doc });
-    const unsavedInEditor = editor.activeDocId === docId
-      && baseline
-      && (baseline !== entryFingerprint || baseline !== editorFingerprint);
-    if (unsavedInEditor) {
+    const openDecision = decideProjectOpen({
+      isActive: editor.activeDocId === docId, baseline, entryFingerprint, editorFingerprint,
+    });
+    if (openDecision === 'keep_editor') {
       // O projeto já está no editor. Reabrir pela biblioteca não pode
       // descartar a edição nem exigir um salvamento que ainda não terminou.
       openDocGateRef.current.begin();
@@ -1595,9 +1596,11 @@ export default function App() {
       setShellView('project');
       return true;
     }
-    if (baseline && baseline !== entryFingerprint) {
-      toast('Salve as alterações deste projeto antes de abri-lo novamente.', 'warning', 5000);
-      return false;
+    if (openDecision === 'open_local') {
+      // FE-18: a alteração local ainda não foi enviada. Abre a versão deste
+      // navegador sem buscar a da conta, que apagaria a edição da tela.
+      openDocLocal(docId);
+      return true;
     }
     const openToken = openDocGateRef.current.begin();
     setOpeningDocId(docId);
@@ -1633,8 +1636,13 @@ export default function App() {
           setShellView('project');
           return true;
         }
-        toast('O projeto mudou enquanto abria. Salve as alterações e tente novamente.', 'warning', 5000);
-        return false;
+        if (!current) {
+          toast('Este projeto não está mais na lista. Atualize a biblioteca e tente novamente.', 'warning', 5000);
+          return false;
+        }
+        // FE-18: mudou neste navegador enquanto a conta respondia; vale a versão local.
+        openDocLocal(docId);
+        return true;
       }
       if (!remote) {
         if (v2VersionsRef.current.has(docId)) {
@@ -2480,22 +2488,20 @@ export default function App() {
         }
         const recoveredCopies = new Set();
         let deletedElsewhere = false;
-        for (const entry of entries) {
-          // Cada card é salvo com a versão que esta aba observou no último pull.
-          // O servidor devolve 409 se outro dispositivo o alterou primeiro.
-          let result;
-          try {
-            // eslint-disable-next-line no-await-in-loop
-            result = await persistProjectV2(entry, pending, { owner });
-          } catch (error) {
-            // Um projeto excluído em outro lugar fica retido para a escolha da
-            // pessoa; ele não pode impedir o envio dos demais projetos.
-            if (error?.code !== 'project_deleted_elsewhere' || source === 'salvar') throw error;
-            deletedElsewhere = true;
-            continue;
-          }
+        // Cada card é salvo com a versão que esta aba observou no último pull.
+        // O servidor devolve 409 se outro dispositivo o alterou primeiro.
+        // FE-18: fora do "Salvar", a falha de um projeto não barra os demais.
+        const persisted = await persistProjectsIndependently(entries,
+          (entry) => persistProjectV2(entry, pending, { owner }), { failFast: source === 'salvar' });
+        for (const { result } of persisted.results) {
           if (result?.recoveredCopy) recoveredCopies.add(result.recoveredCopy);
         }
+        // Um projeto excluído em outro lugar fica retido para a escolha da
+        // pessoa; ele não pode impedir o envio dos demais projetos.
+        const sendFailures = persisted.failures.filter(({ error }) => error?.code !== 'project_deleted_elsewhere');
+        if (sendFailures.length < persisted.failures.length) deletedElsewhere = true;
+        const sendFailure = combinedProjectSyncError(sendFailures, { activeId: selectedId });
+        if (sendFailure) throw sendFailure;
         await persistAccountMetadataV2(pending, { owner, expectedOwnerId });
         let outbox = { pending: 0, needsReview: [] };
         let verifyWithoutOutbox = v2OutboxUnavailableRef.current;
