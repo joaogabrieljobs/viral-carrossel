@@ -204,6 +204,9 @@ export function applyLogoLayoutToSlides(slides = [], {
     return {
       ...target,
       ...controls,
+      // Tamanho copiado também é escolha da pessoa: sem a marca, a logo
+      // pequena voltava a 260 ao reabrir ou duplicar o projeto.
+      logoSizeChosen: true,
       logoHidden: false,
       elementOffsets,
     };
