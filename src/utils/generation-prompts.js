@@ -25,6 +25,18 @@ import {
 
 export const GENERATION_TOPIC_MAX_CHARS = 1500;
 
+/**
+ * Pedido acima do limite usado pela geração nunca segue cortado em silêncio:
+ * devolve a mensagem para recusar, ou '' quando cabe. Um roteiro por card
+ * reconhecido vai inteiro por outro bloco do prompt e não entra nesta conta.
+ */
+export function generationTopicOverageMessage(rawTopic, { hasCardScript = false } = {}) {
+  const length = String(rawTopic || '').length;
+  if (hasCardScript || length <= GENERATION_TOPIC_MAX_CHARS) return '';
+  const n = (value) => value.toLocaleString('pt-BR');
+  return `O pedido tem ${n(length)} caracteres e a geração usa até ${n(GENERATION_TOPIC_MAX_CHARS)}. Nada foi cortado nem enviado. Para gerar com o pedido inteiro, reduza ${n(length - GENERATION_TOPIC_MAX_CHARS)} caracteres.`;
+}
+
 const SOCIAL_FACTUAL_GROUNDING_RULES = `FIDELIDADE AO MATERIAL — vale também para título, legenda e CTA:
 - Use o pedido, brief e material fornecidos como fonte dos fatos. O modo narrativo muda a organização e o ritmo, nunca os fatos, a oferta, o público ou a ação final.
 - Não complete lacunas com números, tempo decorrido, frequência, depoimentos, falas, eventos, diagnósticos, canais de contato, itens inclusos, preço, prazo ou garantias. Um benefício esperado não é um resultado comprovado.

@@ -178,6 +178,7 @@ import {
   CREATIVE_PRESETS,
   CREATIVE_PRESET_BY_ID,
   GENERATION_TOPIC_MAX_CHARS,
+  generationTopicOverageMessage,
   SLIDE_TEXT_DENSITY_OPTIONS,
   SLIDE_TEXT_DENSITY_BY_ID,
   TEXT_DENSITY_TARGET_MULT,
@@ -5572,6 +5573,10 @@ export default function App() {
     const topicCardScript = !isApresentacaoPreset(requestedPresetId)
       ? parseExplicitCardScript(rawTopic)
       : null;
+    // FE-14: o pedido rápido não tem limite no campo. Acima do limite, recusa
+    // com os números em vez de gerar com metade do texto.
+    const topicOverage = generationTopicOverageMessage(rawTopic, { hasCardScript: !!topicCardScript });
+    if (topicOverage) throw new Error(topicOverage);
     topic = rawTopic.slice(0, GENERATION_TOPIC_MAX_CHARS);
     const materialProductKind = isApresentacaoPreset(presetArg ?? creativePreset ?? 'livre')
       ? 'apresentacao'
@@ -5608,7 +5613,12 @@ export default function App() {
       const confirmed = window.confirm(
         `${foundMessage}\n\nConfira a divisão e use esses blocos como roteiro de ${explicitCardScriptCandidate.count} cards?\n\nCancelar mantém a quantidade escolhida e trata o texto apenas como referência.`,
       );
-      if (!confirmed) explicitCardScript = null;
+      if (!confirmed) {
+        explicitCardScript = null;
+        // Sem o roteiro, o pedido longo voltaria a seguir cortado.
+        const declinedOverage = explicitCardScriptCandidate === topicCardScript ? generationTopicOverageMessage(rawTopic) : '';
+        if (declinedOverage) throw new Error(declinedOverage);
+      }
     }
     if (remix) {
       const validation = validateRemixCardCount(slides, explicitCardScript);
