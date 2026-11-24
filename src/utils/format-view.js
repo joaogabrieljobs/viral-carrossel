@@ -364,6 +364,30 @@ export function followLogoDefaultOnAllCards(doc, partial) {
   }, doc);
 }
 
+/**
+ * Duplicar card: a cópia leva também o que o original tem em cada proporção.
+ * A vista é lida pelo id do card; com id novo e sem entrada, a cópia voltava
+ * ao valor-base (em apresentação, todos os ajustes visuais).
+ */
+export function duplicateSlideInDoc(doc, index, newId) {
+  const slides = Array.isArray(doc?.slides) ? doc.slides : [];
+  const source = slides[index];
+  if (!source || !newId) return doc;
+  const next = [...slides];
+  next.splice(index + 1, 0, { ...source, id: newId });
+  let formatViews = doc.formatViews;
+  for (const [fmt, bucket] of Object.entries(doc.formatViews || {})) {
+    const entry = bucket?.slides?.[source.id];
+    if (!entry || typeof entry !== 'object') continue;
+    formatViews = { ...formatViews, [fmt]: { ...bucket, slides: { ...bucket.slides, [newId]: { ...entry } } } };
+  }
+  return {
+    ...doc,
+    slides: next.map((slide, i) => ({ ...slide, num: i + 1 })),
+    ...(formatViews ? { formatViews } : {}),
+  };
+}
+
 /** Ferramentas de composição operam sobre o que está na tela, inclusive em lote. */
 export function transformFormatVisuals(doc, transform) {
   const displayed = (doc.slides || []).map(slide => slideForFormatDisplay(

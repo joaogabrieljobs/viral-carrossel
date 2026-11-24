@@ -140,7 +140,7 @@ import * as accountLibraryMeta from './src/utils/account-library-meta.js';
 import { FORMATS } from './src/utils/formats.js';
 import { usePhotoFraming } from './src/hooks/usePhotoFraming.js';
 import { automaticPhotoFramingPatch } from './src/utils/photo-framing.js';
-import { applyBrandEdit, applyFormatEdit, brandForFormatDisplay, slideForFormatDisplay, transformFormatVisuals } from './src/utils/format-view.js';
+import { applyBrandEdit, applyFormatEdit, brandForFormatDisplay, duplicateSlideInDoc, slideForFormatDisplay, transformFormatVisuals } from './src/utils/format-view.js';
 import { PALETTES, TITLE_FONTS, TEMPLATES } from './src/utils/design-data.js';
 import { getServerStatus } from './src/utils/server-status.js';
 import {
@@ -5540,10 +5540,10 @@ export default function App() {
     deleteSlide(i);
   }, [deleteSlide, selectedCardElement, slides, toast, updateSlideAt, setBrand]);
   const duplicateSlide = useCallback((i) => {
-    const dup = {...slides[i], id:uid(), num:slides.length+1};
-    const next = [...slides]; next.splice(i+1,0,dup);
-    setSlides(next.map((s,j)=>({...s,num:j+1}))); setActiveIdx(i+1);
-  }, [slides]);
+    // A cópia leva também os ajustes do original em cada proporção.
+    const id = uid();
+    history.set(d => duplicateSlideInDoc({ ...d, slides }, i, id)); setActiveIdx(i+1);
+  }, [slides, history]);
   const moveSlide = useCallback((i,d) => {
     const j=i+d; if(j<0||j>=slides.length) return;
     const next=[...slides]; [next[i],next[j]]=[next[j],next[i]];
