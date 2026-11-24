@@ -111,7 +111,32 @@ function PreviewTemplate({ tpl }) {
   );
 }
 
-export default function TemplatesModal({ open, onClose, onApply }) {
+/** Passo de confirmação: como aplicar o template escolhido. */
+export function TemplateApplyPanel({ template, onApply, onBack, hasContent = false, panelRef = null }) {
+  const pendingCredits = templateImageCreditCount(template);
+  return (
+    <div ref={panelRef} role="group" aria-label={`Como aplicar ${template.name}`} style={{
+      margin:'14px 20px 0', padding:14, border:'1px solid var(--accent)', borderRadius:10,
+      background:'var(--accent-surface)', display:'grid', gap:10,
+    }}>
+      <strong style={{ color:'var(--text-primary)' }}>Aplicar “{template.name}”</strong>
+      {/* O template troca tudo: quem já tem conteúdo precisa saber antes de aplicar. */}
+      {hasContent && <span role="alert" style={{ color:'var(--text-primary)', fontSize:12, lineHeight:1.45, fontWeight:600 }}>
+        Este projeto já tem cards. O template substitui os cards, as fotos e as cores atuais. Desfazer recupera esta versão.
+      </span>}
+      <span style={{ color:'var(--text-secondary)', fontSize:12, lineHeight:1.45 }}>
+        O layout e o texto não consomem créditos. Gerar as imagens usa {pendingCredits} crédito{pendingCredits === 1 ? '' : 's'} do plano.
+      </span>
+      <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+        <button type="button" className="vc-btn vc-btn-ghost" onClick={() => onApply(false)}>Aplicar só layout</button>
+        {pendingCredits > 0 && <button type="button" className="vc-btn vc-btn-primary" onClick={() => onApply(true)}>Aplicar e gerar {pendingCredits} imagens</button>}
+        <button type="button" className="vc-btn vc-btn-ghost" onClick={onBack}>Voltar</button>
+      </div>
+    </div>
+  );
+}
+
+export default function TemplatesModal({ open, onClose, onApply, hasContent = false }) {
   const [familia, setFamilia] = React.useState('todos');
   const [pendingTemplate, setPendingTemplate] = React.useState(null);
   const pendingPanelRef = React.useRef(null);
@@ -125,7 +150,6 @@ export default function TemplatesModal({ open, onClose, onApply }) {
   }, [pendingTemplate]);
   if (!open) return null;
   const lista = familia === 'todos' ? TEMPLATES : TEMPLATES.filter((t) => t.categoria === familia);
-  const pendingCredits = templateImageCreditCount(pendingTemplate);
   const apply = (generateImages) => {
     if (!pendingTemplate) return;
     onApply(pendingTemplate, { generateImages });
@@ -195,20 +219,13 @@ export default function TemplatesModal({ open, onClose, onApply }) {
           })}
         </div>
 
-        {pendingTemplate && <div ref={pendingPanelRef} role="group" aria-label={`Como aplicar ${pendingTemplate.name}`} style={{
-          margin:'14px 20px 0', padding:14, border:'1px solid var(--accent)', borderRadius:10,
-          background:'var(--accent-surface)', display:'grid', gap:10,
-        }}>
-          <strong style={{ color:'var(--text-primary)' }}>Aplicar “{pendingTemplate.name}”</strong>
-          <span style={{ color:'var(--text-secondary)', fontSize:12, lineHeight:1.45 }}>
-            O layout e o texto não consomem créditos. Gerar as imagens usa {pendingCredits} crédito{pendingCredits === 1 ? '' : 's'} do plano.
-          </span>
-          <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
-            <button type="button" className="vc-btn vc-btn-ghost" onClick={() => apply(false)}>Aplicar só layout</button>
-            {pendingCredits > 0 && <button type="button" className="vc-btn vc-btn-primary" onClick={() => apply(true)}>Aplicar e gerar {pendingCredits} imagens</button>}
-            <button type="button" className="vc-btn vc-btn-ghost" onClick={() => setPendingTemplate(null)}>Voltar</button>
-          </div>
-        </div>}
+        {pendingTemplate && <TemplateApplyPanel
+          panelRef={pendingPanelRef}
+          template={pendingTemplate}
+          hasContent={hasContent}
+          onApply={apply}
+          onBack={() => setPendingTemplate(null)}
+        />}
 
         <div style={{ padding: 20, display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
           {lista.map((t) => {

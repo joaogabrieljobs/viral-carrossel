@@ -472,6 +472,7 @@ import {
   ensureDocShape,
 } from './src/utils/doc-schema.js';
 import { projectHasCarouselContent } from './src/utils/context-status.js';
+import { docAfterReadyTemplate } from './src/utils/ready-template.js';
 import {
   mergeUtf16AccentIntervals,
   normalizeDestaqueSpansForLen,
@@ -7563,15 +7564,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         };
         return applyCompositionToSlide(base, composition, zonesByKey);
       });
-      return {
-        ...d,
-        slides: newSlides,
-        brand: hb,
-        creativePreset: tpl.creativePreset || d.creativePreset || 'livre',
-        productKind: 'carrossel',
-        fmt: d.fmt === 'apresentacao' ? 'carrossel' : d.fmt,
-        visualPreset: null,
-      };
+      return docAfterReadyTemplate(d, { slides: newSlides, brand: hb, creativePreset: tpl.creativePreset });
     });
     setActiveIdx(0);
     toast(`Template "${tpl.name}" aplicado`, 'success');
@@ -7613,14 +7606,14 @@ Retorne APENAS JSON: ${refineAllWantsBody
           try {
             const baseRefs = await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId, newSlides[i]?.imageReferences);
             const anchorPlan = fmt !== 'apresentacao'
-              ? planPersonAnchor({ visualBible: doc.visualBible, imageQuery: q, anchorUrl: templateAnchor.url, refCount: baseRefs.length })
+              ? planPersonAnchor({ visualBible: null, imageQuery: q, anchorUrl: templateAnchor.url, refCount: baseRefs.length })
               : { refImages: [], direction: '', canBecomeAnchor: false, excludeEntityIds: [] };
             if (imageBatchSkipReason({ slides: history.getState()?.slides, slideId, expectedImageIdentity })) continue;
             const url = await generateDALLEWithRetry(q, openaiKey, imgParams, {
               signal: templateJob.signal,
               refImages: [...baseRefs, ...anchorPlan.refImages],
               imageDirection: composeImageDirection({
-                styleKit, slide: newSlides[i], fmt: fmt === 'apresentacao' ? 'carrossel' : fmt, visualBible: doc.visualBible,
+                styleKit, slide: newSlides[i], fmt: fmt === 'apresentacao' ? 'carrossel' : fmt, visualBible: null,
                 anchorPlan, baseReferenceCount: baseRefs.length,
               }),
               aspectRatio: imageAspectRatioForSlide(newSlides[i], fmt === 'apresentacao' ? 'carrossel' : fmt),
@@ -9610,6 +9603,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         open={templatesOpen}
         onClose={()=>setTemplatesOpen(false)}
         onApply={applyTemplate}
+        hasContent={projectHasCarouselContent(slides)}
       />
       {templateGalleryTab && <TemplateGalleryModal
         open={!!templateGalleryTab}
