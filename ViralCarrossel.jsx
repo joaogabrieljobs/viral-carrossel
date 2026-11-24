@@ -124,6 +124,7 @@ import { isPitchPath, cleanPitchSlide, cleanPitchText } from './src/utils/pitch-
 import { vcCustomTitleFace, hydrateBrandTextColors, effectiveTitleFontFamily } from './src/utils/brand-helpers.js';
 import { SectionLabel as S } from './src/components/ui/SectionLabel.jsx';
 import PromptDialog, { ConfirmDialog } from './src/components/PromptDialog.jsx';
+import CaptionEditorDialog from './src/components/CaptionEditorDialog.jsx';
 import { resolveSlideBrandBg } from './src/utils/brand-helpers.js';
 import { STATUS_DEFS, STATUS_BY_ID, fmtDate, isDefault, repairedActiveDocId } from './src/utils/library-helpers.js';
 import { normalizeLibraryEntry, normalizeLibraryFolders } from './src/utils/library-organizer.js';
@@ -9732,85 +9733,24 @@ Retorne APENAS JSON: ${refineAllWantsBody
         }}
         captionLabel={isPresentationProject ? "Notas deste slide" : "Legenda da publicação"}
       />
-      {captionEditorIdx != null && slides[captionEditorIdx] ? (
-        <div
-          className="modal-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-label={isPresentationProject ? `Notas do slide ${captionEditorIdx + 1}` : "Legenda da publicação"}
-          onClick={() => setCaptionEditorIdx(null)}
-          style={{ zIndex: 1200 }}
-        >
-          <div
-            className="modal-panel"
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: 480, width: 'min(480px, calc(100% - 32px))', padding: 0 }}
-          >
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '14px 16px', borderBottom: '1px solid var(--border)',
-            }}>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em' }}>
-                  {isPresentationProject ? `Notas · slide ${captionEditorIdx + 1}` : 'Legenda da publicação'}
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                  Não aparece no visual do card — só para publicar / copiar.
-                </div>
-              </div>
-              <button
-                type="button"
-                className="vc-icon-btn"
-                aria-label="Fechar"
-                onClick={() => setCaptionEditorIdx(null)}
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div style={{ padding: 16, display: 'grid', gap: 10 }}>
-              <textarea
-                className="vc-input vc-textarea"
-                autoFocus
-                rows={7}
-                value={isPresentationProject ? (slides[captionEditorIdx].caption || '') : caption}
-                onChange={(e) => isPresentationProject ? updateSlideAt(captionEditorIdx, { caption: e.target.value }) : setCaption(e.target.value)}
-                placeholder={isPresentationProject ? "Notas deste slide…" : "Escreva a legenda da publicação…"}
-                style={{ fontSize: 13, lineHeight: 1.5, resize: 'vertical', minHeight: 140 }}
-              />
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button
-                  type="button"
-                  className="vc-btn vc-btn-ghost"
-                  style={{ minHeight: 36, fontSize: 12 }}
-                  onClick={async () => {
-                    const text = String(isPresentationProject ? slides[captionEditorIdx]?.caption || '' : caption).trim();
-                    if (!text) { toast('Texto vazio.', 'info', 2500); return; }
-                    try {
-                      await copyTextToClipboard(text);
-                      toast(isPresentationProject ? 'Notas copiadas.' : 'Legenda da publicação copiada.', 'success', 2500);
-                    } catch {
-                      toast('Não foi possível copiar. Selecione o texto e copie novamente.', 'error', 4000);
-                    }
-                  }}
-                >
-                  <Copy size={13} /> Copiar
-                </button>
-                <button
-                  type="button"
-                  className="vc-btn"
-                  style={{
-                    minHeight: 36, fontSize: 12, borderRadius: 9999, border: 'none',
-                    background: 'var(--accent)', color: '#fff', fontWeight: 600, padding: '0 16px',
-                  }}
-                  onClick={() => setCaptionEditorIdx(null)}
-                >
-                  Feito
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <CaptionEditorDialog
+        open={captionEditorIdx != null && !!slides[captionEditorIdx]}
+        onClose={() => setCaptionEditorIdx(null)}
+        isPresentation={isPresentationProject}
+        slideNumber={(captionEditorIdx ?? 0) + 1}
+        value={isPresentationProject ? (slides[captionEditorIdx]?.caption || '') : caption}
+        onChange={(text) => isPresentationProject ? updateSlideAt(captionEditorIdx, { caption: text }) : setCaption(text)}
+        onCopy={async () => {
+          const text = String(isPresentationProject ? slides[captionEditorIdx]?.caption || '' : caption).trim();
+          if (!text) { toast('Texto vazio.', 'info', 2500); return; }
+          try {
+            await copyTextToClipboard(text);
+            toast(isPresentationProject ? 'Notas copiadas.' : 'Legenda da publicação copiada.', 'success', 2500);
+          } catch {
+            toast('Não foi possível copiar. Selecione o texto e copie novamente.', 'error', 4000);
+          }
+        }}
+      />
       <LibraryModal
         open={libraryOpen}
         onClose={()=>setLibraryOpen(false)}
