@@ -234,7 +234,7 @@ import {
   validateImportedPhotoFile,
 } from './src/utils/batch-photos.js';
 import { mergeGeneratedSlidesWithConcurrentMedia } from './src/utils/generation-media-merge.js';
-import { createLatestRequestGate, isSameOpenProject, resolveOpenDocTarget, teamPullDestination } from './src/utils/operation-target.js';
+import { createLatestRequestGate, isSameOpenProject, resolveOpenDocTarget, summaryNotesPatchForSlide, teamPullDestination } from './src/utils/operation-target.js';
 import { applyImportedTextToSlides } from './src/utils/import-text.js';
 import { creationMaterialOverages } from './src/utils/create-project-flow.js';
 import {
@@ -6997,6 +6997,9 @@ Retorne exatamente: ${singleJson}`,
   const generateCaption = async () => {
     if (accessFree) { openUpgrade('text'); return; }
     const projectId = activeProjectRef.current;
+    // FE-13: o slide do clique é guardado pelo id; o índice muda se a pessoa reordenar.
+    const notesSlideId = slides[activeIdx]?.id;
+    const previousSummary = doc.captionScope === 'publication' ? String(doc.caption || '') : '';
     setGenCaption(true); setError('');
     const job = startAIJob();
     try {
@@ -7048,7 +7051,13 @@ ${isPresentationSummary
 
       if (activeProjectRef.current === projectId) {
         setCaption(finalCaption);
-        if (isPresentationSummary) updateSlideAt(activeIdx, { caption: finalCaption });
+        if (isPresentationSummary) {
+          // O resumo é do deck. Notas próprias do slide não são trocadas por ele.
+          const notesIndex = (slidesLiveRef.current || []).findIndex(item => item.id === notesSlideId);
+          const notesPatch = summaryNotesPatchForSlide({ slide: slidesLiveRef.current?.[notesIndex], summary: finalCaption, previousSummary });
+          if (notesPatch) updateSlideAt(notesIndex, notesPatch);
+          else if (notesIndex >= 0) toast('Resumo da apresentação atualizado. As notas deste slide foram mantidas; use "Copiar" para levar o resumo.', 'info', 7000);
+        }
       }
       return finalCaption;
     } catch(e) {

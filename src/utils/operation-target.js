@@ -44,3 +44,17 @@ export function isSameOpenProject(startedProjectId, currentProjectId) {
 export function teamPullDestination({ targetDocId, activeDocId }) {
   return { entryId: targetDocId, applyToEditor: isSameOpenProject(targetDocId, activeDocId) };
 }
+
+/**
+ * "Regerar" em apresentação devolve o resumo do deck, que vale para o projeto
+ * inteiro. O slide em que a pessoa clicou só recebe o resumo nas notas quando
+ * não há o que perder: notas vazias, ou ainda iguais ao resumo anterior.
+ * Notas próprias (ou o texto que o reparo de espaço tirou do slide) ficam.
+ * Devolve o patch do slide ou `null` para não tocar nele.
+ */
+export function summaryNotesPatchForSlide({ slide, summary, previousSummary = '' } = {}) {
+  if (!slide) return null;
+  const notes = String(slide.caption || '').trim();
+  const previous = String(previousSummary || '').trim();
+  return !notes || (previous && notes === previous) ? { caption: summary } : null;
+}
