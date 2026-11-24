@@ -3808,6 +3808,7 @@ function SidebarContent({
                   onCreativePresetChange={setCreativePreset}
                   presentationPath={presentationPath}
                   onPresentationPathChange={setPresentationPath}
+                  freePlan={freePlan}
                   projectId={activeDocId || activeEntry?.id}
                   folderId={activeEntry?.folderId || ''}
                   publicationDate={activeEntry?.publicationDate || ''}
