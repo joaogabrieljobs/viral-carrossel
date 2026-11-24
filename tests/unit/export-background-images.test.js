@@ -188,10 +188,12 @@ describe('espera de imagens antes da exportação', () => {
 
     expect(exportRenderScope(slides, roots, [1])).toEqual({
       slides: [slides[1]],
+      indexes: [1],
       roots: [roots.b],
     });
     expect(exportRenderScope(slides, roots)).toEqual({
       slides,
+      indexes: [0, 1, 2],
       roots: [roots.a, roots.b, roots.c],
     });
   });

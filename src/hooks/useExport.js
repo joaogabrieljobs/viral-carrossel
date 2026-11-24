@@ -222,10 +222,14 @@ export function exportRenderScope(slides, refs, slideIndexes = null) {
   const indexes = Array.isArray(slideIndexes)
     ? slideIndexes.filter((index) => Number.isInteger(index) && index >= 0 && index < source.length)
     : source.map((_, index) => index);
-  const scopedSlides = indexes.map((index) => source[index]).filter(Boolean);
+  const scopedIndexes = indexes.filter((index) => Boolean(source[index]));
+  const scopedSlides = scopedIndexes.map((index) => source[index]);
   const rootMap = refs && typeof refs === 'object' ? refs : {};
   return {
     slides: scopedSlides,
+    // Posição de cada slide no projeto, na mesma ordem de `slides`: quem avisa
+    // um defeito precisa citar o número que a pessoa vê, não o do recorte.
+    indexes: scopedIndexes,
     roots: scopedSlides.map((slide) => rootMap[slide.id]).filter(Boolean),
   };
 }
@@ -259,7 +263,7 @@ export function overflowExportMessage(numbers = [], { itemLabel = 'slide' } = {}
 /** Legacy decks keep their existing export behavior. The new planning pipeline
  * opts into measured quality gates; native evidence blocks always opt in. */
 export function assertPresentationExportQuality(scope) {
-  const managed = (scope.slides || []).map((slide, index) => ({ slide, index }))
+  const managed = (scope.slides || []).map((slide, index) => ({ slide, index: scope.indexes?.[index] ?? index }))
     .filter(({ slide }) => slide.presentationQualityVersion === 1 || slide.presentationBlocks?.length);
   if (!managed.length) return;
   const issues = managed.flatMap(({ slide, index }) => auditPresentationLayout(slide, { index }).issues);
