@@ -36,4 +36,15 @@ describe('contrato de CI e publicação', () => {
       expect(text, `${doc} não fala mais em 2 jobs`).not.toMatch(/2 jobs/);
     }
   });
+  // MT-03 (auditoria 23/11): a produção roda com Projetos V2 ligado e o CI só
+  // testava o bundle sem a flag. Um defeito real de salvamento (projeto sumia
+  // ao recarregar logo depois de editar) ficou escondido assim.
+  it('o job de navegador roda também o caminho de produção dos Projetos V2', () => {
+    const step = workflow.match(/- name: E2E Projetos V2[^\n]*\n(?:\s+.*\n)*?\s+run: ([^\n]+)/);
+    expect(step, 'passo "E2E Projetos V2" no workflow').not.toBeNull();
+    expect(workflow).toMatch(/- name: E2E Projetos V2[^\n]*\n\s+env:\n\s+VITE_PROJECTS_V2: 'true'/);
+    for (const spec of ['projects-v2.spec.js', 'projects-v2-outbox-fallback.spec.js', 'save-after-deploy.spec.js', 'plano-gratis.spec.js', 'project-creation-flow.spec.js']) {
+      expect(step[1], `o passo roda ${spec}`).toContain(`tests/e2e/${spec}`);
+    }
+  });
 });
