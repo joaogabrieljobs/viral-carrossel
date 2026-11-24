@@ -109,6 +109,27 @@ export function buildSeededLibraryDoc(seedDoc = null, fallbackBrand = DEFAULT_BR
   };
 }
 
+/**
+ * Foto de fundo de um card no backup: volta embutida em data URL quando os
+ * bytes estão neste navegador. `missing` avisa que o card ficou sem a foto.
+ */
+export async function fundoDoSlideParaBackup(sl, lerImagem = imagemComoDataUrl) {
+  if (!sl?.bgImageId) {
+    // DB-10: a foto existe na conta, mas os bytes não estão neste navegador
+    // (projeto nunca aberto aqui, ou só a prévia temporária). O arquivo sai
+    // sem ela, então o card entra na contagem do aviso.
+    const embutida = typeof sl?.bgImage === 'string' && sl.bgImage.startsWith('data:');
+    return { slide: sl, missing: !!sl?.bgImageAssetId && !embutida };
+  }
+  try {
+    const dataUrl = await lerImagem(sl.bgImageId);
+    if (!dataUrl) return { slide: sl, missing: true };
+    return { slide: { ...sl, bgImage: dataUrl }, missing: false };
+  } catch {
+    return { slide: sl, missing: true };
+  }
+}
+
 export function useLibrary({
   library, setLibrary,
   libraryFolders, setLibraryFolders,
@@ -381,18 +402,9 @@ export function useLibrary({
             const portable = await exportProjectReferences({ refImages:sl.imageReferences });
             sl = { ...sl, imageReferences:portable.refImages };
           }
-          if (!sl?.bgImageId) return sl;
-          try {
-            const dataUrl = await imagemComoDataUrl(sl.bgImageId);
-            if (!dataUrl) {
-              missingBg += 1;
-              return sl;
-            }
-            return { ...sl, bgImage: dataUrl };
-          } catch {
-            missingBg += 1;
-            return sl;
-          }
+          const fundo = await fundoDoSlideParaBackup(sl);
+          if (fundo.missing) missingBg += 1;
+          return fundo.slide;
         }));
         return {
           ...entry,
