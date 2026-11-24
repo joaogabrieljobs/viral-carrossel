@@ -52,11 +52,11 @@ describe('auditoria 23/11 FE-08: trocar de projeto durante a importação em lot
     const guard = 'isSameOpenProject(importProjectId, activeProjectRef.current)';
     const partial = handler.indexOf('if (job.cancelled) {\n          //');
     const firstGuard = handler.indexOf(guard, partial);
-    const partialApply = handler.indexOf('setSlides((prev) => applyBatchPhotosToSlides(prev, urls', partial);
+    const partialApply = handler.indexOf('((prev) => applyBatchPhotosToSlides(prev, urls', partial);
     expect(firstGuard).toBeGreaterThan(partial);
     expect(firstGuard).toBeLessThan(partialApply);
     const secondGuard = handler.indexOf(guard, partialApply);
-    const finalApply = handler.indexOf('setSlides((prev) => applyBatchPhotosToSlides(\n', partialApply);
+    const finalApply = handler.indexOf('((prev) => applyBatchPhotosToSlides(\n', partialApply);
     expect(secondGuard).toBeGreaterThan(partialApply);
     expect(secondGuard).toBeLessThan(finalApply);
   });
