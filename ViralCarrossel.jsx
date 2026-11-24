@@ -233,7 +233,7 @@ import {
   validateImportedPhotoFile,
 } from './src/utils/batch-photos.js';
 import { mergeGeneratedSlidesWithConcurrentMedia } from './src/utils/generation-media-merge.js';
-import { createLatestRequestGate, resolveOpenDocTarget } from './src/utils/operation-target.js';
+import { createLatestRequestGate, isSameOpenProject, resolveOpenDocTarget } from './src/utils/operation-target.js';
 import { applyImportedTextToSlides } from './src/utils/import-text.js';
 import { creationMaterialOverages } from './src/utils/create-project-flow.js';
 import {
@@ -4872,6 +4872,8 @@ export default function App() {
 
     const job = { cancelled: false };
     importAbortRef.current = job;
+    // FE-08: as fotos pertencem ao projeto em que a importação começou.
+    const importProjectId = activeProjectRef.current;
     const total = files.length;
     setImportProgress({
       phase: 'import',
@@ -4952,7 +4954,9 @@ export default function App() {
         }
 
         if (job.cancelled) {
-          // Aplica o que já foi lido antes do cancelamento.
+          // Trocar de projeto também marca o cancelamento; o parcial só vale
+          // no projeto de origem. Aplica o que já foi lido antes do cancelamento.
+          if (!isSameOpenProject(importProjectId, activeProjectRef.current)) return;
           const partial = urls.filter((p) => p && (p.bgImage || p.bgImageId));
           if (partial.length) {
             const isPresentation = activeProductKind === 'apresentacao';
@@ -4962,6 +4966,7 @@ export default function App() {
           }
           return;
         }
+        if (!isSameOpenProject(importProjectId, activeProjectRef.current)) return;
 
         const beforeCount = slidesLiveRef.current.length;
         const isPresentation = activeProductKind === 'apresentacao';

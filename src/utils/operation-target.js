@@ -26,3 +26,12 @@ export function resolveOpenDocTarget({ docId, activeDocId, isLatest }) {
   if (!isLatest) return 'superseded';
   return docId === activeDocId ? 'refresh-active' : 'open';
 }
+
+/**
+ * A operação começou com `startedProjectId` aberto no editor. Só pode gravar
+ * no editor se o mesmo projeto continua aberto. Trocar de projeto no meio
+ * (importação em lote, receber da equipe) não leva o resultado para o outro.
+ */
+export function isSameOpenProject(startedProjectId, currentProjectId) {
+  return startedProjectId === currentProjectId;
+}
