@@ -106,6 +106,19 @@ export function footerPillColors(brand) {
 }
 
 /**
+ * A foto está de fato atrás da barra editorial e do contador (topo do card)?
+ * Mesmo critério do rodapé, olhando o topo: com a foto numa moldura, numa
+ * faixa mais abaixo ou em coluna lateral, ou quando ela não carregou, os dois
+ * ficam sobre o papel do card e branco some em padrão claro (GA-08). A barra
+ * começa a 2,8% do topo e vai de 5% a 95% da largura.
+ */
+export function photoBehindHeaderChrome(slide, { imgErr = false } = {}) {
+  if (!slide?.bgImage || imgErr) return false;
+  const zona = (slide.canvas?.applied || slide.canvas?.enabled) ? slide.canvas?.zones?.photo : null;
+  return !zona || (zona.y <= 3 && zona.y + zona.h >= 6 && zona.x <= 5 && zona.x + zona.w >= 95);
+}
+
+/**
  * Mesma reserva em % da altura, arredondada para cima em passos de 0,5.
  * As zonas do canvas são percentuais; arredondar para cima nunca deixa o
  * texto entrar na faixa do ornamento.

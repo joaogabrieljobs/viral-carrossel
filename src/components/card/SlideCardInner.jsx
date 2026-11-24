@@ -23,7 +23,7 @@ import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks, inkI
 import { displayListMarkers } from '../../utils/list-markers.js';
 import { brandPaletteOverrides, groundInks } from '../../utils/presentation-families.js';
 import { resolvePresetChrome, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
-import { footerChromeReservePx, footerGuardApplies, footerPillBottomPx, footerPillColors, textZonesAboveFooter, STORIES_FOOTER_LIFT } from '../../utils/card-chrome.js';
+import { footerChromeReservePx, footerGuardApplies, footerPillBottomPx, footerPillColors, photoBehindHeaderChrome, textZonesAboveFooter, STORIES_FOOTER_LIFT } from '../../utils/card-chrome.js';
 import { titleLetterSpacingEm } from '../../utils/title-tracking.js';
 import { photoPlaceholderRect } from '../../utils/photo-placeholder.js';
 import { cultureAccentRenderablePieces } from '../../utils/text-spans.js';
@@ -2268,10 +2268,12 @@ const SlideCardInner = React.forwardRef(({
           const quietFolio = presentationMode && [1, 2].includes(slide.presentationArtDirectionVersion) && footerChromeReservePx(brand, f) === 0;
           const folioOnRight = (slide.canvas?.zones?.title?.x || 0) > 40;
           if (!hasHeaderBar && !hasPageBadge) return null;
-          // Cor branca translúcida quando há foto BG; senão tom da marca.
-          const headerColor = slide.bgImage ? 'rgba(255,255,255,0.85)' : (displayBodyInk || '#555');
-          const badgeBg = slide.bgImage ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.12)';
-          const badgeColor = slide.bgImage ? '#fff' : (displayBodyInk || '#222');
+          // Cor branca translúcida só quando a foto está de fato atrás do topo;
+          // com a foto numa caixa mais abaixo (ou sem carregar), tom da marca.
+          const fotoAtrasDoTopo = photoBehindHeaderChrome(slide, { imgErr });
+          const headerColor = fotoAtrasDoTopo ? 'rgba(255,255,255,0.85)' : (displayBodyInk || '#555');
+          const badgeBg = fotoAtrasDoTopo ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.12)';
+          const badgeColor = fotoAtrasDoTopo ? '#fff' : (displayBodyInk || '#222');
           return (
             <>
               {hasHeaderBar && (
