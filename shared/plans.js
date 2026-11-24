@@ -1,7 +1,8 @@
 /**
  * Planos Moont — fonte de verdade para tier, preço e quota de imagem SJinn.
- * Usado no servidor (api/) e no client (src/). Manter em sync com
- * docs/product/PRD-planos-imagem-sjinn.md
+ * Usado no servidor (api/) e no client (src/). Os documentos seguem este
+ * arquivo, não o contrário: docs/product/PRD-planos-imagem-sjinn.md é
+ * histórico e docs/STRIPE.md descreve a cobrança atual.
  */
 
 export const PLAN_TIERS = {

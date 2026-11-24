@@ -1,5 +1,7 @@
 # Sync de biblioteca na nuvem (multiutilizador)
 
+> **Documento histórico (auditoria 23/11/2026, MT-13).** Descreve o armazenamento anterior da biblioteca: um manifesto por conta em Blob e Redis, em que vencia a maior revisão e data. Desde 15/10/2026 a produção usa Postgres (`LIBRARY_SYNC_BACKEND=postgres`): um projeto por linha em `moont.account_projects`, cada um com a sua versão. Quem grava com versão antiga recebe `409` e é avisado; a exclusão fica registrada e o projeto não volta. O documento atual é `docs/moont-architecture.md`; o código é `api/projects.js` e `api/lib/library-sync-postgres.js`. A rota `/api/library-sync` continua em uso para as fotos e para o manifesto de transição. O que está abaixo sobre Blob e Redis só vale com a flag desligada.
+
 Atualizado em 2026-10-13.
 
 ## Promessa

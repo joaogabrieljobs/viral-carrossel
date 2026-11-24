@@ -1,5 +1,7 @@
 # PRD — Planos com imagem inclusa (SJinn) + Essencial sem imagem
 
+> **Documento histórico (auditoria 23/11/2026, MT-13).** Guarda as decisões e o plano de setembro de 2026. Nomes, preços e cotas de imagem valem como estão em `shared/plans.js`, que é a fonte única. Três pontos abaixo estão superados: a cota de imagem não fica mais em KV/Redis, e sim no Postgres (`IMAGE_QUOTA_BACKEND=postgres`, tabelas `moont.image_quota_periods` e `moont.image_quota_operations`, com reserva, confirmação e devolução por operação); a rota `api/ai/sjinn-image.js` usa `maxDuration: 300`, não 120; e o Upstash virou armazenamento legado, que `UPSTASH_DISABLED=1` desliga. O documento atual de conta, cota e armazenamento é `docs/moont-architecture.md`; o de cobrança é `docs/STRIPE.md`.
+
 **Status:** Implementado; comunicação pública alinhada em 29/09/2026. Os itens abaixo preservam as decisões e o planejamento original.
 **Autor:** João Gabriel (via sessão de produto)
 **Data:** 2026-09-14
