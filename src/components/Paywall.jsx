@@ -23,6 +23,7 @@ export default function Paywall({
   upgradeReason = '',
   upgradeFeature = '',
   onContinueFree,
+  paymentUnconfirmed = false,
 }) {
   const [email, setEmail] = useState(initialEmail || '');
   // Quem veio por imagem gerada precisa de um plano com imagens; para texto, o Essencial já resolve.
@@ -106,6 +107,21 @@ export default function Paywall({
         <div style={{ marginBottom: 16 }}>
           <BrandLogo height={isMobile ? 26 : 30} />
         </div>
+        {/* UX-03: voltou do pagamento e a assinatura ainda não foi confirmada. */}
+        {paymentUnconfirmed && (
+          <section role="alert" data-vc-payment-unconfirmed style={{
+            marginBottom: 20, padding: 16, borderRadius: 12, fontSize: 14, lineHeight: 1.5,
+            border: '1px solid rgba(255,196,87,0.6)', background: 'rgba(255,196,87,0.1)',
+          }}>
+            <strong style={{ display: 'block', marginBottom: 6 }}>Não pague de novo.</strong>
+            <p style={{ margin: '0 0 12px' }}>
+              Seu pagamento pode já ter sido aprovado, mas ainda não conseguimos confirmar a assinatura. Tente confirmar de novo em alguns instantes.
+            </p>
+            <button type="button" onClick={() => window.location.reload()} className="vc-btn vc-btn-primary" style={{ width: '100%', minHeight: 44 }}>
+              Tentar confirmar de novo
+            </button>
+          </section>
+        )}
         <p style={{
           margin: '0 0 8px',
           fontFamily: 'var(--font-mono, monospace)',

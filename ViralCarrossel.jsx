@@ -2956,6 +2956,7 @@ export default function App() {
     loginOpen, setLoginOpen,
     paywallEmail, setPaywallEmail,
     loginHint, setLoginHint,
+    billingUnconfirmed,
     access, setAccess,
     accessActive,
     accessFree,
@@ -8061,6 +8062,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
             isMobile={isMobile}
             initialEmail={paywallEmail || (accessFree ? access.email || '' : '')}
             loginHint={accessFree ? '' : loginHint}
+            paymentUnconfirmed={billingUnconfirmed}
             freeAccount={accessFree}
             upgradeReason={accessFree ? loginHint : ''}
             upgradeFeature={accessFree ? upgradeFeature : ''}

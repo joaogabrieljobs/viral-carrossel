@@ -9,6 +9,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   fetchAccessSession,
   isAccessSessionUnavailable,
+  billingReturnUnconfirmed,
   confirmCheckoutSessionWithRetry,
   clearPendingCheckoutSessionId,
   openBillingPortal,
@@ -328,6 +329,7 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
   const [loginOpen, setLoginOpen] = useState(false);
   const [paywallEmail, setPaywallEmail] = useState('');
   const [loginHint, setLoginHint] = useState('');
+  const [billingUnconfirmed, setBillingUnconfirmed] = useState(false);
   const [accountTab, setAccountTab] = useState('projects'); // projects | profile
   const [access, setAccess] = useState({ status: 'loading', active: false, email: null });
   const latestAccessRef = useRef(access);
@@ -476,7 +478,9 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
         } catch { /* */ }
       }
       if (billing === 'success' && session.active) clearPendingCheckoutSessionId();
-      if (billing === 'success' && confirmFailed && !session.active) {
+      if (billingReturnUnconfirmed({ billing, confirmFailed, sessionActive: session.active })) {
+        // UX-03: a tela de planos não desenha a pilha de avisos; ela recebe este estado.
+        setBillingUnconfirmed(true);
         // Fica na tela até a pessoa fechar (MOO-15): o pagamento pode ter sido feito.
         toast?.('Seu pagamento pode já ter sido aprovado, mas não conseguimos confirmar a assinatura agora. Recarregue esta página em alguns instantes para confirmar. Não pague de novo.', 'warning', 0);
       }
@@ -859,6 +863,7 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
     loginOpen, setLoginOpen,
     paywallEmail, setPaywallEmail,
     loginHint, setLoginHint,
+    billingUnconfirmed,
     access, setAccess,
     accessActive,
     accessFree,

@@ -96,6 +96,15 @@ export async function startCheckout(email, { tier = 'creator' } = {}) {
   return data;
 }
 
+/**
+ * UX-03: voltou do pagamento, a confirmação falhou e não há assinatura ativa.
+ * É a condição do aviso "Não pague de novo", que precisa aparecer também na
+ * tela de planos (quem assinou sem conta não chega ao editor).
+ */
+export function billingReturnUnconfirmed({ billing, confirmFailed, sessionActive } = {}) {
+  return billing === 'success' && confirmFailed === true && sessionActive !== true;
+}
+
 export async function confirmCheckoutSession(sessionId) {
   const pendingId = sessionId || readPendingCheckoutSessionId();
   const r = await fetch('/api/stripe/confirm', {
