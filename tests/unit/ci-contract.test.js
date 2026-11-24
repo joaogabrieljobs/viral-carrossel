@@ -23,4 +23,17 @@ describe('contrato de CI e publicação', () => {
     expect(guide).toContain('CI / deployment-gate');
     expect(guide).toContain('configurado no projeto hospedado');
   });
+
+  // MT-13: CLAUDE.md e README.md diziam "2 jobs: test + e2e". Quem lia a
+  // instrução conferia o check errado antes de considerar a publicação feita.
+  it('CLAUDE.md e README.md citam os três jobs e o check exigido', () => {
+    const jobNames = [...workflow.matchAll(/^  [a-z0-9-]+:\n\s+name: ([a-z0-9-]+)$/gm)].map((m) => m[1]);
+    expect(jobNames).toEqual(['quality', 'e2e', 'deployment-gate']);
+    for (const doc of ['CLAUDE.md', 'README.md']) {
+      const text = source(doc);
+      for (const job of jobNames) expect(text, `${doc} cita o job ${job}`).toContain(`\`${job}\``);
+      expect(text, `${doc} cita o check exigido`).toContain('CI / deployment-gate');
+      expect(text, `${doc} não fala mais em 2 jobs`).not.toMatch(/2 jobs/);
+    }
+  });
 });

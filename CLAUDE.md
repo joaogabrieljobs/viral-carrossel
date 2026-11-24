@@ -8,7 +8,7 @@ Studio de narrativas visuais com IA para comunicação e apresentações. Vite +
 - Tese de produto (duas profundidades): **docs/product/duas-profundidades-criacao.md** (Criar rápido × Controle profissional; Fatias 0–3)
 - Organização editorial: **docs/product/organizacao-calendario.md** (pastas, estados, data da pauta, calendário local e regras de backup)
 - Contratos atuais: **docs/engineering/controles-geracao-projeto.md** · docs/engineering/referencias-imagem-plano.md · docs/engineering/recuperacao-senha.md
-- Landing: **docs/LANDING-COPY.md**; preços/quotas vêm de `shared/plans.js`, texto incluso e chave própria opcional.
+- Landing: a que está no ar é `src/components/OnboardingLandingProduct.jsx`, carregada por `src/LandingFirst.jsx`; o texto vive no próprio componente. Preços, cotas e texto de cada plano vêm de `shared/plans.js`. `docs/LANDING-COPY.md` é documento histórico (descreve a landing anterior, sem rota) e não serve de spec.
 - Auditorias históricas: docs/audit.md (2026-08-07) · docs/audit-produto.md (2026-08-07) · docs/audit-ia-2026-09-15.md. Achados e linhas retratam a versão auditada; consultar revisões posteriores e o código atual antes de reutilizá-los.
 - Plano grátis (conta sem assinatura, sem IA, projetos no aparelho): **docs/product/plano-gratis.md**
 - Publicar modelo (galeria pública de estrutura visual): **docs/product/publicar-modelo.md**
@@ -29,4 +29,4 @@ O repositório é aninhado: o app vive em `viral-carrossel/viral-carrossel/`. A 
 
 - `npm test` — unit + integração (Vitest, `tests/unit` + `tests/integration`)
 - `npm run test:e2e` — Playwright contra `vite preview` (`tests/e2e`), `/api` sempre mockado
-- CI obrigatório verde antes de considerar deploy OK (2 jobs: test + e2e)
+- CI obrigatório verde antes de considerar deploy OK. São 3 jobs em `.github/workflows/ci.yml`: `quality` (acessibilidade estática, Vitest e build), `e2e` (Playwright) e `deployment-gate` (só aprova se os dois anteriores passarem). O check exigido é `CI / deployment-gate`; ver docs/engineering/ci-deployment-gate.md.

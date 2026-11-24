@@ -81,7 +81,7 @@ npm run test:e2e         # Playwright; APIs simuladas, sem créditos pagos
 npm run build
 ```
 
-O push para `main` aciona CI e deploy Vercel. Só considerar a publicação concluída depois dos jobs **test** e **e2e** aprovados e do domínio oficial apontar para a versão pronta.
+O push para `main` aciona CI e deploy Vercel. O CI tem 3 jobs: `quality` (acessibilidade estática, Vitest e build), `e2e` (Playwright) e `deployment-gate`, que só aprova quando os dois anteriores passam. Só considerar a publicação concluída depois do check **`CI / deployment-gate`** aprovado e do domínio oficial apontar para a versão pronta. Detalhes em [portão de CI e publicação](docs/engineering/ci-deployment-gate.md).
 
 Base publicada em 28/09/2026: `d2043b6`, **343 testes de código + 66 testes de navegador**. Contagens registram essa versão; a suíte pode crescer.
 
@@ -102,7 +102,7 @@ Base publicada em 28/09/2026: `d2043b6`, **343 testes de código + 66 testes de 
 - [Guia de projetos e geração](docs/product/guia-projetos-geracao.md)
 - [Organização por pastas e calendário editorial](docs/product/organizacao-calendario.md)
 - [Controles de geração e logo: contratos e testes](docs/engineering/controles-geracao-projeto.md)
-- [Copy da landing](docs/LANDING-COPY.md)
+- [Copy da landing anterior](docs/LANDING-COPY.md): documento histórico. A landing no ar é `src/components/OnboardingLandingProduct.jsx` e o texto vive no componente.
 - [Revisão editorial dos prompts](docs/revisao-prompts-texto.md)
 - [Revisão do kit por projeto — caso MUSA](docs/revisao-style-kit-musa.md)
 - [Referências de imagem do plano](docs/engineering/referencias-imagem-plano.md)
