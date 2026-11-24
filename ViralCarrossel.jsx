@@ -233,6 +233,7 @@ import {
   validateImportedPhotoFile,
 } from './src/utils/batch-photos.js';
 import { mergeGeneratedSlidesWithConcurrentMedia } from './src/utils/generation-media-merge.js';
+import { createLatestRequestGate, resolveOpenDocTarget } from './src/utils/operation-target.js';
 import { applyImportedTextToSlides } from './src/utils/import-text.js';
 import { creationMaterialOverages } from './src/utils/create-project-flow.js';
 import {
@@ -1556,6 +1557,8 @@ export default function App() {
       return false;
     }
   }, [deleteDocLocal, toast]);
+  const openDocGateRef = useRef(null);
+  if (!openDocGateRef.current) openDocGateRef.current = createLatestRequestGate();
   const openDoc = useCallback(async (docId) => {
     // Conta grátis: o projeto só existe neste navegador, não há versão remota a conferir.
     if (!PROJECTS_V2 || accessSessionRef.current?.free) return openDocLocal(docId);
@@ -1579,6 +1582,7 @@ export default function App() {
     if (unsavedInEditor) {
       // O projeto já está no editor. Reabrir pela biblioteca não pode
       // descartar a edição nem exigir um salvamento que ainda não terminou.
+      openDocGateRef.current.begin();
       setLibraryOpen(false);
       setShellView('project');
       return true;
@@ -1587,6 +1591,7 @@ export default function App() {
       toast('Salve as alterações deste projeto antes de abri-lo novamente.', 'warning', 5000);
       return false;
     }
+    const openToken = openDocGateRef.current.begin();
     setOpeningDocId(docId);
     try {
       const { getProject } = projectClient;
@@ -1602,6 +1607,14 @@ export default function App() {
         clearTimeout(openingTimer);
       }
       if (readDataOwner() !== owner || v2ObservedOwnerRef.current !== owner) return false;
+      // FE-07: a resposta pode chegar depois de a pessoa abrir outro projeto.
+      // Vale o projeto que está no editor agora; a abertura mais nova vence.
+      const openTarget = resolveOpenDocTarget({
+        docId,
+        activeDocId: editorSyncStateRef.current.activeDocId,
+        isLatest: openDocGateRef.current.isLatest(openToken),
+      });
+      if (openTarget === 'superseded') return false;
       const current = libraryPersistRef.current.find((project) => project.id === docId);
       const latestEditor = editorSyncStateRef.current;
       if (!current || (baseline && (baseline !== projectCacheFingerprint(current)
@@ -1632,7 +1645,7 @@ export default function App() {
       v2VersionsRef.current.set(docId, remote.version);
       v2BaselinesRef.current.set(docId, projectCacheFingerprint(readyEntry));
       setCloudReceipts(current => ({ ...current, [docId]:{ owner, at:Date.now(), fingerprint:projectCacheFingerprint(readyEntry) } }));
-      if (docId === activeDocId) {
+      if (openTarget === 'refresh-active') {
         // `openDocLocal` inclui um flush do doc em edição. Para o projeto que já
         // estava ativo, esse flush reporia a versão anterior sobre o GET novo.
         flushSync(() => {
@@ -1658,7 +1671,7 @@ export default function App() {
     } finally {
       setOpeningDocId((current) => current === docId ? null : current);
     }
-  }, [activeDocId, history.reset, openDocLocal, setShellView, toast]);
+  }, [history.reset, openDocLocal, setShellView, toast]);
   const askPromptRef = useRef(null);
   // Configuração isolada: nenhum projeto/identidade é alterado ao navegar
   // pelas páginas. O destino só nasce na confirmação final de geração.
