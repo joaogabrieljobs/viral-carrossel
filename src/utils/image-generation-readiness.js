@@ -22,7 +22,11 @@ export function imageGenerationAccess({ access = {}, useOwnImageKey = false, has
   if (quota?.available === false || quota?.status === 'unavailable') {
     return blocked('quota_unavailable', 'Não foi possível consultar seu saldo de imagens. Tente atualizar a página em instantes.');
   }
-  if (access.tier === 'essential' || (quota?.limit != null && Number(quota.limit) === 0)) {
+  // MT-09: quem decide é a quota que o servidor mandou. Isenção "Essencial sem
+  // limite de imagens" chega com limite positivo e pode gerar; o nome do plano
+  // só vale quando não veio limite nenhum.
+  const quotaLimit = quota?.limit != null ? Number(quota.limit) : null;
+  if (quotaLimit === 0 || (access.tier === 'essential' && !(quotaLimit > 0))) {
     return blocked('plan_without_images', 'Seu plano não inclui imagens. Faça upgrade ou use sua chave em Configurar IA.');
   }
   if (quota?.limit != null && quota?.remaining != null
