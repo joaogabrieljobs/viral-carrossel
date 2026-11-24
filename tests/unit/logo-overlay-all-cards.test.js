@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ensureDocShape, DEFAULT_BRAND, mkSlide } from '../../src/utils/doc-schema.js';
-import { applyCardSettingToAll, ownPhotoOverlay, LOGO_SIZE_IMPORT } from '../../src/utils/slide-logo.js';
+import { ownPhotoOverlay, LOGO_SIZE_IMPORT } from '../../src/utils/slide-logo.js';
+import { applyFormatEditToAll } from '../../src/utils/format-view.js';
 
 // Reteste 22/11 (WebExpresso, marca própria): logo entrava enorme e só se
 // ajustava card a card; duplicar voltava a logo a 260; o escurecimento 58 era
@@ -21,11 +22,12 @@ describe('logo e escurecimento', () => {
     expect(LOGO_SIZE_IMPORT).toBeLessThanOrEqual(200);
   });
   it('"usar em todos os cards" copia o ajuste para os outros cards', () => {
-    const slides = [{ id: 'a', logoSize: 300, overlay: 58 }, { id: 'b', logoSize: 120 }, { id: 'c' }];
-    expect(applyCardSettingToAll(slides, { logoSize: 140, logoOpacity: 80 })).toEqual([
+    // Auditoria 23/11 (FE-03): o ajuste vai pela proporção aberta; no Feed, grava no card.
+    const doc = { fmt: 'carrossel', slides: [{ id: 'a', logoSize: 300, overlay: 58 }, { id: 'b', logoSize: 120 }, { id: 'c' }] };
+    expect(applyFormatEditToAll(doc, { logoSize: 140, logoOpacity: 80 }).slides).toEqual([
       { id: 'a', logoSize: 140, logoOpacity: 80, overlay: 58 }, { id: 'b', logoSize: 140, logoOpacity: 80 }, { id: 'c', logoSize: 140, logoOpacity: 80 },
     ]);
-    expect(applyCardSettingToAll(slides, { overlay: 30 }).map(slide => slide.overlay)).toEqual([30, 30, 30]);
+    expect(applyFormatEditToAll(doc, { overlay: 30 }).slides.map(slide => slide.overlay)).toEqual([30, 30, 30]);
   });
   it('foto própria entra com escurecimento mais leve', () => {
     expect(ownPhotoOverlay(58)).toBe(40);

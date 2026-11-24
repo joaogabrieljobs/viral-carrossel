@@ -7724,6 +7724,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
     slide: panelSlide, slides, activeIdx, brand: sidebarBrand, setBrand:setSidebarBrand, updateSlide,
     onSaveBrandLogo: appMode === 'criador' ? saveQuickProjectLogo : editingCardVisual ? null : saveBrandLogo,
     setSlides,
+    // Ações "em todos os cards" do painel: um passo de desfazer, na proporção aberta.
+    editDoc: (transform) => history.set(transform),
     addSlide, deleteSlide, duplicateSlide, moveSlide, refineSlide, refining,
     generateCaption, genCaption, caption, setCaption, handleCopyCaption, handleExportPackage,
     setSetupOpen: setSetupOpenForSidebar,

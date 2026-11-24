@@ -1,5 +1,6 @@
 import { FORMATS } from './formats.js';
-import { LOGO_SIZE_MAX, LOGO_SIZE_MIN } from './slide-logo.js';
+import { LOGO_SIZE_MAX, LOGO_SIZE_MIN, applyLogoLayoutToSlides, resolveLogoControls } from './slide-logo.js';
+import { clearReplacedSlideAssets } from './cloud-media-merge.js';
 import { hasPresentationDesign, presentationForSocialFormat } from './presentation-format.js';
 import { restorePresentationPhotoComposition } from './presentation-composition.js';
 import { socialFormatPatch } from './social-visual-composition.js';
@@ -257,6 +258,78 @@ export function applyFormatEdit(doc, index, patch) {
     };
   }
   return next;
+}
+
+function isDerivedView(doc, slide) {
+  const fmt = FORMATS[doc.fmt] ? doc.fmt : 'carrossel';
+  return fmt !== 'carrossel' || hasPresentationDesign(slide, doc.creativePreset);
+}
+
+function withViewEntry(doc, slideId, entry) {
+  const fmt = FORMATS[doc.fmt] ? doc.fmt : 'carrossel';
+  const views = { ...(doc.formatViews || {}) };
+  const bucket = { ...(views[fmt] || {}) };
+  bucket.slides = { ...(bucket.slides || {}), [slideId]: entry };
+  views[fmt] = bucket;
+  return { ...doc, formatViews: views };
+}
+
+/**
+ * "Usar em todos os cards": o mesmo ajuste em cada card, pelo caminho do
+ * ajuste card a card. Fora do Feed e em apresentação ele fica na proporção
+ * aberta; gravar só no slide não mudava os cards já ajustados.
+ */
+export function applyFormatEditToAll(doc, patch, ids = null) {
+  if (!doc || !patch || typeof patch !== 'object') return doc;
+  const only = Array.isArray(ids) ? new Set(ids) : null;
+  return (Array.isArray(doc.slides) ? doc.slides : []).reduce((next, slide, index) => (
+    only && !only.has(slide?.id) ? next : applyFormatEdit(next, index, patch)
+  ), doc);
+}
+
+/** Origem sem arrasto: a vista perde o dela e anula o que herdaria da base. */
+function dropLogoOffsetInView(doc, index) {
+  const slide = doc.slides[index];
+  const entry = viewEntry(doc.formatViews, doc.fmt, slide.id) || {};
+  const offsets = { ...(entry.elementOffsets || {}) };
+  delete offsets.logo;
+  const next = entry.elementOffsets ? withViewEntry(doc, slide.id, { ...entry, elementOffsets: offsets }) : doc;
+  const inherited = slideForFormatDisplay(slide, next.fmt, next.formatViews, next.creativePreset)?.elementOffsets?.logo;
+  return inherited ? withViewEntry(doc, slide.id, { ...entry, elementOffsets: { ...offsets, logo: null } }) : next;
+}
+
+/**
+ * "Aplicar em todos" da logo. O arquivo é do card; posição, tamanho, opacidade
+ * e arrasto livre do card de origem valem na proporção aberta, como o ajuste
+ * feito card a card. `ids` limita aos cards selecionados.
+ */
+export function applyLogoToCards(doc, {
+  ids = null, logoImageId = null, logoImage = null, sourceSlide = {}, brand = {},
+} = {}) {
+  if (!doc) return doc;
+  const before = Array.isArray(doc.slides) ? doc.slides : [];
+  const only = Array.isArray(ids) ? new Set(ids) : null;
+  const hasAsset = !!(logoImageId || logoImage);
+  const sourceOffset = sourceSlide?.elementOffsets?.logo;
+  const hasOffset = !!sourceOffset && typeof sourceOffset === 'object';
+  let next = doc;
+  before.forEach((slide, index) => {
+    if (only && !only.has(slide?.id)) return;
+    const withAsset = hasAsset ? { ...slide, logoImageId, logoImage } : slide;
+    const derived = isDerivedView(doc, slide);
+    const card = derived ? withAsset : applyLogoLayoutToSlides([withAsset], { sourceSlide, brand })[0];
+    next = { ...next, slides: next.slides.map((item, i) => (i === index ? card : item)) };
+    if (!derived) return;
+    next = applyFormatEdit(next, index, {
+      ...resolveLogoControls(brand, sourceSlide),
+      logoSizeChosen: true,
+      logoHidden: false,
+      ...(hasOffset ? { elementOffsets: { logo: { ...sourceOffset } } } : {}),
+    });
+    if (!hasOffset) next = dropLogoOffsetInView(next, index);
+  });
+  if (next === doc) return doc;
+  return { ...next, slides: clearReplacedSlideAssets(before, next.slides) };
 }
 
 /** Ferramentas de composição operam sobre o que está na tela, inclusive em lote. */

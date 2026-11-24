@@ -1,6 +1,7 @@
 import { ApprovalPanel } from './panels/ApprovalPanel.jsx';
 import { SlideLogoPanel } from './panels/SlideLogoPanel.jsx';
-import { LOGO_SIZE_MIN, LOGO_SIZE_MAX, LOGO_SIZE_DEFAULT, applyCardSettingToAll, ownPhotoOverlay } from '../utils/slide-logo.js';
+import { LOGO_SIZE_MIN, LOGO_SIZE_MAX, LOGO_SIZE_DEFAULT, ownPhotoOverlay } from '../utils/slide-logo.js';
+import { applyFormatEditToAll } from '../utils/format-view.js';
 import { RemixPanel } from './panels/RemixPanel.jsx';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState, useLayoutEffect, useRef, useCallback } from 'react';
@@ -250,6 +251,7 @@ function SidebarContent({
   slide, slides, activeIdx, brand, setBrand, updateSlide,
   onSaveBrandLogo = null,
   setSlides = null,
+  editDoc = null,
   addSlide, deleteSlide, duplicateSlide, moveSlide, refineSlide, refining,
   handleCopyCaption, handleExportPackage,
   generateCaption, genCaption, caption, setCaption, setSetupOpen, setResearchOpen, fileInputRef,
@@ -1846,8 +1848,8 @@ function SidebarContent({
                     onChange={v=>updateSlide({bgZoom:v})}
                   />
                   <Slider label="Overlay escuro" value={slide.overlay} min={0} max={100} onChange={v=>updateSlide({overlay:v})}/>
-                  {setSlides ? <button type="button" className="vc-btn vc-btn-ghost" style={{ alignSelf:'flex-start', fontSize:12 }}
-                    onClick={() => { setSlides(current => applyCardSettingToAll(current, { overlay: slide.overlay })); toast?.('Escurecimento aplicado em todos os cards. Desfazer: Cmd+Z.', 'success'); }}>
+                  {editDoc ? <button type="button" className="vc-btn vc-btn-ghost" style={{ alignSelf:'flex-start', fontSize:12 }}
+                    onClick={() => { editDoc(d => applyFormatEditToAll(d, { overlay: slide.overlay })); toast?.('Escurecimento aplicado em todos os cards. Desfazer: Cmd+Z.', 'success'); }}>
                     Usar este escurecimento em todos os cards
                   </button> : null}
                   <Slider label="Opacidade" value={slide.bgOpacity} min={0} max={100} onChange={v=>updateSlide({bgOpacity:v})}/>
@@ -3046,6 +3048,7 @@ function SidebarContent({
                   brand={brand}
                   setBrand={setBrand}
                   setSlides={setSlides}
+                  editDoc={editDoc}
                   onSaveBrandLogo={onSaveBrandLogo}
                   cardIndex={activeIdx}
                   selectedSlideIds={selectedSlideIds}

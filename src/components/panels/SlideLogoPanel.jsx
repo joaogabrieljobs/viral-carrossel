@@ -6,10 +6,7 @@ import {
   resolveLogoControls,
   clearSlideLogoLayout,
   resolveLogoDataUrl,
-  applyLogoAssetToSlides,
-  applyLogoLayoutToSlides,
   stampLogoVisibleOnSlides,
-  hideLogoOnSlides,
   LOGO_SIZE_MIN,
   LOGO_SIZE_MAX,
   LOGO_SIZE_DEFAULT,
@@ -18,8 +15,8 @@ import {
   brandLogoReplacementPatch,
   clearLogoOffsetOnSlide,
   clearLogoOffsetOnSlides,
-  applyCardSettingToAll,
 } from '../../utils/slide-logo.js';
+import { applyFormatEditToAll, applyLogoToCards } from '../../utils/format-view.js';
 import { origemParaBlob } from '../../utils/image-store.js';
 import { Slider } from '../ui/primitives.jsx';
 
@@ -47,6 +44,7 @@ export function SlideLogoPanel({
   setBrand,
   onSaveBrandLogo = null,
   setSlides,
+  editDoc = null,
   cardIndex = 0,
   selectedSlideIds = null,
   cardOnly = false,
@@ -79,7 +77,7 @@ export function SlideLogoPanel({
 
   /** Aplica a logo em cards sem promover a logo específica do projeto ao perfil global. */
   const insertLogoOnAllCards = async (onlySelected = false) => {
-    if (!setSlides) {
+    if (!editDoc) {
       toast?.('Não foi possível aplicar a logo em todos os cards.', 'error');
       return;
     }
@@ -106,21 +104,16 @@ export function SlideLogoPanel({
         logoImage = stored.logoImage;
       }
       if (!alive.current) return;
-      setSlides((list) => {
-        // Mesmo quando a origem é a marca, substituir as cópias antigas dos
-        // destinos. Apenas desocultar deixava overrides vazios bloqueando-a.
-        const withAsset = applyLogoAssetToSlides(list, {
-          ids,
-          logoImageId,
-          logoImage,
-          hideUnselected: false,
-        });
-        return applyLogoLayoutToSlides(withAsset, {
-          sourceSlide: slide,
-          brand,
-          ids,
-        });
-      });
+      // Mesmo quando a origem é a marca, substituir as cópias antigas dos
+      // destinos. Apenas desocultar deixava overrides vazios bloqueando-a.
+      // O ajuste vai pela proporção aberta, como o feito card a card.
+      editDoc((d) => applyLogoToCards(d, {
+        ids,
+        logoImageId,
+        logoImage,
+        sourceSlide: slide,
+        brand,
+      }));
       if (!onlySelected) setStyleKit?.((prev) => ({ ...prev, logoOnGenerate: true }));
       toast?.(
         ids
@@ -137,13 +130,13 @@ export function SlideLogoPanel({
   };
 
   const removeLogoFromCards = (onlySelected = false) => {
-    if (!setSlides) return;
+    if (!editDoc) return;
     const ids = onlySelected && selectedSlideIds?.length ? selectedSlideIds : null;
     if (onlySelected && !ids?.length) {
       toast?.('Selecione cards na lista para remover a logo só neles.', 'info');
       return;
     }
-    setSlides((list) => hideLogoOnSlides(list, ids));
+    editDoc((d) => applyFormatEditToAll(d, { logoHidden: true }, ids));
     toast?.(
       ids
         ? `Logo ocultada em ${ids.length} card${ids.length === 1 ? '' : 's'}. Desfazer: Cmd+Z.`
@@ -357,7 +350,7 @@ export function SlideLogoPanel({
           </>
         ) : null}
 
-        {hasLogoSource && setSlides ? (
+        {hasLogoSource && editDoc ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <button
               type="button"
@@ -505,9 +498,9 @@ export function SlideLogoPanel({
               max={100}
               onChange={(v) => setCardLayout({ logoOpacity: v })}
             />
-            {setSlides ? <button type="button" className="vc-btn vc-btn-ghost" style={{ alignSelf: 'flex-start', fontSize: 12 }}
+            {editDoc ? <button type="button" className="vc-btn vc-btn-ghost" style={{ alignSelf: 'flex-start', fontSize: 12 }}
               onClick={() => {
-                setSlides((current) => applyCardSettingToAll(current, { logoSize: ctrl.logoSize, logoSizeChosen: true, logoOpacity: ctrl.logoOpacity }));
+                editDoc((d) => applyFormatEditToAll(d, { logoSize: ctrl.logoSize, logoSizeChosen: true, logoOpacity: ctrl.logoOpacity }));
                 toast?.('Tamanho e opacidade da logo aplicados em todos os cards. Desfazer: Cmd+Z.', 'success');
               }}>
               Usar tamanho e opacidade em todos os cards
