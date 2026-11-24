@@ -1516,7 +1516,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
           ink={displaySubtitleInk}
           accentColor={cultureAccentCol}
           fontFamily={subtitleFF}
-          fontSize={f.w * 0.028 * (slide.subSize / 100)}
+          fontSize={f.w * 0.028 * ((slide.subSize ?? 100) / 100)}
           lineHeight={(slide.subLeading ?? 150) / 100}
           fontWeight={brand.subtitleWeight ?? 400}
           letterSpacing={`${(-1 + (slide.subTracking ?? 0)) / 100}em`}
@@ -1526,7 +1526,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
     ) : (
       <p style={{
         color: displaySubtitleInk, fontFamily: subtitleFF,
-        fontSize: f.w * 0.028 * (slide.subSize / 100),
+        fontSize: f.w * 0.028 * ((slide.subSize ?? 100) / 100),
         lineHeight: (slide.subLeading ?? 150) / 100,
         fontWeight: brand.subtitleWeight ?? 400, margin: 0,
         letterSpacing: `${(-1 + (slide.subTracking ?? 0)) / 100}em`,
@@ -2763,7 +2763,7 @@ const SlideCardInner = React.forwardRef(({
             ink={slide.subtitleColor || inkIfReadable(cr.subtitleInk, bgSolid, cr.subtitleInk, 3)}
             accentColor={cr.accentInk}
             fontFamily={subtitleFF}
-            fontSize={f.w * 0.031 * (slide.subSize / 100) * topScale}
+            fontSize={f.w * 0.031 * ((slide.subSize ?? 100) / 100) * topScale}
             lineHeight={(slide.subLeading ?? 150) / 100}
             fontWeight={brand.subtitleWeight ?? 600}
             letterSpacing={`${(-1 + (slide.subTracking ?? 0)) / 100}em`}
@@ -3805,7 +3805,7 @@ const SlideCardInner = React.forwardRef(({
                       ink={displaySubtitleInk}
                       accentColor={cultureAccentCol}
                       fontFamily={subtitleFF}
-                      fontSize={f.w*0.028*(slide.subSize/100)}
+                      fontSize={f.w*0.028*((slide.subSize ?? 100)/100)}
                       lineHeight={(slide.subLeading ?? 150)/100}
                       fontWeight={brand.subtitleWeight ?? 400}
                       letterSpacing={`${(-1 + (slide.subTracking ?? 0)) / 100}em`}
@@ -3815,7 +3815,7 @@ const SlideCardInner = React.forwardRef(({
                 ) : (
                 <InlineEditableText as="p" value={slide.subtitle} onCommit={(text) => commitInlineText('subtitle', text)} elementProps={mov('subtitle', {
                   color: displaySubtitleInk, fontFamily: subtitleFF,
-                  fontSize:f.w*0.028*(slide.subSize/100),
+                  fontSize:f.w*0.028*((slide.subSize ?? 100)/100),
                   lineHeight:(slide.subLeading ?? 150)/100,
                   fontWeight: brand.subtitleWeight ?? 400,
                   margin:0,
