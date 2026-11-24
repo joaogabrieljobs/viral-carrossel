@@ -233,7 +233,7 @@ import {
   validateImportedPhotoFile,
 } from './src/utils/batch-photos.js';
 import { mergeGeneratedSlidesWithConcurrentMedia } from './src/utils/generation-media-merge.js';
-import { createLatestRequestGate, isSameOpenProject, resolveOpenDocTarget } from './src/utils/operation-target.js';
+import { createLatestRequestGate, isSameOpenProject, resolveOpenDocTarget, teamPullDestination } from './src/utils/operation-target.js';
 import { applyImportedTextToSlides } from './src/utils/import-text.js';
 import { creationMaterialOverages } from './src/utils/create-project-flow.js';
 import {
@@ -4700,7 +4700,10 @@ export default function App() {
 
   const handleTeamDocPulled = useCallback(async (payload) => {
     if (!payload?.doc || typeof payload.doc !== 'object') return;
+    // FE-09: o destino é o projeto aberto quando a pessoa pediu para receber.
+    const targetDocId = activeDocId;
     const { hydrateSharedDocImages, teamShareDocumentsDiffer } = await import('./src/utils/project-share.js');
+    if (!isSameOpenProject(targetDocId, editorSyncStateRef.current?.activeDocId)) return { cancelled: true };
     const localDoc = editorSyncStateRef.current?.doc || history.state;
     if (teamShareDocumentsDiffer(localDoc, payload.doc)
       && typeof window !== 'undefined'
@@ -4717,18 +4720,23 @@ export default function App() {
       shareRevision: payload.revision ?? hydrated.shareRevision ?? 0,
       shareUpdatedAt: payload.updatedAt ?? Date.now(),
     });
-    history.reset(shaped);
-    const currentEditor = editorSyncStateRef.current;
-    editorSyncStateRef.current = {
-      ...(currentEditor || {}),
-      activeDocId,
-      doc: shaped,
-    };
+    // Durante o download das fotos a pessoa pode ter aberto outro projeto. O
+    // recebido vai para a entrada de origem; o editor só muda se ela continua aberta.
+    const destination = teamPullDestination({ targetDocId, activeDocId: editorSyncStateRef.current?.activeDocId });
+    if (destination.applyToEditor) {
+      history.reset(shaped);
+      const currentEditor = editorSyncStateRef.current;
+      editorSyncStateRef.current = {
+        ...(currentEditor || {}),
+        activeDocId: targetDocId,
+        doc: shaped,
+      };
+    }
     libraryPersistRef.current = (libraryPersistRef.current || []).map((entry) => (
-      entry.id === activeDocId ? { ...entry, doc: shaped, updatedAt: Date.now() } : entry
+      entry.id === destination.entryId ? { ...entry, doc: shaped, updatedAt: Date.now() } : entry
     ));
     setLibrary(libraryPersistRef.current);
-    const current = libraryPersistRef.current.find((entry) => entry.id === activeDocId);
+    const current = libraryPersistRef.current.find((entry) => entry.id === destination.entryId);
     let queued = true;
     if (current) {
       try {
@@ -4737,7 +4745,7 @@ export default function App() {
         queued = false;
       }
     }
-    setActiveIdx(0);
+    if (destination.applyToEditor) setActiveIdx(0);
     const failed = (shaped.slides || []).filter((slide) => slide.bgImageFailed).length;
     return { failed, queued };
   }, [activeDocId, history, queueProjectForAccount]);

@@ -35,3 +35,12 @@ export function resolveOpenDocTarget({ docId, activeDocId, isLatest }) {
 export function isSameOpenProject(startedProjectId, currentProjectId) {
   return startedProjectId === currentProjectId;
 }
+
+/**
+ * "Receber alterações da equipe": onde gravar o documento recebido depois do
+ * download das fotos. A entrada de origem sempre recebe, porque foi nela que a
+ * pessoa confirmou. O editor só recebe se esse projeto continua aberto.
+ */
+export function teamPullDestination({ targetDocId, activeDocId }) {
+  return { entryId: targetDocId, applyToEditor: isSameOpenProject(targetDocId, activeDocId) };
+}
