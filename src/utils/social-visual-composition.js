@@ -207,7 +207,7 @@ export function applySocialVisualCompositionV3(slides, { preset, photoRegion = '
 }
 
 /** Marcas que a composição grava no card; sem as caixas elas não significam nada. */
-const SOCIAL_COMPOSITION_FIELDS = ['socialComposition', 'socialCompositionVersion', 'socialVisualPresetId', 'socialZoneAnchors', 'overlayMode', 'socialScrimTop', 'socialArt', 'socialFunction', 'socialFamily', 'socialPhotoTreatment', 'titleItalic', 'subtitleWeight', 'hideFooterPill', 'subtitleCase', 'subtitleItalic'];
+export const SOCIAL_COMPOSITION_FIELDS = ['socialComposition', 'socialCompositionVersion', 'socialVisualPresetId', 'socialZoneAnchors', 'overlayMode', 'socialScrimTop', 'socialArt', 'socialFunction', 'socialFamily', 'socialPhotoTreatment', 'titleItalic', 'subtitleWeight', 'hideFooterPill', 'subtitleCase', 'subtitleItalic'];
 
 /**
  * Troca de padrão num projeto já gerado.

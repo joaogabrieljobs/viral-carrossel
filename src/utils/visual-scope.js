@@ -1,8 +1,9 @@
-import { applyVisualPreset, getSlideOverridesForPreset } from '../styles/visual-presets.jsx';
+import { applyVisualPreset, getSlideOverridesForPreset, PRESET_BRAND_SIGNATURE_KEYS } from '../styles/visual-presets.jsx';
 import { applyPresentationVisualPresetToDoc } from './presentation-state.js';
 import { sanitizeCustomVisualPresetBrand } from './custom-visual-presets.js';
 import { suggestCreativePresetForVisual } from './slide-design-system.js';
-import { applyFormatEdit, applyBrandEdit, brandForFormatDisplay, slideForFormatDisplay } from './format-view.js';
+import { applyFormatEdit, applyBrandEdit, brandForFormatDisplay, slideForFormatDisplay, transformFormatVisuals } from './format-view.js';
+import { dropKeysFromFormatViews } from './format-view-keys.js';
 
 const CONTENT_KEYS = ['id', 'title', 'subtitle', 'bodyAfterImage', 'eyebrowText', 'strikethroughText', 'afterTitleText', 'caption', 'bgImage', 'bgImageId', 'bgImageAssetId', 'imageQuery', 'overlays'];
 
@@ -58,4 +59,18 @@ export function applyVisualPresetToCard(doc, index, preset, presets) {
     visualPresetId: preset.id,
     visualCreativePreset: preset.socialFamily ? doc.creativePreset : (preset.creativePreset || suggestCreativePresetForVisual(preset.id) || doc.creativePreset),
   });
+}
+
+/**
+ * Antes de um padrão valer para todos os cards: sai o estilo próprio de cada
+ * card na proporção aberta e, em toda proporção, as cores e fontes que o
+ * padrão define (a vista guardava o valor antigo e vencia o novo). A logo não
+ * é do padrão: posição, tamanho e opacidade por proporção continuam.
+ */
+export function clearOwnVisualsBeforePresetOnAll(doc, preset) {
+  const cleared = transformFormatVisuals(doc, items => items.map(item => ({ ...item, visualBrand:null, visualPresetId:null, visualCreativePreset:null })));
+  const brandKeys = [...Object.keys(preset?.brand || {}), ...PRESET_BRAND_SIGNATURE_KEYS]
+    .filter(key => !key.startsWith('logo'));
+  const formatViews = dropKeysFromFormatViews(cleared.formatViews, { brandKeys });
+  return formatViews === cleared.formatViews ? cleared : { ...cleared, formatViews };
 }

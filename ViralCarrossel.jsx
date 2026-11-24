@@ -3,7 +3,7 @@ import { ensurePresentationFonts } from './src/utils/presentation-font-manifest.
 import { copyTextToClipboard } from './src/utils/export-package.js';
 import { GenerationScopePicker } from './src/components/GenerationScopePicker.jsx';
 import { joinSlideCaptions } from './src/utils/import-text.js';
-import { applyVisualPresetToCard, editCardVisualBrand, preserveVisualPresetContent } from './src/utils/visual-scope.js';
+import { applyVisualPresetToCard, clearOwnVisualsBeforePresetOnAll, editCardVisualBrand, preserveVisualPresetContent } from './src/utils/visual-scope.js';
 import { ProjectSaveStatus } from './src/components/ProjectSaveStatus.jsx';
 import CardThumbnail from './src/components/card/CardThumbnail.jsx';
 import { cloudSyncFailureMessage, freePlanSaveFeedback, isModuleLoadError } from './src/utils/cloud-sync-feedback.js';
@@ -1460,7 +1460,7 @@ export default function App() {
       if (scope === 'card') return applyVisualPresetToCard(d, index, preset, visualPresets);
       totalCards = Array.isArray(d.slides) ? d.slides.length : 0;
       replacedOwnVisuals = countSlidesWithOwnVisuals(d.slides);
-      d = transformFormatVisuals(d, items => items.map(item => ({ ...item, visualBrand:null, visualPresetId:null, visualCreativePreset:null })));
+      d = clearOwnVisualsBeforePresetOnAll(d, preset);
       if (isPresentationVisual) {
         return preserveVisualPresetContent(applyPresentationVisualPresetToDoc(d, resolvedPresetId, visualPresets, {
           initialize: d.productKind !== 'apresentacao' || !isApresentacaoPreset(d.creativePreset),

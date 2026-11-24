@@ -16,6 +16,7 @@ import {
   sanitizeCustomVisualPresetBrand,
   sanitizeCustomVisualPresetSlideDefaults,
 } from './custom-visual-presets.js';
+import { dropKeysFromFormatViews } from './format-view-keys.js';
 
 export const TEMPLATE_VERSION = 1;
 export const TEMPLATE_FORMATS = ['carrossel', 'quadrado', 'stories', 'apresentacao'];
@@ -49,7 +50,13 @@ export const TEMPLATE_SLIDE_FIELDS = [
 /** Ajustes por card que vêm de outro estilo e precisam sair para o modelo valer. */
 const SLIDE_STYLE_OVERRIDES = [
   'visualBrand', 'visualPresetId', 'visualCreativePreset',
+  // Todas as marcas da composição social (a mesma lista de
+  // SOCIAL_COMPOSITION_FIELDS). Com só quatro delas, o véu, o selo e os
+  // ornamentos do estilo anterior continuavam desenhados sobre o modelo.
   'socialComposition', 'socialCompositionVersion', 'socialVisualPresetId', 'socialZoneAnchors',
+  'overlayMode', 'socialScrimTop', 'socialArt', 'socialFunction', 'socialFamily',
+  'socialPhotoTreatment', 'titleItalic', 'subtitleWeight', 'hideFooterPill',
+  'subtitleCase', 'subtitleItalic',
 ];
 
 const TOKEN_ONLY = /^(?:\s|\{handle\}|\{marca\}|\{ano\}|[·•|/–—\-])*$/i;
@@ -190,11 +197,19 @@ export function applyTemplateToDoc(doc = {}, rawContent) {
     const { role, ...visual } = template;
     return { ...next, ...structuredCloneSafe(visual) };
   });
+  // O que a pessoa ajustou numa proporção (em apresentação, tudo) vencia o
+  // modelo: o aviso dizia aplicado e a tela ficava igual. Logo e recorte da
+  // foto não são do modelo e continuam.
+  const formatViews = dropKeysFromFormatViews(doc.formatViews, {
+    brandKeys: Object.keys(content.brand || {}),
+    slideKeys: [...TEMPLATE_SLIDE_FIELDS, ...SLIDE_STYLE_OVERRIDES],
+  });
   return {
     ...doc,
     brand: { ...(doc.brand || {}), ...structuredCloneSafe(content.brand) },
     slides: nextSlides,
     visualPreset: null,
+    ...(formatViews !== doc.formatViews ? { formatViews } : {}),
   };
 }
 
