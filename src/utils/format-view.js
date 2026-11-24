@@ -1,6 +1,7 @@
 import { FORMATS } from './formats.js';
 import { LOGO_SIZE_MAX, LOGO_SIZE_MIN, applyLogoLayoutToSlides, resolveLogoControls } from './slide-logo.js';
 import { clearReplacedSlideAssets } from './cloud-media-merge.js';
+import { slideImageIdentity } from './image-store.js';
 import { hasPresentationDesign, presentationForSocialFormat } from './presentation-format.js';
 import { restorePresentationPhotoComposition } from './presentation-composition.js';
 import { socialFormatPatch } from './social-visual-composition.js';
@@ -25,6 +26,9 @@ const BRAND_KEYS = [
 ];
 
 const OVERLAY_CONTENT_KEYS = ['text', 'label', 'href', 'type'];
+
+/** Recorte da foto. Vale para uma imagem; a foto nova não o herda. */
+const PHOTO_FRAMING_KEYS = ['photoFraming', 'bgFit', 'bgX', 'bgY', 'bgZoom', 'bgMirror'];
 
 function hexToRgb(hex) {
   let s = String(hex || '').replace('#', '').trim();
@@ -200,6 +204,70 @@ export function logoRenderPx(fmt, frameW, logoSize) {
   return height * (0.12 + t * 0.5);
 }
 
+/** Patch de troca de foto: imagem nova com enquadramento automático (`automaticPhotoFramingPatch`). */
+function isPhotoSwap(slide, patch) {
+  if (patch.photoFraming !== 'auto' || (!patch.bgImageId && !patch.bgImage)) return false;
+  return slideImageIdentity({ ...slide, ...patch }) !== slideImageIdentity(slide);
+}
+
+/** Tira de todas as proporções o recorte que o card guardava para a foto antiga. */
+function dropPhotoFramingFromViews(formatViews, slideId) {
+  let views = formatViews;
+  for (const [fmt, bucket] of Object.entries(formatViews || {})) {
+    const entry = bucket?.slides?.[slideId];
+    if (!entry || typeof entry !== 'object') continue;
+    const hasOffset = !!entry.elementOffsets && Object.hasOwn(entry.elementOffsets, 'photo');
+    if (!hasOffset && !PHOTO_FRAMING_KEYS.some(key => Object.hasOwn(entry, key))) continue;
+    const kept = { ...entry };
+    for (const key of PHOTO_FRAMING_KEYS) delete kept[key];
+    if (hasOffset) {
+      kept.elementOffsets = { ...entry.elementOffsets };
+      delete kept.elementOffsets.photo;
+    }
+    views = { ...views, [fmt]: { ...bucket, slides: { ...bucket.slides, [slideId]: kept } } };
+  }
+  return views;
+}
+
+/**
+ * Troca de foto por `updateSlide` (importação, recorte). O enquadramento que
+ * veio com a foto nova fica no slide e nenhuma proporção guarda o da antiga:
+ * antes só o formato aberto era limpo, e os outros mostravam a foto nova com
+ * o zoom e a posição da anterior.
+ */
+function settlePhotoSwap(doc, index, patch) {
+  const framing = {};
+  for (const key of PHOTO_FRAMING_KEYS) if (patch[key] !== undefined) framing[key] = patch[key];
+  const photoOffset = patch.elementOffsets?.photo;
+  const slides = doc.slides.map((item, i) => (i !== index ? item : {
+    ...item,
+    ...framing,
+    ...(photoOffset ? { elementOffsets: { ...(item.elementOffsets || {}), photo: photoOffset } } : {}),
+  }));
+  const formatViews = dropPhotoFramingFromViews(doc.formatViews, doc.slides[index].id);
+  return { ...doc, slides, ...(formatViews !== doc.formatViews ? { formatViews } : {}) };
+}
+
+/**
+ * Troca de foto gravada direto na lista de slides (imagem de IA, importação
+ * em lote). Compara a foto de cada card antes e depois e tira das vistas o
+ * recorte da foto antiga. Só para gravações que são troca de foto: recarregar
+ * ou guardar no aparelho a mesma imagem também muda o endereço dela.
+ */
+export function applyPhotoSwapSlides(doc, nextSlides) {
+  if (!doc || !Array.isArray(nextSlides)) return doc;
+  const before = new Map((doc.slides || []).map(slide => [slide?.id, slide]));
+  let formatViews = doc.formatViews;
+  for (const slide of nextSlides) {
+    const old = before.get(slide?.id);
+    if (!old || slide.photoFraming !== 'auto') continue;
+    const identity = slideImageIdentity(slide);
+    if (identity === 'none' || identity === slideImageIdentity(old)) continue;
+    formatViews = dropPhotoFramingFromViews(formatViews, slide.id);
+  }
+  return { ...doc, slides: nextSlides, ...(formatViews !== doc.formatViews ? { formatViews } : {}) };
+}
+
 /**
  * Edição visual numa vista derivada vai para o mapa dessa proporção.
  * Em apresentações, o feed também é derivado; o original não muda.
@@ -257,7 +325,7 @@ export function applyFormatEdit(doc, index, patch) {
       }),
     };
   }
-  return next;
+  return isPhotoSwap(slide, patch) ? settlePhotoSwap(next, index, patch) : next;
 }
 
 function isDerivedView(doc, slide) {

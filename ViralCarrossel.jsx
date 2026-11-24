@@ -140,7 +140,7 @@ import * as accountLibraryMeta from './src/utils/account-library-meta.js';
 import { FORMATS } from './src/utils/formats.js';
 import { usePhotoFraming } from './src/hooks/usePhotoFraming.js';
 import { automaticPhotoFramingPatch } from './src/utils/photo-framing.js';
-import { applyBrandEdit, applyFormatEdit, brandForFormatDisplay, duplicateSlideInDoc, slideForFormatDisplay, transformFormatVisuals } from './src/utils/format-view.js';
+import { applyBrandEdit, applyFormatEdit, applyPhotoSwapSlides, brandForFormatDisplay, duplicateSlideInDoc, slideForFormatDisplay, transformFormatVisuals } from './src/utils/format-view.js';
 import { PALETTES, TITLE_FONTS, TEMPLATES } from './src/utils/design-data.js';
 import { getServerStatus } from './src/utils/server-status.js';
 import {
@@ -1250,6 +1250,11 @@ export default function App() {
     ...d,
     slides: clearReplacedSlideAssets(d.slides, typeof next === 'function' ? next(d.slides) : next),
   })), [history]);
+  // Troca de foto pela lista de slides (IA, importação em lote): o recorte
+  // manual da foto antiga sai também das outras proporções.
+  const setSlidesPhotoSwap = useCallback(next => history.set((d) => applyPhotoSwapSlides(
+    d, clearReplacedSlideAssets(d.slides, next(d.slides)),
+  )), [history]);
   const setBrand = useCallback(
     (next) =>
       history.set((d) => {
@@ -4985,7 +4990,7 @@ export default function App() {
           const partial = urls.filter((p) => p && (p.bgImage || p.bgImageId));
           if (partial.length) {
             const isPresentation = activeProductKind === 'apresentacao';
-            setSlides((prev) => applyBatchPhotosToSlides(prev, urls, mkSlide, brand, { isPresentation }));
+            setSlidesPhotoSwap((prev) => applyBatchPhotosToSlides(prev, urls, mkSlide, brand, { isPresentation }));
             setActiveIdx(0);
             toast(`${partial.length} foto${partial.length === 1 ? '' : 's'} aplicada${partial.length === 1 ? '' : 's'} antes do cancelamento.`, 'info', 4500);
           }
@@ -4998,7 +5003,7 @@ export default function App() {
         const validCount = urls.filter((p) => p && (p.bgImage || p.bgImageId)).length;
 
         if (validCount > 0) {
-          setSlides((prev) => applyBatchPhotosToSlides(
+          setSlidesPhotoSwap((prev) => applyBatchPhotosToSlides(
             prev,
             urls,
             mkSlide,
@@ -5033,7 +5038,7 @@ export default function App() {
         }
       }
     })();
-  }, [activeProductKind, brand, setSlides, toast]);
+  }, [activeProductKind, brand, setSlidesPhotoSwap, toast]);
 
   const enableCanvasLayout = useCallback(() => {
     // Reutiliza zonas guardadas — antes repunha os defaults e perdia a foto ajustada (bug 2026-09-15).
@@ -5265,7 +5270,7 @@ export default function App() {
         if (patchImg.bgImageId) imageDelete(patchImg.bgImageId).catch(() => {});
         return { ok: false, reason: 'stale_target', slideId };
       }
-      setSlides(prev => activeProjectRef.current !== generationProjectId ? prev : applySlidePatchIfImageCurrent(prev, {
+      setSlidesPhotoSwap(prev => activeProjectRef.current !== generationProjectId ? prev : applySlidePatchIfImageCurrent(prev, {
         id: slideId,
         expectedImageIdentity,
         patch: automaticPhotoFramingPatch({
@@ -5304,7 +5309,7 @@ export default function App() {
         return next;
       });
     }
-  }, [slides, fmt, imageGenerationAvailability, openaiKey, imgParams, styleKit, setSlides, toast, activeEntry?.name, doc.visualBible]);
+  }, [slides, fmt, imageGenerationAvailability, openaiKey, imgParams, styleKit, setSlides, setSlidesPhotoSwap, toast, activeEntry?.name, doc.visualBible]);
 
   useEffect(() => {
     const onQuota = (ev) => {
