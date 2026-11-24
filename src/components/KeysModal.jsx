@@ -10,6 +10,7 @@ import {
   TEXT_PROVIDERS,
 } from '../config/ai-providers.js';
 import { useModalDialog } from '../hooks/useModalDialog.js';
+import { PLAN_TIERS } from '../../shared/plans.js';
 
 const PRESETS = [
   {
@@ -261,7 +262,7 @@ export default function KeysModal({
                 Configurar IA
               </h2>
               <p style={{ margin: '3px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>
-                Texto e imagens inclusos no plano com a Moont AI. Chave própria é opcional.
+                Texto incluso no plano com a Moont AI. Imagens inclusas a partir do Plano Criador. Chave própria é opcional.
               </p>
             </div>
           </div>
@@ -439,7 +440,7 @@ export default function KeysModal({
                       <div className="vc-label" style={{ marginBottom: 8 }}>Imagens do plano</div>
                       <p style={{ margin: '0 0 12px', fontSize: 12, lineHeight: 1.45, color: 'var(--text-muted)' }}>
                         Nos planos Criador, Pro e Max as imagens já estão inclusas — gera direto no editor.
-                        No Essencial (R$ 19,90), ative abaixo sua própria chave para gerar imagens.
+                        No Essencial ({PLAN_TIERS.essential.priceLabel}), ative abaixo sua própria chave para gerar imagens.
                       </p>
                       <label style={{
                         display: 'flex',

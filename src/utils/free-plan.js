@@ -138,7 +138,7 @@ export const PLAN_REQUIRED_MESSAGES = {
   keys: 'Usar chave própria de IA faz parte dos planos pagos.',
   share: 'Compartilhar com a equipe faz parte dos planos pagos.',
   agents: 'Conectar assistentes faz parte dos planos pagos.',
-  projects: `O plano grátis guarda até ${FREE_PROJECT_LIMIT} projetos. Assine para criar sem limite.`,
+  projects: `O plano grátis guarda até ${FREE_PROJECT_LIMIT} projetos. Assine para criar mais projetos e guardá-los na conta.`,
 };
 
 export function planRequiredError(feature = 'text') {
