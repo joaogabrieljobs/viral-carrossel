@@ -19,6 +19,11 @@ const ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
 const fail = (code, message, status = 400, extra = {}) => Object.assign(new Error(message), { code, status, ...extra });
 
+/** Mesma resposta nas duas checagens do limite do dia (linhas da tabela e contador). */
+export function templateDailyLimitError() {
+  return fail('template_daily_limit', `Cada conta publica até ${MAX_PUBLISHES_PER_DAY} modelos por dia. Tente amanhã.`, 429, { limit: MAX_PUBLISHES_PER_DAY });
+}
+
 export function newTemplateId() {
   const bytes = randomBytes(20);
   let id = 'tpl_';
@@ -153,7 +158,7 @@ export function createPublishedTemplatesStore({ sql: injectedSql } = {}) {
         throw fail('template_owner_limit', `Cada conta publica até ${MAX_PUBLISHED_PER_OWNER} modelos. Apague um para publicar outro.`, 409, { limit: MAX_PUBLISHED_PER_OWNER });
       }
       if (Number(counts?.today || 0) >= MAX_PUBLISHES_PER_DAY) {
-        throw fail('template_daily_limit', `Cada conta publica até ${MAX_PUBLISHES_PER_DAY} modelos por dia. Tente amanhã.`, 429, { limit: MAX_PUBLISHES_PER_DAY });
+        throw templateDailyLimitError();
       }
       const rows = await tx.unsafe(`/* templates_insert */
         INSERT INTO moont.published_templates

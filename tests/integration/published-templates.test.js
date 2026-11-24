@@ -188,6 +188,8 @@ describe('publicar modelo — limites e moderação', () => {
     await sql.unsafe("UPDATE moont.published_templates SET created_at = now() - interval '3 days' WHERE owner_id = $1", [A]);
     for (let i = 0; i < MAX_PUBLISHED_PER_OWNER - MAX_PUBLISHES_PER_DAY; i += 1) expect((await publicar(A, { name: `N${i}` })).statusCode).toBe(201);
     await sql.unsafe("UPDATE moont.published_templates SET created_at = now() - interval '3 days' WHERE owner_id = $1", [A]);
+    // Os dias "passaram" só no banco: zera também o contador do dia (DB-11).
+    resetRateLimits();
     const decimoPrimeiro = await publicar(A, { name: 'onze' });
     expect(decimoPrimeiro.statusCode).toBe(409);
     expect(decimoPrimeiro.body.code).toBe('template_owner_limit');

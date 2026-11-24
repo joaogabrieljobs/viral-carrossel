@@ -96,7 +96,7 @@ Publicar, listar, aplicar e despublicar funcionam de ponta a ponta entre duas co
 Regras implementadas:
 - O servidor reconstrói o modelo por lista permitida antes de gravar; texto livre de ornamento só passa se for marcador. Limite de 48 KB.
 - Escrita compara o dono no SQL; modelo alheio responde 404. `owner_id` e contagem de denúncias nunca saem na resposta.
-- Limites por conta: 10 modelos publicados e 5 publicações a cada 24 h; 10 publicações por minuto.
+- Limites por conta: 10 modelos publicados e 5 publicações a cada 24 h; 10 publicações por minuto. Apagar o modelo não devolve a publicação do dia: além das linhas da tabela, um contador próprio (janela fixa de 24 h, `api/templates.js`) conta as publicações aceitas na validação.
 - Denúncia: uma por conta e modelo; ninguém denuncia o próprio. Só soma para ocultar a denúncia de conta com assinatura ativa ou isenção (`api/templates.js`, `reportCountsTowardHide`); com 3 dessas o modelo sai da galeria (`status = 'hidden'`) e a autora vê "em revisão". Denúncia de conta grátis fica registrada e aparece na fila da moderação, mas não oculta o modelo. Se a consulta do plano falhar, a denúncia também fica registrada sem somar. Revisão do João: pela tabela `moont.published_template_reports` no Supabase.
 - Despublicar apaga o modelo. Projetos que já o usaram não mudam (aplicar é uma cópia).
 - Aplicar mantém textos, fotos, logo, nome, @ e o formato do projeto; capa no primeiro card, fechamento no último, conteúdo se repete no meio. Dá para desfazer.

@@ -27,7 +27,7 @@ import { readCurrentAccessCookie, billingDisabled } from './lib/access.js';
 import { resolveAccountEntitlement } from './lib/account-entitlements.js';
 import { consumeRateLimit, rateLimitResponse } from './lib/rate-limit.js';
 import { resolveLibraryOwnerId } from './lib/library-sync-store.js';
-import defaultStore from './lib/published-templates-store.js';
+import defaultStore, { MAX_PUBLISHES_PER_DAY, templateDailyLimitError } from './lib/published-templates-store.js';
 import {
   sanitizeTemplateContent, sanitizeTemplateMeta, templateContentBytes, TEMPLATE_FORMATS, TEMPLATE_MAX_BYTES,
 } from '../src/utils/published-template.js';
@@ -123,6 +123,14 @@ export function createTemplatesHandler({
           const meta = sanitizeTemplateMeta(body);
           // Reconstrói por lista permitida: o que vier fora dela não é gravado.
           const content = sanitizeTemplateContent(body.content);
+          // DB-11: o limite do dia contado pelas linhas da tabela era contornado
+          // apagando o modelo e publicando de novo. Este contador não perde a
+          // marca quando o modelo é apagado. Vem depois da validação: pedido
+          // recusado não gasta as publicações do dia.
+          const dayLimited = await consumeRateLimit(req, {
+            limit: MAX_PUBLISHES_PER_DAY, windowMs: 24 * 60 * 60_000, keyPrefix: 'templates-publish-day', subject: owner,
+          });
+          if (dayLimited) return send(res, templateDailyLimitError());
           const template = await store.publish(owner, {
             ...meta, format: content.format, content, contentBytes: templateContentBytes(content),
           });
