@@ -34,6 +34,7 @@ import { splitLeadingUppercaseLabel } from '../../utils/subtitle-label.js';
 import { readTypedText } from '../../utils/inline-edit-text.js';
 import { headerCenterText, dedupeHeaderColumns } from '../../utils/card-header.js';
 import { useElementDrag } from './useElementDrag.js';
+import { textNudgePosition } from '../../utils/text-nudge-position.js';
 import { slideHasPendingPhotoIntent, inferCanvasDefaults, sandwichPhotoZoneImgStyle } from '../../utils/canvas-zones.js';
 import { DEFAULT_SLIDE_TEXT_INSET, SANDWICH_PHOTO_ZONE_MIN_H_PCT, clampRect, DEFAULT_CANVAS_ZONES_CLASSIC, CANVAS_AUTO_EDGE_PCT } from '../../utils/canvas-layout.js';
 
@@ -1969,14 +1970,13 @@ const SlideCardInner = React.forwardRef(({
       const blockBox = block.getBoundingClientRect();
       const cardBox = card.getBoundingClientRect();
       if (!cardBox.width || !blockBox.height) return;
-      const gap = 6;
-      const size = 26;
-      const clusterW = size * 2 + 4;
-      let left = blockBox.right - cardBox.left + gap;
-      let top = blockBox.top - cardBox.top + (blockBox.height - size) / 2;
-      if (left + clusterW > cardBox.width - 4) left = blockBox.left - cardBox.left - clusterW - gap;
-      left = Math.max(4, Math.min(left, cardBox.width - clusterW - 4));
-      top = Math.max(4, Math.min(top, cardBox.height - size - 4));
+      const { left, top } = textNudgePosition({
+        block: {
+          left: blockBox.left - cardBox.left, right: blockBox.right - cardBox.left,
+          top: blockBox.top - cardBox.top, bottom: blockBox.bottom - cardBox.top,
+        },
+        card: { width: cardBox.width, height: cardBox.height },
+      });
       setTextNudgeBox((prev) => (
         prev && Math.abs(prev.left - left) < 0.5 && Math.abs(prev.top - top) < 0.5 ? prev : { left, top }
       ));
