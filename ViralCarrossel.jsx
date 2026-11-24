@@ -1548,8 +1548,16 @@ export default function App() {
       if (event?.target) event.target.value = '';
       return undefined;
     }
-    return handleImportFileRaw(event);
-  }, [freeLimitBlocks, handleImportFileRaw]);
+    // GB-09: o arquivo pode trazer vários projetos; a quantidade só é
+    // conhecida depois da leitura.
+    return handleImportFileRaw(event, {
+      canAdd: (count) => {
+        if (!freeLimitBlocks(count)) return true;
+        toast(`O arquivo tem ${count} projetos e passaria do limite de ${FREE_PROJECT_LIMIT} projetos do plano grátis. Nada foi importado.`, 'warning', 8000);
+        return false;
+      },
+    });
+  }, [freeLimitBlocks, handleImportFileRaw, toast]);
   const deleteDoc = useCallback(async (docId) => {
     // Conta grátis não tem biblioteca na nuvem: excluir é sempre local.
     if (!PROJECTS_V2 || accessSessionRef.current?.free) return deleteDocLocal(docId);

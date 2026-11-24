@@ -47,6 +47,7 @@ import {
 import { cloneBrandStyleKit } from '../utils/brand-context.js';
 import { normalizeStyleKit } from '../utils/style-kit.js';
 import { rememberDeletedProjectIds } from '../utils/project-deletions.js';
+import { readBackupEntries } from '../utils/backup-import.js';
 
 export const INVALID_BACKUP_MESSAGE = 'Arquivo inválido ou corrompido. Verifique se é um backup exportado pela Moont.';
 export function reportInvalidBackup(toast) {
@@ -465,7 +466,7 @@ export function useLibrary({
 
   // Importa um arquivo .json exportado anteriormente (merge na biblioteca)
   const importDocRef = useRef(null);
-  const handleImportFile = useCallback((e) => {
+  const handleImportFile = useCallback((e, { canAdd } = {}) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
@@ -473,8 +474,13 @@ export function useLibrary({
     reader.onload = async (ev) => {
       try {
         const parsed = JSON.parse(ev.target.result);
-        const docs = parsed.docs || (Array.isArray(parsed) ? parsed : null);
-        if (!docs?.length) throw new Error('Formato inválido');
+        // GB-09: confere a forma antes de importar. Nome vira texto, id de
+        // slide repetido é trocado e o que não é projeto é contado.
+        const { entries: docs, skipped } = readBackupEntries(parsed, uid);
+        if (!docs.length) throw new Error('Formato inválido');
+        // O limite do plano vale para a quantidade do arquivo, conhecida só
+        // aqui. Recusado antes de gravar qualquer coisa.
+        if (typeof canAdd === 'function' && !canAdd(docs.length)) return;
         const { folders: importedFolders, remap: folderRemap } = mergeImportedFolders(
           libraryFolders,
           parsed.folders,
@@ -504,7 +510,7 @@ export function useLibrary({
         const newEntries = docs.map(e => normalizeLibraryEntry({
           ...e,
           id: uid(),
-          name: e.name || 'Importado',
+          name: e.name,
           folderId: folderRemap.get(e.folderId) || '',
           importedAt: Date.now(),
           // Um backup é uma nova biblioteca local. Nunca herda o vínculo de
@@ -612,6 +618,12 @@ export function useLibrary({
         }
         setLibraryOpen(false);
         setShellView('project');
+        if (skipped > 0) {
+          toast(
+            `${skipped === 1 ? '1 item do arquivo não é um projeto e ficou' : `${skipped} itens do arquivo não são projetos e ficaram`} de fora. ${newEntries.length === 1 ? '1 projeto foi importado' : `${newEntries.length} projetos foram importados`}.`,
+            'warning', 8000,
+          );
+        }
       } catch {
         // Um backup inválido não é quota de armazenamento. O evento de quota
         // cria deliberadamente um aviso persistente até `quota-recovered`;
