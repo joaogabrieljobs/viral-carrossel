@@ -342,13 +342,31 @@ export async function handleCheckout(req, res) {
       status: 'open',
       limit: 100,
     });
-    let session = (openSessions.data || []).find((entry) => (
+    const ownOpenSessions = (openSessions.data || []).filter((entry) => (
       entry?.mode === 'subscription'
       && entry?.metadata?.product === 'viral-carrossel'
-      && entry?.metadata?.tier === tier
+    ));
+    let session = ownOpenSessions.find((entry) => (
+      entry?.metadata?.tier === tier
       && typeof entry?.url === 'string'
       && entry.url.startsWith('https://')
     ));
+    // AUTH-02: a sessão de pagamento de outro plano não pode continuar aberta.
+    // Pagar as duas criaria duas assinaturas no mesmo cliente.
+    const closedSessionIds = [];
+    for (const stale of ownOpenSessions) {
+      if (stale === session || !stale?.id) continue;
+      try {
+        await stripe.checkout.sessions.expire(stale.id);
+      } catch (expireError) {
+        // Outra requisição pode ter expirado antes. Qualquer outro estado
+        // (paga, por exemplo) interrompe: abrir novo pagamento cobraria em dobro.
+        const current = await stripe.checkout.sessions.retrieve(stale.id);
+        if (current?.status !== 'expired') throw expireError;
+      }
+      closedSessionIds.push(stale.id);
+      clearCheckoutCookie(res, stale.id);
+    }
     if (!session) {
       const checkoutWindow = Math.floor(Date.now() / (30 * 60_000));
       const expiresAt = checkoutWindow * 30 * 60 + CHECKOUT_MAX_AGE_SEC - 60;
@@ -377,7 +395,10 @@ export async function handleCheckout(req, res) {
         },
       }, {
         idempotencyKey: checkoutIdempotencyKey(
-          'session', `viral-carrossel:${customer.id}:${priceId}:${tier}:${checkoutWindow}`,
+          // As sessões fechadas entram na chave: sem isso, voltar ao mesmo plano
+          // na mesma janela receberia do Stripe a resposta guardada da sessão expirada.
+          'session', `viral-carrossel:${customer.id}:${priceId}:${tier}:${checkoutWindow}${
+            closedSessionIds.length ? `:${[...closedSessionIds].sort().join(',')}` : ''}`,
         ),
       });
     }
