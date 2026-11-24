@@ -216,7 +216,14 @@ export function applyGenerationLogoPolicy(slides = [], {
   hasBrandLogo = false,
 } = {}) {
   if (!enabled) return hideLogoOnSlides(slides);
-  if (projectLogoAsset) return applyLogoAssetToSlides(slides, projectLogoAsset);
+  if (projectLogoAsset) {
+    const stamped = applyLogoAssetToSlides(slides, projectLogoAsset);
+    if (hasBrandLogo) return stamped;
+    // Logo só do projeto: a marca não tem logo, então o tamanho dela é o de
+    // fábrica (260), que ninguém escolheu. A logo entra no tamanho de
+    // importação, como em Marca → Logo.
+    return stamped.map((slide) => (slide.logoSize == null ? { ...slide, logoSize: LOGO_SIZE_IMPORT } : slide));
+  }
   if (hasBrandLogo) return stampLogoVisibleOnSlides(slides);
   return slides;
 }

@@ -6213,6 +6213,14 @@ ${jsonShapeLine}`;
       }),
       { creativePreset: cp, slideTextDensity: td },
     ));
+    // Antes de compor: a composição reserva o canto da logo que o card já tem.
+    if (!remix) {
+      newSlides = applyGenerationLogoPolicy(newSlides, {
+        enabled: styleKit?.logoOnGenerate !== false,
+        projectLogoAsset,
+        hasBrandLogo: !!(generationBrand?.logo || generationBrand?.logoImageId),
+      });
+    }
     if (!remix && !isPresentationGeneration) {
       // Marca efetiva e formato entram na conta: a composição já nasce acima
       // do selo/barra do rodapé e respeita o alinhamento declarado pelo preset.
@@ -6229,13 +6237,6 @@ ${jsonShapeLine}`;
       newSlides = autoAdjustOnGenerate
         ? autoAdjustSlides(newSlides, { creativePreset: cp, fmt: isPresentationGeneration ? 'apresentacao' : fmt })
         : applyFinalizeCanvasMarginsToSlides(newSlides, isPresentationGeneration ? 'apresentacao' : fmt);
-    }
-    if (!remix) {
-      newSlides = applyGenerationLogoPolicy(newSlides, {
-        enabled: styleKit?.logoOnGenerate !== false,
-        projectLogoAsset,
-        hasBrandLogo: !!(generationBrand?.logo || generationBrand?.logoImageId),
-      });
     }
     const visualQuality = isPresentationGeneration && !remix
       ? repairPresentationLayouts(newSlides, { fmt: 'apresentacao' })

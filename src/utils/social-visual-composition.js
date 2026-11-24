@@ -576,9 +576,11 @@ function logoTopReserve(logo, F) {
   return round2(((F.w * 0.045 + size * (size <= 180 ? 1 : 0.6)) / F.h) * 100 + 1.5);
 }
 
-function logoCornerFor(brand) {
-  if (!brand?.logo && !brand?.logoImageId) return null;
-  const pos = brand.logoPosition || 'tr';
+/** Canto da logo: a da marca ou a do projeto, que vive como camada em cada card. */
+function logoCornerFor(brand, slide = null) {
+  const cardLogo = !!slide && !slide.logoHidden && !!(slide.logoImageId || slide.logoImage);
+  if (!cardLogo && !brand?.logo && !brand?.logoImageId) return null;
+  const pos = brand?.logoPosition || 'tr';
   return pos === 'c' ? null : pos;
 }
 
@@ -633,7 +635,7 @@ function composeSocialLibrary(slides, { preset, brand, formato, narrative }) {
     const structured = normalizePresentationBlocks(slide.presentationBlocks).length > 0;
     const art = {
       family: familyKey, fn, variant: variants[index], structured, typo, footer,
-      logoCorner: logoCornerFor(base), logo: logoCornerFor(base) ? { pos: logoCornerFor(base), size: slide.logoSize ?? base.logoSize ?? SOCIAL_LOGO_SIZE_DEFAULT } : null, labelFont: ownType ? (family.type.label || null) : null, ownType, viral,
+      logoCorner: logoCornerFor(base, slide), logo: logoCornerFor(base, slide) ? { pos: logoCornerFor(base, slide), size: slide.logoSize ?? base.logoSize ?? SOCIAL_LOGO_SIZE_DEFAULT } : null, labelFont: ownType ? (family.type.label || null) : null, ownType, viral,
       signatureOnPhoto: viral && luminance(base.titleColor) != null && luminance(base.titleColor) < 0.6,
     };
     const patch = socialFormatPatch({ ...slide, socialArt: art }, formato);
