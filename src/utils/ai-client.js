@@ -128,6 +128,22 @@ function sessionGateError(status, data) {
   return e;
 }
 
+/**
+ * Nos proxies de texto, só o portão do Moont marca a própria recusa (cabeçalho
+ * `X-Moont-Gate` ou `error.code`); o 401/402 do provedor é repassado sem marca
+ * e não é sessão expirada (auditoria 23/11, IA-07).
+ */
+function moontGateError(res, data) {
+  const marked = !!res?.headers?.get?.('x-moont-gate')
+    || ['session_required', 'subscription_inactive'].includes(data?.error?.code);
+  return marked ? sessionGateError(res.status, data) : null;
+}
+
+/** 401 do provedor com a chave da própria pessoa: sair e entrar de novo não resolve. */
+function providerKeyRejectedError() {
+  return Object.assign(new Error('Chave recusada pelo provedor. Confira em Configurar IA.'), { status: 401, code: 'provider_key_rejected' });
+}
+
 const AI_SYSTEM_CORE = 'Você é especialista em conteúdo estratégico para redes sociais. Escreva com verbos concretos e vocabulário adequado ao público; evite jargão corporativo vazio e tom de guru. Use somente o material fornecido como base factual. Não invente dados, pesquisas, citações, preços, vagas, prazos, depoimentos, casos, cenas, sensações, hábitos do público, generalizações ou relações de causa e efeito; isso também vale para afirmações sem números. Um problema, benefício ou resultado apenas plausível não é um fato disponível. Preserve condições, limites e a diferença entre plano e realização. Notas de produção, como marca fictícia ou rascunho, não viram automaticamente texto público; quando um exemplo, dado ou resultado simulado puder ser confundido com evidência real, identifique seu caráter ilustrativo junto ao conteúdo pertinente. Só desenvolva exemplos hipotéticos quando o usuário os solicitar expressamente, sem apresentá-los como fatos do projeto. Fidelidade e restrições do usuário prevalecem sobre o arco e o tom; não complete etapas com informação ausente. Não use Slide N/Card N como rótulo no texto visível; Passo N é permitido em tutoriais. Preserve o schema solicitado, sem acrescentar campos.';
 
 const CONTENT_LANGUAGE_SYSTEM_RULES = Object.freeze({
@@ -218,10 +234,10 @@ const callAnthropic = async (userMsg, { json = false, jsonParser = null, maxToke
   try { data = JSON.parse(raw); }
   catch { throw new Error(`Resposta inválida (HTTP ${res.status})`); }
   if (!res.ok || data.error) {
-    if (USE_ANTHROPIC_PROXY && !IS_LOCAL_DEV) {
-      const gate = sessionGateError(res.status, data);
-      if (gate) throw gate;
-    }
+    const gate = moontGateError(res, data);
+    if (gate) throw gate;
+    // Claude só funciona com a chave da própria pessoa.
+    if (res.status === 401) throw providerKeyRejectedError();
     const e = new Error(data?.error?.message || `Anthropic HTTP ${res.status}`);
     e.status = res.status;
     throw e;
@@ -398,9 +414,10 @@ const callCompatibleChat = async (
 
     if (!res.ok || data.error) {
       if (!useDirect) {
-        const gate = sessionGateError(res.status, data);
+        const gate = moontGateError(res, data);
         if (gate) throw gate;
       }
+      if (res.status === 401 && apiKey) throw providerKeyRejectedError();
       // Limite diário do texto incluso (auditoria 23/11, IA-01): quem recusou
       // foi o Moont, não o provedor. Trocar de modelo só repetia a recusa, e a
       // frase do servidor (quando volta, chave própria) era descartada.

@@ -341,6 +341,7 @@ describe('apresentação planejada e revisada', () => {
     [{ status: 403 }, 'access_denied'],
     [{ status: 429, code: 'rate_limited' }, 'rate_limited'],
     [{ status: 429, code: 'text_quota_exhausted' }, 'text_quota_exhausted'],
+    [{ status: 401, code: 'provider_key_rejected' }, 'provider_key_rejected'],
   ])('preserva 6 de 12 e a causa de acesso sem confundir com erro da IA (%j)', async (details, interruptionReason) => {
     const denied = Object.assign(new Error('Texto privado da conta e do provedor.'), details);
     const ai = vi.fn().mockResolvedValueOnce(planWithCount(12)).mockResolvedValueOnce(batch(0)).mockResolvedValueOnce(batch(3)).mockRejectedValue(denied);

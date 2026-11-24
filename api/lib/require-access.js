@@ -42,10 +42,16 @@ export function invalidateActiveAccessForCustomer(customerId) {
 export async function requireActiveSubscription(req, res, opts = {}) {
   const asJson = opts.asJson !== false;
   const fail = (status, message) => {
+    // Marca do portão do Moont (auditoria 23/11, IA-07). Os proxies de IA
+    // repassam o status do provedor como veio; sem a marca, o app lia o 401 de
+    // uma chave recusada pelo provedor como sessão expirada. O formato simples
+    // do corpo não muda (clientes já abertos continuam lendo `error`).
+    const code = status === 401 ? 'session_required' : status === 402 ? 'subscription_inactive' : '';
+    if (code) res.setHeader?.('X-Moont-Gate', status === 401 ? 'session' : 'subscription');
     if (asJson) {
       return res.status(status).json(
         opts.errorShape === 'nested'
-          ? { error: { message } }
+          ? { error: { message, ...(code ? { code } : {}) } }
           : { error: message },
       );
     }
