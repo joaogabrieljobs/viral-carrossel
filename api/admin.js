@@ -235,6 +235,8 @@ export function createAdminHandler({
         if ((intent === 'grant' && selfTarget) || (!selfTarget && await store.roleOf(customerId))) {
           throw adminFail('admin_target_forbidden', 'Esta ação não pode ser feita na sua conta nem em outra conta da equipe.', 403);
         }
+        // Conta a tentativa antes de abrir a transação da ação (AUTH-04).
+        await store.claimChallengeAttempt(actor, { challengeId: body.challengeId, now: now() });
         const hooks = {
           before: (tx) => store.consumeChallenge(tx, actor, { challengeId: body.challengeId, code: body.code, action: intent, payload, now: now() }),
           after: (tx, result) => store.recordAction(tx, {
@@ -263,7 +265,6 @@ export function createAdminHandler({
 
       return res.status(400).json({ error: 'Ação inválida.', code: 'admin_bad_action' });
     } catch (cause) {
-      if (cause?.failedChallengeId) await store.countFailedAttempt(cause.failedChallengeId).catch(() => {});
       if (cause?.code === 'entitlement_grant_conflict') {
         return res.status(409).json({ error: 'Esta conta já tem uma isenção ativa. Revogue a atual antes de conceder outra.', code: cause.code });
       }

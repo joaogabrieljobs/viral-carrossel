@@ -255,6 +255,22 @@ describe('console admin — isenção com código por e-mail', () => {
     expect((await call(ADMIN, { method: 'POST', body: { action: 'grant', challengeId, code, ...pedido } })).body.code).toBe('admin_code_locked');
   });
 
+  // AUTH-04 (auditoria 23/11): a tentativa era contada depois da transação
+  // desfeita, em outra consulta. Pedidos em paralelo liam o contador antes do
+  // incremento do anterior e passavam todos do teto de 5.
+  it('20 palpites em paralelo: só 5 chegam a ser comparados e o código trava', async () => {
+    const { code, challengeId } = await pedirCodigo();
+    const palpite = (i) => String((Number(code) + 1 + i) % 1_000_000).padStart(6, '0');
+    const respostas = await Promise.all(Array.from({ length: 20 }, (_, i) =>
+      call(ADMIN, { method: 'POST', body: { action: 'grant', challengeId, code: palpite(i), ...pedido } })));
+    const codigos = respostas.map((r) => r.body.code);
+    expect(codigos.filter((c) => c === 'admin_code_invalid')).toHaveLength(5);
+    expect(codigos.filter((c) => c === 'admin_code_locked')).toHaveLength(15);
+    expect((await sql.unsafe('SELECT attempts FROM moont.admin_challenges'))[0].attempts).toBe(5);
+    expect((await call(ADMIN, { method: 'POST', body: { action: 'grant', challengeId, code, ...pedido } })).body.code).toBe('admin_code_locked');
+    expect(await sql.unsafe('SELECT id FROM moont.account_access_grants')).toEqual([]);
+  });
+
   it('revoga com código e trilha', async () => {
     const c1 = await pedirCodigo();
     const grantId = (await call(ADMIN, { method: 'POST', body: { action: 'grant', challengeId: c1.challengeId, code: c1.code, ...pedido } })).body.grant.id;

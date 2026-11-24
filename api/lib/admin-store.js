@@ -296,18 +296,37 @@ export function createAdminStore({ sql: injectedSql, env = process.env } = {}) {
     return { challengeId: row.id, code };
   }
 
-  /** Confere e consome o código dentro da transação da própria ação. */
+  /**
+   * Conta a tentativa ANTES de comparar o código, numa instrução própria e já
+   * confirmada (AUTH-04). O teto vale mesmo com pedidos em paralelo: quem não
+   * consegue incrementar não chega à comparação. A tentativa certa também gasta
+   * uma das cinco.
+   */
+  async function claimChallengeAttempt(actor, { challengeId, now = Date.now() }) {
+    if (!UUID.test(challengeId || '')) throw adminFail('admin_code_invalid', 'Código inválido.', 403);
+    const [claimed] = await q(`/* admin_challenge_attempt */
+      UPDATE moont.admin_challenges SET attempts = attempts + 1
+      WHERE id = $1::uuid AND owner_id = $2 AND used_at IS NULL AND expires_at > $3 AND attempts < $4
+      RETURNING attempts`, [challengeId, actor.id, new Date(now), CHALLENGE_MAX_ATTEMPTS]);
+    if (claimed) return;
+    const [row] = await q(`SELECT attempts, used_at, expires_at FROM moont.admin_challenges WHERE id = $1::uuid AND owner_id = $2`, [challengeId, actor.id]);
+    if (row && !row.used_at && new Date(row.expires_at).getTime() > now && Number(row.attempts) >= CHALLENGE_MAX_ATTEMPTS) {
+      throw adminFail('admin_code_locked', 'Tentativas esgotadas. Peça outro código.', 403);
+    }
+    throw adminFail('admin_code_expired', 'Código expirado ou já usado. Peça outro.', 403);
+  }
+
+  /** Confere e consome o código dentro da transação da própria ação. A tentativa já foi contada. */
   async function consumeChallenge(tx, actor, { challengeId, code, action, payload, now = Date.now() }) {
     if (!UUID.test(challengeId || '') || !/^\d{6}$/.test(String(code || ''))) throw adminFail('admin_code_invalid', 'Código inválido.', 403);
     const [row] = await tx.unsafe(`SELECT * FROM moont.admin_challenges WHERE id = $1::uuid AND owner_id = $2 FOR UPDATE`, [challengeId, actor.id]);
     if (!row || row.used_at || new Date(row.expires_at).getTime() <= now || row.action !== action) {
       throw adminFail('admin_code_expired', 'Código expirado ou já usado. Peça outro.', 403);
     }
-    if (Number(row.attempts) >= CHALLENGE_MAX_ATTEMPTS) throw adminFail('admin_code_locked', 'Tentativas esgotadas. Peça outro código.', 403);
+    if (Number(row.attempts) > CHALLENGE_MAX_ATTEMPTS) throw adminFail('admin_code_locked', 'Tentativas esgotadas. Peça outro código.', 403);
     if (row.payload_hash !== payloadHash(action, payload)) throw adminFail('admin_code_mismatch', 'O código foi pedido para outra ação. Peça outro.', 403);
     if (row.code_hash !== sha256(`${challengeId}:${code}`)) {
-      // A transação da ação vai desfazer tudo; quem chama conta a tentativa depois (countFailedAttempt).
-      throw Object.assign(adminFail('admin_code_invalid', 'Código incorreto.', 403), { failedChallengeId: challengeId });
+      throw adminFail('admin_code_invalid', 'Código incorreto.', 403);
     }
     await tx.unsafe(`UPDATE moont.admin_challenges SET used_at = now() WHERE id = $1::uuid`, [challengeId]);
   }
@@ -323,8 +342,7 @@ export function createAdminStore({ sql: injectedSql, env = process.env } = {}) {
 
   return {
     roleOf, recordAction, overview, searchAccounts, getAccount, listGrants, health, listActions,
-    createChallenge, consumeChallenge, quotaAnchorFor,
-    countFailedAttempt: (challengeId) => q(`UPDATE moont.admin_challenges SET attempts = attempts + 1 WHERE id = $1::uuid AND used_at IS NULL`, [challengeId]),
+    createChallenge, claimChallengeAttempt, consumeChallenge, quotaAnchorFor,
     begin: (work) => connection().begin(work),
     customerOf: async (accountId) => (await q(`SELECT stripe_customer_id FROM moont.account_stripe_customers WHERE account_id = $1::uuid`, [accountId]))[0]?.stripe_customer_id || null,
   };
