@@ -277,6 +277,30 @@ export function clampPresentationSlideCount(value, fallback = 10) {
   return Math.min(PRESENTATION_SLIDE_LIMITS.max, Math.max(PRESENTATION_SLIDE_LIMITS.min, n));
 }
 
+/**
+ * Campo "Outro" da quantidade (auditoria 23/11, GB-07). A apresentação gera de
+ * 5 a 24 slides; aceitar de 1 a 4 mostrava no resumo um número e créditos que a
+ * geração não cumpria. Campo vazio não é erro: a pessoa ainda está digitando.
+ */
+const CUSTOM_COUNT_MAX = 24;
+
+export function customCountLimits(isPresentation) {
+  return isPresentation
+    ? { min: PRESENTATION_SLIDE_LIMITS.min, max: PRESENTATION_SLIDE_LIMITS.max }
+    : { min: 1, max: CUSTOM_COUNT_MAX };
+}
+
+export function customCountIssue(raw, { isPresentation = false } = {}) {
+  const text = String(raw ?? '').trim();
+  if (!text) return '';
+  const { min, max } = customCountLimits(isPresentation);
+  const n = Number(text);
+  if (!Number.isInteger(n)) return `Digite um número inteiro de ${min} a ${max}.`;
+  if (n < min) return isPresentation ? `Apresentações têm no mínimo ${min} slides.` : `O mínimo é ${min} card.`;
+  if (n > max) return `O máximo é ${max} ${isPresentation ? 'slides' : 'cards'}.`;
+  return '';
+}
+
 /** Defaults ao criar / alternar para apresentação. */
 export function presentationDocPatch(options = DEFAULT_PRESENTATION_PATH_ID) {
   const opts = options && typeof options === 'object' ? options : { pathId: options };

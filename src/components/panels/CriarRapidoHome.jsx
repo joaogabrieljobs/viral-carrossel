@@ -10,6 +10,8 @@ import {
   PRESENTATION_PATHS,
   getPresentationPath,
   normalizePresentationPath,
+  customCountIssue,
+  customCountLimits,
 } from '../../utils/presentation.js';
 import { MOONT_NARRATIVES } from '../../config/moont-brand.js';
 import { imageBatchSelection } from '../../utils/image-generation-readiness.js';
@@ -111,12 +113,16 @@ export function CriarRapidoHome({
   // Valor cru: aparar aqui devolvia o texto sem o espaço recém-digitado a cada tecla.
   const bioDraft = String(brand?.bio || '');
   const countPresets = isPresentation ? ['auto', 6, 8, 10, 12, 14, 16] : ['auto', 3, 5, 6, 8, 10];
-  const maxCustomCount = isPresentation ? 24 : 24;
+  // GB-07: a faixa do campo é a que a geração cumpre (apresentação começa em 5).
+  const { min: minCustomCount, max: maxCustomCount } = customCountLimits(isPresentation);
   const numericQuickCount = displayedQuickCardCount === 'auto' ? null : Number(displayedQuickCardCount);
   const isCustomCount = numericQuickCount != null
     && Number.isInteger(numericQuickCount)
     && !countPresets.includes(numericQuickCount);
   const showCustomCount = customCountOpen || isCustomCount;
+  const customCountError = showCustomCount && !explicitCardScript
+    ? customCountIssue(customCountDraft, { isPresentation })
+    : '';
 
   useEffect(() => {
     setUploadingLogo(false);
@@ -188,7 +194,7 @@ export function CriarRapidoHome({
   };
 
   const handleGenerate = async () => {
-    if (!generationPrompt || genBusy) return;
+    if (!generationPrompt || genBusy || customCountError) return;
     const effectiveNarrativeMode = isPresentation
       ? 'editorial'
       : resolveQuickNarrativeMode(objectiveId, narrativeMode);
@@ -507,7 +513,7 @@ export function CriarRapidoHome({
                 );
               }}
               style={{ minHeight: 38, padding: '0 4px', fontSize: 10 }}
-              title={`Número personalizado (1–${maxCustomCount})`}
+              title={`Número personalizado (${minCustomCount}–${maxCustomCount})`}
             >
               Outro
             </button>
@@ -516,17 +522,18 @@ export function CriarRapidoHome({
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
               <input
                 type="number"
-                min={1}
+                min={minCustomCount}
                 max={maxCustomCount}
                 inputMode="numeric"
                 aria-label={isPresentation ? 'Número personalizado de slides' : 'Número personalizado de cards'}
-                placeholder={`1–${maxCustomCount}`}
+                aria-invalid={customCountError ? 'true' : undefined}
+                placeholder={`${minCustomCount}–${maxCustomCount}`}
                 value={explicitCardScript ? String(explicitCardScript.count) : customCountDraft}
                 disabled={genBusy || !!explicitCardScript}
                 onChange={(e) => setCustomCountDraft(e.target.value.replace(/[^\d]/g, ''))}
                 onBlur={() => {
                   const n = Number(customCountDraft);
-                  if (Number.isInteger(n) && n >= 1 && n <= maxCustomCount) {
+                  if (Number.isInteger(n) && n >= minCustomCount && n <= maxCustomCount) {
                     onQuickCardCountChange(n);
                   }
                 }}
@@ -534,7 +541,7 @@ export function CriarRapidoHome({
                   if (e.key !== 'Enter') return;
                   e.preventDefault();
                   const n = Number(customCountDraft);
-                  if (Number.isInteger(n) && n >= 1 && n <= maxCustomCount) {
+                  if (Number.isInteger(n) && n >= minCustomCount && n <= maxCustomCount) {
                     onQuickCardCountChange(n);
                     e.currentTarget.blur();
                   }
@@ -545,8 +552,8 @@ export function CriarRapidoHome({
                   fontSize: 13, fontVariantNumeric: 'tabular-nums',
                 }}
               />
-              <span style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.35 }}>
-                Digite de 1 a {maxCustomCount} e confirme.
+              <span role={customCountError ? 'alert' : undefined} style={{ fontSize: 10, color: customCountError ? 'var(--danger-text)' : 'var(--text-muted)', lineHeight: 1.35 }}>
+                {customCountError || `Digite de ${minCustomCount} a ${maxCustomCount} e confirme.`}
               </span>
             </div>
           ) : null}
@@ -590,13 +597,13 @@ export function CriarRapidoHome({
         <button
           type="button"
           aria-label={isPresentation ? 'Gerar apresentação' : 'Gerar carrossel'}
-          disabled={genBusy || !generationPrompt}
+          disabled={genBusy || !generationPrompt || !!customCountError}
           onClick={handleGenerate}
           style={{
             width: '100%', height: 48, borderRadius: 9999, border: 'none',
-            cursor: genBusy || !generationPrompt ? 'not-allowed' : 'pointer',
-            background: genBusy || !generationPrompt ? 'var(--bg-pearl)' : 'var(--accent)',
-            color: genBusy || !generationPrompt ? 'var(--text-muted)' : '#fff',
+            cursor: genBusy || !generationPrompt || customCountError ? 'not-allowed' : 'pointer',
+            background: genBusy || !generationPrompt || customCountError ? 'var(--bg-pearl)' : 'var(--accent)',
+            color: genBusy || !generationPrompt || customCountError ? 'var(--text-muted)' : '#fff',
             fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             ...BTN_CAPS,
           }}

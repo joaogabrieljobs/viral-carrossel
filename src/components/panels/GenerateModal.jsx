@@ -18,6 +18,8 @@ import {
   PRESENTATION_PATHS,
   getPresentationPath,
   normalizePresentationPath,
+  customCountIssue,
+  customCountLimits,
 } from '../../utils/presentation.js';
 import {
   DEFAULT_PRESENTATION_VISUAL_PRESET_ID,
@@ -167,7 +169,10 @@ function GenerateModal({
   ));
   const countEditedRef = useRef(false);
   const visualEditedRef = useRef(false);
-  const changeCount = value => { countEditedRef.current = true; setCount(value); };
+  // GB-07: texto digitado em "Outro" enquanto ainda não é uma quantidade válida.
+  const [countDraft, setCountDraft] = useState(null);
+  const changeCount = value => { countEditedRef.current = true; setCountDraft(null); setCount(value); };
+  const countLimits = customCountLimits(isPresentation);
   const [niche, setNiche] = useState(defaultNiche);
   const [audience, setAudience] = useState(defaultAudience || '');
   const [mode, setMode] = useState(defaultMode);
@@ -189,6 +194,7 @@ function GenerateModal({
     setPresentationPath(nextPath);
     countEditedRef.current = false;
     visualEditedRef.current = false;
+    setCountDraft(null);
     setCount(isPresentation ? getPresentationPath(nextPath).defaultSlideCount : 6);
     setPackCreative(resolveCreativePresetForProduct(defaultCreativePreset, productKind));
   }, [open, defaultCreativePreset, defaultPresentationPath, isPresentation, productKind]);
@@ -197,6 +203,8 @@ function GenerateModal({
     const candidate = parseExplicitCardScript(topic) || parseExplicitCardScript(material?.content);
     return canAutoApplyExplicitCardScript(candidate) ? candidate : null;
   }, [isPresentation, material?.content, topic]);
+  // Com roteiro numerado a quantidade vem do roteiro e o campo fica travado.
+  const countIssue = countDraft == null || explicitCardScript ? '' : customCountIssue(countDraft, { isPresentation });
   useEffect(() => {
     if (!open || !explicitCardScript || count === explicitCardScript.count) return;
     setCount(explicitCardScript.count);
@@ -387,7 +395,7 @@ function GenerateModal({
 
   // A etapa 1 exige tema válido (resolvedGenerationTopic já cobre alternativas
   // de nicho e contexto). As demais etapas permitem revisar os valores padrão.
-  const canProceed = step === 1 ? !!resolvedGenerationTopic : true;
+  const canProceed = step === 1 ? !!resolvedGenerationTopic : step === 2 ? !countIssue : true;
   const selectedPresentationPath = getPresentationPath(presentationPath);
   const selectPresentationPath = (pathId) => {
     const normalized = normalizePresentationPath(pathId);
@@ -405,6 +413,7 @@ function GenerateModal({
   if (!open) return null;
 
   const run = async ({ withImages } = { withImages: true }) => {
+    if (countIssue) { setErr(countIssue); setStep(2); return; }
     if (!resolvedGenerationTopic) {
       setErr(
         isPresentation
@@ -937,14 +946,18 @@ function GenerateModal({
                     Outro
                     <input
                       type="number"
-                      min={1}
-                      max={24}
-                      value={count}
+                      min={countLimits.min}
+                      max={countLimits.max}
+                      value={explicitCardScript ? count : (countDraft ?? count)}
                       disabled={!!explicitCardScript}
                       aria-label={isPresentation ? 'Número personalizado de slides' : 'Número personalizado de cards'}
+                      aria-invalid={countIssue ? 'true' : undefined}
+                      aria-describedby="generation-card-count-help"
                       onChange={(e) => {
-                        const n = Number(e.target.value);
-                        if (Number.isInteger(n) && n >= 1 && n <= 24) changeCount(n);
+                        const raw = e.target.value;
+                        // Fora da faixa fica visível com o motivo, em vez de ser ignorado.
+                        if (raw.trim() && !customCountIssue(raw, { isPresentation })) changeCount(Number(raw));
+                        else setCountDraft(raw);
                       }}
                       style={{
                         width: 52, height: 32, borderRadius: 8,
@@ -956,10 +969,12 @@ function GenerateModal({
                     />
                   </label>
                 </div>
-                <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                <p id="generation-card-count-help" role={countIssue ? 'alert' : undefined} style={{ margin: '8px 0 0', fontSize: 11, color: countIssue ? 'var(--danger-text)' : 'var(--text-muted)', lineHeight: 1.4 }}>
                   {explicitCardScript
                     ? `A quantidade vem dos ${explicitCardScript.count} blocos numerados do roteiro.`
-                    : 'Use Outro para qualquer quantidade entre 1 e 24.'}
+                    : countIssue
+                      ? `${countIssue} A quantidade continua em ${count} até você corrigir.`
+                      : `Use Outro para qualquer quantidade de ${countLimits.min} a ${countLimits.max}.`}
                 </p>
               </div>
 
@@ -1328,7 +1343,7 @@ function GenerateModal({
               onClick={() => canProceed && setStep(step + 1)}
               disabled={!canProceed || busy}
               title={!canProceed
-                ? `Informe o tema (ou ${isPresentation ? 'contexto' : 'nicho'}, ou contexto Marca/Conteúdo) para continuar`
+                ? (step === 2 ? countIssue : `Informe o tema (ou ${isPresentation ? 'contexto' : 'nicho'}, ou contexto Marca/Conteúdo) para continuar`)
                 : 'Próximo passo'}
               style={{
                 height:44, minWidth:160, padding:'0 22px', borderRadius:9999, border:'none',
