@@ -8,6 +8,6 @@ export function oauthRateLimitResponse(res, limited) {
     error: 'temporarily_unavailable',
     error_description: unavailable
       ? 'Proteção contra excesso de pedidos temporariamente indisponível. Tente novamente em instantes.'
-      : 'Demasiados pedidos. Aguarde um momento e tente de novo.',
+      : 'Muitos pedidos. Aguarde um momento e tente de novo.',
   });
 }

@@ -193,7 +193,7 @@ export function rateLimitResponse(res, retryAfterSec, nested = false) {
     );
   }
   res.setHeader('Retry-After', String(retryAfterSec));
-  const message = 'Demasiados pedidos. Aguarde um momento e tente de novo.';
+  const message = 'Muitos pedidos. Aguarde um momento e tente de novo.';
   return res.status(429).json(
     nested ? { error: { message } } : { error: message },
   );

@@ -114,7 +114,7 @@ test('primeira conta cria só o projeto solicitado e não recebe tour sobre form
   await page.getByRole('button', { name:'Perfil', exact:true }).first().click();
   const library = await openProjectLibrary(page);
   await library.getByRole('button', { name:'Apagar Dicas de preparo', exact:true }).click();
-  await library.getByRole('button', { name:'Confirmar eliminação', exact:true }).click();
+  await library.getByRole('button', { name:'Confirmar exclusão', exact:true }).click();
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vc_library')))).toEqual([]);
   await page.reload();
   await expect(page.getByRole('button', { name:'Criar um projeto', exact:true })).toBeVisible();

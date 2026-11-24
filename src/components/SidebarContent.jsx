@@ -1197,7 +1197,7 @@ function SidebarContent({
             </S>)}
 
             {(tab==='imagem'||tab==='slide') && slide.bgImage ? (
-              <S title="Posicionar foto" hint="Arraste a foto livremente num preview grande pra centralizar. Usa o mesmo bgX/bgY já existente, só a UX é melhor.">
+              <S title="Posicionar foto" hint="Arraste a foto em uma prévia grande para centralizar.">
                 <button
                   type="button"
                   onClick={() => onOpenPhotoPosition()}
@@ -1819,9 +1819,9 @@ function SidebarContent({
                     max={300}
                     onChange={v=>updateSlide({bgZoom:v})}
                   />
-                  <Slider label="Overlay escuro" value={slide.overlay} min={0} max={100} onChange={v=>updateSlide({overlay:v})}/>
+                  <Slider label="Escurecimento" value={slide.overlay} min={0} max={100} onChange={v=>updateSlide({overlay:v})}/>
                   {editDoc ? <button type="button" className="vc-btn vc-btn-ghost" style={{ alignSelf:'flex-start', fontSize:12 }}
-                    onClick={() => { editDoc(d => applyFormatEditToAll(d, { overlay: slide.overlay })); toast?.('Escurecimento aplicado em todos os cards. Desfazer: Cmd+Z.', 'success'); }}>
+                    onClick={() => { editDoc(d => applyFormatEditToAll(d, { overlay: slide.overlay })); toast?.('Escurecimento aplicado em todos os cards. Use Desfazer para voltar.', 'success'); }}>
                     Usar este escurecimento em todos os cards
                   </button> : null}
                   <Slider label="Opacidade" value={slide.bgOpacity} min={0} max={100} onChange={v=>updateSlide({bgOpacity:v})}/>
@@ -1919,9 +1919,9 @@ function SidebarContent({
                     background:'var(--bg-pearl)', border:'1px solid var(--hairline)', borderRadius:11,
                     padding:'8px 10px',
                   }}>
-                    Com composição ativa, esta grelha afeta o posicionamento <strong style={{ fontWeight:600 }}>dentro</strong>
-                    {' '}das zonas de texto do preview (junto com «Distância das bordas»).
-                    Para mover o quadro inteiro no {itemLabel}, use o modo edição de zonas no preview e arraste a moldura.
+                    Com composição ativa, esta grade posiciona o texto <strong style={{ fontWeight:600 }}>dentro</strong>
+                    {' '}das zonas (junto com «Distância das bordas»).
+                    Para mover o quadro inteiro no {itemLabel}, ligue «Mostrar zonas» e arraste a moldura na prévia.
                   </div>
                 )}
                 <div>
@@ -1969,7 +1969,7 @@ function SidebarContent({
                     })}
                   </div>
                 </div>
-                <Toggle label="Glass ao redor do conteúdo" value={!!slide.textBg} onChange={(v) => updateSlide({ textBg: v })} />
+                <Toggle label="Fundo translúcido ao redor do texto" value={!!slide.textBg} onChange={(v) => updateSlide({ textBg: v })} />
                 {slide.textBg && (
                   <Slider label="Opacidade do glass" value={slide.textBgOpacity ?? 55} min={10} max={90} onChange={(v) => updateSlide({ textBgOpacity: v })} />
                 )}
@@ -1979,7 +1979,7 @@ function SidebarContent({
 
             {(tab==='layout'||tab==='slide') && (<S
               title="Ajuste automático"
-              hint="Cover e tipografia; com composição ativa reorganiza foto e todas as zonas de texto em conjunto (largura útil ~6%, espaçamentos entre foto/título/subtítulo ou topo/foto/rodapé) para caber dentro da margem do cartão e evitar cortes."
+              hint="Ajusta a foto e o tamanho do texto. Com composição ativa, reorganiza a foto e as zonas de texto juntas para caber dentro da margem do card, sem cortes."
             >
               <button
                 type="button"
@@ -1991,8 +1991,8 @@ function SidebarContent({
                   }
                   updateSlide(p);
                   const parts = [];
-                  if (p.bgFit != null || p.bgX != null || p.bgY != null || p.bgZoom != null) parts.push('foto a preencher a zona (cover)');
-                  if (p.canvas) parts.push('zonas normalizadas');
+                  if (p.bgFit != null || p.bgX != null || p.bgY != null || p.bgZoom != null) parts.push('foto preenchendo a zona');
+                  if (p.canvas) parts.push('zonas reorganizadas');
                   if (p.titleSize != null || p.subSize != null || p.bodyAfterSize != null || p.titleLeading != null || p.subLeading != null || p.textInset != null) {
                     parts.push('tipografia calibrada');
                   }
@@ -2030,7 +2030,7 @@ function SidebarContent({
               ) : null}
             </S>)}
 
-            {(tab==='texto'||tab==='slide') && (<S title="Estilo do título" hint="Peso e caixa são os controles primários. Tracking/leading em «Ajustes avançados».">
+            {(tab==='texto'||tab==='slide') && (<S title="Estilo do título" hint="Peso e caixa são os controles principais. Espaço entre letras e entre linhas ficam em «Ajustes avançados».">
               <div>
                 <label className="vc-label-sm">
                   Peso da fonte

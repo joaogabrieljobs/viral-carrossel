@@ -188,7 +188,7 @@ export function BrandWorkspacePanel({
           <button
             type="button"
             onClick={onOpenBrands}
-            aria-label="Gerir marcas"
+            aria-label="Gerenciar marcas"
             style={{
               flex: '0 0 auto',
               minHeight: 36,
@@ -205,7 +205,7 @@ export function BrandWorkspacePanel({
               gap: 6,
             }}
           >
-            <Plus size={12} /> Gerir
+            <Plus size={12} /> Gerenciar
           </button>
         ) : null}
       </div>

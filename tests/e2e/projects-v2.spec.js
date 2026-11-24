@@ -183,7 +183,7 @@ test('Salvar cria só o projeto ativo; novo browser restaura e exclusão não re
   await openProjectLibrary(anotherPage);
   await expect(anotherPage.getByRole('button', { name:'Abrir Projeto novo', exact:true }).first()).toBeVisible();
   await anotherPage.getByRole('button', { name: 'Apagar Projeto novo' }).click();
-  await anotherPage.getByRole('button', { name: 'Confirmar eliminação' }).click();
+  await anotherPage.getByRole('button', { name: 'Confirmar exclusão' }).click();
   await expect.poll(() => cloud.deletes.length).toBe(1);
   await page.reload();
   await home(page);
@@ -301,7 +301,7 @@ test('DELETE em conflito mantém o projeto e a revisão pendente não bloqueia o
   await expect(page.getByRole('button', { name:'Abrir Projeto A', exact:true }).first()).toBeVisible();
   cloud.forceDeleteConflictOnce = true;
   await page.getByRole('button', { name: 'Apagar Projeto A' }).click();
-  await page.getByRole('button', { name: 'Confirmar eliminação' }).click();
+  await page.getByRole('button', { name: 'Confirmar exclusão' }).click();
   await expect(page.getByText(/A exclusão não foi feita/)).toBeVisible();
   expect(cloud.deletes).toHaveLength(0);
   await page.reload();

@@ -488,9 +488,9 @@ function AccountHomeShell({
                             background: 'rgba(255,59,48,0.08)',
                           }}
                         >
-                          {deletingId === entry.id ? 'Excluindo…' : 'Confirmar eliminação'}
+                          {deletingId === entry.id ? 'Excluindo…' : 'Confirmar exclusão'}
                         </button>
-                        <button type="button" onClick={() => setConfirmDeleteId(null)} aria-label="Cancelar eliminação" style={{
+                        <button type="button" onClick={() => setConfirmDeleteId(null)} aria-label="Cancelar exclusão" style={{
                           width: 44,
                           height: 44,
                           borderRadius: 8,

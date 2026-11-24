@@ -620,7 +620,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     });
     for (const name of PROJECT_NAMES.slice(1)) {
       await page.getByRole('button', { name: `Apagar ${name}`, exact: true }).click();
-      await page.getByRole('button', { name: 'Confirmar eliminação', exact: true }).click();
+      await page.getByRole('button', { name: 'Confirmar exclusão', exact: true }).click();
       await expect(page.getByRole('button', { name: `Abrir ${name}`, exact: true })).toHaveCount(0);
     }
     await page.getByRole('button', { name: 'Atualizar da conta', exact: true }).click();

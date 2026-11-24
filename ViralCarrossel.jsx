@@ -5149,7 +5149,7 @@ export default function App() {
     // Reutiliza zonas guardadas — antes repunha os defaults e perdia a foto ajustada (bug 2026-09-15).
     history.set(d => transformFormatVisuals(d, viewed => enableCanvasLayoutSlides(viewed, d.creativePreset)));
     setCanvasEditMode(true);
-    toast('Composição ativada em todos os cards. Use o toggle para mover e redimensionar zonas.', 'success');
+    toast('Composição ativada em todos os cards. Ligue «Mostrar zonas» para mover e redimensionar.', 'success');
   }, [history, toast]);
 
   const disableCanvasLayout = useCallback(() => {
@@ -8929,7 +8929,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                         </div>
                         <div style={{ opacity:0.85, fontSize:10, lineHeight:1.6 }}>
                           {appMode === 'criador' ? (
-                            <>→ Escreva o pedido na <strong style={{ color:'#fff' }}>sidebar</strong><br/>
+                            <>→ Escreva o pedido em <strong style={{ color:'#fff' }}>Criar rápido</strong><br/>
                             → Toque em <strong style={{ color:'#fff' }}>{activeProductKind === 'apresentacao' ? 'Gerar apresentação' : 'Moont Comunica'}</strong><br/>
                             → Revise e baixe {activeProductKind === 'apresentacao' ? 'o PDF' : 'os PNGs'}</>
                           ) : activeProductKind === 'apresentacao' ? (
@@ -9007,7 +9007,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       type="button"
                       onClick={() => setCaptionEditorIdx(activeIdx)}
                       title={isPresentationProject ? "Notas deste slide" : "Legenda da publicação"}
-                      aria-label={`Legenda do card ${activeIdx + 1}`}
+                      aria-label={isPresentationProject ? `Notas do slide ${activeIdx + 1}` : `Legenda do card ${activeIdx + 1}`}
                       style={{
                         minWidth:36, minHeight:36, borderRadius:9999, cursor:'pointer',
                         background: String(isPresentationProject ? slide?.caption || '' : caption).trim() ? 'var(--accent-surface)' : 'transparent',
@@ -9080,8 +9080,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     <button
                       type="button"
                       onClick={() => setThumbQaMode((v) => !v)}
-                      title={thumbQaMode ? 'Sair da prévia no celular (distância)' : 'QA: prévia à distância do polegar'}
-                      aria-label="Preview qualidade tipográfica"
+                      title={thumbQaMode ? 'Sair da prévia no tamanho do celular' : 'Ver no tamanho do celular'}
+                      aria-label="Prévia no tamanho do celular"
                       aria-pressed={thumbQaMode}
                       style={{
                         minWidth:36, minHeight:36, borderRadius:9999, cursor:'pointer',
@@ -9244,7 +9244,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                         <button
                           onClick={(e)=>{ e.stopPropagation(); setActiveIdx(i); setCaptionEditorIdx(i); }}
                           title={isPresentationProject ? "Notas deste slide" : "Legenda da publicação"}
-                          aria-label={`Legenda do card ${i+1}`}
+                          aria-label={isPresentationProject ? `Notas do slide ${i+1}` : `Legenda do card ${i+1}`}
                           style={{
                             background: String(isPresentationProject ? s.caption || '' : caption).trim() ? 'var(--accent-surface)' : 'none',
                             border:'none',

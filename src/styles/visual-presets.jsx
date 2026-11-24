@@ -320,7 +320,7 @@ const LEGACY_SOCIAL_PRESETS = [
   {
     id: 'sports_editorial',
     label: 'Sports Editorial',
-    desc: 'Título rosa pastel · header bar 3-col · badge N/M · alinhado esquerda',
+    desc: 'Fundo preto, título rosa claro em caixa alta, alinhado à esquerda',
     creativePreset: 'quick_erro_comum',
     brand: {
       bg: '#0a0a0a',
@@ -357,7 +357,7 @@ const LEGACY_SOCIAL_PRESETS = [
     id: 'case_study_neon',
     creativePreset: 'quick_decodificacao',
     label: 'Case Study Neon',
-    desc: 'Pill CTA verde-neon · estrela ornament · header 3-col · estilo case study',
+    desc: 'Fundo escuro, título branco em caixa alta e botão verde-neon',
     brand: {
       bg: '#0c0c10',
       titleColor: '#ffffff',
@@ -397,7 +397,7 @@ const LEGACY_SOCIAL_PRESETS = [
     id: 'mood_sepia',
     creativePreset: 'quick_comportamento',
     label: 'Mood Sépia',
-    desc: 'Cream centralizado · pill com hashtag · vibe mood reflexivo',
+    desc: 'Fundo marrom escuro, título creme centralizado e etiqueta com hashtag',
     brand: {
       bg: '#1a1612',
       titleColor: '#fff5d1',  // CREAM mais claro (luminância alta)
@@ -442,7 +442,7 @@ const LEGACY_SOCIAL_PRESETS = [
     id: 'bold_promo_rosa',
     creativePreset: 'quick_erro_comum',
     label: 'Bold Promo Pink',
-    desc: 'Display branco · preço riscado em âmbar sobre rosa profundo',
+    desc: 'Fundo rosa forte, título branco em caixa alta e preço riscado em âmbar',
     brand: {
       bg: '#be185d',
       titleColor: '#ffffff',
@@ -486,7 +486,7 @@ const LEGACY_SOCIAL_PRESETS = [
     id: 'reflexivo_cream',
     creativePreset: 'quick_decodificacao',
     label: 'Reflexivo Serif',
-    desc: 'Serifa creme centrada sobre grafite frio · pill de handle no rodapé',
+    desc: 'Fundo grafite, título creme com serifa, centralizado, e @ no rodapé',
     brand: {
       bg: '#16171c',
       titleColor: '#f0ead6',
@@ -528,7 +528,7 @@ const LEGACY_SOCIAL_PRESETS = [
     id: 'tabloid_keywords',
     creativePreset: 'quick_tendencia',
     label: 'Tabloid Keywords',
-    desc: 'Sans branco · accent verde-menta · marque palavras-chave com Destaque',
+    desc: 'Fundo preto, título branco e palavras-chave em verde-menta, marcadas com Destaque',
     brand: {
       bg: '#0a0a0a',
       titleColor: '#ffffff',
@@ -568,7 +568,7 @@ const LEGACY_SOCIAL_PRESETS = [
     id: 'editorial_magazine',
     creativePreset: 'tendencia_cultura',
     label: 'Editorial Magazine',
-    desc: 'Serifa Playfair elegante · estilo capa de revista lookbook',
+    desc: 'Fundo azul-marinho, título branco com serifa, como capa de revista',
     brand: {
       bg: '#1e3a5f',
       titleColor: '#ffffff',
@@ -607,7 +607,7 @@ const LEGACY_SOCIAL_PRESETS = [
     id: 'luxury_hybrid',
     creativePreset: 'quick_decodificacao',
     label: 'Luxury Hybrid',
-    desc: 'Sans bold branco + accent dourado · vibe luxo fashion editorial',
+    desc: 'Fundo marrom, título branco em caixa alta e detalhes dourados',
     brand: {
       bg: '#3e2418',
       titleColor: '#ffffff',
@@ -643,7 +643,7 @@ const LEGACY_SOCIAL_PRESETS = [
     id: 'viral_hype_dark',
     creativePreset: 'quick_erro_comum',
     label: 'Viral Hype Dark',
-    desc: 'Preto/vermelho dramático · pill "ARRASTA PRO LADO →"',
+    desc: 'Fundo preto, título branco, detalhes vermelhos e a chamada "ARRASTA PRO LADO →"',
     brand: {
       bg: '#0a0a0a',
       titleColor: '#ffffff',
@@ -680,7 +680,7 @@ const LEGACY_SOCIAL_PRESETS = [
     id: 'cinematic_hybrid',
     creativePreset: 'tendencia_cultura',
     label: 'Cinematic Hybrid',
-    desc: 'Serifa vermelha cinematic · vibe cinema noir filme',
+    desc: 'Fundo azul-noite, título vermelho com serifa, clima de cinema',
     brand: {
       bg: '#0c1018',
       // #dc2626 dava 3.94:1 numa serifa de traço fino — passava raspando no
@@ -718,7 +718,7 @@ const LEGACY_SOCIAL_PRESETS = [
     id: 'authority_black',
     creativePreset: 'quick_erro_comum',
     label: 'Authority Black',
-    desc: 'Display branco gigante · rodapé 3 colunas tipo ficha técnica',
+    desc: 'Fundo preto, título branco bem grande e rodapé em três colunas',
     brand: {
       bg: '#0a0a0a',
       titleColor: '#ffffff',
@@ -760,7 +760,7 @@ const LEGACY_SOCIAL_PRESETS = [
     id: 'minimal_clean',
     creativePreset: 'livre',
     label: 'Minimal Clean',
-    desc: 'Fundo creme · tipografia centrada · vibe Apple/Swiss',
+    desc: 'Fundo creme, título preto centralizado, visual limpo',
     brand: {
       bg: '#fafaf6',
       titleColor: '#0a0a0a',

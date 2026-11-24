@@ -93,7 +93,7 @@ export function SlideLogoPanel({
     try {
       const asset = resolveLogoAssetSource(brand, styleKit, slide);
       if (!asset) {
-        toast?.('Carrega uma logo da marca ou do projeto primeiro.', 'error');
+        toast?.('Carregue uma logo da marca ou do projeto primeiro.', 'error');
         return;
       }
       // O card selecionado é a fonte de verdade: se ele usa um PNG próprio,
@@ -120,8 +120,8 @@ export function SlideLogoPanel({
       if (!onlySelected) setStyleKit?.((prev) => ({ ...prev, logoOnGenerate: true }));
       toast?.(
         ids
-          ? `Logo aplicada em ${ids.length} card${ids.length === 1 ? '' : 's'} selecionado${ids.length === 1 ? '' : 's'}. Desfazer: Cmd+Z.`
-          : 'Logo e ajuste do card atual aplicados em todos. Desfazer: Cmd+Z.',
+          ? `Logo aplicada em ${ids.length} card${ids.length === 1 ? '' : 's'} selecionado${ids.length === 1 ? '' : 's'}. Use Desfazer para voltar.`
+          : 'Logo e ajuste do card atual aplicados em todos. Use Desfazer para voltar.',
         'success',
         5500,
       );
@@ -142,8 +142,8 @@ export function SlideLogoPanel({
     editDoc((d) => applyFormatEditToAll(d, { logoHidden: true }, ids));
     toast?.(
       ids
-        ? `Logo ocultada em ${ids.length} card${ids.length === 1 ? '' : 's'}. Desfazer: Cmd+Z.`
-        : 'Logo removida de todos os cards (a marca mantém-se). Desfazer: Cmd+Z.',
+        ? `Logo ocultada em ${ids.length} card${ids.length === 1 ? '' : 's'}. Use Desfazer para voltar.`
+        : 'Logo removida de todos os cards. A marca continua com a logo. Use Desfazer para voltar.',
       'success',
       5500,
     );
@@ -165,7 +165,7 @@ export function SlideLogoPanel({
       toast?.(
         stored.logoLowRes
           ? `Logo aplicada, mas o PNG é pequeno (<600px). Use um arquivo maior para ficar nítida.`
-          : `Logo da marca aplicada · tamanho ${LOGO_SIZE_IMPORT}px (ajuste no slider até ${LOGO_SIZE_MAX}).`,
+          : `Logo da marca aplicada · tamanho ${LOGO_SIZE_IMPORT}px (ajuste o tamanho até ${LOGO_SIZE_MAX}).`,
         stored.logoLowRes ? 'info' : 'success',
         stored.logoLowRes ? 7000 : 4000,
       );
@@ -467,7 +467,7 @@ export function SlideLogoPanel({
           </button>
         ) : (
           <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45 }}>
-            Carrega a logo da marca acima — ou importa um PNG só para este card.
+            Carregue a logo da marca acima ou importe um PNG só para este card.
           </p>
         )}
 
@@ -506,7 +506,7 @@ export function SlideLogoPanel({
             {editDoc ? <button type="button" className="vc-btn vc-btn-ghost" style={{ alignSelf: 'flex-start', fontSize: 12 }}
               onClick={() => {
                 editDoc((d) => applyFormatEditToAll(d, { logoSize: ctrl.logoSize, logoSizeChosen: true, logoOpacity: ctrl.logoOpacity }));
-                toast?.('Tamanho e opacidade da logo aplicados em todos os cards. Desfazer: Cmd+Z.', 'success');
+                toast?.('Tamanho e opacidade da logo aplicados em todos os cards. Use Desfazer para voltar.', 'success');
               }}>
               Usar tamanho e opacidade em todos os cards
             </button> : null}
