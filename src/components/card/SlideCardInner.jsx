@@ -1325,7 +1325,7 @@ const ClassicCanvasInner = React.forwardRef(({
                   style={vcHandleAvatarImgStyle(brand)}
                 />
               ) : (
-                <VcHandleAvatarFallback f={f} bg={bg} />
+                <VcHandleAvatarFallback f={f} bg={bg} forExport={forExport} />
               )}
             </div>
           </div>
@@ -1576,6 +1576,10 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
 
   const bandClickable = !!(onPhotoZoneClick && (showCanvasChrome || slideHasPendingPhotoIntent(slide)) && !slide.bgImage);
 
+  // Faixa sem foto é convite do editor: no arquivo ela guarda o espaço (o texto
+  // fica onde a pessoa viu), mas não pinta fundo nem sombra.
+  const bandEmptyInExport = forExport && (!slide.bgImage || imgErr);
+
   const photoBand = (
     <div
       role={bandClickable ? 'button' : undefined}
@@ -1588,9 +1592,9 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
         borderRadius: rad,
         overflow: 'hidden',
         position: 'relative',
-        background: bg,
+        background: bandEmptyInExport ? 'transparent' : bg,
         zIndex: 2,
-        boxShadow: 'var(--shadow-product)',
+        boxShadow: bandEmptyInExport ? 'none' : 'var(--shadow-product)',
         cursor: bandClickable ? 'pointer' : undefined,
       })}
     >
@@ -1820,7 +1824,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
                   style={vcHandleAvatarImgStyle(brand)}
                 />
               ) : (
-                <VcHandleAvatarFallback f={f} bg={bg} />
+                <VcHandleAvatarFallback f={f} bg={bg} forExport={forExport} />
               )}
             </div>
           </div>
@@ -3122,7 +3126,8 @@ const SlideCardInner = React.forwardRef(({
               ) : null}
             </div>
           )}
-          {sandwich && !hasRuntimePhoto && !showPhotoSpinner && slideHasPendingPhotoIntent(slide) && (
+          {/* Moldura de convite: só no editor. No arquivo, o texto ocupa o lugar dela. */}
+          {sandwich && !hasRuntimePhoto && !showPhotoSpinner && slideHasPendingPhotoIntent(slide) && !forExport && (
             <div
               data-vc-photo-zone="1"
               {...movSeparate('photo', {
@@ -3182,7 +3187,7 @@ const SlideCardInner = React.forwardRef(({
                 }}/>
               ) : null}
               <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 2 }} />
-              <span
+              {forExport ? null : <span
                 title="Vídeo importado"
                 style={{
                   position: 'absolute', top: f.h * 0.012, right: f.w * 0.018, zIndex: 3,
@@ -3192,7 +3197,7 @@ const SlideCardInner = React.forwardRef(({
                   backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', pointerEvents: 'none',
                   display:'inline-flex', alignItems:'center', gap:4,
                 }}
-              ><Video size={Math.max(8, f.w * 0.018)} aria-hidden/> VÍDEO</span>
+              ><Video size={Math.max(8, f.w * 0.018)} aria-hidden/> VÍDEO</span>}
             </div>
           )}
           {sandwich && !slide.videoId && imgReady && !imgErr && slide.bgImage && (
@@ -3222,7 +3227,7 @@ const SlideCardInner = React.forwardRef(({
                 }}/>
               ) : null}
               <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 2 }} />
-              {slide.bgImageSource === 'ai' ? (
+              {slide.bgImageSource === 'ai' && !forExport ? (
                 <span
                   title="Imagem gerada por IA"
                   style={{
@@ -3317,7 +3322,7 @@ const SlideCardInner = React.forwardRef(({
                     style={vcHandleAvatarImgStyle(brand)}
                   />
                 ) : (
-                  <VcHandleAvatarFallback f={f} bg={bgSolid} />
+                  <VcHandleAvatarFallback f={f} bg={bgSolid} forExport={forExport} />
                 )}
               </div>
             </div>
@@ -3635,7 +3640,7 @@ const SlideCardInner = React.forwardRef(({
                   style={vcHandleAvatarImgStyle(brand)}
                 />
               ) : (
-                <VcHandleAvatarFallback f={f} bg={bg} />
+                <VcHandleAvatarFallback f={f} bg={bg} forExport={forExport} />
               )}
             </div>
           </div>
@@ -4144,6 +4149,7 @@ function vcHandleBadgeBoxPositionStyle(brand) {
 /**
  * Badge do @ sem foto carregada. Era um anel vazio, que lido em miniatura
  * parece defeito de render; um emoji de foto diz "põe a tua aqui".
+ * O emoji é convite do editor: no arquivo exportado o anel sai sem ele.
  */
 const VC_HANDLE_AVATAR_EMOJI = '📷';
 
@@ -4155,14 +4161,14 @@ function vcHandleLabel(brand) {
   return h.startsWith('@') ? h : `@${h}`;
 }
 
-function VcHandleAvatarFallback({ f, bg }) {
+function VcHandleAvatarFallback({ f, bg, forExport = false }) {
   return (
     <div style={{
       width: '100%', height: '100%', borderRadius: '50%', background: bg,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: f.w * 0.017, lineHeight: 1, userSelect: 'none',
     }}>
-      <span aria-hidden>{VC_HANDLE_AVATAR_EMOJI}</span>
+      {forExport ? null : <span aria-hidden>{VC_HANDLE_AVATAR_EMOJI}</span>}
     </div>
   );
 }
