@@ -20,7 +20,7 @@ Evitamos: trilha que pode falhar em silêncio, ação de risco sem confirmação
 
 **Endereço.** `https://moont.ai/admin`, dentro do próprio app, sem link no menu. Para quem não tem papel, a página e a API respondem como se não existissem (404). Nada do console entra no bundle de quem não é admin: a tela é carregada sob demanda só depois que o servidor confirma o papel.
 
-**Quem entra.** Nova tabela `moont.admin_roles` (conta, papel `admin` ou `suporte`, quem concedeu, motivo, revogação). Variável `MOONT_ADMIN_ACCOUNTS` como entrada de emergência, no padrão do MUSA. Quem tem papel também modera modelos (a checagem da moderação passa a aceitar `template_moderators` ou papel de admin). Ninguém muda o próprio papel; o último admin não pode ser revogado.
+**Quem entra.** Nova tabela `moont.admin_roles` (conta, papel `admin` ou `suporte`, quem concedeu, motivo, revogação). Variável `MOONT_ADMIN_ACCOUNTS` como entrada de emergência, no padrão do MUSA. Quem tem papel também modera modelos (a checagem da moderação passa a aceitar `template_moderators` ou papel de admin). Papel se dá e se revoga por SQL; não há rota nem tela para isso. As regras "ninguém muda o próprio papel" e "o último admin não pode ser revogado" foram propostas aqui e **não estão implementadas**: nem a migração 018 nem `api/admin.js` impedem uma coisa ou outra. O que o código garante hoje é mais estreito: ninguém concede isenção à própria conta, e conta com papel de admin ou suporte não recebe nem perde isenção por outro admin (`api/admin.js`, resposta 403).
 
 **Trilha.** Tabela `moont.admin_actions` (quem, papel, ação, conta alvo, motivo obrigatório, detalhes, data), com trigger que recusa UPDATE e DELETE. Toda escrita grava a trilha na mesma transação. Abrir a ficha de uma conta também registra (leitura de dado pessoal).
 
@@ -31,7 +31,7 @@ Evitamos: trilha que pode falhar em silêncio, ação de risco sem confirmação
 3. **Isenções.** Lista das ativas e histórico. Conceder e revogar pela tela, usando o `grantAccountAccess`/`revokeAccountAccess` que já existem e já gravam auditoria.
 4. **Moderação.** A fila de modelos que hoje está na galeria, também acessível pelo console.
 5. **Saúde.** Gerações de imagem presas em "reservado", falhas recentes por motivo, últimos webhooks do Stripe recebidos, MCP/OAuth (tokens ativos).
-6. **Trilha.** Últimas ações do console, com filtro por conta.
+6. **Trilha.** Últimas ações do console. A API aceita filtrar por conta (`GET /api/admin?view=actions&target=`), mas a tela não tem campo de filtro: mostra a lista inteira (`src/admin/AdminConsole.jsx`).
 
 **API.** `api/admin.js` (uma rota, ação por parâmetro), sessão `vc_access` mais papel conferido no banco a cada chamada. Leitura por GET com página; escrita por POST com motivo obrigatório. Erros de banco saem genéricos.
 
@@ -50,7 +50,7 @@ Reembolso e mudança de plano no Stripe (continuam no painel do Stripe), envio d
 
 ## 5. Como vamos saber que funciona
 
-- Integração com PGlite: conta sem papel recebe 404 em todas as ações; papel `suporte` lê mas não concede isenção; toda escrita deixa linha em `admin_actions`; UPDATE/DELETE na trilha falham; ninguém revoga o último admin nem o próprio papel.
+- Integração com PGlite: conta sem papel recebe 404 em todas as ações; papel `suporte` lê mas não concede isenção; toda escrita deixa linha em `admin_actions`; UPDATE/DELETE na trilha falham; isenção para a própria conta e para conta com papel responde 403. Não há teste de "último admin" nem de "próprio papel", porque essas regras não existem no código (ver seção 2).
 - E2E: admin abre `/admin`, busca uma conta, vê a ficha, concede e revoga isenção com confirmação; conta comum em `/admin` vê "página não encontrada" e o bundle do console não é baixado; 390 px sem rolagem lateral.
 - Portão completo verde e capturas conferidas em tamanho real.
 
@@ -62,4 +62,4 @@ Reembolso e mudança de plano no Stripe (continuam no painel do Stripe), envio d
 - **Tela:** `/admin` (`src/admin/AdminEntry.jsx` confere o papel antes de baixar `src/admin/AdminConsole.jsx`). Abas Início, Contas (busca e ficha), Isenções, Moderação (a mesma fila da galeria), Saúde e Trilha. Tabela a partir de 900 px; cards no celular.
 - **Testes:** `tests/integration/admin-console.test.js` (PGlite com todas as migrações) e `tests/e2e/console-admin.spec.js`.
 
-**Para ligar em produção:** aplicar a migração 018, `INSERT INTO moont.admin_roles (owner_id, role, granted_by, reason) VALUES ('cus_VGFkzHLNfQZotl', 'admin', 'joao', 'Dono do produto, decisão D2 de 19/11')`, conferir `RESEND_API_KEY` e `AUTH_EMAIL_FROM` (os mesmos da recuperação de senha) e publicar.
+**Para ligar em produção:** aplicar a migração 018, `INSERT INTO moont.admin_roles (owner_id, role, granted_by, reason) VALUES ('cus_EXEMPLO0000001', 'admin', 'joao', 'Dono do produto, decisão D2 de 19/11')` (trocar `cus_EXEMPLO0000001` pelo id de cliente real, que não fica neste arquivo), conferir `RESEND_API_KEY` e `AUTH_EMAIL_FROM` (os mesmos da recuperação de senha) e publicar.
