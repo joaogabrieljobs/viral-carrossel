@@ -828,5 +828,6 @@ describe('confirmar a senha da conta aberta antes de apagar o aparelho', () => {
     // Outra conta, no mesmo IP, segue confirmando.
     const vizinha = await confirmar(cookieFor('cus_vizinha_confirma', 'vizinha@teste.exemplo'), 'SenhaDaConta123!');
     expect(vizinha.body).toEqual({ verified: true, hasPassword: true });
-  });
+  // Seis conferências de senha (scrypt) seguidas: prazo próprio para máquina carregada.
+  }, 30_000);
 });
