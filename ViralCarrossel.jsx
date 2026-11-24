@@ -1089,6 +1089,8 @@ export default function App() {
   const v2OutboxUnavailableRef = useRef(false);
   const v2MetaRevisionRef = useRef(null);
   const v2MetaBaselineRef = useRef(null);
+  // DB-04: o que esta aba recebeu da conta; base para resolver um 409 por campo.
+  const v2MetaObservedRef = useRef(null);
   const v2RestoreGenerationRef = useRef(0);
   const v2UserProfileRef = useRef(null);
   const [profileRevision, setProfileRevision] = useState(0);
@@ -2150,6 +2152,7 @@ export default function App() {
   const observeCloudMetadataV2 = useCallback((owner, metadata, snapshot) => {
     if (!PROJECTS_V2 || !owner || readDataOwner() !== owner) return;
     v2MetaRevisionRef.current = Number.isSafeInteger(metadata?.revision) ? metadata.revision : null;
+    v2MetaObservedRef.current = metadata?.metadata || null;
     if (snapshot) {
       v2UserProfileRef.current = metadata.metadata.userProfile || null;
       if (Array.isArray(metadata.metadata.hookLibrary)) {
@@ -2351,17 +2354,25 @@ export default function App() {
     }
     const fingerprint = accountMetaFingerprint(pending.snapshot);
     if (fingerprint === v2MetaBaselineRef.current) return { skipped: true };
-    const { saveAccountLibraryMetadata } = accountLibraryMeta;
-    const saved = await saveAccountLibraryMetadata(pending.snapshot, {
-      baseRevision: v2MetaRevisionRef.current,
-      expectedOwnerId,
-      localOwnerId: owner,
-      isCurrent: () => readDataOwner() === owner && v2ObservedOwnerRef.current === owner,
-      resolveRevisionConflict: true,
-    });
+    const { saveAccountLibraryMetadata, ACCOUNT_META_CONFLICT_HELP } = accountLibraryMeta;
+    let saved;
+    try {
+      saved = await saveAccountLibraryMetadata(pending.snapshot, {
+        baseRevision: v2MetaRevisionRef.current,
+        expectedOwnerId,
+        localOwnerId: owner,
+        isCurrent: () => readDataOwner() === owner && v2ObservedOwnerRef.current === owner,
+        resolveRevisionConflict: true,
+        baseMetadata: v2MetaObservedRef.current,
+      });
+    } catch (error) {
+      if (error?.code !== 'account_meta_conflict') throw error;
+      throw Object.assign(new Error(ACCOUNT_META_CONFLICT_HELP), { code: error.code, status: error.status });
+    }
     v2MetaRevisionRef.current = saved.revision;
+    v2MetaObservedRef.current = saved.metadata;
     v2MetaBaselineRef.current = fingerprint;
-    return { saved: true };
+    return { saved: true, adoptedFolders: saved.adoptedFolders };
   }, []);
 
   // Edições que ficaram só neste navegador porque o projeto foi excluído em
@@ -2504,7 +2515,7 @@ export default function App() {
         if (sendFailures.length < persisted.failures.length) deletedElsewhere = true;
         const sendFailure = combinedProjectSyncError(sendFailures, { activeId: selectedId });
         if (sendFailure) throw sendFailure;
-        await persistAccountMetadataV2(pending, { owner, expectedOwnerId });
+        const metaSaved = await persistAccountMetadataV2(pending, { owner, expectedOwnerId });
         let outbox = { pending: 0, needsReview: [] };
         let verifyWithoutOutbox = v2OutboxUnavailableRef.current;
         if (!verifyWithoutOutbox) {
@@ -2554,6 +2565,19 @@ export default function App() {
         });
         if (continuation === 'owner_changed' || continuation === 'changed_before_restore') {
           throw new Error('A biblioteca mudou durante a sincronização. Suas alterações foram preservadas; salve novamente.');
+        }
+        // DB-04: o conflito dos dados da conta foi resolvido com pastas criadas
+        // em outro dispositivo. No Sync o pull abaixo as traz; aqui a aba as
+        // adota, para a próxima gravação não apagá-las da conta.
+        if (metaSaved?.adoptedFolders && source !== 'sync') {
+          const adopted = normalizeLibraryFolders(metaSaved.adoptedFolders);
+          const adoptedIds = new Set(adopted.map((folder) => folder.id));
+          const folders = normalizeLibraryFolders([
+            ...adopted, ...(libraryFoldersPersistRef.current || []).filter((folder) => !adoptedIds.has(folder.id)),
+          ]);
+          libraryFoldersPersistRef.current = folders;
+          setLibraryFolders(folders);
+          v2MetaBaselineRef.current = accountMetaFingerprint({ ...pending.snapshot, libraryFolders: adopted });
         }
         const newerChanges = continuation === 'send_latest';
         if (newerChanges) {

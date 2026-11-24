@@ -13,6 +13,8 @@ export function cloudSyncFailureMessage(error, { localSaved = false, cloudSaved 
   if (legacy) {
     return `${localSaved ? 'Projeto salvo neste navegador. ' : ''}Sincronização incompleta: ${error?.message || 'tente novamente.'}`;
   }
+  // DB-04: o conflito é só dos dados da conta; os projetos já foram confirmados.
+  if (error?.code === 'account_meta_conflict' && error?.message) return error.message;
   return `${cloudSaved ? 'O projeto foi salvo, mas a lista não foi atualizada. ' : localSaved ? 'A edição continua neste editor, mas ainda não foi confirmada na conta. ' : ''}${error?.message || 'Não foi possível sincronizar.'}`;
 }
 

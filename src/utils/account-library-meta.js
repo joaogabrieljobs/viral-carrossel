@@ -50,22 +50,10 @@ function readLocalJson(key, fallback) {
   catch { return fallback; }
 }
 
-function withoutMergeableCollections(metadata = {}) {
-  const { hookLibrary: _hooks, customVisualPresets: _presets, ...rest } = metadata;
-  return rest;
-}
-
 function canonicalize(value) {
   if (Array.isArray(value)) return value.map(canonicalize);
   if (!isRecord(value)) return value;
   return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]));
-}
-
-function sameMetadataOutsideCollections(left, right) {
-  try {
-    return JSON.stringify(canonicalize(withoutMergeableCollections(left)))
-      === JSON.stringify(canonicalize(withoutMergeableCollections(right)));
-  } catch { return false; }
 }
 
 function mergeById(remote, local, normalize) {
@@ -98,6 +86,86 @@ function mergeConcurrentCollections(remote, local) {
     ),
   };
 }
+
+// DB-04: o projeto aberto é estado de navegação e a lista de imagens é unida
+// pelo servidor. Nenhum dos dois é edição concorrente dos dados da conta.
+const NOT_CONFLICT_FIELDS = new Set(['activeDocId', 'assetIds', 'hookLibrary', 'customVisualPresets']);
+
+function sameValue(left, right) {
+  try { return JSON.stringify(canonicalize(left ?? null)) === JSON.stringify(canonicalize(right ?? null)); }
+  catch { return false; }
+}
+
+const folderList = (value) => (Array.isArray(value) ? value.filter((folder) => folder?.id) : []);
+const sameFolder = (left, right) => !!left && !!right
+  && String(left.name || '') === String(right.name || '');
+
+/**
+ * Pastas com as três versões (a que esta aba viu, a desta aba e a da conta):
+ * cada lado mantém o que criou; exclusão ou novo nome feitos no outro aparelho
+ * valem quando esta aba não mexeu na mesma pasta. Edição dupla devolve null.
+ */
+function mergeFoldersThreeWay(base, local, remote) {
+  const baseById = new Map(folderList(base).map((folder) => [folder.id, folder]));
+  const remoteById = new Map(folderList(remote).map((folder) => [folder.id, folder]));
+  const merged = [];
+  const seen = new Set();
+  for (const folder of folderList(local)) {
+    seen.add(folder.id);
+    const before = baseById.get(folder.id);
+    const other = remoteById.get(folder.id);
+    const localChanged = !sameFolder(folder, before);
+    if (!before) { merged.push(folder); continue; } // criada aqui
+    if (!other) { // excluída no outro aparelho
+      if (localChanged) return null;
+      continue;
+    }
+    if (sameFolder(other, before) || sameFolder(other, folder)) { merged.push(folder); continue; }
+    if (localChanged) return null; // renomeada dos dois lados
+    merged.push(other);
+  }
+  for (const folder of folderList(remote)) {
+    if (seen.has(folder.id)) continue;
+    const before = baseById.get(folder.id);
+    if (!before) { merged.push(folder); continue; } // criada lá
+    // Excluída aqui: vale, a menos que tenha mudado lá depois.
+    if (!sameFolder(folder, before)) return null;
+  }
+  return merged;
+}
+
+/**
+ * Resolve um 409 dos dados da conta sem sobrescrever às cegas. Ganchos e
+ * padrões são unidos por item. Com `base` (o que esta aba recebeu da conta),
+ * um campo que só mudou aqui é gravado e as pastas são fundidas por item; um
+ * campo que mudou na conta e difere do desta aba devolve null (conflito real).
+ */
+export function resolveAccountMetadataConflict({ local = {}, remote = {}, base = null } = {}) {
+  const hasBase = isRecord(base);
+  let folders = local.folders;
+  let foldersAdopted = false;
+  for (const key of new Set([...Object.keys(local), ...Object.keys(remote)])) {
+    if (NOT_CONFLICT_FIELDS.has(key)) continue;
+    if (key === 'folders' && hasBase) {
+      const merged = mergeFoldersThreeWay(base.folders, local.folders, remote.folders);
+      if (!merged) return null;
+      foldersAdopted = !sameValue(merged.map((folder) => [folder.id, folder.name]),
+        folderList(local.folders).map((folder) => [folder.id, folder.name]));
+      folders = merged;
+      continue;
+    }
+    if (sameValue(local[key], remote[key])) continue;
+    // Diferente da conta: só passa se a conta não mexeu neste campo.
+    if (!hasBase || !sameValue(remote[key], base[key])) return null;
+  }
+  return {
+    metadata: { ...mergeConcurrentCollections(remote, local), ...(folders !== undefined ? { folders } : {}) },
+    ...(foldersAdopted ? { adoptedFolders: folders } : {}),
+  };
+}
+
+/** Orientação para o conflito que não se resolve sozinho (mesmo dado alterado nos dois lados). */
+export const ACCOUNT_META_CONFLICT_HELP = 'Marcas, pastas ou perfil foram alterados em outro dispositivo e também nesta aba. Seus projetos continuam sendo salvos na conta. Para receber a versão da conta desses dados, recarregue a página: a alteração deles feita nesta aba não será enviada.';
 
 function validateResponse(data) {
   if (data?.ok !== true || !isRecord(data.metadata)
@@ -203,7 +271,7 @@ export async function prepareAccountLibraryMetadata(snapshot = {}, {
  */
 export async function saveAccountLibraryMetadata(snapshot, {
   baseRevision, expectedOwnerId, localOwnerId, signal, isCurrent,
-  resolveRevisionConflict = false,
+  resolveRevisionConflict = false, baseMetadata = null,
 } = {}) {
   if (!Number.isSafeInteger(baseRevision) || baseRevision < 0) {
     throw error('Confirme a revisão dos dados da conta antes de salvar.', 'account_meta_bad_revision');
@@ -223,13 +291,14 @@ export async function saveAccountLibraryMetadata(snapshot, {
   }, { expectedOwnerId, localOwnerId, signal, isCurrent });
   let saved;
   let attempted = baseRevision;
+  let adoptedFolders;
   try {
     saved = await put(attempted);
   } catch (cause) {
     // Um projeto salvo neste mesmo navegador pode avançar a revisão da conta.
-    // Antes de tentar outra vez, releia a nuvem. Só hooks e presets têm merge
-    // por identidade/data; qualquer diferença nas demais coleções é conflito
-    // real e nunca deve ser sobrescrita silenciosamente.
+    // Antes de tentar outra vez, releia a nuvem. Hooks e presets têm merge
+    // por identidade/data e, com a base desta aba, pastas também (DB-04). Um
+    // campo alterado nos dois lados é conflito real e nunca é sobrescrito.
     const nextRevision = cause?.cloudRevision;
     if (!resolveRevisionConflict || cause?.status !== 409 || cause?.code !== 'account_meta_conflict'
       || !Number.isSafeInteger(nextRevision) || nextRevision === baseRevision) throw cause;
@@ -237,16 +306,22 @@ export async function saveAccountLibraryMetadata(snapshot, {
       expectedOwnerId, localOwnerId, signal, isCurrent,
     });
     guard();
-    if (remote.revision !== nextRevision
-      || !sameMetadataOutsideCollections(remote.metadata, prepared.metadata)) throw cause;
+    const resolved = remote.revision === nextRevision ? resolveAccountMetadataConflict({
+      local: prepared.metadata, remote: remote.metadata, base: baseMetadata,
+    }) : null;
+    if (!resolved) throw cause;
     attempted = nextRevision;
-    saved = await put(attempted, mergeConcurrentCollections(remote.metadata, prepared.metadata));
+    adoptedFolders = resolved.adoptedFolders;
+    saved = await put(attempted, resolved.metadata);
   }
   guard();
   if (saved.revision <= attempted) {
     throw error('A nuvem não confirmou a nova revisão dos dados da conta.', 'account_meta_bad_response');
   }
-  return { ...saved, assetsUploaded: uploaded.uploaded, assetsReused: uploaded.skipped };
+  return {
+    ...saved, assetsUploaded: uploaded.uploaded, assetsReused: uploaded.skipped,
+    ...(adoptedFolders ? { adoptedFolders } : {}),
+  };
 }
 
 /**
