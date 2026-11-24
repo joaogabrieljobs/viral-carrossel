@@ -119,6 +119,7 @@ import {
   readCustomVisualPresets,
   writeCustomVisualPresets,
 } from './src/utils/custom-visual-presets.js';
+import { saveCustomVisualPresets } from './src/utils/account-preferences.js';
 import { useScrollLock } from './src/hooks/useScrollLock.js';
 import { isPitchPath, cleanPitchSlide, cleanPitchText } from './src/utils/pitch-content.js';
 import { vcCustomTitleFace, hydrateBrandTextColors, effectiveTitleFontFamily } from './src/utils/brand-helpers.js';
@@ -1438,7 +1439,7 @@ export default function App() {
     [customVisualPresets],
   );
   useEffect(() => {
-    writeCustomVisualPresets(customVisualPresets);
+    saveCustomVisualPresets(customVisualPresets);
     if (PROJECTS_V2) queueMicrotask(() => cloudAutoPushScheduleRef.current?.());
   }, [customVisualPresets]);
   const setVisualPreset = useCallback(next => history.set(d => ({

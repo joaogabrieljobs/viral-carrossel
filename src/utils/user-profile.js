@@ -1,3 +1,5 @@
+import { canWriteAccountPreference } from './storage.js';
+
 export const USER_PROFILE_KEY = 'vc_user_profile';
 
 export const DEFAULT_USER_PROFILE = {
@@ -37,6 +39,10 @@ export function loadUserProfile() {
 
 export function saveUserProfile(profile) {
   const next = normalizeUserProfile(profile);
+  // Aba que ficou com a conta anterior não grava o perfil dela no navegador de outra.
+  if (!canWriteAccountPreference(USER_PROFILE_KEY)) {
+    throw new Error('A conta mudou em outra aba. Recarregue esta página antes de salvar o perfil.');
+  }
   localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(next));
   return next;
 }

@@ -305,9 +305,25 @@ const ACCOUNT_WRITE_KEYS = new Set([
   SK.libraryDeletedIds,
 ]);
 
+/**
+ * Preferências da conta gravadas fora da biblioteca: chave própria e ajustes de
+ * IA, ganchos, padrões visuais salvos e perfil. Uma aba que ficou aberta com a
+ * conta anterior não pode regravá-las depois que outra aba trocou a conta deste
+ * navegador (FE-25). Devolve `false` e avisa quando a gravação deve ser pulada.
+ */
+export function canWriteAccountPreference(key) {
+  if (!foreignAccountOwner()) return true;
+  if (Date.now() - lastForeignWriteNotice > 2_000 && typeof window !== 'undefined') {
+    lastForeignWriteNotice = Date.now();
+    window.dispatchEvent(new CustomEvent('vc:account-write-blocked', { detail: { key } }));
+  }
+  return false;
+}
+
 // lsSet retorna true em sucesso, false em falha.
 // Em caso de QuotaExceededError dispara evento customizado que o App escuta para exibir toast.
 const lsSet = (key, value) => {
+  if (key === SK.hookLibrary && !canWriteAccountPreference(key)) return false;
   if (ACCOUNT_WRITE_KEYS.has(key)) {
     const foreign = foreignWriteLock() || foreignAccountOwner();
     if (accountDataWriteLocked || foreign) {

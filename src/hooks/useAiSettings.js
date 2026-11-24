@@ -6,7 +6,35 @@
 import { useState, useEffect } from 'react';
 import { DEFAULT_AI_SETTINGS, normalizeAISettings } from '../config/ai-providers.js';
 import { setAIRuntimeSettings } from '../utils/ai-client.js';
-import { SK } from '../utils/storage.js';
+import { SK, canWriteAccountPreference } from '../utils/storage.js';
+
+/**
+ * Grava preferências e chaves de IA no navegador. Devolve `false` quando não
+ * gravou: storage bloqueado, ou outra aba trocou a conta e estas chaves não
+ * podem ir para o navegador de quem entrou depois.
+ */
+export function persistAISettings(aiSettings) {
+  if (!canWriteAccountPreference(SK.aiSettings)) return false;
+  try {
+    const { keys, ...safeSettings } = aiSettings;
+    localStorage.setItem(SK.aiSettings, JSON.stringify({
+      ...safeSettings,
+      persistKeys: !!aiSettings.persistKeys,
+    }));
+    if (aiSettings.persistKeys) {
+      localStorage.setItem(SK.aiKeys, JSON.stringify(keys));
+      sessionStorage.setItem(SK.aiKeys, JSON.stringify(keys));
+    } else {
+      sessionStorage.setItem(SK.aiKeys, JSON.stringify(keys));
+      localStorage.removeItem(SK.aiKeys);
+    }
+    localStorage.removeItem(SK.openaiKey);
+    sessionStorage.removeItem(SK.openaiKey);
+    localStorage.removeItem(SK.anthropicKey);
+    sessionStorage.removeItem(SK.anthropicKey);
+    return true;
+  } catch { return false; /* storage privado/bloqueado */ }
+}
 
 export function useAiSettings() {
   const [aiSettings, setAISettings] = useState(() => {
@@ -67,24 +95,7 @@ export function useAiSettings() {
 
   useEffect(() => {
     setAIRuntimeSettings(aiSettings);
-    try {
-      const { keys, ...safeSettings } = aiSettings;
-      localStorage.setItem(SK.aiSettings, JSON.stringify({
-        ...safeSettings,
-        persistKeys: !!aiSettings.persistKeys,
-      }));
-      if (aiSettings.persistKeys) {
-        localStorage.setItem(SK.aiKeys, JSON.stringify(keys));
-        sessionStorage.setItem(SK.aiKeys, JSON.stringify(keys));
-      } else {
-        sessionStorage.setItem(SK.aiKeys, JSON.stringify(keys));
-        localStorage.removeItem(SK.aiKeys);
-      }
-      localStorage.removeItem(SK.openaiKey);
-      sessionStorage.removeItem(SK.openaiKey);
-      localStorage.removeItem(SK.anthropicKey);
-      sessionStorage.removeItem(SK.anthropicKey);
-    } catch { /* storage privado/bloqueado */ }
+    persistAISettings(aiSettings);
   }, [aiSettings]);
 
   const openaiKey = aiSettings.keys.openai || '';
