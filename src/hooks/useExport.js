@@ -242,6 +242,20 @@ function listNumbers(numbers) {
   return numbers.length > 1 ? `${numbers.slice(0, -1).join(', ')} e ${numbers.at(-1)}` : String(numbers[0]);
 }
 
+/** Aviso da trava de exportação quando o texto não cabe; `numbers` começa em 1. */
+export function overflowExportMessage(numbers = [], { itemLabel = 'slide' } = {}) {
+  if (itemLabel === 'card') {
+    const where = numbers.length
+      ? `${numbers.length === 1 ? 'Card' : 'Cards'} ${listNumbers(numbers)}`
+      : 'Um card';
+    return `${where}: o texto não cabe na área do card e sairia cortado no arquivo. Abra ${numbers.length === 1 ? 'o card' : 'cada card'} e encurte o texto ou diminua o tamanho da letra.`;
+  }
+  const where = numbers.length
+    ? `${numbers.length === 1 ? 'Slide' : 'Slides'} ${listNumbers(numbers)}`
+    : 'Um slide';
+  return `${where}: o texto passa da área segura e seria cortado no arquivo. Abra ${numbers.length === 1 ? 'o slide' : 'cada slide'} e reduza o texto na aba Texto, ou aumente a caixa arrastando a borda.`;
+}
+
 /** Legacy decks keep their existing export behavior. The new planning pipeline
  * opts into measured quality gates; native evidence blocks always opt in. */
 export function assertPresentationExportQuality(scope) {
@@ -286,12 +300,7 @@ export function useExport({
         ? slides.indexOf(slide) + 1 : null))
       .filter(Boolean);
     if (overflowSlides.length || presentationOverflowAtFloor(roots).length) {
-      const where = overflowSlides.length
-        ? `${overflowSlides.length === 1 ? 'Slide' : 'Slides'} ${listNumbers(overflowSlides)}`
-        : 'Um slide';
-      throw exportQualityError(
-        `${where}: o texto passa da área segura e seria cortado no arquivo. Abra ${overflowSlides.length === 1 ? 'o slide' : 'cada slide'} e reduza o texto na aba Texto, ou aumente a caixa arrastando a borda.`,
-      );
+      throw exportQualityError(overflowExportMessage(overflowSlides, { itemLabel }));
     }
     if (isPresentation) assertPresentationExportQuality(scope);
   };

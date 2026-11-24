@@ -194,6 +194,26 @@ function overflowFitRatio(available, content) {
   return Math.min(1, parsedAvailable / parsedContent);
 }
 
+/** Os três pisos da zona; `absoluteFloor` é o menor tamanho a que ela chega. */
+function overflowFloors({
+  minScale = AUTOFIT_MIN_SCALE,
+  hardMinScale = minScale,
+  absoluteMinScale = OVERFLOW_ABSOLUTE_MIN_SCALE,
+  strictMinScale = false,
+}) {
+  const softFloor = overflowScaleFloor(minScale, AUTOFIT_MIN_SCALE);
+  const hardFloor = strictMinScale
+    ? softFloor
+    : Math.min(softFloor, overflowScaleFloor(hardMinScale, softFloor));
+  const absoluteFloor = strictMinScale
+    ? softFloor
+    : Math.min(
+      hardFloor,
+      overflowScaleFloor(absoluteMinScale, OVERFLOW_ABSOLUTE_MIN_SCALE),
+    );
+  return { softFloor, hardFloor, absoluteFloor };
+}
+
 /**
  * Calcula o passo seguinte sem perder a hierarquia entre os filhos: todos os
  * tamanhos continuam a receber o mesmo multiplicador. `minScale` e o piso
@@ -214,19 +234,12 @@ function nextOverflowScale({
   absoluteMinScale = OVERFLOW_ABSOLUTE_MIN_SCALE,
   strictMinScale = false,
 }) {
-  const softFloor = overflowScaleFloor(minScale, AUTOFIT_MIN_SCALE);
+  const { softFloor, hardFloor, absoluteFloor } = overflowFloors({
+    minScale, hardMinScale, absoluteMinScale, strictMinScale,
+  });
   const current = strictMinScale
     ? Math.max(softFloor, overflowScaleFloor(currentScale, 1))
     : overflowScaleFloor(currentScale, 1);
-  const hardFloor = strictMinScale
-    ? softFloor
-    : Math.min(softFloor, overflowScaleFloor(hardMinScale, softFloor));
-  const absoluteFloor = strictMinScale
-    ? softFloor
-    : Math.min(
-      hardFloor,
-      overflowScaleFloor(absoluteMinScale, OVERFLOW_ABSOLUTE_MIN_SCALE),
-    );
   const fixedPhoto = Math.max(0, Number(photoHeight) || 0);
   const parsedClientHeight = Number(clientHeight);
   const parsedContentHeight = Number(contentHeight);
@@ -252,6 +265,82 @@ function nextOverflowScale({
       ? absoluteFloor
       : hardFloor;
   return Math.min(current, Math.max(floor, desired));
+}
+
+/**
+ * Depois de uma medição com transbordo: a zona fica marcada como "não cabe"?
+ *
+ * O deck de piso rígido marca no próprio piso. Fora dele a marca era sempre
+ * falsa: o card do carrossel descia até o menor tamanho, continuava cortado e
+ * ninguém ficava sabendo. Com `flagAtLowestFloor` a zona marca quando já está
+ * no menor tamanho possível e o texto ainda não cabe (não há mais o que
+ * reduzir: o que sobra está cortado).
+ */
+function overflowFlagAfterMeasure({
+  effectiveScale,
+  target,
+  minScale = AUTOFIT_MIN_SCALE,
+  hardMinScale = minScale,
+  absoluteMinScale = OVERFLOW_ABSOLUTE_MIN_SCALE,
+  strictMinScale = false,
+  flagAtLowestFloor = false,
+}) {
+  if (!strictMinScale && !flagAtLowestFloor) return false;
+  const { absoluteFloor } = overflowFloors({
+    minScale, hardMinScale, absoluteMinScale, strictMinScale,
+  });
+  return effectiveScale <= absoluteFloor + 0.003 && target <= absoluteFloor + 0.003;
+}
+
+/** Folga, em px de layout do card de 1080: 2% do lado, entre 1 e 12 px. */
+function cutTolerancePx(side) {
+  return Math.min(12, Math.max(1, side * 0.02));
+}
+
+/**
+ * O bloco passa da área que o recorta? Posição do bloco dentro dela, em px de
+ * layout. A folga cobre arredondamento e a sobra de entrelinha, que não tem
+ * tinta; passar disso é texto cortado de verdade.
+ */
+function blockOutsideFrame({
+  frameWidth = 0,
+  frameHeight = 0,
+  left = 0,
+  top = 0,
+  width = 0,
+  height = 0,
+}) {
+  if (!(frameWidth > 0) || !(frameHeight > 0)) return false;
+  const tolY = cutTolerancePx(frameHeight);
+  const tolX = cutTolerancePx(frameWidth);
+  return top < -tolY
+    || left < -tolX
+    || top + height > frameHeight + tolY
+    || left + width > frameWidth + tolX;
+}
+
+/**
+ * Algum filho da zona passa da borda dela? Entrar no recuo interno não conta:
+ * quem recorta é a borda. Os retângulos vêm em px de ecrã (a pré-visualização
+ * é escalada); a razão devolve px de layout.
+ */
+function measureZoneTextCut(el) {
+  const zone = el.getBoundingClientRect?.();
+  if (!zone || !(zone.width > 0) || !(zone.height > 0)) return false;
+  const ratio = el.offsetHeight > 0 ? el.offsetHeight / zone.height : 1;
+  for (const child of el.children || []) {
+    const box = child.getBoundingClientRect?.();
+    if (!box || (!(box.width > 0) && !(box.height > 0))) continue;
+    if (blockOutsideFrame({
+      frameWidth: zone.width * ratio,
+      frameHeight: zone.height * ratio,
+      left: (box.left - zone.left) * ratio,
+      top: (box.top - zone.top) * ratio,
+      width: box.width * ratio,
+      height: box.height * ratio,
+    })) return true;
+  }
+  return false;
 }
 
 /**
@@ -333,6 +422,7 @@ function OverflowScaler({
   hardMinScale = minScale,
   absoluteMinScale = OVERFLOW_ABSOLUTE_MIN_SCALE,
   strictMinScale = false,
+  flagOverflowAtLowestFloor = false,
   onOverflowAtFloor = null,
   children,
 }) {
@@ -433,10 +523,15 @@ function OverflowScaler({
       absoluteMinScale,
       strictMinScale,
     });
-    const isOverflowingAtStrictFloor = strictMinScale
-      && effectiveScale <= strictFloor + 0.003
-      && target <= strictFloor + 0.003;
-    setOverflowAtFloor(isOverflowingAtStrictFloor);
+    setOverflowAtFloor(overflowFlagAfterMeasure({
+      effectiveScale,
+      target,
+      minScale,
+      hardMinScale,
+      absoluteMinScale,
+      strictMinScale,
+      flagAtLowestFloor: flagOverflowAtLowestFloor,
+    }));
     if (target < effectiveScale - 0.003) {
       setScale(target);
     } else if (strictMinScale && scale < strictFloor - 0.003) {
@@ -455,9 +550,48 @@ function OverflowScaler({
       {...(containerProps || {})}
       data-vc-overflow-at-floor={overflowAtFloor ? 'true' : 'false'}
       data-vc-overflow-scale={String(Number(effectiveScale.toFixed(4)))}
+      data-vc-overflow-flag={flagOverflowAtLowestFloor && !strictMinScale ? 'lowest-floor' : undefined}
       style={{ ...containerStyle, ...(containerProps?.style || {}) }}
     >
       {children(effectiveScale)}
+    </div>
+  );
+}
+
+/**
+ * Zona de texto com letra de tamanho fixo (sem OverflowScaler): só mede. Texto
+ * que passa da borda da zona sai cortado; a zona recebe então
+ * `data-vc-overflow-at-floor`, a mesma marca que a trava de exportação já lê,
+ * no editor e na árvore do arquivo.
+ *
+ * `zone` só dá nome à zona (`column`: coluna da foto em faixa; `frame`: moldura
+ * do card inteiro). `active={false}` desliga a medição (texto arrastado pela
+ * pessoa: o que se vê é o que sai).
+ */
+function OverflowFlagZone({ zone = 'column', active = true, children, ...props }) {
+  const ref = React.useRef(null);
+  const [cut, setCut] = React.useState(false);
+  const [, setMeasurementRevision] = React.useState(0);
+  // Mede a cada render, como o OverflowScaler: o texto muda sem a zona mudar.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    const next = !!(active && el && measureZoneTextCut(el));
+    setCut((previous) => (previous === next ? previous : next));
+  });
+  // Fonte que termina de carregar muda a altura do texto sem novo render.
+  React.useEffect(() => observeOverflowInvalidations(
+    ref.current,
+    () => setMeasurementRevision((revision) => revision + 1),
+  ), []);
+  return (
+    <div
+      ref={ref}
+      {...props}
+      data-vc-fit-zone={zone}
+      data-vc-overflow-at-floor={cut ? 'true' : undefined}
+    >
+      {children}
     </div>
   );
 }
@@ -471,6 +605,10 @@ export {
   CultureRichParagraphs,
   OVERFLOW_ABSOLUTE_MIN_SCALE,
   nextOverflowScale,
+  overflowFlagAfterMeasure,
+  blockOutsideFrame,
+  measureZoneTextCut,
   observeOverflowInvalidations,
   OverflowScaler,
+  OverflowFlagZone,
 };

@@ -18,7 +18,7 @@ import { logoRenderPx, presentationReadingSurface } from '../../utils/format-vie
 import { AUTOFIT_MIN_SCALE, DARK_CREAM, getComposition } from '../../utils/slide-design-system.js';
 import { normalizePresentationImgAdjust, buildPresentationImageFilter, presentationAdjustIsNeutral } from './FullscreenViewer.jsx';
 import { pctBox, CanvasZonesOverlay } from './CanvasZonesOverlay.jsx';
-import { VcBgPatternLayer, CultureInlineRich, CultureRichParagraphs, OverflowScaler } from './render-primitives.jsx';
+import { VcBgPatternLayer, CultureInlineRich, CultureRichParagraphs, OverflowScaler, OverflowFlagZone } from './render-primitives.jsx';
 import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks, inkIfReadable, accentInkOnSurface } from '../../utils/brand-visuals.js';
 import { displayListMarkers } from '../../utils/list-markers.js';
 import { brandPaletteOverrides, groundInks } from '../../utils/presentation-families.js';
@@ -1035,6 +1035,8 @@ const ClassicCanvasInner = React.forwardRef(({
         // Piso frouxo só no deck. O carrossel gerado também tem texto de apoio,
         // mas num card de 1080 um título a 32% some: fica no piso social.
         hardMinScale={presentationMode ? 0.32 : 0.45}
+        // Carrossel: no menor tamanho e ainda cortado, a zona avisa a exportação.
+        flagOverflowAtLowestFloor={!presentationMode}
       >
         {(titleScale) => (
         <div
@@ -1140,6 +1142,7 @@ const ClassicCanvasInner = React.forwardRef(({
         minScale={presentationAutofitSoftFloor(slide, 0.62)}
         strictMinScale={strictPresentationAutofit(slide)}
         hardMinScale={presentationMode ? 0.45 : 0.62}
+        flagOverflowAtLowestFloor={!presentationMode}
       >
         {(subScale) => (
         <div
@@ -1417,6 +1420,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
   /** `(chave, estiloBase) => props` do arrasto livre; vem do SlideCardInner. */
   mov = null,
   fallbackLogo = '',
+  presentationMode = false,
 }, ref) => {
   void imgModeNorm;
   const logoFallback = fallbackLogo && fallbackLogo !== brand?.logo ? fallbackLogo : '';
@@ -1639,46 +1643,49 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
     textAlign: slide.align,
     ...VC_TEXT_ZONE_STYLE,
   };
+  // A letra aqui tem tamanho fixo: a coluna só mede e avisa quando recorta.
+  // Só no carrossel; a exportação dos decks antigos continua como era.
+  const textColClips = !presentationMode && textColBase.overflow === 'hidden';
 
   let mainColumn = null;
   if (pr === 'inset_h_top') {
     mainColumn = (
       <>
         {photoBand}
-        <div {...movOu('text', { ...textColBase, padding: `${f.h * 0.014}px ${padH}px ${f.h * 0.02}px`, gap: f.h * 0.01 })}>
+        <OverflowFlagZone active={textColClips} {...movOu('text', { ...textColBase, padding: `${f.h * 0.014}px ${padH}px ${f.h * 0.02}px`, gap: f.h * 0.01 })}>
           {bothText}
-        </div>
+        </OverflowFlagZone>
       </>
     );
   } else if (pr === 'inset_h_bottom') {
     mainColumn = (
       <>
-        <div {...movOu('text', { ...textColBase, padding: `${f.h * 0.04}px ${padH}px ${f.h * 0.012}px` })}>
+        <OverflowFlagZone active={textColClips} {...movOu('text', { ...textColBase, padding: `${f.h * 0.04}px ${padH}px ${f.h * 0.012}px` })}>
           {bothText}
-        </div>
+        </OverflowFlagZone>
         {photoBand}
       </>
     );
   } else {
     mainColumn = (
       <>
-        <div {...movOu('text', {
+        <OverflowFlagZone active={textColClips} {...movOu('text', {
           ...textColBase,
           flex: '1 1 0',
           justifyContent: 'center',
           padding: `${f.h * 0.02}px ${padH}px ${f.h * 0.01}px`,
         })}>
           {titleOnlyWrapped}
-        </div>
+        </OverflowFlagZone>
         {photoBand}
-        <div {...movOu('subtitle', {
+        <OverflowFlagZone active={textColClips} {...movOu('subtitle', {
           ...textColBase,
           flex: '1 1 0',
           justifyContent: 'center',
           padding: `${f.h * 0.01}px ${padH}px ${f.h * 0.02}px`,
         })}>
           {subOnlyWrapped}
-        </div>
+        </OverflowFlagZone>
       </>
     );
   }
@@ -3411,6 +3418,7 @@ const SlideCardInner = React.forwardRef(({
         showCanvasChrome={showCanvasChrome}
         mov={mov}
         showSupportingText={presentationMode || slide.canvas?.source === 'social-preset'}
+        presentationMode={presentationMode}
         onInlineTextChange={commitInlineText}
       />
     );
@@ -3663,7 +3671,11 @@ const SlideCardInner = React.forwardRef(({
           ? Math.max(24, Math.min(92, slide.textBlockWidth))
           : null;
         return (
-          <div style={{
+          // Letra de tamanho fixo: a moldura só mede. Bloco que passa da borda
+          // do card sai cortado no editor e no arquivo, e a exportação avisa.
+          // Arrastado pela pessoa, não mede: ela escolheu onde o texto fica.
+          // Só no carrossel; a exportação dos decks antigos continua como era.
+          <OverflowFlagZone zone="frame" active={!presentationMode && !textoDeslocado} style={{
             position:'absolute', inset:0,
             padding:`${padVTop}px ${padH}px ${padVBot}px`,
             display:'flex', flexDirection:'column',
@@ -3914,7 +3926,7 @@ const SlideCardInner = React.forwardRef(({
                 </div>
               )}
             </div>
-          </div>
+          </OverflowFlagZone>
         );
       })()}
 
