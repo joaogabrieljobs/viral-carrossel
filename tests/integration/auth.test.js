@@ -812,4 +812,21 @@ describe('confirmar a senha da conta aberta antes de apagar o aparelho', () => {
     expect(res.statusCode).toBe(401);
     expect(stripeMock.customers.retrieve).not.toHaveBeenCalled();
   });
+
+  // AUTH-05 (auditoria 23/11): a confirmação saía antes do limite por conta;
+  // com a sessão de alguém dava para testar senhas sem teto.
+  it('a 6ª confirmação seguida na mesma conta recebe 429 sem conferir a senha', async () => {
+    const { salt, hash } = hashPassword('SenhaDaConta123!');
+    const customer = { id: 'cus_limite_confirma', email: 'limite@teste.exemplo', metadata: { vc_pw_salt: salt, vc_pw_hash: hash } };
+    stripeMock.customers.retrieve.mockImplementation(async (id) => (id === customer.id ? customer
+      : { id, email: 'vizinha@teste.exemplo', metadata: { vc_pw_salt: salt, vc_pw_hash: hash } }));
+    const statuses = [];
+    for (let i = 0; i < 6; i += 1) statuses.push((await confirmar(cookieFor(customer.id, customer.email), `Palpite${i}Errado!`)).statusCode);
+    expect(statuses).toEqual([401, 401, 401, 401, 401, 429]);
+    // Nem a senha certa passa depois do teto: o palpite seguinte não vira oráculo.
+    expect((await confirmar(cookieFor(customer.id, customer.email), 'SenhaDaConta123!')).statusCode).toBe(429);
+    // Outra conta, no mesmo IP, segue confirmando.
+    const vizinha = await confirmar(cookieFor('cus_vizinha_confirma', 'vizinha@teste.exemplo'), 'SenhaDaConta123!');
+    expect(vizinha.body).toEqual({ verified: true, hasPassword: true });
+  });
 });

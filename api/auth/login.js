@@ -39,6 +39,14 @@ async function confirmCurrentPassword(req, res, password) {
   }
   const hasPassword = !!(record?.salt && record?.hash);
   if (!hasPassword) return res.status(200).json({ verified: false, hasPassword: false });
+  // Limite por conta (AUTH-05): a confirmação saía antes dos limites do login e,
+  // com a sessão de alguém, cada resposta dizia se o palpite conferia, sem teto.
+  // A conta vem da sessão, então um terceiro não consegue gastar o balde alheio.
+  const limited = await consumeRateLimit(req, {
+    limit: 5, windowMs: 15 * 60_000, keyPrefix: 'login-confirm', failClosed: true,
+    subject: createHash('sha256').update(String(access.customerId)).digest('hex').slice(0, 40),
+  });
+  if (limited) return rateLimitResponse(res, limited.retryAfterSec);
   const verified = verifyPassword(String(password || ''), record);
   return res.status(verified ? 200 : 401).json(verified
     ? { verified: true, hasPassword: true }
