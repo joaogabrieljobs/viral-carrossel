@@ -5,7 +5,6 @@ import { slideImageIdentity } from './image-store.js';
 import { hasPresentationDesign, presentationForSocialFormat } from './presentation-format.js';
 import { restorePresentationPhotoComposition } from './presentation-composition.js';
 import { socialFormatPatch } from './social-visual-composition.js';
-import { clearReplacedSlideAssets } from './cloud-media-merge.js';
 
 /** Ajustes visuais que podem ser diferentes em cada proporção. Texto e foto continuam no slide. */
 const VIEW_KEYS = [
