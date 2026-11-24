@@ -99,7 +99,8 @@ export function TeamSharePanel({
 
   const applyJoined = async (res) => {
     if (typeof onShareJoined === 'function') {
-      await onShareJoined(res);
+      // Projeto local mantido como estava: a revisão publicada não é a dele.
+      if ((await onShareJoined(res))?.keptLocal) return;
     } else {
       await onDocPulled(res);
     }

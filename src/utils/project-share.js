@@ -716,6 +716,19 @@ export function teamShareDocumentsDiffer(localDoc, remoteDoc) {
   }
 }
 
+/**
+ * Entrar pelo link ou pelo código quando o projeto pode já estar na biblioteca.
+ *  - 'create': não há projeto local com esse código;
+ *  - 'replace': o local é igual ao publicado, ou a pessoa confirmou a troca;
+ *  - 'keep-local': o local tem diferenças e a pessoa não confirmou.
+ * `confirmReplace` só é chamado quando há diferença a perder.
+ */
+export function resolveTeamShareJoin({ existingDoc, remoteDoc, confirmReplace } = {}) {
+  if (!existingDoc) return 'create';
+  if (!teamShareDocumentsDiffer(existingDoc, remoteDoc)) return 'replace';
+  return confirmReplace?.() === true ? 'replace' : 'keep-local';
+}
+
 export async function pushProjectShare({ code, doc, name }) {
   const normalizedCode = normalizeShareCode(code);
   const docCode = normalizeShareCode(doc?.shareCode);

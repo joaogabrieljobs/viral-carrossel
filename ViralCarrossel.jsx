@@ -4755,7 +4755,7 @@ export default function App() {
     if (!payload?.doc || typeof payload.doc !== 'object' || !Array.isArray(payload.doc.slides) || !payload.doc.slides.length) {
       throw new Error('O link da equipe não retornou um projeto válido. Peça um novo link à equipe.');
     }
-    const { hydrateSharedDocImages, normalizeShareCode } = await import('./src/utils/project-share.js');
+    const { hydrateSharedDocImages, normalizeShareCode, resolveTeamShareJoin } = await import('./src/utils/project-share.js');
     const hydrated = await hydrateSharedDocImages(payload.doc, { code: payload.code });
     if (!isCurrent()) return false;
     const code = normalizeShareCode(payload.code || hydrated.shareCode || '');
@@ -4778,6 +4778,20 @@ export default function App() {
     const existing = code
       ? flushed.find((entry) => normalizeShareCode(entry.doc?.shareCode) === code)
       : null;
+    // GB-02: o projeto local pode ter edições que ainda não foram enviadas.
+    // Mesma pergunta do "Receber alterações"; sem o sim, nada é substituído.
+    const joinMode = resolveTeamShareJoin({
+      existingDoc: existing?.doc,
+      remoteDoc: payload.doc,
+      confirmReplace: () => typeof window === 'undefined' || window.confirm(
+        'Este projeto da equipe já está na sua biblioteca e está diferente da versão publicada. Trazer a versão da equipe substituirá suas alterações locais e limpará o histórico de Desfazer.\n\nOK substitui pela versão da equipe. Cancelar abre o seu projeto como está.',
+      ),
+    });
+    if (joinMode === 'keep-local') {
+      openDocLocal(existing.id);
+      toast('Abrimos o seu projeto como estava; nada foi substituído. Para trazer a versão da equipe, use "Receber alterações da equipe".', 'info', 8000);
+      return { keptLocal: true };
+    }
     const created = !existing;
     const queuedEntry = existing
       ? { ...existing, doc: shaped, name: existing.name || name, updatedAt: Date.now() }
@@ -4813,7 +4827,7 @@ export default function App() {
     }
     trackEvent('team_share_joined', { created: created ? '1' : '0' });
     return true;
-  }, [history.reset, queueProjectForAccount, toast]);
+  }, [history.reset, openDocLocal, queueProjectForAccount, toast]);
 
   // Link ?share=CÓDIGO (stash sobrevive ao login Google): entra e abre o projeto.
   const shareInviteInFlight = useRef(null);
