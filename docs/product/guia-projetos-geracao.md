@@ -22,9 +22,9 @@ O **material** em Add Conteúdo é a matéria-prima do post: texto-base, fontes 
 
 Abra **Prompt para gerar** e escreva um pedido concreto, por exemplo: “Crie 3 cards anunciando o lançamento do MUSA. Destaque a geração de imagens e termine com um convite para conhecer o studio.”
 
-1. Escolha um **modo narrativo**: Editorial, Profundo, Odisseia da Dor, Viral Trends, Storytelling, Passo-a-passo, Jornalístico ou Sensacionalista. **Seguir meu pedido** (Nenhum) segue o pedido e o brief sem impor uma fórmula narrativa. O **tom de voz da marca** é independente e acompanha qualquer modo quando analisado e activo.
+1. Escolha um **modo narrativo**. Na tela os nomes são: Explicar com autoridade, Ir a fundo, Falar da dor, Prender atenção, Contar uma história, Ensinar passo a passo, Tom jornalístico e Alto impacto (`src/utils/ui-depth-labels.js`). No fluxo de criar projeto os dois últimos aparecem como Informar com clareza e Criar alto impacto (`src/utils/create-project-flow.js`). Os nomes antigos (Editorial, Profundo, Odisseia da Dor, Viral Trends, Storytelling, Passo-a-passo, Jornalístico, Sensacionalista) continuam só como rótulo interno em `src/utils/generation-prompts.js`. **Seguir meu pedido** (Nenhum) segue o pedido e o brief sem impor uma fórmula narrativa. O **tom de voz da marca** é independente e acompanha qualquer modo quando analisado e activo.
 2. Escolha **Só texto** ou **Texto e imagens**. Só texto é o padrão. Imagens exigem saldo no plano ou chave própria configurada.
-3. Clique em **Gerar com contexto e referências**. A quantidade explícita no pedido é respeitada dentro do limite de 1–12 cards.
+3. Clique em **Gerar com contexto e referências**. A quantidade explícita no pedido é respeitada dentro do limite de 1–24 cards.
 4. Revise o resultado antes de exportar. O brief orienta o modelo; não elimina a necessidade de conferir fatos e o visual.
 
 No **Criar rápido**, a quantidade pode ficar em **Auto** ou ser definida antes da primeira geração. Auto respeita uma quantidade escrita no pedido e usa seis cards quando o pedido não informa esse número.
@@ -36,6 +36,10 @@ Depois de gerar, **Gerar imagens** abre a seleção de cards. Escolha todos ou s
 A opção de modo narrativo é salva no projeto. O rascunho do prompt permanece ao mudar a orientação/tamanho da tela, mas é limpo ao trocar de projeto e não é um arquivo salvo para reutilização após recarregar.
 
 Os modos de interface **Criar rápido, Controle profissional e Studio** (internamente criador/diretor/studio) controlam ferramentas visíveis; não são modos narrativos nem o plano comercial «Criador».
+
+## Trocar o estilo visual
+
+Em **Ajustes**, a troca de estilo vale para **Todos** os cards por padrão. **Este card** é a exceção: a escolha fica lembrada no projeto enquanto a aba está aberta e volta para Todos ao recarregar a página (`src/utils/style-scope-memory.js`).
 
 ## Refazer com outro tom
 
@@ -57,7 +61,7 @@ Uma solicitação já aceita pelo provedor pode continuar sendo processada. O ca
 ## Aplicar uma logo já salva
 
 1. Importe a logo PNG no contexto do projeto (ou em Marca).
-2. Preferência do projeto: **Aplicar a logo nos novos cards deste projeto** (ligada por omissão após importar).
+2. Preferência do projeto: **Aplicar a logo nos novos cards deste projeto**. Ela já vem ligada e importar a logo a mantém ligada. Vale para os cards gerados depois; importar a logo não muda os cards que já existem.
 3. Em **Marca → Logo**, use **Inserir logo em todos os cards** para os cards já existentes.
 4. Por card: ocultar, reposicionar, tamanho/opacidade ou PNG só deste card.
 
