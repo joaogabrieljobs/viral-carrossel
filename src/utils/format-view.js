@@ -5,6 +5,7 @@ import { slideImageIdentity } from './image-store.js';
 import { hasPresentationDesign, presentationForSocialFormat } from './presentation-format.js';
 import { restorePresentationPhotoComposition } from './presentation-composition.js';
 import { socialFormatPatch } from './social-visual-composition.js';
+import { clearReplacedSlideAssets } from './cloud-media-merge.js';
 
 /** Ajustes visuais que podem ser diferentes em cada proporção. Texto e foto continuam no slide. */
 const VIEW_KEYS = [
@@ -315,14 +316,16 @@ export function applyFormatEdit(doc, index, patch) {
   if (Object.keys(rest).length) {
     next = {
       ...next,
-      slides: slides.map((item, i) => {
+      // FE-06: remover ou trocar a foto (ou a logo do card) por aqui também
+      // solta o asset da conta; sem isso a mídia antiga voltava ao reabrir.
+      slides: clearReplacedSlideAssets(slides, slides.map((item, i) => {
         if (i !== index) return item;
         const merged = { ...item, ...rest };
         if (rest.elementOffsets && typeof rest.elementOffsets === 'object') {
           merged.elementOffsets = { ...(item.elementOffsets || {}), ...rest.elementOffsets };
         }
         return merged;
-      }),
+      })),
     };
   }
   return isPhotoSwap(slide, patch) ? settlePhotoSwap(next, index, patch) : next;
