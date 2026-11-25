@@ -90,7 +90,14 @@ describe('modo livre, fase 1: os 10 padrões não mudam', () => {
 const LIVRE = FREE_PRESENTATION_PRESET_ID;
 const livre = (slides = deck(), options = {}) => applyPresentationVisualPresetToSlides(slides, LIVRE, 'auto', undefined, options);
 /** Fundo real atrás do texto: a cor gravada no slide, ou o véu escuro quando o texto fica sobre a foto. */
-const fundoDoTexto = slide => (slide.presentationFreeDesign.ground === 'photo' ? '#111111' : slide.customBg);
+const fundoDoTexto = (slide, zona = 'subtitle') => slide.presentationFreeTextSurfaces?.[zona]
+  || (slide.presentationFreeDesign.ground === 'photo' ? '#111111' : slide.customBg);
+const KIT_ESCURO = { contextMd: 'Fundo: #0D1B2A\nDestaque: #E0A458\nTítulo: #F4F1DE' };
+const docKit = () => applyPresentationVisualPresetToDoc({ presentationPath: 'auto', brand: {}, slides: deck({ fotoPronta: false }), styleKit: KIT_ESCURO }, LIVRE);
+const lendo = (s, i) => {
+  expect(wcagContrast(s.titleColor, fundoDoTexto(s, 'title')), `slide ${i + 1}: título`).toBeGreaterThanOrEqual(4.5);
+  for (const cor of [s.subtitleColor, s.textColor]) expect(wcagContrast(cor, fundoDoTexto(s)), `slide ${i + 1}: ${cor} sobre ${fundoDoTexto(s)}`).toBeGreaterThanOrEqual(4.5);
+};
 
 describe('modo livre, fase 1: preset virtual', () => {
   it('presentation_free existe no catálogo, marcado como livre, fora do seletor', () => {
@@ -157,6 +164,22 @@ describe('modo livre, fase 1: diretor de arte determinístico na Apoteose', () =
     expect(hash(livre())).toBe(hash(livre()));
   });
 
+  it('sequência de design da Apoteose (paleta padrão)', () => {
+    const linha = s => [s.presentationComposition, s.presentationFreeDesign.family, s.presentationFreeDesign.ground, s.presentationFreeDesign.photo, s.presentationFreeDesign.block].join(' · ');
+    expect(livre().map(linha)).toEqual([
+      'cover · editorial · bg · half · none',
+      'content · typographic · surface · small · none',
+      'demo · cinematic · photo · full · none',
+      'content · executive · bg · small · none',
+      'content · editorial · inverse · half · none',
+      'content · executive · bg · half · none',
+      'content · cinematic · surface · half · none',
+      'content · typographic · inverse · small · none',
+      'data · editorial · bg · none · metrics',
+      'closing · executive · accent · half · none',
+    ]);
+  });
+
   it('cumpre as regras de ritmo, fundos e fotos da spec', () => {
     const slides = livre();
     expect(freeDeckViolations(slides)).toEqual([]);
@@ -190,12 +213,23 @@ describe('modo livre, fase 1: diretor de arte determinístico na Apoteose', () =
   });
 
   it('contraste de 4,5:1 entre texto e fundo em cada slide', () => {
-    livre().forEach((s, i) => {
-      const fundo = fundoDoTexto(s);
-      for (const cor of [s.titleColor, s.subtitleColor, s.textColor]) {
-        expect(wcagContrast(cor, fundo), `slide ${i + 1}: ${cor} sobre ${fundo}`).toBeGreaterThanOrEqual(4.5);
-      }
-    });
+    livre().forEach(lendo);
+  });
+
+  it('texto sobre cartão da família mede contra o cartão; o fundo da página não troca sob o cartão', () => {
+    // Conferência visual 25/11 (kit escuro): cartão modular escuro sobre fundo
+    // invertido claro, com a tinta escura do fundo: apoio ilegível.
+    const slides = docKit().slides;
+    slides.forEach(lendo);
+    const comCartao = slides.filter(s => s.presentationFreeTextSurfaces?.subtitle && s.presentationFreeTextSurfaces.subtitle !== s.customBg && s.presentationFreeDesign.ground !== 'photo');
+    expect(comCartao.length).toBeGreaterThan(0);
+    comCartao.forEach(s => expect(s.presentationGround, s.id).toBe(s.presentationFreeDesign.ground));
+  });
+
+  it('as fotos do deck têm um tratamento só (sem preto e branco de uma família)', () => {
+    const tratamentos = new Set(livre().filter(s => s.presentationFreeDesign.photo !== 'none').map(s => s.presentationPhotoTreatment));
+    expect(tratamentos.size).toBe(1);
+    expect([...tratamentos][0]).not.toMatch(/grayscale/);
   });
 
   it('fundo, tinta e destaque vêm da paleta do deck, não do destaque da marca', () => {
@@ -242,7 +276,7 @@ describe('modo livre, fase 1: diretor de arte determinístico na Apoteose', () =
     doc.slides.forEach((s, i) => {
       expect(s.presentationPaletteOverrides.accent).toBe('#E0A458');
       if (s.presentationFreeDesign.ground === 'bg') expect(s.customBg).toBe('#0D1B2A');
-      for (const cor of [s.titleColor, s.subtitleColor, s.textColor]) expect(wcagContrast(cor, fundoDoTexto(s)), `slide ${i + 1}`).toBeGreaterThanOrEqual(4.5);
+      lendo(s, i);
     });
     expect(freeDeckViolations(doc.slides)).toEqual([]);
     expect(deckDesignFromBrand({ accent: '#E0A458', bg: '#0D1B2A' }).palette).toMatchObject({ accent: '#E0A458', bg: '#0D1B2A' });

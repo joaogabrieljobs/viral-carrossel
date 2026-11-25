@@ -23,6 +23,7 @@ import {
   hasVisual, photoSizeOfLayout, resolvePresentationCompositionKind,
 } from './presentation-composition.js';
 import { pitchCompositionOverrides } from './pitch-content.js';
+import { resolveChromeColor } from './presentation-chrome.js';
 import { titleTrackingBase } from './title-tracking.js';
 import { wcagContrast } from './wcag.js';
 
@@ -351,6 +352,27 @@ export function freeSlideGeometry(slide = {}) {
   });
 }
 
+/**
+ * Cartão da família atrás de uma zona de texto (ex.: cartões do Modular): o
+ * bloco de chrome que cobre a maior parte da zona. O texto lê contra ele, não
+ * contra o fundo da página.
+ */
+function textPanel(layout, zone) {
+  if (!zone) return null;
+  const area = zone.w * zone.h;
+  const covering = (layout.chrome || []).filter((d) => {
+    if (d.t !== 'block' || !(d.w > 0) || !(d.h > 0)) return false;
+    const w = Math.min(d.x + d.w, zone.x + zone.w) - Math.max(d.x, zone.x);
+    const h = Math.min(d.y + d.h, zone.y + zone.h) - Math.max(d.y, zone.y);
+    return w > 0 && h > 0 && w * h >= area * 0.6;
+  });
+  return covering.at(-1) || null;
+}
+const hasTextPanel = layout => !!(textPanel(layout, layout.title) || textPanel(layout, layout.subtitle));
+
+/** Tratamento único das fotos no modo livre: nada de preto e branco de uma família só. */
+export const FREE_PHOTO_TREATMENT = 'saturate(0.94) contrast(1.03)';
+
 const ALTERNATIVE_KINDS = ['content', 'demo', 'divider'];
 /** Função de página fixa (capa, fecho, bloco nativo) ou null quando o diretor pode alternar. */
 function fixedKind(slide, index, count) {
@@ -396,6 +418,7 @@ function previousDesigns(previous = []) {
     ground: item?.presentationFreeDesign?.ground || item?.presentationGround || 'bg',
     photo: item?.presentationFreeDesign?.photo || (item?.presentationSuppressPhoto ? 'none' : 'half'),
     geometry: freeSlideGeometry(item || {}),
+    shape: freeSlideGeometry({ ...(item || {}), presentationFreeDesign: { ground: '' }, presentationGround: '' }),
   }));
 }
 
@@ -424,13 +447,17 @@ function candidatesFor({ slide, stage, index, count }) {
       // Bloco nativo (tabela, métricas, etapas) só em fundo claro ou de
       // superfície: o tratamento de evidência das famílias usa a tinta da
       // paleta, desenhada para esses fundos.
+      // Cartão atrás do texto: o fundo da página fica o da família, senão o
+      // cartão (cor de superfície) pode cair sobre um fundo do mesmo tom da tinta.
       const grounds = onPhoto ? ['photo']
+        : hasTextPanel(layout) ? [layout.ground]
         : hasBlocks(slide) ? ['bg', 'surface']
           : ['bg', 'surface', 'inverse', ...(ACCENT_KINDS.has(kind) ? ['accent'] : [])];
       for (const ground of grounds) {
         out.push({
           family, kind, photo: size, ground, native: onPhoto || ground === layout.ground,
           geometry: geometryOf({ ground, photo: layout.photo, scrim: !!layout.scrim, title: layout.title, subtitle: layout.subtitle }),
+          shape: geometryOf({ ground: '', photo: layout.photo, scrim: !!layout.scrim, title: layout.title, subtitle: layout.subtitle }),
         });
       }
     }
@@ -458,6 +485,9 @@ function scoreCandidate(c, { prev, role, visual, order, enough }) {
   if (prev.slice(-3).some(p => p.family === c.family)) s += 2;
   s += count('family', c.family) * 0.5;
   if (last && last.geometry === c.geometry) s += 2;
+  // Mesma página (família, foto e colunas) já usada no deck: só o fundo
+  // mudaria, e fundo claro e de superfície quase não se distinguem.
+  s += prev.filter(p => p.shape === c.shape).length * 2.5;
   return s + order.indexOf(c.family) * 0.01;
 }
 
@@ -527,6 +557,17 @@ export function freePresentationCompositionOverrides(base, {
   const inks = onPhoto
     ? { bg: palette.inverse, ink: readable('#111111', [palette.inverseInk, palette.bg, '#FFFFFF']), muted: readable('#111111', [palette.inverseMuted, palette.inverseInk, '#F5F5F7']) }
     : groundInks(family, ground, palette);
+  // Texto sobre cartão da família lê contra o cartão.
+  const zonesNow = composed.canvas?.zones || {};
+  const panelColor = (zone) => {
+    const panel = !onPhoto && textPanel(layout, zone);
+    return panel ? resolveChromeColor(family, chromeGround, panel.color, palette) : null;
+  };
+  const surfaceTitle = panelColor(zonesNow.title) || (onPhoto ? '#111111' : inks.bg);
+  const surfaceText = panelColor(zonesNow.subtitle) || (onPhoto ? '#111111' : inks.bg);
+  const titleInk = readable(surfaceTitle, [inks.ink, palette.ink, palette.inverseInk]);
+  const textInk = readable(surfaceText, [inks.ink, palette.ink, palette.inverseInk]);
+  const mutedInk = readable(surfaceText, [inks.muted, palette.muted, palette.inverseMuted, textInk]);
   const display = freeFontSpec(deck.fonts.display, 'display');
   const text = freeFontSpec(deck.fonts.text, 'text');
   const fam = familySpec(family).fonts.display;
@@ -554,9 +595,11 @@ export function freePresentationCompositionOverrides(base, {
     },
     presentationNumericTypography: { fontFamily: display.css, weight: display.weight },
     customBg: inks.bg,
-    titleColor: inks.ink,
-    subtitleColor: inks.ink,
-    textColor: inks.muted,
+    titleColor: titleInk,
+    subtitleColor: textInk,
+    textColor: mutedInk,
+    presentationFreeTextSurfaces: { title: surfaceTitle, subtitle: surfaceText },
+    presentationPhotoTreatment: FREE_PHOTO_TREATMENT,
     titleSize,
     titleWeight: display.weight,
     titleCase: display.case === 'upper' ? 'upper' : 'normal',
@@ -578,7 +621,7 @@ export function freePresentationCompositionOverrides(base, {
 /** Campos que só existem no modo livre; saem quando o deck volta a um preset comum. */
 export const FREE_SLIDE_FIELDS = Object.freeze([
   'presentationFreeDesign', 'presentationDeckDesign', 'presentationPaletteOverrides',
-  'presentationNumericTypography', 'customBg', 'titleColor', 'subtitleColor', 'textColor',
+  'presentationNumericTypography', 'presentationFreeTextSurfaces', 'customBg', 'titleColor', 'subtitleColor', 'textColor',
   'titleWeight', 'titleCase',
 ]);
 
@@ -617,8 +660,9 @@ export function freeDeckViolations(slides = []) {
     if (a?.presentationFreeDesign && a.presentationFreeDesign.family === d.family && a.presentationComposition === s.presentationComposition) {
       out.push({ code: 'free_rhythm_family_kind', slideIndex: i });
     }
-    const surface = d.ground === 'photo' ? '#111111' : s.customBg;
+    const page = d.ground === 'photo' ? '#111111' : s.customBg;
     for (const key of ['titleColor', 'subtitleColor', 'textColor']) {
+      const surface = s.presentationFreeTextSurfaces?.[key === 'titleColor' ? 'title' : 'subtitle'] || page;
       if (!s[key] || !surface || wcagContrast(s[key], surface) < 4.5) out.push({ code: 'free_contrast', slideIndex: i, field: key });
     }
   });
