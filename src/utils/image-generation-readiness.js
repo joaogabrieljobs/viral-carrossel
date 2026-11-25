@@ -1,3 +1,5 @@
+import { normalizeAccountUsage } from './account-usage.js';
+
 const text = (value) => typeof value === 'string' ? value.trim() : '';
 const ready = { canGenerate: true, reason: null, message: '' };
 const blocked = (reason, message) => ({ canGenerate: false, reason, message });
@@ -81,6 +83,27 @@ export function slideImageGenerationState(slide = {}, accessState = ready, style
     };
   }
   return { ...ready, ...instruction };
+}
+
+/**
+ * QA 24/11 (editor 7): gerar por cima de uma foto enviada troca a foto e tem
+ * custo. Devolve a pergunta para confirmar antes, ou '' quando não há foto
+ * enviada no card. Com chave própria o custo é do provedor, não do plano.
+ */
+export function importedPhotoRegenerationPrompt(slide = {}, {
+  useOwnImageKey = false, billingDisabled = false, imageQuota = null, planTier = null, itemLabel = 'card',
+} = {}) {
+  if (slide?.bgImageSource !== 'imported' || !(slide.bgImage || slide.bgImageId || slide.bgImageAssetId)) return '';
+  const intro = `Este ${itemLabel} tem uma foto que você enviou. Gerar uma imagem com IA troca essa foto.`;
+  if (useOwnImageKey) {
+    return `${intro}\n\nA nova imagem é gerada com a sua chave de imagem e a cobrança é do provedor da chave.\n\nCancelar mantém a foto e não gera nada.`;
+  }
+  if (billingDisabled) {
+    return `${intro}\n\nA cobrança está desativada neste ambiente.\n\nCancelar mantém a foto e não gera nada.`;
+  }
+  const usage = normalizeAccountUsage({ imageQuota, planTier });
+  const left = usage.hasUsage && !usage.unlimited && usage.remaining > 0 ? ` Restam ${usage.remaining} neste ciclo.` : '';
+  return `${intro}\n\nA nova imagem usa 1 crédito de imagem do plano.${left}\n\nCancelar mantém a foto e não usa crédito.`;
 }
 
 /**

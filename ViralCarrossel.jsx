@@ -259,7 +259,7 @@ import {
 import { buildProjectDesignInstructions, explicitBrandColorsFromKit, projectDesignBrandPatch, PROJECT_DESIGN_SCHEMA } from './src/utils/style-kit-design.js';
 import { buildExplicitCardScriptPrompt, canAutoApplyExplicitCardScript, parseExplicitCardScript } from './src/utils/structured-card-script.js';
 import { resolveImageReferences, migrateProjectReferences } from './src/utils/style-kit-storage.js';
-import { imageGenerationAccess, slideImageGenerationState, slidesPendingImageGeneration } from './src/utils/image-generation-readiness.js';
+import { imageGenerationAccess, importedPhotoRegenerationPrompt, slideImageGenerationState, slidesPendingImageGeneration } from './src/utils/image-generation-readiness.js';
 import { createImagePromptCutGate } from './src/utils/image-prompt-budget.js';
 import { GLOBAL_STYLE } from './src/styles/global-style.js';
 import { useExport, waitForExportReadiness } from './src/hooks/useExport.js';
@@ -5332,6 +5332,15 @@ export default function App() {
       return { ok: false, reason: imageState.reason, slideId };
     }
 
+    // QA 24/11: foto enviada só sai com confirmação e com o custo dito antes.
+    // O lote (parentSignal) pula card com foto; só chega aqui card sem os bytes.
+    const importedPhotoQuestion = parentSignal ? '' : importedPhotoRegenerationPrompt(snap, {
+      useOwnImageKey, billingDisabled: !!access?.billingDisabled, imageQuota: access?.imageQuota, planTier: access?.tier, itemLabel,
+    });
+    if (importedPhotoQuestion && !window.confirm(importedPhotoQuestion)) {
+      return { ok: false, reason: 'imported_photo_kept', slideId };
+    }
+
     slideImgGenIdsRef.current.add(slideId);
     setSlideImgGenBusy(prev => ({ ...prev, [slideId]: true }));
     const job = startAIJob(parentSignal);
@@ -5433,7 +5442,7 @@ export default function App() {
         return next;
       });
     }
-  }, [slides, fmt, imageGenerationAvailability, openaiKey, imgParams, styleKit, setSlides, setSlidesPhotoSwap, toast, activeEntry?.name, doc.visualBible]);
+  }, [slides, fmt, imageGenerationAvailability, openaiKey, imgParams, styleKit, setSlides, setSlidesPhotoSwap, toast, activeEntry?.name, doc.visualBible, access, useOwnImageKey]);
 
   useEffect(() => {
     const onQuota = (ev) => {
