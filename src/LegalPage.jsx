@@ -5,7 +5,7 @@ export const LEGAL_PAGES = {
   '/privacidade': {
     eyebrow: 'Privacidade',
     title: 'Política de privacidade',
-    updated: '23 de outubro de 2026',
+    updated: '25 de novembro de 2026',
     sections: [
       {
         heading: 'Controlador dos dados',
@@ -33,7 +33,11 @@ export const LEGAL_PAGES = {
       },
       {
         heading: 'Operadores e serviços contratados',
-        body: 'Para prestar o serviço, usamos fornecedores que tratam dados sob contrato e conforme a função necessária: Vercel para hospedagem, execução e armazenamento; Stripe para pagamentos; Google quando você escolhe entrar com Google; e os provedores de inteligência artificial escolhidos no Moont para processar as solicitações de texto ou imagem. Esses fornecedores podem usar suboperadores e aplicar transferências internacionais com as salvaguardas exigidas pela legislação aplicável.',
+        body: 'Para prestar o serviço, usamos fornecedores que tratam dados sob contrato e conforme a função necessária: Vercel para hospedagem, execução e armazenamento; Stripe para pagamentos; Google quando você escolhe entrar com Google ou aceita o Google Analytics; e os provedores de inteligência artificial escolhidos no Moont para processar as solicitações de texto ou imagem. Esses fornecedores podem usar suboperadores e aplicar transferências internacionais com as salvaguardas exigidas pela legislação aplicável.',
+      },
+      {
+        heading: 'Cookies e medição de uso',
+        body: 'Os cookies próprios do Moont servem para manter sua sessão e concluir o pagamento. Para contar visitas e ações no site usamos o Plausible, sem cookies e sem identificar o visitante. O Google Analytics é opcional e só é ligado se você aceitar: ele usa cookies e registra as páginas visitadas (sem os parâmetros do endereço, exceto os de campanha), dados do navegador e do aparelho, localização aproximada e as ações de passar pela página inicial, abrir a tela de planos, criar conta e iniciar o pagamento. Não enviamos seu e-mail nem o conteúdo dos projetos, e os recursos de publicidade ficam desligados. A base legal é o seu consentimento. O Google atua como operador e pode tratar esses dados fora do Brasil; a retenção configurada para os dados de usuário e evento é de 2 meses. Você pode mudar a escolha a qualquer momento em Preferências de cookies, no fim desta página ou no rodapé da página inicial.',
       },
       {
         heading: 'Guarda e exclusão',
@@ -136,6 +140,13 @@ export default function LegalPage() {
           <a href="/privacidade" style={{ color: '#000' }}>Privacidade</a>
           <a href="/termos" style={{ color: '#000' }}>Termos</a>
           <a href="/" style={{ color: '#000' }}>Voltar</a>
+          <button
+            type="button"
+            onClick={() => window.moontGA4?.abrirPreferencias()}
+            style={{ border: 0, background: 'none', padding: 0, color: '#000', font: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}
+          >
+            Preferências de cookies
+          </button>
         </nav>
       </main>
     </div>
