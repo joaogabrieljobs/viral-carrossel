@@ -22,13 +22,14 @@ import {
   contentAwarePresentationLayout, contentAwarePresentationOverrides, fittedTitleSize, hasBlocks,
   hasVisual, photoSizeOfLayout, resolvePresentationCompositionKind,
 } from './presentation-composition.js';
-import { estimateTitleLines, rendererSubtitleSizePercent, rendererTitleSizePercent } from './presentation-families.js';
+import { rendererSubtitleSizePercent, rendererTitleSizePercent } from './presentation-families.js';
 import { pitchCompositionOverrides } from './pitch-content.js';
 import { resolveChromeColor } from './presentation-chrome.js';
 import { titleTrackingBase } from './title-tracking.js';
 import { wcagContrast } from './wcag.js';
 import { markdownBoldAccentIntervalsUtf16 } from './text-spans.js';
 import { PRESENTATION_ICON_NAMES } from './presentation-icons.js';
+import { FREE_FONT_ADVANCES, FREE_FONT_CHARSET } from './free-font-metrics.js';
 
 export { FREE_PRESENTATION_PRESET_ID };
 
@@ -757,6 +758,58 @@ const subPxOf = size => size * 1920 * 0.028 / 100;
 const SUPPORT_MAX_PX = 32;
 const STACK_GAP = 3.5;
 
+/* Largura medida (fase 3) ---------------------------------------------------- */
+
+const advanceCache = new Map();
+/** Avanço por caractere (em) de uma fonte da biblioteca no papel pedido; null se não medida. */
+function advances(font, role) {
+  const key = `${font}|${role === 'display' ? 'display' : 'text'}`;
+  if (advanceCache.has(key)) return advanceCache.get(key);
+  const raw = FREE_FONT_ADVANCES[key];
+  let out = null;
+  if (raw) {
+    const values = raw.split(',').map(Number);
+    const map = new Map([...FREE_FONT_CHARSET].map((c, i) => [c, values[i] / 1000]));
+    const lower = [...'abcdefghijklmnopqrstuvwxyz'].map(c => map.get(c));
+    out = { map, fallback: lower.reduce((a, b) => a + b, 0) / lower.length };
+  }
+  advanceCache.set(key, out);
+  return out;
+}
+
+/**
+ * Largura de um texto (px) na fonte do deck, pelas métricas geradas do canvas
+ * (free-font-metrics.js), com o espaçamento entre letras em em. Sem kerning:
+ * fica um pouco acima do que o navegador desenha, nunca abaixo.
+ */
+export function freeTextWidth(text, px, font, role = 'text', { trackingEm = 0, upper = false } = {}) {
+  const value = upper ? String(text || '').toUpperCase() : String(text || '');
+  const table = advances(font, role);
+  const chars = [...value];
+  if (!table) return chars.length * 0.55 * px;
+  return chars.reduce((sum, c) => sum + (table.map.get(c) ?? table.fallback) + trackingEm, 0) * px;
+}
+
+/**
+ * Linhas de um texto quebrado por palavras numa coluna, com a largura real da
+ * fonte do deck (conferência da fase 2: a largura média contava 3 linhas num
+ * título que o navegador desenha em 2 e abria um vão até o apoio). Folga de 2%
+ * para a diferença de arredondamento entre a medida e o desenho.
+ */
+export function freeTextLines(value, widthPx, px, font, role = 'text', options = {}) {
+  const limit = Math.max(1, widthPx * 0.98);
+  const space = freeTextWidth(' ', px, font, role, options);
+  return String(value || '').replace(/\*\*/g, '').split('\n').reduce((total, paragraph) => {
+    let lines = 1;
+    let used = 0;
+    for (const word of paragraph.split(/\s+/).filter(Boolean)) {
+      const w = freeTextWidth(word, px, font, role, options);
+      if (used && used + space + w > limit) { lines += 1 + Math.floor(w / limit); used = w % limit; } else used += (used ? space : 0) + w;
+    }
+    return total + lines;
+  }, 0);
+}
+
 function estimateLines(value, widthPx, px, widthFactor) {
   const capacity = Math.max(1, widthPx / (px * (widthFactor || 0.55)));
   return String(value || '').replace(/\*\*/g, '').split('\n').reduce((total, paragraph) => {
@@ -781,16 +834,17 @@ function estimateLines(value, widthPx, px, widthFactor) {
  * fim da área de leitura ao lado da foto e o corpo cresce em passos de 2 px até
  * 32 px enquanto o texto estimado couber. Nunca diminui.
  */
-function compactReading({ zones, chrome, slide, titleSize, subSize, display, kind, leading, titleLeading }) {
+function compactReading({ zones, chrome, slide, titleSize, subSize, display, text, kind, leading, titleLeading }) {
   const t = zones.title;
   const sub = zones.subtitle;
   if (!t || !sub || !['content', 'demo'].includes(kind)) return null;
   if (!(sub.y >= t.y + 1) || Math.min(t.x + t.w, sub.x + sub.w) - Math.max(t.x, sub.x) <= Math.min(t.w, sub.w) * 0.4) return null;
-  // Mesma conta do aperto da pilha das famílias (tightenStack), com a fonte do
-  // deck (a largura média da biblioteca já é folgada): a zona do título encolhe para o que o
-  // título ocupa, e o apoio começa logo abaixo, sem sobrepor.
+  // Mesma conta do aperto da pilha das famílias (tightenStack), com a largura
+  // medida da fonte do deck (free-font-metrics.js): a zona do título encolhe
+  // para o que o título ocupa, e o apoio começa logo abaixo, sem sobrepor.
   const titlePx = titlePxOf(titleSize);
-  const lines = estimateTitleLines(String(slide.title || '').replace(/\*\*/g, ''), 1920 * t.w / 100 - 24, titlePx, display.widthFactor || 0.55, display.case === 'upper');
+  const lines = freeTextLines(String(slide.title || ''), 1920 * t.w / 100 - 24, titlePx, display.family, 'display',
+    { trackingEm: (display.tracking || 0) / 100, upper: display.case === 'upper' });
   const breathing = Math.max(20, titlePx * 0.44 + 1080 * 0.012);
   const needed = Math.round(((lines * titlePx * titleLeading + breathing) / 1080) * 10000) / 100 + 0.5;
   const titleZone = needed < t.h - 1 ? { ...t, h: needed } : t;
@@ -803,7 +857,8 @@ function compactReading({ zones, chrome, slide, titleSize, subSize, display, kin
   const tail = String(slide.bodyAfterImage || '').replace(/\*\*/g, '').trim();
   const widthPx = 1920 * zone.w / 100 - 24;
   const heightPx = 1080 * zone.h / 100 - 14;
-  const height = px => estimateLines(copy, widthPx, px, 0.55) * px * leading + (tail ? 0.8 * px + estimateLines(tail, widthPx, px * 0.85, 0.55) * px * 0.85 * leading : 0);
+  const copyLines = (value, px) => (text?.family ? freeTextLines(value, widthPx, px, text.family, 'text') : estimateLines(value, widthPx, px, 0.55));
+  const height = px => copyLines(copy, px) * px * leading + (tail ? 0.8 * px + copyLines(tail, px * 0.85) * px * 0.85 * leading : 0);
   const startPx = subPxOf(subSize);
   let px = startPx;
   if (copy) for (let next = Math.ceil(startPx / 2) * 2; next <= SUPPORT_MAX_PX && height(next) <= heightPx; next += 2) px = Math.max(px, next);
@@ -873,7 +928,7 @@ export function freePresentationCompositionOverrides(base, {
   const familyChrome = composed.presentationChrome?.chrome || [];
   // Cartão atrás do texto (Modular): o texto fica no cartão; não recompõe.
   const reading = !onPhoto && !hasBlocks(layoutSlide) && !hasTextPanel(layout)
-    ? compactReading({ zones, chrome: familyChrome, slide: layoutSlide, titleSize, subSize: composed.subSize, display, kind,
+    ? compactReading({ zones, chrome: familyChrome, slide: layoutSlide, titleSize, subSize: composed.subSize, display, text, kind,
       leading: (composed.subLeading || 150) / 100, titleLeading: familySpec(family).type.titleLeading || 1.05 })
     : null;
   const subSize = reading ? reading.subSize : composed.subSize;

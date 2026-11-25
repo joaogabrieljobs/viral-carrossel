@@ -260,3 +260,39 @@ describe('fase 3, defeitos da fase 2', () => {
     expect(comum.match(/style="([^"]*)"[^>]*>12%</)[1]).not.toMatch(/(?:^|;)color:/);
   });
 });
+
+describe('fase 3, defeitos da fase 2: vão entre título e apoio (deck padrão, página 2)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { estimateTitleLines } = await import('../../src/utils/presentation-families.js');
+  const { freeTextLines, freeTextWidth } = await import('../../src/utils/free-design.js');
+  const apoteose = JSON.parse(readFileSync(new URL('../fixtures/apoteose-estrutura.json', import.meta.url), 'utf8'));
+  const palavras = (n) => { const base = 'festa cidade ritmo encontro noite cultura'; let out = ''; while (out.length < n) out += (out ? ' ' : '') + base; return out.slice(0, n).trim(); };
+  const FOTO = 'data:image/png;base64,iVBORw0KGgo=';
+  const padrao = () => apoteose.slides.map((s, i) => ({
+    id: `l${i}`, title: palavras(s.titulo).replace(/^./, c => c.toUpperCase()), subtitle: palavras(s.apoio).replace(/^./, c => c.toUpperCase()), bodyAfterImage: palavras(s.final),
+    ...(s.foto ? { bgImage: FOTO, imageQuery: 'editorial photo' } : {}),
+    presentationBlocks: s.bloco ? [{ type: 'metrics', items: [1, 2, 3].map(n => ({ label: `Rótulo ${n}`, value: `${n * 12}%`, detail: palavras(55) })) }] : [],
+    presentationPlan: { visualRole: s.visualRole, purpose: s.purpose, question: 'Por quê?', keyMessage: 'Mensagem.' },
+  }));
+  const TITULO = 'Festa cidade ritmo encontro noite cultura';
+
+  it('a largura vem das métricas da fonte do deck: 2 linhas, como o navegador desenha (a média dava 3)', () => {
+    // Fraunces 380 a 81,9 px numa coluna de 897 px (página 2 da folha livre-f2).
+    expect(estimateTitleLines(TITULO, 897.6, 81.9, 0.5)).toBe(3);
+    expect(freeTextLines(TITULO, 897.6, 81.9, 'Fraunces', 'display', { trackingEm: -0.022 })).toBe(2);
+    // Medida do Chromium (canvas) para "Festa cidade ritmo" em Fraunces 380 a 100 px: ~ 735 px.
+    expect(freeTextWidth('Festa cidade ritmo', 100, 'Fraunces', 'display')).toBeGreaterThan(650);
+    expect(freeTextWidth('Festa cidade ritmo', 100, 'Fraunces', 'display')).toBeLessThan(820);
+    // Caixa alta e fonte condensada também.
+    expect(freeTextWidth('FESTA', 100, 'Anton', 'display')).toBeLessThan(freeTextWidth('FESTA', 100, 'Archivo', 'display'));
+  });
+
+  it('o apoio começa logo abaixo das 2 linhas do título', () => {
+    const s = applyPresentationVisualPresetToSlides(padrao(), FREE_PRESENTATION_PRESET_ID, 'auto')[1];
+    const { title, subtitle } = s.canvas.zones;
+    const titlePx = s.titleSize * 1920 * 0.084 / 100;
+    const duasLinhas = (2 * titlePx * 1.05 + Math.max(20, titlePx * 0.44 + 1080 * 0.012)) / 1080 * 100 + 1;
+    expect(title.h).toBeLessThanOrEqual(duasLinhas);
+    expect(subtitle.y - (title.y + title.h)).toBeLessThanOrEqual(4);
+  });
+});
