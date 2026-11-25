@@ -19,6 +19,8 @@ import { AUTOFIT_MIN_SCALE, DARK_CREAM, getComposition } from '../../utils/slide
 import { normalizePresentationImgAdjust, buildPresentationImageFilter, presentationAdjustIsNeutral } from './FullscreenViewer.jsx';
 import { pctBox, CanvasZonesOverlay } from './CanvasZonesOverlay.jsx';
 import { VcBgPatternLayer, CultureInlineRich, CultureRichParagraphs, OverflowScaler, OverflowFlagZone } from './render-primitives.jsx';
+import { useTitleStackingGuard } from './useTitleStackingGuard.js';
+import { titleBottomReservePx } from '../../utils/title-stacking.js';
 import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks, inkIfReadable, accentInkOnSurface } from '../../utils/brand-visuals.js';
 import { displayListMarkers } from '../../utils/list-markers.js';
 import { brandPaletteOverrides, groundInks } from '../../utils/presentation-families.js';
@@ -867,6 +869,14 @@ const ClassicCanvasInner = React.forwardRef(({
     const reservaPx = footerChromeReservePx(brand, f);
     if (reservaPx > 0) ({ title: tr, subtitle: sr } = textZonesAboveFooter({ title: tr, subtitle: sr }, 100 - (reservaPx / f.h) * 100));
   }
+  // Perna em cima de acento e perna cortada na última linha: o título que tem
+  // esse encontro ganha só a entrelinha/reserva que o separa (title-stacking.js).
+  const titleWrapRef = React.useRef(null);
+  const titleStack = useTitleStackingGuard(titleWrapRef, [
+    slide.title, resolvedTitleFF, resolvedTitleWeight, resolvedTitleTransform, resolvedTitleItalic,
+    resolvedTitleTracking, presentationTitleLeadingPercent(slide), tr.w, f.w,
+  ].join('|'));
+  const titleLineHeight = Math.max(presentationTitleLeadingPercent(slide) / 100, titleStack.leading);
   const photoLoaded = !!(slide.bgImage && imgReady && !imgErr);
   const photoZone = zcv.photo;
   const photoBehindText = photoLoaded && (!photoZone || zonesOverlap(photoZone, tr) || zonesOverlap(photoZone, sr));
@@ -1044,6 +1054,7 @@ const ClassicCanvasInner = React.forwardRef(({
       >
         {(titleScale) => (
         <div
+          ref={titleWrapRef}
           style={{
             width: '100%',
             minWidth: 0,
@@ -1058,7 +1069,7 @@ const ClassicCanvasInner = React.forwardRef(({
           color: titleInk,
           fontFamily: resolvedTitleFF,
           fontSize: f.w * 0.084 * (presentationTitleSizePercent(slide) / 100) * titleScale,
-          lineHeight: presentationTitleLeadingPercent(slide) / 100,
+          lineHeight: titleLineHeight,
           position: 'relative',
           paddingTop: vcTitleOvershootShift(
             f.w * 0.084 * (presentationTitleSizePercent(slide) / 100) * titleScale,
@@ -1067,10 +1078,16 @@ const ClassicCanvasInner = React.forwardRef(({
           // Nas fontes novas, descendentes também ultrapassam o line box.
           // Sem reserva inferior, flex-end cria overflow constante mesmo com
           // uma linha curta, e o autofit reduz o título até o piso à toa.
-          paddingBottom: (slide.presentationArtDirectionVersion === 2 || slide.socialCompositionVersion >= 4) ? vcTitleOvershootShift(
+          // A reserva vale sempre (0,15 em no mínimo): sem ela o título ancorado
+          // embaixo em fonte alta era reduzido à toa e a perna ficava na borda.
+          paddingBottom: titleBottomReservePx(
             f.w * 0.084 * (presentationTitleSizePercent(slide) / 100) * titleScale,
-            presentationTitleLeadingPercent(slide),
-          ) : 0,
+            (slide.presentationArtDirectionVersion === 2 || slide.socialCompositionVersion >= 4) ? vcTitleOvershootShift(
+              f.w * 0.084 * (presentationTitleSizePercent(slide) / 100) * titleScale,
+              presentationTitleLeadingPercent(slide),
+            ) : 0,
+            titleStack.reserve,
+          ),
           boxSizing: 'content-box',
           fontWeight: resolvedTitleWeight,
           letterSpacing: `${titleLetterSpacingEm(resolvedTitleFF, resolvedTitleTracking)}em`,
@@ -1099,7 +1116,7 @@ const ClassicCanvasInner = React.forwardRef(({
             accentColor={cultureAccentCol}
             fontFamily={resolvedTitleFF}
             fontSize={f.w * 0.084 * (presentationTitleSizePercent(slide) / 100) * titleScale}
-            lineHeight={presentationTitleLeadingPercent(slide) / 100}
+            lineHeight={titleLineHeight}
             fontWeight={resolvedTitleWeight}
             letterSpacing={`${titleLetterSpacingEm(resolvedTitleFF, resolvedTitleTracking)}em`}
           />
