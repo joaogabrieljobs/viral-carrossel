@@ -164,7 +164,7 @@ export function validatePresentationPlan(raw, { count, sources = [] } = {}) {
 
 export function buildPresentationPlanBlock(plan) {
   if (!isObject(plan) || !Array.isArray(plan.slides)) throw new Error('Plano de apresentação indisponível.');
-  return `\nPLANO EDITORIAL VALIDADO — CONTRATO DA REDAÇÃO:\n${JSON.stringify(plan)}\nSiga a ordem, pergunta, contribuição e estágio de cada posição. Use exclusivamente as evidências mapeadas e os fatos disponíveis, sem transformar proposta em resultado. Desenvolva o argumento com clareza dentro dos limites de texto. Os IDs, citações internas e lacunas de planejamento não são rodapés nem rótulos visíveis. Atribua a imagem apenas quando imageBrief contribuir; imagem não substitui informação. Não insira o plano no JSON final.\n`;
+  return `\nPLANO EDITORIAL VALIDADO — CONTRATO DA REDAÇÃO:\n${JSON.stringify(plan)}\nSiga a ordem, pergunta, contribuição e estágio de cada posição. Use exclusivamente as evidências mapeadas e os fatos disponíveis, sem transformar proposta em resultado. Desenvolva o argumento com clareza dentro dos limites de texto. Os IDs, citações internas e lacunas de planejamento não são rodapés nem rótulos visíveis. As lacunas (gaps) são mostradas à pessoa fora do slide, no aviso sobre o material: nunca as escreva em título, apoio ou bloco. Atribua a imagem apenas quando imageBrief contribuir; imagem não substitui informação. Não insira o plano no JSON final.\n`;
 }
 
 /** Persist only compact provenance and layout intent, never the full uploaded documents. */

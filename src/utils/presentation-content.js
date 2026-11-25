@@ -3,6 +3,8 @@
  * Recebe o caminho já normalizado pelo domínio de apresentações.
  * Não altera schema, composição nem limites visuais.
  */
+import { PRESENTATION_GAP_RULE } from './factual-grounding.js';
+
 export const PRESENTATION_PROVENANCE_RULE = `ENTREGA FINAL AUTÔNOMA: fale diretamente ao público. Não mencione o arquivo enviado, upload, manual de referência, processo de extração, "matéria-prima" ou "segundo o material". Manuais orientam o método; seus exemplos não são fatos do projeto. Preserve instituição, estudo e ano fornecidos quando necessários para contextualizar uma evidência; isso é diferente de citar o documento de entrada. Não invente fontes e não esconda limitações.`;
 
 export const PRESENTATION_FIELD_GROUNDING_RULES = `FIDELIDADE EM TODOS OS CAMPOS:
@@ -15,6 +17,7 @@ export const PRESENTATION_FIELD_GROUNDING_RULES = `FIDELIDADE EM TODOS OS CAMPOS
 - Preserve a identidade da unidade observada: mesmo tamanho de amostra, mesmo tipo e mesmas equipes não significam as mesmas observações repetidas. Se o segundo período contém outras ocorrências, mantenha essa distinção também nas notas e no resumo; não troque proporção de eventos por proporção de pessoas.
 - Finalidade ou mecanismo proposto não comprovam diagnóstico nem causa do problema. Sem evidência, não afirme que essa causa existia nem que o método “gerou”, “impactou” ou “resolveu” o resultado. Em antes/depois sem atribuição causal sustentada, descreva mudanças observadas e o que o método busca organizar; uma ressalva em outra página não corrige uma afirmação categórica. O mesmo rigor vale para “garante” e outras promessas nas notas.
 - Escopo comercial visível mantém quantidades, entregáveis, exclusões, responsabilidades e condições que mudam a decisão. Não substitua uma exclusão por outra parecida: licenças de software não equivalem a software próprio. Resuma sem ampliar ou reduzir o compromisso. Preserve qualificadores temporais das exclusões; excluir atendimento após um período não exclui o atendimento durante todo o programa. Compare categorias equivalentes em tabelas.
+${PRESENTATION_GAP_RULE}
 - speakerNotes aprofunda a fala com informações sustentadas; não contém instruções para o gerador nem corrige silenciosamente uma omissão essencial do slide.`;
 
 // Redação, revisão e refinamento aceitam cenário didático fornecido ou pedido;

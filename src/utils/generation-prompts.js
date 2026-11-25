@@ -1485,7 +1485,7 @@ Preferências do usuário para APRESENTAÇÃO 16:9 (viés suave — ${hasWeb ? '
 - Caminho do deck: ${presentationPath || 'auto'}.
 - Procure afirmações que possam ser sustentadas por evidência, possíveis ângulos de explicação e a decisão, aprendizagem ou ação que cada ângulo ajuda o público a tomar.
 - Uma abertura de apresentação orienta a sala com contexto, tensão ou conclusão. Não use fórmulas de parada de scroll, cliffhanger, promessa viral, CTA social ou linguagem de carrossel.
-- Prefira evidência verificável, comparação, demonstração, dado com unidade/período e fonte, caso real ou diagrama explicativo. Identifique claramente hipóteses e lacunas.
+- Prefira evidência verificável, comparação, demonstração, dado com unidade/período e fonte, caso real ou diagrama explicativo. Identifique claramente as hipóteses. O que falta fica só no campo warning, nunca em título, ângulo, evidência ou abertura.
 `;
   }
   const m = GEN_MODE_BY_ID[narrativeModeId] || GEN_MODE_BY_ID.editorial;

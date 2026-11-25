@@ -416,6 +416,11 @@ export function auditDraftFactuality(draft, config = {}) {
  * concorrentes…", "…não foram documentados", "Faltam combinar o endereço…").
  */
 export const NO_GAP_NOTE_RULE = 'Nunca escreva no card ou slide que um dado falta, não foi informado, não foi documentado ou não existe (ex.: "não há dados de…", "não foram documentados", "faltam definir o endereço"). Mostre o que o material traz; o que falta fica fora do texto visível.';
+// QA 24/11 (texto 1): a apresentação não recebia a regra acima (só a ressalva
+// essencial) e a lacuna virou slide inteiro em Pitch, Proposta, Relatório e
+// Caso do briefing em inglês. O que falta vai para gaps do plano, que a pessoa
+// lê no aviso de material, fora do slide.
+export const PRESENTATION_GAP_RULE = '- O texto visível do slide (title, subtitle, bodyAfterImage e presentationBlocks) nunca diz que um dado falta, não foi informado, não foi documentado, não foi especificado ou não pode ser avaliado (ex.: "no prior results documented", "unspecified", "cannot be evaluated", "based on the available evidence", "não há dados de…", "não especificado"). Nenhum slide, linha de tabela ou métrica tem a lacuna como assunto. O que falta fica em gaps do plano, que a pessoa lê fora do slide; na página, mostre o que o material traz. Decisão pendente só entra quando o próprio material diz que ela está em aberto; ausência de dado não é decisão pendente.';
 
 export function buildFactualGroundingPrompt(config = {}) {
   const source = config.factualSource ?? config.commercialClaimSource;
@@ -473,31 +478,82 @@ const BRIEFING_NOTE_MORE = /\b(?:n[ãa]o\s+h[áa]\s+(?:dados?|informa[çc](?:[ã
 // "not available in the material provided". "Your data is not shared" fica.
 const BRIEFING_NOTE_EN = /\b(?:(?:was|were)\s+not\s+(?:specified|provided|detailed|shared|included|mentioned|given|stated|documented)\b|(?:is|are)\s+not\s+(?:specified|detailed|mentioned|stated|documented)\b|not\s+(?:specified|provided|detailed|mentioned|stated|available)\s+in\s+the\s+(?:material|brief|briefing)\b|(?:in|from)\s+the\s+(?:material|brief|briefing)\s+(?:provided|supplied|shared)\b)|^\s*no\s+[^.!?]{0,60}\b(?:was|were)\s+(?:shared|provided|given)\b/iu;
 
+// QA 24/11 (texto 1), BLK FROGDAY em produção: a lacuna voltou em redações que
+// as regras acima não viam ("No prior results documented", "Timeline:
+// unspecified", "…cannot be evaluated", "The available evidence does not
+// show…") e nas equivalentes em português. Fato do cliente fica: "No payment
+// until you see the site", "Every step is documented in your dashboard",
+// "Não dá para comparar com o pão de mercado".
+// Sem vírgula entre o "no/sem/nenhum" e o particípio, e particípio no fim da
+// oração em português: "Sem surpresas, tudo detalhado na proposta" e "Nenhum
+// valor é cobrado sem ser informado antes" são fala do cliente.
+const GAP_NOTE_EN = /\bno\s+(?:prior|previous|past|earlier|historical)\s+[^.!?;:,]{0,60}\b(?:documented|recorded|reported|provided|available|specified|shared|disclosed|on\s+(?:record|file))\b|^\s*no\s+[^.!?;:,]{0,60}\b(?:is|are|was|were|has\s+been|have\s+been)\s+(?:documented|recorded|reported|specified|disclosed)\b|\bno\s+(?:data|information|evidence|details?|figures|metrics|benchmarks?|market\s+sizing)\s+(?:(?:is|are|was|were)\s+)?(?:available|provided|documented|on|about|regarding)\b|\b(?:unspecified|undocumented)\b|^\s*(?:not|never)\s+(?:specified|provided|stated|mentioned|detailed|informed)\s*\.?\s*$|\b(?:not|never)\s+(?:yet\s+)?(?:been\s+)?(?:documented|disclosed)\b|\b(?:cannot|can\s?not|can['’]t|could\s+not|couldn['’]t)\s+(?:yet\s+)?be\s+(?:evaluated|assessed|verified|determined|measured|compared|quantified|validated|estimated|established|judged)\b|\b(?:(?:it\s+is|it['’]s)\s+)?(?:not\s+possible|impossible)\s+to\s+(?:evaluate|assess|verify|determine|measure|quantify|validate|estimate)\b|\b(?:the\s+)?available\s+(?:evidence|documentation)\b|\bevidence\s+available\b|\binsufficient\s+(?:data|information|evidence|details?|documentation)\b|\black\s+of\s+(?:data|information|evidence|documentation)\b/iu;
+const GAP_NOTE_PT = /\b(?:nenhum[a]?|sem|n[ãa]o\s+h[áa])\s+[^.!?;:,]{0,60}\b(?:documentad|especificad|informad|divulgad|detalhad)[oa]s?(?=\s*(?:[.!?;:,]|$))|\bn[ãa]o\s+h[áa]\s+(?:dimensionamento|estimativas?|m[ée]tricas?|evid[êe]ncias?|comprova[çc][ãa]o|valida[çc](?:[ãa]o|[õo]es)|benchmarks?)\b|\bn[ãa]o\s+(?:pode(?:m)?|d[áa]\s+para|[ée]\s+poss[ií]vel|foi\s+poss[ií]vel)\s+(?:se\s+)?(?:ser\s+(?:avaliad|verificad|medid|comparad|determinad|estimad|quantificad|mensurad|aferid)[oa]s?|avaliar|verificar|medir|determinar|estimar|quantificar|mensurar|aferir)\b|\bevid[êe]ncias?\s+dispon[ií]ve(?:l|is)\b|\b(?:dados|informa[çc][õo]es|evid[êe]ncias?|detalhes)\s+insuficientes\b|\bfalta\s+de\s+(?:dados|informa[çc](?:[ãa]o|[õo]es)|evid[êe]ncias?|documenta[çc][ãa]o)\b/iu;
+// "Based on the available evidence, the offer targets small businesses.": a
+// ressalva de abertura sai e a afirmação fica.
+const GAP_HEDGE = /^\s*(?:(?:based\s+on|from|given|according\s+to)\s+(?:the\s+)?(?:available|provided|supplied)\s+(?:evidence|information|data|material|details|documentation)|(?:based\s+on|from|given|according\s+to)\s+(?:the\s+)?(?:evidence|information|data|material|details|documentation)\s+(?:available|provided|supplied|shared)|(?:com\s+base\s+n[oa]s?|a\s+partir\s+d[oa]s?|segundo|conforme|pel[oa]s?)\s+(?:(?:[oa]s?)\s+)?(?:evid[êe]ncias?|informa[çc](?:[ãa]o|[õo]es)|dados|materia(?:l|is)|documenta[çc][ãa]o)\s+(?:dispon[ií]ve(?:l|is)|fornecid[oa]s?|enviad[oa]s?|recebid[oa]s?))\s*[,:]\s*(?=\S)/iu;
+
+const noteSentence = text => BRIEFING_NOTE.test(text) || BRIEFING_NOTE_MORE.test(text) || BRIEFING_NOTE_EN.test(text) || GAP_NOTE_EN.test(text) || GAP_NOTE_PT.test(text);
+
 export function isBriefingNote(sentence) {
   const text = String(sentence || '');
-  return BRIEFING_NOTE.test(text) || BRIEFING_NOTE_MORE.test(text) || BRIEFING_NOTE_EN.test(text);
+  return noteSentence(text) || GAP_HEDGE.test(text);
 }
 
 /** Remove frases inteiras que comentam o briefing. Preserva o resto do texto. */
 // "Preços definidos; investimento não informado" (título de Proposta, reteste
 // 20/11): só a oração da nota sai, o resto do título fica.
-function dropNoteClauses(sentence) {
-  if (!isBriefingNote(sentence) || !/[;:]/.test(sentence)) return sentence;
-  const kept = sentence.split(/\s*[;:]\s*/u).filter(clause => clause && !isBriefingNote(clause));
-  if (!kept.length) return '';
+function dropNoteClauses(sentence, notes) {
+  const hedge = GAP_HEDGE.exec(sentence);
+  if (hedge) {
+    const rest = sentence.slice(hedge[0].length);
+    sentence = rest.charAt(0).toUpperCase() + rest.slice(1);
+  }
+  if (!noteSentence(sentence)) return sentence;
+  if (!/[;:]/.test(sentence)) { notes.push(sentence.trim()); return ''; }
+  const clauses = sentence.split(/\s*[;:]\s*/u).filter(Boolean);
+  const kept = clauses.filter(clause => !noteSentence(clause));
+  // "Timeline: unspecified." é uma lacuna só; o rótulo sozinho não é texto.
+  if (!kept.length || (clauses.length === 2 && kept.length === 1 && kept[0] === clauses[0] && /:/.test(sentence) && kept[0].split(/\s+/).length <= 4)) { notes.push(sentence.trim()); return ''; }
+  notes.push(...clauses.filter(clause => noteSentence(clause)).map(clause => clause.trim()));
   const joined = kept.join('; ');
   return /[.!?…]$/u.test(sentence) && !/[.!?…]$/u.test(joined) ? `${joined}.` : joined;
 }
 
-export function stripBriefingNotes(text) {
-  if (typeof text !== 'string' || !text || !isBriefingNote(text)) return text;
-  return text
+/**
+ * QA 24/11 (texto 1): além do texto sem a nota, devolve as frases tiradas. A
+ * lacuna não some: vai para o aviso de material, fora do slide.
+ */
+export function splitBriefingNotes(text) {
+  if (typeof text !== 'string' || !text || !isBriefingNote(text)) return { text, notes: [] };
+  const notes = [];
+  const kept = text
     .split(/\n/)
-    .map(line => line.split(/(?<=[.!?…])\s+/u).map(dropNoteClauses).filter(sentence => sentence && !isBriefingNote(sentence)).join(' '))
+    .map(line => line.split(/(?<=[.!?…])\s+/u).map(sentence => dropNoteClauses(sentence, notes)).filter(Boolean).join(' '))
     .filter((line, index, lines) => line.trim() || (index > 0 && index < lines.length - 1 && lines[index - 1].trim()))
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+  return { text: kept, notes };
+}
+
+export function stripBriefingNotes(text) {
+  return splitBriefingNotes(text).text;
+}
+
+/** Texto do aviso "Sobre o material" com as lacunas que ficaram fora do slide. */
+export function materialGapNotice(gaps) {
+  const seen = new Set();
+  const items = (Array.isArray(gaps) ? gaps : []).map(gap => String(gap || '').replace(/\s+/g, ' ').trim().replace(/[.;]+$/, '')).filter(gap => {
+    const key = gap.toLowerCase();
+    if (!gap || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (!items.length) return '';
+  const shown = items.slice(0, 4).map(gap => `“${gap.length > 140 ? `${gap.slice(0, 139).trim()}…` : gap}”`);
+  const more = items.length > shown.length ? ` e mais ${items.length - shown.length}` : '';
+  return `Ficou fora do texto, porque o material não traz essa informação: ${shown.join('; ')}${more}. Para incluir, acrescente os dados ao material e gere de novo.`;
 }
 
 /**

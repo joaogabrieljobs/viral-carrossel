@@ -7,7 +7,7 @@ import { buildPresentationPlanBlock, attachPresentationPlan } from './presentati
 import { generatePresentationPlan, parsePresentationPlanResponse, presentationResponseMetadata } from './presentation-planning.js';
 import { buildPresentationBlocksPrompt, normalizePresentationBlocks } from './presentation-quality.js';
 import { requiresSocialTitles, recoverSocialTitle, recoverSocialTitleForEditing, missingSocialTitleIndexes, auditSocialTextDensity, buildSocialTextLimitsPrompt } from './social-generation.js';
-import { auditDraftFactuality, auditUnsupportedCommercialClaims, buildFactualGroundingPrompt, buildReviewFactCheckPrompt, replaceEmDashes } from './factual-grounding.js';
+import { auditDraftFactuality, auditUnsupportedCommercialClaims, buildFactualGroundingPrompt, buildReviewFactCheckPrompt, replaceEmDashes, splitBriefingNotes } from './factual-grounding.js';
 export { auditUnsupportedCommercialClaims } from './factual-grounding.js';
 
 const isObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -255,6 +255,66 @@ function mapBlockText(blocks, fn) {
   return blocks.map(block => block.type === 'comparison'
     ? { ...block, headers: block.headers.map(map), rows: block.rows.map(row => row.map(map)) }
     : { ...block, items: block.items.map(item => Object.fromEntries(Object.entries(item).map(([key, value]) => [key, map(value)]))) });
+}
+
+/**
+ * QA 24/11 (texto 1): a lacuna do briefing virou slide ("No prior results
+ * documented", célula "Unspecified"). A frase sai do texto visível, inclusive
+ * dos blocos, e é devolvida para o aviso de material. Linha de tabela, métrica
+ * ou etapa cujo valor é só a lacuna sai inteira; o bloco que não se sustenta
+ * sem ela sai também.
+ */
+function blocksWithoutGapNotes(blocks, gaps) {
+  const clean = value => {
+    if (typeof value !== 'string') return value;
+    const { text, notes } = splitBriefingNotes(value);
+    return { text, notes, emptied: !String(text).trim() && !!value.trim() };
+  };
+  return blocks.flatMap((block) => {
+    if (block?.type === 'comparison' && Array.isArray(block.rows) && Array.isArray(block.headers)) {
+      if (block.headers.some(header => clean(header).emptied)) { gaps.push(block.headers.join(' / ')); return []; }
+      const rows = block.rows.flatMap((row) => {
+        const cells = row.map(clean);
+        if (cells.some(cell => cell.emptied)) { gaps.push(`${row[0]}: ${row.slice(1).join(' / ')}`); return []; }
+        cells.forEach(cell => gaps.push(...cell.notes));
+        return [cells.map(cell => cell.text)];
+      });
+      return rows.length ? [{ ...block, rows }] : [];
+    }
+    if (!Array.isArray(block?.items)) return [block];
+    const main = block.type === 'metrics' ? ['label', 'value'] : ['title'];
+    const items = block.items.flatMap((item) => {
+      const cells = Object.fromEntries(Object.entries(item).map(([key, value]) => [key, clean(value)]));
+      if (main.some(key => cells[key]?.emptied)) { gaps.push(main.map(key => item[key]).filter(Boolean).join(': ')); return []; }
+      Object.values(cells).forEach(cell => Array.isArray(cell?.notes) && gaps.push(...cell.notes));
+      return [Object.fromEntries(Object.entries(cells).map(([key, cell]) => [key, typeof item[key] === 'string' ? cell.text : item[key]]))];
+    });
+    return items.length >= (block.type === 'steps' ? 2 : 1) ? [{ ...block, items }] : [];
+  });
+}
+
+export function moveGapNotesOutOfSlides(draft) {
+  const gaps = [];
+  const emptiedTitles = [];
+  let changed = false;
+  const slides = (Array.isArray(draft?.slides) ? draft.slides : []).map((slide, slideIndex) => {
+    const next = { ...slide };
+    for (const field of PRESENTATION_TEXT_FIELDS) {
+      if (typeof slide?.[field] !== 'string') continue;
+      const { text, notes } = splitBriefingNotes(slide[field]);
+      if (text === slide[field]) continue;
+      changed = true;
+      next[field] = text;
+      gaps.push(...notes);
+      if (field === 'title' && !text.trim()) emptiedTitles.push(slideIndex);
+    }
+    if (Array.isArray(slide?.presentationBlocks) && slide.presentationBlocks.length) {
+      const blocks = blocksWithoutGapNotes(slide.presentationBlocks, gaps);
+      if (JSON.stringify(blocks) !== JSON.stringify(slide.presentationBlocks)) { changed = true; next.presentationBlocks = blocks; }
+    }
+    return next;
+  });
+  return { draft: changed ? { ...draft, slides } : draft, gaps, emptiedTitles };
 }
 
 export function validateCarouselDraft(rawDraft, { count, presetId, densityId, presentationPath, nativeBlocks = true, narrativeMode, allowMissingSocialTitles = false, allowLongSocialSupport = false, allowIncompleteDraft = false }) {
@@ -811,10 +871,14 @@ Reescreva frases completas para respeitar o limite. Preserve números, condiçõ
 function finishSocialReview(result, reviewStatus, violations = []) {
   const normalization = (Array.isArray(result.normalizationIssues) ? result.normalizationIssues : []).map(code => ({ kind:'normalization', slideIndex:null, code }));
   const all = [...violations, ...normalization];
+  // QA 24/11 (texto 1): a lacuna que sobrou no card vai para o aviso de
+  // material; o editor já tira a frase do card ao montar o projeto.
+  const materialGaps = moveGapNotesOutOfSlides(result).gaps;
   return {
     result,
     reviewStatus:all.length ? 'needs_attention' : reviewStatus,
     ...(all.length ? { violations:all, issues:all.filter(item => item.code).map(({slideIndex, code}) => ({slideIndex, code})) } : {}),
+    ...(materialGaps.length ? { materialGaps } : {}),
   };
 }
 
@@ -982,10 +1046,20 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
   const factsOf = result => auditDraftFactuality({ ...result, slides: result.slides.map(slide => ({ ...slide,
     bodyAfterImage: [slide.bodyAfterImage, slide.speakerNotes, collectText(slide.presentationBlocks)].filter(Boolean).join('\n'),
   })) }, factualConfig).map(issue => ({ ...issue, kind: 'factual' }));
-  const finish = (result, reviewStatus, extra = {}) => {
-    const facts = factsOf(result);
+  // QA 24/11 (texto 1): slide cujo título é só a lacuna ("No prior results
+  // documented") entra no reparo de fatos que já existe; o resto sai sem IA.
+  const gapTitlesOf = result => moveGapNotesOutOfSlides(result).emptiedTitles
+    .map(slideIndex => ({ slideIndex, field: 'title', category: 'lacuna do material', claim: String(result.slides[slideIndex].title).trim(), kind: 'factual' }));
+  const finish = (reviewed, reviewStatus, extra = {}) => {
+    // A lacuna sai do texto visível e vai, com as do plano, para o aviso de
+    // material. Título que ficou vazio é marcado para revisão.
+    const moved = moveGapNotesOutOfSlides(reviewed);
+    const result = moved.draft;
+    const facts = [...moved.emptiedTitles.map(slideIndex => ({ kind: 'missing_title', slideIndex, field: 'title' })), ...factsOf(result)];
+    const materialGaps = [...(Array.isArray(plan.gaps) ? plan.gaps : []), ...moved.gaps];
     return { result, plan, planningDiagnostics, writingDiagnostics, reviewDiagnostics, reviewStatus: facts.length ? 'needs_attention' : reviewStatus, ...extra,
-      ...((facts.length || extra.violations?.length) ? { violations: [...(extra.violations || []), ...facts] } : {}) };
+      ...((facts.length || extra.violations?.length) ? { violations: [...(extra.violations || []), ...facts] } : {}),
+      ...(materialGaps.length ? { materialGaps } : {}) };
   };
   const plannedConfig = {
     ...factualConfig, presentationPlan: plan,
@@ -1055,17 +1129,18 @@ REPARO DE REPETIÇÃO: edite somente os slides com slideIndex ${targets.join(', 
     return finish(result, reviewStatus, extra);
   };
   const settle = async (result, reviewStatus, extra = {}) => {
-    const facts = factsOf(result);
+    const problemsOf = value => [...factsOf(value), ...gapTitlesOf(value)];
+    const facts = problemsOf(result);
     const indexes = [...new Set(facts.map(item => item.slideIndex).filter(Number.isInteger))];
     if (!indexes.length) return settleRepetition(result, reviewStatus, extra);
     onStage?.('repairing');
     try {
       const repair = await callAI(`${buildEditorialReviewPrompt(briefing, result, plannedConfig)}
-REPARO DE FATOS: edite somente os slides com slideIndex ${indexes.join(', ')}. Estes trechos não estão no material: ${facts.filter(item => Number.isInteger(item.slideIndex)).map(item => `slideIndex ${item.slideIndex}, ${item.field === 'bodyAfterImage' ? 'apoio, notas ou bloco' : item.field}: "${item.claim}"`).join('; ')}. Reescreva cada frase sem o detalhe, com o que o material sustenta (uma encomenda reserva, não garante). Não acrescente fatos; preserve números, unidades e condições do material.`, reviewOptions);
+REPARO DE FATOS: edite somente os slides com slideIndex ${indexes.join(', ')}. Estes trechos não estão no material: ${facts.filter(item => Number.isInteger(item.slideIndex)).map(item => `slideIndex ${item.slideIndex}, ${item.field === 'bodyAfterImage' ? 'apoio, notas ou bloco' : item.field}: "${item.claim}"`).join('; ')}. Reescreva cada frase sem o detalhe, com o que o material sustenta (uma encomenda reserva, não garante). Título que só comenta um dado ausente sai: reescreva o slide com o que o material traz sobre o assunto. Não acrescente fatos; preserve números, unidades e condições do material.`, reviewOptions);
       throwIfGenerationCancelled(aiOptions?.signal);
       if (!Array.isArray(repair?.edits) || repair.edits.some(edit => !indexes.includes(edit?.slideIndex))) throw new Error('Reparo fora do escopo');
       const repaired = applyEditorialReview(result, repair, plannedConfig, { deferQualityChecks: true });
-      if (factsOf(repaired).length < facts.length && overLimits(repaired.slides).length <= overLimits(result.slides).length) {
+      if (problemsOf(repaired).length < facts.length && overLimits(repaired.slides).length <= overLimits(result.slides).length) {
         // Auditoria 23/11 (B1): o reparo de fatos encerrava aqui e o de repetição
         // nunca rodava (Pitch BLK FROGDAY: slides 8 e 9 idênticos).
         return settleRepetition(repaired, 'repaired', extra);
