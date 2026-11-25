@@ -1,5 +1,6 @@
 import React from 'react';
 import { chromeElements, chromeTokensForSlide } from '../../utils/presentation-chrome.js';
+import { ContentLabelLanguageContext } from '../../utils/content-label-language.js';
 
 /**
  * Linguagem gráfica da família (fios, numerais, grade, blocos de cor, marcas
@@ -8,10 +9,11 @@ import { chromeElements, chromeTokensForSlide } from '../../utils/presentation-c
  * Compartilhado entre preview e exportação.
  */
 export default function PresentationArtChrome({ slide, frame, accent, ink, index = 0, total = 1, paletteOverrides = {} }) {
+  const lang = React.useContext(ContentLabelLanguageContext);
   if (slide.presentationArtDirectionVersion === 2 && slide.presentationChrome?.chrome) {
     const { family, format, ground, chrome } = slide.presentationChrome;
     const elements = chromeElements({ family, format, ground, chrome }, {
-      frame, tokens: chromeTokensForSlide(slide, { index, total }), overrides: paletteOverrides,
+      frame, tokens: chromeTokensForSlide(slide, { index, total }), overrides: paletteOverrides, lang,
     });
     return <div aria-hidden="true" data-vc-presentation-art={family}>
       {elements.map((item) => <div key={item.key} data-vc-art-device={item.key} style={{

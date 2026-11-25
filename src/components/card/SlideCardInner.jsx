@@ -23,6 +23,8 @@ import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks, inkI
 import { displayListMarkers } from '../../utils/list-markers.js';
 import { brandPaletteOverrides, groundInks } from '../../utils/presentation-families.js';
 import { resolvePresetChrome, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
+import { localizeFixedLabel } from '../../utils/fixed-labels.js';
+import { ContentLabelLanguageContext } from '../../utils/content-label-language.js';
 import { cultureHeaderInks, footerChromeReservePx, footerGuardApplies, footerPillBottomPx, footerPillColors, photoBehindHeaderChrome, textZonesAboveFooter, STORIES_FOOTER_LIFT } from '../../utils/card-chrome.js';
 import { titleLetterSpacingEm } from '../../utils/title-tracking.js';
 import { photoPlaceholderRect } from '../../utils/photo-placeholder.js';
@@ -1906,6 +1908,8 @@ const SlideCardInner = React.forwardRef(({
   // (selo, cabeçalho, barra atômica). Token sem valor some do card: nenhum
   // "SUA MARCA" ou "@seuperfil" chega ao resultado de quem não tem marca.
   brand = React.useMemo(() => resolvePresetChrome(brandRaw), [brandRaw]);
+  // QA 24/11: o selo "ARRASTA PRO LADO" do padrão segue o idioma do conteúdo.
+  const labelLang = React.useContext(ContentLabelLanguageContext);
   const logoFallback = profileLogo && profileLogo !== brand?.logo ? profileLogo : '';
 
   const f = FORMATS[fmt] || FORMATS.carrossel;
@@ -2429,7 +2433,7 @@ const SlideCardInner = React.forwardRef(({
                   letterSpacing:'-0.011em', whiteSpace:'nowrap',
                   textTransform: 'uppercase',
                 }}>
-                  {brand.footerPillText}
+                  {localizeFixedLabel(brand.footerPillText, labelLang)}
                   {showArrow && (
                     <span style={{
                       width: f.w*0.05*escPill, height: f.w*0.05*escPill, borderRadius:'50%',

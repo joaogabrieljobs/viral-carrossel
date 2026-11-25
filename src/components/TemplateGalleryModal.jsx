@@ -15,6 +15,7 @@ import { Check, EyeOff, Flag, RotateCcw, Trash2, X } from 'lucide-react';
 import { useModalDialog } from '../hooks/useModalDialog.js';
 import { SlideCard } from './card/SlideCard.jsx';
 import { FORMATS } from '../utils/formats.js';
+import { ContentLabelLanguageContext, contentLabelLanguage } from '../utils/content-label-language.js';
 import {
   buildTemplateContent, templatePreviewDoc, TEMPLATE_NAME_MAX, TEMPLATE_DESCRIPTION_MAX, TEMPLATE_AUTHOR_MAX,
 } from '../utils/published-template.js';
@@ -35,8 +36,11 @@ function TemplatePreview({ content, width = 150, slideIndex = 0 }) {
   const slide = doc.slides[Math.min(slideIndex, doc.slides.length - 1)];
   return (
     <div aria-hidden="true" style={{ width, height: f.h * (width / f.w), borderRadius: 10, overflow: 'hidden', flexShrink: 0, background: '#000' }}>
-      <SlideCard slide={slide} fmt={doc.fmt} brand={doc.brand} num={slideIndex + 1} total={doc.slides.length}
-        scale={width / f.w} showCanvasChrome={false} />
+      {/* Rótulos fixos no idioma do texto fictício da prévia, não no do projeto aberto. */}
+      <ContentLabelLanguageContext.Provider value={contentLabelLanguage(doc.slides)}>
+        <SlideCard slide={slide} fmt={doc.fmt} brand={doc.brand} num={slideIndex + 1} total={doc.slides.length}
+          scale={width / f.w} showCanvasChrome={false} />
+      </ContentLabelLanguageContext.Provider>
     </div>
   );
 }

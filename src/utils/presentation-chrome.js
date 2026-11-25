@@ -8,6 +8,7 @@
  * (eyebrow, legenda da foto). Token vazio remove o dispositivo inteiro.
  */
 import { FORMAT_SPECS, familyFont, familySpec, groundInks } from './presentation-families.js';
+import { localizeLabelTemplate } from './fixed-labels.js';
 
 const pct = (value) => `${value}%`;
 
@@ -37,9 +38,10 @@ export function fillChromeTokens(text, tokens = {}) {
 
 /**
  * @param {object} layout resultado de familyLayout
- * @param {{ frame: {w:number,h:number}, tokens?: object }} ctx
+ * @param {{ frame: {w:number,h:number}, tokens?: object, lang?: string }} ctx
+ *   `lang`: idioma do conteúdo, para o rótulo fixo da família ("CENA").
  */
-export function chromeElements(layout, { frame, tokens = {}, overrides = {} } = {}) {
+export function chromeElements(layout, { frame, tokens = {}, overrides = {}, lang } = {}) {
   if (!layout || !frame) return [];
   const family = layout.family;
   const ground = layout.ground || 'bg';
@@ -92,7 +94,7 @@ export function chromeElements(layout, { frame, tokens = {}, overrides = {} } = 
       out.push({ key: `${key}-a`, z: 1, style: { left: pct(d.x), top: `calc(${d.y}% - ${8 * scale}px)`, width: t, height: 16 * scale, background: c } });
       out.push({ key: `${key}-b`, z: 1, style: { left: `calc(${d.x + d.w}% - ${t}px)`, top: `calc(${d.y}% - ${8 * scale}px)`, width: t, height: 16 * scale, background: c } });
     } else if (d.t === 'text' || d.t === 'pill') {
-      const text = fillChromeTokens(d.text, tokens);
+      const text = fillChromeTokens(localizeLabelTemplate(d.text, lang), tokens);
       if (text === null || !text.trim()) return;
       const f = familyFont(family, d.role === 'numeric' ? 'numeric' : d.role === 'display' ? 'display' : d.role === 'text' ? 'text' : 'label');
       const size = d.size * scale;

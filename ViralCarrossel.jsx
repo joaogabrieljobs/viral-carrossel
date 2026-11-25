@@ -97,6 +97,7 @@ import { VISUAL_PRESETS, applyVisualPreset, getSlideOverridesForPreset, PRESET_B
 import { recommendedGenerationVisualPreset } from './src/utils/generation-visual-choice.js';
 import { applySocialVisualComposition, isFlattenedSocialSlide, restoreSocialCompositionTypography, restyleSocialSlides, usesSocialLibrary } from './src/utils/social-visual-composition.js';
 import { buildSocialSequencePrompt } from './src/utils/social-sequence.js';
+import { ContentLabelLanguageContext, contentLabelLanguage } from './src/utils/content-label-language.js';
 import { buildNarrativeModeSequence } from './src/utils/narrative-sequence.js';
 import { socialFamilyFor } from './src/utils/social-families.js';
 import { propagateBrandTypography } from './src/utils/brand-typography.js';
@@ -1259,6 +1260,8 @@ export default function App() {
   const slides = (Array.isArray(doc.slides) && doc.slides.length > 0) ? doc.slides : [mkSlide(1, brand)];
   const slidesLiveRef = useRef(slides);
   slidesLiveRef.current = slides;
+  // QA 24/11: rótulos fixos do desenho ("CENA", selo de arrastar) no idioma do conteúdo.
+  const contentLabelLang = useMemo(() => contentLabelLanguage(slides), [slides]);
   const fmt = doc.fmt && FORMATS[doc.fmt] ? doc.fmt : 'carrossel';
   const caption = doc.captionScope === 'publication' ? String(doc.caption || '') : (String(doc.caption || '') || joinSlideCaptions(slides));
   const material  = doc.material  || { content:'', sources:'', context:'' };
@@ -8174,6 +8177,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
   }
 
   return (
+    <ContentLabelLanguageContext.Provider value={contentLabelLang}>
     <div style={{
       width:'100%', height:'100dvh', background:'var(--bg-base)', color:'var(--text-primary)',
       display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:'var(--font-ui)',
@@ -9860,6 +9864,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         </div>
       )}
     </div>
+    </ContentLabelLanguageContext.Provider>
   );
 }
 

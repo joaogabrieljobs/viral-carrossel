@@ -1,5 +1,6 @@
 import React from 'react';
 import { socialChromeElements, socialChromeTokens } from '../../utils/social-chrome.js';
+import { ContentLabelLanguageContext } from '../../utils/content-label-language.js';
 
 /**
  * Linguagem gráfica das famílias de carrossel (fios, numeração, grade,
@@ -7,10 +8,11 @@ import { socialChromeElements, socialChromeTokens } from '../../utils/social-chr
  * Só desenha quando o card foi composto pela biblioteca v4 (`socialArt`).
  */
 export default function SocialArtChrome({ slide, brand, frame, titleFont, bodyFont, index = 0, total = 1, titleInsetPx = 0 }) {
+  const lang = React.useContext(ContentLabelLanguageContext);
   const art = slide?.socialArt;
   if (!art || slide.socialCompositionVersion < 4) return null;
   const elements = socialChromeElements(art, {
-    frame, brand,
+    frame, brand, lang,
     tokens: socialChromeTokens(brand, { index, total, slide }),
     fonts: { title: titleFont, body: bodyFont, label: art.labelFont || bodyFont, titleWeight: slide.titleWeight, titleInsetPx },
   });
