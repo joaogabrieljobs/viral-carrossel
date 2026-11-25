@@ -108,7 +108,9 @@ export function chromeElements(layout, { frame, tokens = {}, overrides = {}, lan
         letterSpacing: d.tracking ? `${d.tracking / 100}em` : f.tracking ? `${f.tracking / 100}em` : 0,
         textTransform: d.case === 'upper' ? 'uppercase' : undefined,
         color: d.t === 'pill' ? color(d.ink || 'inverseInk') : color(d.color), opacity: d.opacity ?? 1,
-        fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', fontSynthesis: 'none',
+        // Sem algarismos tabulares: o html2canvas desenha o algarismo padrão na
+        // posição do tabular e o "1" ficava solto ("1 0") no arquivo.
+        whiteSpace: 'nowrap', fontSynthesis: 'none',
       };
       if (d.t === 'pill') Object.assign(style, { background: color(d.color), padding: `${size * 0.35}px ${size * 0.8}px`, borderRadius: size * 2 });
       if (d.w != null && d.t !== 'pill') Object.assign(style, { width: pct(d.w), textAlign: d.align || 'left', whiteSpace: 'nowrap', overflow: 'visible' });

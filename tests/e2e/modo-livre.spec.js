@@ -142,9 +142,11 @@ test('Livre no assistente: roteiro v3, páginas variadas, salva e reabre igual',
   // QA livre-f2 ("cida de", "9/1 0"): o texto do slide não herda as variantes
   // de glifo da interface (cv11, ss01). O html2canvas desenha o glifo padrão na
   // posição medida com a variante e abria um vão depois de cada "a".
+  // O mesmo vale para os algarismos tabulares ("7/1 0" no fólio em Inter).
   const variantes = await page.locator('main [data-vc-card-surface]').evaluateAll(nodes => [...new Set(nodes.flatMap(n => [...n.querySelectorAll('h1, p, span, div')]
-    .filter(e => [...e.childNodes].some(c => c.nodeType === 3 && c.textContent.trim())).map(e => getComputedStyle(e).fontFeatureSettings)))]);
-  expect(variantes).toEqual(['normal']);
+    .filter(e => [...e.childNodes].some(c => c.nodeType === 3 && c.textContent.trim()))
+    .map(e => `${getComputedStyle(e).fontFeatureSettings} | ${getComputedStyle(e).fontVariantNumeric}`)))]);
+  expect(variantes).toEqual(['normal | normal']);
 
   // Reabre: nada é recomposto.
   await page.reload();

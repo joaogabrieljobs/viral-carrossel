@@ -2358,7 +2358,7 @@ const SlideCardInner = React.forwardRef(({
                   background: badgeBg, color: badgeColor,
                   padding:`${f.h*0.006*escBadge}px ${f.w*0.022*escBadge}px`, borderRadius:9999,
                   fontSize:f.w*0.024*escBadge, fontWeight:600, fontFamily:getTextFont(slide, 'pageBadge', bodyFF),
-                  letterSpacing:'-0.011em', fontVariantNumeric:'tabular-nums',
+                  letterSpacing:'-0.011em',
                   backdropFilter:'blur(6px)', WebkitBackdropFilter:'blur(6px)',
                   ...(quietFolio ? {
                     // Quadrado: altura menor; 2,6% encostava o fólio em cartões que vão até 95%.

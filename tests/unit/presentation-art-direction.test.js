@@ -98,7 +98,9 @@ describe('direções visuais dos dez padrões planejados', () => {
     for (const forExport of [false, true]) {
       const rendered = html(forExport);
       expect(rendered).toContain('data-vc-evidence-design="modular"');
-      expect(rendered).toContain('font-variant-numeric:tabular-nums');
+      // QA livre-f3: sem algarismos tabulares; o html2canvas não os desenha e
+      // o "1" ficava solto no arquivo. Tela e arquivo usam os mesmos algarismos.
+      expect(rendered).not.toContain('tabular-nums');
       expect(rendered).toContain('Segundo mês do piloto');
       expect(rendered).toMatch(/font-size:9\d(\.\d+)?px/);
     }

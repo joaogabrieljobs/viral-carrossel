@@ -288,7 +288,7 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, stro
         {(() => {
           const weight = numericTypography?.weight || familyFont(key, 'numeric').weight || 600;
           const fit = metricRowFit({ values: block.items.map(entry => entry.value), columnPx: metricColumnPx(block.items.length), unit, fontFamily: numberFont, weight })[index];
-          return cell(item.value, ['items', index, 'value'], `valor ${index + 1}`, { display: 'block', whiteSpace: fit.wrap ? 'normal' : 'nowrap', overflowWrap: 'normal', fontFamily: numberFont, fontVariantNumeric: 'tabular-nums', fontSize: fit.fontSize, letterSpacing: '-0.02em', lineHeight: fit.wrap ? 1.1 : 1.18, fontWeight: weight, fontSynthesisWeight: 'none',
+          return cell(item.value, ['items', index, 'value'], `valor ${index + 1}`, { display: 'block', whiteSpace: fit.wrap ? 'normal' : 'nowrap', overflowWrap: 'normal', fontFamily: numberFont, fontSize: fit.fontSize, letterSpacing: '-0.02em', lineHeight: fit.wrap ? 1.1 : 1.18, fontWeight: weight, fontSynthesisWeight: 'none',
             // QA livre-f2: sobre a superfície o número saía no cinza do apoio.
             // No modo livre ele usa a tinta do título, medida contra o quadro.
             ...(strongInk ? { color: strong } : {}) });
@@ -337,7 +337,7 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, stro
       })}
     </ul> : <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gridTemplateColumns: `repeat(${stepColumns}, minmax(0, 1fr))`, gap: 24 * unit }}>
       {block.items.map((item, index) => <li key={index} style={{ minWidth: 0, borderTop: st.metricRule ? `${Math.max(1, (st.metricRule > 4 ? 6 : 2) * unit)}px solid ${ruleColor}` : 'none', padding: panel ? `${22 * unit}px` : `${16 * unit}px 0 0`, borderRadius: st.radius * unit, backgroundColor: panel ? st.panelColor : 'transparent', color: panelInk }}>
-        {!/^[A-Z][.)]?$/.test(item.title) && <span aria-hidden style={{ display: st.stepMarker === 'pill' ? 'inline-block' : 'block', fontFamily: numberFont, fontSize: (st.stepMarker === 'pill' ? 20 : 40) * unit, lineHeight: 1, marginBottom: 14 * unit, fontVariantNumeric: 'tabular-nums', color: st.accent,
+        {!/^[A-Z][.)]?$/.test(item.title) && <span aria-hidden style={{ display: st.stepMarker === 'pill' ? 'inline-block' : 'block', fontFamily: numberFont, fontSize: (st.stepMarker === 'pill' ? 20 : 40) * unit, lineHeight: 1, marginBottom: 14 * unit, color: st.accent,
           fontStyle: st.stepMarker === 'roman' ? 'italic' : 'normal',
           ...(st.stepMarker === 'pill' ? { backgroundColor: st.accent, color: st.pillInk, borderRadius: 40 * unit, padding: `${8 * unit}px ${16 * unit}px` } : {}) }}>{marker(index)}</span>}
         {cell(item.title, ['items', index, 'title'], `etapa ${index + 1}`, { display: 'block', fontWeight: 600, fontSize: 28 * unit, lineHeight: 1.2 })}
