@@ -93,7 +93,10 @@ const livre = (slides = deck(), options = {}) => applyPresentationVisualPresetTo
 const fundoDoTexto = (slide, zona = 'subtitle') => slide.presentationFreeTextSurfaces?.[zona]
   || (slide.presentationFreeDesign.ground === 'photo' ? '#111111' : slide.customBg);
 const KIT_ESCURO = { contextMd: 'Fundo: #0D1B2A\nDestaque: #E0A458\nTítulo: #F4F1DE' };
-const docKit = () => applyPresentationVisualPresetToDoc({ presentationPath: 'auto', brand: {}, slides: deck({ fotoPronta: false }), styleKit: KIT_ESCURO }, LIVRE);
+// Fase 2: o cartão do Modular entra pela proposta do roteiro v3 (página 6),
+// para o teste não depender da ordem de famílias que o diretor escolhe.
+const docKit = () => applyPresentationVisualPresetToDoc({ presentationPath: 'auto', brand: {}, slides: deck({ fotoPronta: false })
+  .map((s, i) => (i === 5 ? { ...s, presentationPlan: { ...s.presentationPlan, design: { family: 'modular', ground: 'bg', photo: 'half', block: 'none', emphasis: [], icons: [] } } } : s)), styleKit: KIT_ESCURO }, LIVRE);
 const lendo = (s, i) => {
   expect(wcagContrast(s.titleColor, fundoDoTexto(s, 'title')), `slide ${i + 1}: título`).toBeGreaterThanOrEqual(4.5);
   for (const cor of [s.subtitleColor, s.textColor]) expect(wcagContrast(cor, fundoDoTexto(s)), `slide ${i + 1}: ${cor} sobre ${fundoDoTexto(s)}`).toBeGreaterThanOrEqual(4.5);
@@ -166,17 +169,20 @@ describe('modo livre, fase 1: diretor de arte determinístico na Apoteose', () =
 
   it('sequência de design da Apoteose (paleta padrão)', () => {
     const linha = s => [s.presentationComposition, s.presentationFreeDesign.family, s.presentationFreeDesign.ground, s.presentationFreeDesign.photo, s.presentationFreeDesign.block].join(' · ');
+    // Fase 2: superfície distinta do fundo (muda a ordem das famílias, que
+    // depende da paleta), foto que alterna de lado e página com foto que não
+    // perde a foto para variar.
     expect(livre().map(linha)).toEqual([
-      'cover · editorial · bg · half · none',
-      'content · typographic · surface · small · none',
+      'cover · typographic · inverse · small · none',
+      'content · cultural · bg · half · none',
       'demo · cinematic · photo · full · none',
-      'content · executive · bg · small · none',
-      'content · editorial · inverse · half · none',
-      'content · executive · bg · half · none',
-      'content · cinematic · surface · half · none',
-      'content · typographic · inverse · small · none',
-      'data · editorial · bg · none · metrics',
-      'closing · executive · accent · half · none',
+      'content · technical · bg · small · none',
+      'demo · cinematic · photo · full · none',
+      'divider · technical · surface · small · none',
+      'content · cultural · bg · half · none',
+      'content · technical · surface · half · none',
+      'data · typographic · bg · none · metrics',
+      'closing · cinematic · accent · half · none',
     ]);
   });
 

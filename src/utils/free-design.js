@@ -22,6 +22,7 @@ import {
   contentAwarePresentationLayout, contentAwarePresentationOverrides, fittedTitleSize, hasBlocks,
   hasVisual, photoSizeOfLayout, resolvePresentationCompositionKind,
 } from './presentation-composition.js';
+import { rendererSubtitleSizePercent, rendererTitleSizePercent } from './presentation-families.js';
 import { pitchCompositionOverrides } from './pitch-content.js';
 import { resolveChromeColor } from './presentation-chrome.js';
 import { titleTrackingBase } from './title-tracking.js';
@@ -144,7 +145,7 @@ function readable(bg, candidates) {
 
 export const DEFAULT_DECK_DESIGN = Object.freeze({
   palette: Object.freeze({
-    bg: '#F5F2EC', surface: '#EAE5DB', ink: '#15171C', muted: '#53575F',
+    bg: '#F5F2EC', surface: '#E4DCCB', ink: '#15171C', muted: '#53575F',
     accent: '#C2410C', accent2: '#1E3A5F', inverse: '#15171C', inverseInk: '#F5F2EC',
   }),
   fonts: Object.freeze({ display: 'Fraunces', text: 'Inter' }),
@@ -158,7 +159,7 @@ function completePalette(raw = {}) {
   const bg = given.bg || d.bg;
   const light = isLight(bg);
   const ink = readable(bg, [given.ink, light ? d.ink : d.inverseInk]);
-  const surface = given.surface && wcagContrast(ink, given.surface) >= 4.5 ? given.surface
+  const surface = given.surface && distinctSurface(given.surface, bg, ink) ? given.surface
     : readableSurface(bg, ink);
   const muted = readable(bg, [given.muted, mixHex(ink, bg, 0.72), ink]);
   const mutedOk = wcagContrast(muted, surface) >= 4.5 ? muted : readable(surface, [muted, ink]);
@@ -171,11 +172,22 @@ function completePalette(raw = {}) {
   return { bg, surface, ink, muted: mutedOk, accent, accent2, inverse: inverseRaw, inverseInk };
 }
 
-/** Superfície próxima do fundo (um passo rumo à tinta) onde a tinta ainda lê. */
+/**
+ * Diferença mínima entre o fundo e a superfície (razão de luminância). Na
+ * conferência da fase 1, #F5F2EC e #EAE5DB (≈1,1) não se distinguiam na tela
+ * e a regra de "3 fundos" contava duas páginas iguais como fundos diferentes.
+ */
+export const FREE_SURFACE_MIN_CONTRAST = 1.18;
+const distinctSurface = (c, bg, ink) => wcagContrast(c, bg) >= FREE_SURFACE_MIN_CONTRAST && wcagContrast(ink, c) >= 4.5;
+
+/** Superfície um passo rumo à tinta (ou ao polo oposto), distinta do fundo e onde a tinta ainda lê. */
 function readableSurface(bg, ink) {
-  for (const t of [0.06, 0.04, 0.02, 0]) {
-    const c = t ? mixHex(ink, bg, t) : bg;
-    if (wcagContrast(ink, c) >= 4.5) return c;
+  const pole = isLight(bg) ? '#000000' : '#FFFFFF';
+  for (const toward of [ink, pole === '#000000' ? '#FFFFFF' : '#000000', pole]) {
+    for (let t = 0.04; t <= 0.4; t = Math.round((t + 0.02) * 100) / 100) {
+      const c = mixHex(toward, bg, t);
+      if (distinctSurface(c, bg, ink)) return c;
+    }
   }
   return bg;
 }
@@ -467,7 +479,14 @@ function previousDesigns(previous = []) {
     photo: item?.presentationFreeDesign?.photo || (item?.presentationSuppressPhoto ? 'none' : 'half'),
     geometry: freeSlideGeometry(item || {}),
     shape: freeSlideGeometry({ ...(item || {}), presentationFreeDesign: { ground: '' }, presentationGround: '' }),
+    side: item?.presentationSuppressPhoto ? null : photoSide(item?.canvas?.zones?.photo, item?.presentationFreeDesign?.photo),
   }));
+}
+
+/** Lado da foto lateral (pequena ou metade); foto cheia ou sem foto não tem lado. */
+function photoSide(zone, size) {
+  if (!zone || !(zone.w > 0) || !['small', 'half'].includes(size)) return null;
+  return zone.x + zone.w / 2 < 50 ? 'left' : 'right';
 }
 
 /** Ordem de famílias do deck: estável para a mesma paleta e o mesmo clima. */
@@ -503,7 +522,7 @@ function candidatesFor({ slide, stage, index, count }) {
           : ['bg', 'surface', 'inverse', ...(ACCENT_KINDS.has(kind) ? ['accent'] : [])];
       for (const ground of grounds) {
         out.push({
-          family, kind, photo: size, ground, native: onPhoto || ground === layout.ground,
+          family, kind, photo: size, ground, native: onPhoto || ground === layout.ground, side: photoSide(layout.photo, size),
           geometry: geometryOf({ ground, photo: layout.photo, scrim: !!layout.scrim, title: layout.title, subtitle: layout.subtitle }),
           shape: geometryOf({ ground: '', photo: layout.photo, scrim: !!layout.scrim, title: layout.title, subtitle: layout.subtitle }),
         });
@@ -524,7 +543,8 @@ function scoreCandidate(c, { prev, role, visual, order, enough, proposal }) {
   const photos = new Set(prev.map(p => p.photo));
   let s = 0;
   if (c.kind !== role && !['cover', 'closing', 'data'].includes(c.kind)) s += 3;
-  if (visual && c.photo === 'none') s += 6;
+  // Página com foto não perde a foto (a imagem já existe ou foi pedida).
+  if (visual && c.photo === 'none') s += 14;
   s += count('photo', c.photo) * 1.5;
   if (enough && photos.size < 3 && !photos.has(c.photo)) s -= 4;
   if (!c.native) s += 1.5;
@@ -541,6 +561,14 @@ function scoreCandidate(c, { prev, role, visual, order, enough, proposal }) {
   // Mesma página (família, foto e colunas) já usada no deck: só o fundo
   // mudaria, e fundo claro e de superfície quase não se distinguem.
   s += prev.filter(p => p.shape === c.shape).length * 2.5;
+  // Lado da foto (conferência da fase 1: quase todas à direita). Quando a
+  // família desenha os dois lados, o diretor alterna; nunca inventa layout.
+  if (c.side) {
+    const sides = prev.map(p => p.side).filter(Boolean);
+    s += sides.filter(side => side === c.side).length * 0.8;
+    if (sides.at(-1) === c.side) s += 1.5;
+    if (sides.length >= 2 && sides.slice(-2).every(side => side === c.side)) s += 3;
+  }
   // A IA propõe, o código garante: cada campo que bate com a proposta pesa a
   // favor; regras de ritmo e de variedade já filtraram os candidatos.
   if (proposal) {
@@ -564,7 +592,8 @@ function forceVariety(allowed, { prev, index, count, visual }) {
     if (!applies) continue;
     const seen = new Set(prev.map(p => p[key]));
     if (seen.size >= 3 || 3 - seen.size < remaining) continue;
-    const fresh = out.filter(c => !seen.has(c[key]));
+    // Página com foto não perde a foto para variar: 'none' só vale como fundo.
+    const fresh = out.filter(c => !seen.has(c[key]) && !(key === 'photo' && c.photo === 'none'));
     if (fresh.length) out = fresh;
   }
   return out;
@@ -622,6 +651,127 @@ export function resolveDeckDesign(deckDesign, slide = {}, previous = []) {
 
 const tracking = (display) => Math.round(((display.tracking || 0) - titleTrackingBase(display.css)) * 100) / 100;
 
+/* Adornos da família no modo livre ----------------------------------------- */
+
+const lum = hex => wcagContrast(hex, '#000000');
+const covers = (d, x, y) => d.w > 0 && d.h > 0 && x >= d.x && x <= d.x + d.w && y >= d.y && y <= d.y + d.h;
+const inside = (zone, x, y) => !!zone && zone.w > 0 && zone.h > 0 && covers(zone, x, y);
+/** Faixa de letterbox (Cinemático): bloco de largura total, fino, por cima da foto. */
+const isLetterbox = d => d.t === 'block' && d.w >= 99 && d.h <= 12 && d.z === 'over';
+/** Tamanho a partir do qual o adorno é texto grande (WCAG: 3:1). */
+const LARGE_CHROME_PX = 48;
+
+/**
+ * Chrome da família com as cores do deck resolvidas e lidas contra o que fica
+ * atrás (conferência da fase 1): "CENA nn" em laranja sobre preto (3,5:1),
+ * faixas do Cinemático creme com kit escuro e fio de destaque sumindo no
+ * fundo de destaque. No modo livre cada adorno vira cor fixa:
+ * - faixa de letterbox: a cor mais escura do deck;
+ * - texto: ≥ 4,5:1 (≥ 3:1 se grande) contra o bloco ou o fundo atrás dele,
+ *   ou sai quando fica sobre a foto sem faixa;
+ * - fio: nunca da cor do que está atrás (≥ 1,5:1).
+ */
+export function freeChromeDevices(chrome, { family, ground, palette, photoZone = null }) {
+  const color = token => (/^#/.test(String(token)) ? token : resolveChromeColor(family, ground, token, palette));
+  const page = groundInks(family, ground, palette).bg;
+  const darkest = [palette.inverse, palette.bg, palette.ink, palette.surface].filter(Boolean).sort((a, b) => lum(a) - lum(b))[0];
+  const inks = [palette.ink, palette.inverseInk, palette.accent2, palette.muted];
+  const resolved = (Array.isArray(chrome) ? chrome : []).map(d => (
+    d.t === 'block' || d.t === 'circle' ? { ...d, color: isLetterbox(d) ? darkest : color(d.color) } : d));
+  const behind = (x, y, self) => {
+    const block = [...resolved].reverse().find(d => d !== self && (d.t === 'block' || (d.t === 'circle' && covers({ x: d.x, y: d.y, w: d.d, h: d.d * 16 / 9 }, x, y))) && (d.t !== 'block' || covers(d, x, y)));
+    if (block) return block.color;
+    return inside(photoZone, x, y) ? null : page;
+  };
+  const out = [];
+  for (const d of resolved) {
+    if (d.t === 'rule') {
+      const bgColor = behind(d.x + 0.1, d.y, d) || page;
+      const c = color(d.color);
+      out.push({ ...d, color: wcagContrast(c, bgColor) >= 1.5 ? c : readable(bgColor, inks) });
+    } else if (d.t === 'pill') {
+      const pillBg = color(d.color);
+      const ink = color(d.ink || 'inverseInk');
+      out.push({ ...d, color: pillBg, ink: wcagContrast(ink, pillBg) >= 4.5 ? ink : readable(pillBg, [ink, ...inks]) });
+    } else if (d.t === 'text') {
+      const bgColor = behind(d.x + 0.5, d.y + 0.5, d);
+      if (!bgColor) continue;
+      const c = color(d.color);
+      const opacity = d.opacity ?? 1;
+      const seen = opacity < 1 ? mixHex(c, bgColor, opacity) : c;
+      const min = (d.size || 0) >= LARGE_CHROME_PX ? 3 : 4.5;
+      out.push(wcagContrast(seen, bgColor) >= min ? { ...d, color: c } : { ...d, color: readable(bgColor, [c, ...inks]), opacity: 1 });
+    } else out.push(d);
+  }
+  return out;
+}
+
+/* Tipografia e leitura no modo livre ---------------------------------------- */
+
+/**
+ * Teto do título com a fonte do deck (conferência da fase 1): o Tipográfico
+ * desenha 150 a 220 px para a Archivo pesada; com outra fonte o título enchia
+ * meia página. Capa e divisor mantêm a voz de abertura.
+ */
+export const FREE_TITLE_MAX_PX = Object.freeze({ cover: 176, divider: 176, other: 128 });
+const titlePxOf = size => size * 1920 * 0.084 / 100;
+const subPxOf = size => size * 1920 * 0.028 / 100;
+const SUPPORT_MAX_PX = 32;
+const STACK_GAP = 3.5;
+
+function estimateLines(value, widthPx, px, widthFactor) {
+  const capacity = Math.max(1, widthPx / (px * (widthFactor || 0.55)));
+  return String(value || '').replace(/\*\*/g, '').split('\n').reduce((total, paragraph) => {
+    let lines = 1;
+    let used = 0;
+    for (const word of paragraph.split(/\s+/).filter(Boolean)) {
+      const chars = [...word].length;
+      if (used && used + 1 + chars > capacity) { lines += 1; used = 0; }
+      used += (used ? 1 : 0) + chars;
+    }
+    return total + lines;
+  }, 0);
+}
+
+/**
+ * Leitura sem vazio (conferência da fase 1, Executivo com leitura longa): a
+ * zona do título é calculada para a fonte da família; com a fonte do deck o
+ * título ocupa menos linhas e o apoio ficava longe dele, com a metade de baixo
+ * da coluna vazia. Nas páginas de conteúdo e demonstração com o apoio logo
+ * abaixo do título (mesma coluna, fora da foto e sem bloco), o apoio sobe para
+ * perto do título (os adornos que o seguem sobem junto), a coluna desce até o
+ * fim da área de leitura ao lado da foto e o corpo cresce em passos de 2 px até
+ * 32 px enquanto o texto estimado couber. Nunca diminui.
+ */
+function compactReading({ zones, chrome, slide, titleSize, subSize, display, text, kind, leading }) {
+  const t = zones.title;
+  const sub = zones.subtitle;
+  if (!t || !sub || !['content', 'demo'].includes(kind)) return null;
+  if (!(sub.y >= t.y + 1) || Math.min(t.x + t.w, sub.x + sub.w) - Math.max(t.x, sub.x) <= Math.min(t.w, sub.w) * 0.4) return null;
+  const titlePx = titlePxOf(titleSize);
+  const lines = estimateLines(slide.title, 1920 * t.w / 100 - 24, titlePx, display.widthFactor);
+  const titleBottom = t.y + ((lines * titlePx * 1.1 + 20) / 1080) * 100;
+  const photo = zones.photo && zones.photo.w > 0 && Math.min(sub.x + sub.w, zones.photo.x + zones.photo.w) - Math.max(sub.x, zones.photo.x) <= 0 ? zones.photo : null;
+  const top = Math.round(Math.min(sub.y, Math.max(titleBottom + STACK_GAP, t.y + 6)) * 100) / 100;
+  const bottom = Math.max(sub.y + sub.h, photo ? Math.min(90, photo.y + photo.h) : 0);
+  const zone = { ...sub, y: top, h: Math.round((bottom - top) * 100) / 100 };
+  const delta = sub.y - top;
+  const copy = String(slide.subtitle || '').replace(/\*\*/g, '').trim();
+  const tail = String(slide.bodyAfterImage || '').replace(/\*\*/g, '').trim();
+  const widthPx = 1920 * zone.w / 100 - 24;
+  const heightPx = 1080 * zone.h / 100 - 14;
+  const height = px => estimateLines(copy, widthPx, px, 0.55) * px * leading + (tail ? 0.8 * px + estimateLines(tail, widthPx, px * 0.85, 0.55) * px * 0.85 * leading : 0);
+  const startPx = subPxOf(subSize);
+  let px = startPx;
+  if (copy) for (let next = Math.ceil(startPx / 2) * 2; next <= SUPPORT_MAX_PX && height(next) <= heightPx; next += 2) px = Math.max(px, next);
+  if (delta < 1 && px === startPx) return null;
+  return {
+    zone,
+    subSize: px === startPx ? subSize : rendererSubtitleSizePercent(px),
+    chrome: delta >= 1 ? chrome.map(d => (d.follow === 'subtitle' ? { ...d, y: Math.round((d.y - delta) * 100) / 100 } : d)) : chrome,
+  };
+}
+
 /**
  * Compõe a página no modo livre: geometria da família escolhida, fundo e
  * tinta pela paleta do deck, fontes do deck e foto no tamanho decidido.
@@ -668,11 +818,21 @@ export function freePresentationCompositionOverrides(base, {
   // deck mais larga começa proporcionalmente menor e passa pelo mesmo ajuste.
   const scale = Math.min(1, (fam.widthFactor || 0.55) / (display.widthFactor || 0.55));
   const zones = composed.canvas?.zones || {};
-  const titleSize = scale < 1 && zones.title
+  const fittedSize = scale < 1 && zones.title
     ? fittedTitleSize(Math.round(composed.titleSize * scale), slide.title, zones.title, display.css)
     : composed.titleSize;
+  const titleCap = rendererTitleSizePercent(FREE_TITLE_MAX_PX[kind] || FREE_TITLE_MAX_PX.other);
+  const titleSize = Math.min(fittedSize, titleCap);
   const typographyAll = composed.presentationTypographyByComposition || {};
   const typo = typographyAll[kind] || {};
+  const photoZone = composed.presentationSuppressPhoto ? null : zones.photo;
+  const familyChrome = composed.presentationChrome?.chrome || [];
+  // Cartão atrás do texto (Modular): o texto fica no cartão; não recompõe.
+  const reading = !onPhoto && !hasBlocks(layoutSlide) && !hasTextPanel(layout)
+    ? compactReading({ zones, chrome: familyChrome, slide: layoutSlide, titleSize, subSize: composed.subSize, display, text, kind, leading: (composed.subLeading || 150) / 100 })
+    : null;
+  const subSize = reading ? reading.subSize : composed.subSize;
+  const chrome = freeChromeDevices(reading ? reading.chrome : familyChrome, { family, ground: chromeGround, palette, photoZone });
   return {
     ...composed,
     presentationPresetId: FREE_PRESENTATION_PRESET_ID,
@@ -684,8 +844,11 @@ export function freePresentationCompositionOverrides(base, {
     presentationChrome: {
       ...composed.presentationChrome,
       ground: chromeGround,
+      chrome,
       fonts: { display, text },
     },
+    ...(reading ? { canvas: { ...composed.canvas, zones: { ...zones, subtitle: reading.zone } } } : {}),
+    subSize,
     presentationNumericTypography: { fontFamily: display.css, weight: display.weight },
     customBg: inks.bg,
     titleColor: titleInk,
@@ -705,7 +868,7 @@ export function freePresentationCompositionOverrides(base, {
           ...typo.title, fontFamily: display.css, weight: display.weight, tracking: tracking(display),
           case: display.case === 'upper' ? 'upper' : 'normal', italic: false, sizePercent: titleSize,
         },
-        subtitle: { ...typo.subtitle, fontFamily: text.css, weight: Math.max(400, text.weight || 400), tracking: 1 + (text.tracking || 0) },
+        subtitle: { ...typo.subtitle, fontFamily: text.css, weight: Math.max(400, text.weight || 400), tracking: 1 + (text.tracking || 0), sizePercent: subSize },
       },
     },
   };
@@ -825,7 +988,13 @@ export function freeDeckViolations(slides = []) {
   });
   const withDesign = list.filter(s => s.presentationFreeDesign);
   if (withDesign.length >= 6) {
-    if (new Set(withDesign.map(s => s.presentationFreeDesign.ground)).size < 3) out.push({ code: 'free_grounds_variety', slideIndex: null });
+    // Superfície que quase não se distingue do fundo conta como o mesmo fundo.
+    const groundOf = (s) => {
+      const g = s.presentationFreeDesign.ground;
+      const p = s.presentationPaletteOverrides;
+      return g === 'surface' && p?.bg && p?.surface && wcagContrast(p.bg, p.surface) < FREE_SURFACE_MIN_CONTRAST ? 'bg' : g;
+    };
+    if (new Set(withDesign.map(groundOf)).size < 3) out.push({ code: 'free_grounds_variety', slideIndex: null });
     const visualPages = withDesign.filter(s => hasVisual(s)).length;
     if (visualPages >= 3 && new Set(withDesign.map(s => s.presentationFreeDesign.photo)).size < 3) out.push({ code: 'free_photo_variety', slideIndex: null });
   }
