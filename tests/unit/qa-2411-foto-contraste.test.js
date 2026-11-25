@@ -54,49 +54,57 @@ describe('QA 24/11 deck C: tinta do texto acompanha a superfície ao importar fo
     expect(slide.titleColor).toBe('#F7F7F5');
   });
 
-  it('caso inverso: capa do Ensaio fotográfico passa a ter o texto sobre a foto escurecida e a tinta fica clara', () => {
-    const { brand, slide } = pagina('presentation_photo_essay');
-    // Sem foto: tinta escura da marca sobre o papel claro, sem cor gravada no slide.
-    expect(slide.titleColor).toBeUndefined();
-    expect(wcagContrast(tintas(slide, brand).titulo, superficie(slide, brand))).toBeGreaterThanOrEqual(4.5);
-
-    const vista = comFoto(slide);
-    // O texto fica sobre a foto: véu da família no teto da foto própria (40) e tinta clara.
-    expect(vista.overlay).toBe(40);
-    expect(needsLightPhotoText(vista)).toBe(true);
-    const c = contrastes(vista, brand);
-    expect(c.titulo).toBeGreaterThanOrEqual(4.5);
-    expect(c.apoio).toBeGreaterThanOrEqual(4.5);
-    expect(c.corpo).toBeGreaterThanOrEqual(4.5);
+  // Ajuste 24/11: a composição grava sempre um número no escurecimento (0 na
+  // página sem foto), então 0 gravado não se distingue de 0 escolhido pela
+  // pessoa. A vista não aplica véu nenhum por conta própria.
+  it('escurecimento 0 gravado + foto: a vista mantém 0 (Ensaio fotográfico e Cinemático)', () => {
+    for (const id of ['presentation_photo_essay', 'presentation_cinematic']) {
+      const { slide } = pagina(id);
+      expect(slide.overlay, id).toBe(0);
+      const vista = comFoto(slide);
+      expect(vista.overlay, id).toBe(0);
+      expect(vista.overlayMode, id).toBe(slide.overlayMode);
+    }
   });
 
-  it('escurecimento que a pessoa já ajustou no slide não é trocado pelo véu da família', () => {
-    const { slide } = pagina('presentation_photo_essay');
-    expect(comFoto({ ...slide, overlay: 15 }).overlay).toBe(15);
+  it('qualquer escurecimento gravado é respeitado como está', () => {
+    for (const overlay of [0, 15, 40, 80]) {
+      const { slide } = pagina('presentation_photo_essay');
+      expect(comFoto({ ...slide, overlay }).overlay).toBe(overlay);
+    }
   });
 
-  it('páginas em que o texto continua na mesma superfície não mudam de cor ao receber a foto (dez famílias, seis funções)', () => {
+  it('texto que passa a ficar sobre a foto: cor e véu ficam como na página sem foto', () => {
+    for (const id of ['presentation_photo_essay', 'presentation_cinematic']) for (const [role, index] of [['cover', 0], ['demo', 2]]) {
+      const { slide } = pagina(id, role, index);
+      const vista = comFoto(slide);
+      expect([vista.titleColor, vista.subtitleColor, vista.textColor, vista.overlay], `${id} ${role}`)
+        .toEqual([slide.titleColor, slide.subtitleColor, slide.textColor, slide.overlay]);
+    }
+  });
+
+  it('só a capa do Executivo muda de cor ao receber a foto (dez famílias, seis funções)', () => {
     const mudou = [];
+    for (const preset of PRESETS) for (const [role, index] of ROLES) {
+      const { slide } = pagina(preset.id, role, index);
+      const vista = comFoto(slide);
+      const gravado = (s) => JSON.stringify([s.titleColor, s.subtitleColor, s.textColor, s.overlay, s.overlayMode]);
+      if (gravado(slide) !== gravado(vista)) mudou.push(`${preset.id} ${role}`);
+    }
+    expect(mudou).toEqual(['presentation_executive_minimal cover']);
+  });
+
+  it('página com fundo próprio da família continua legível depois da foto (>= 4,5)', () => {
     for (const preset of PRESETS) for (const [role, index] of ROLES) {
       const { brand, slide } = pagina(preset.id, role, index);
       const vista = comFoto(slide);
+      // Texto sobre a foto não entra: a superfície é a foto e o escurecimento é da pessoa.
+      const z = vista.canvas.zones;
+      const sobreFoto = z.photo.x <= z.title.x && z.photo.x + z.photo.w >= z.title.x + z.title.w && z.photo.y <= z.title.y && z.photo.y + z.photo.h >= z.title.y + z.title.h;
+      if (sobreFoto) continue;
       const c = contrastes(vista, brand);
       expect(Math.min(c.titulo, c.apoio, c.corpo), `${preset.id} ${role}`).toBeGreaterThanOrEqual(4.5);
-      const gravado = (s) => JSON.stringify([s.titleColor, s.subtitleColor, s.textColor, s.overlay || 0]);
-      if (gravado(slide) !== gravado(vista)) mudou.push(`${preset.id} ${role}`);
     }
-    // Muda só onde a superfície do texto trocou: capa do Executivo (marinho → claro)
-    // e as páginas em que o texto passou a ficar sobre a foto.
-    expect(mudou).toEqual(['presentation_executive_minimal cover', 'presentation_cinematic cover', 'presentation_cinematic demo', 'presentation_photo_essay cover']);
-  });
-
-  it('texto que passa a ficar sobre a foto mantém a tinta da família (Cinemático), agora com o véu', () => {
-    const { brand, slide } = pagina('presentation_cinematic');
-    const vista = comFoto(slide);
-    expect(vista.overlay).toBe(40);
-    // Mesma cor de título de antes da foto: a da família, não o branco genérico.
-    expect(vista.titleColor.toLowerCase()).toBe(brand.titleColor.toLowerCase());
-    expect(contrastes(vista, brand).titulo).toBeGreaterThanOrEqual(4.5);
   });
 
   it('cor escolhida pela pessoa que continua legível na superfície nova é mantida', () => {

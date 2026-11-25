@@ -6,7 +6,6 @@ import {
 } from './presentation-families.js';
 import { titleTrackingBase } from './title-tracking.js';
 import { wcagContrast } from './wcag.js';
-import { ownPhotoOverlay } from './slide-logo.js';
 const DATA_ROLES = new Set(['data', 'metric', 'result', 'matrix', 'comparison', 'priorities']);
 const DEMO_ROLES = new Set(['demo', 'example', 'evidence', 'story', 'people', 'application']);
 const DIVIDER_ROLES = new Set(['divider', 'agenda', 'question', 'reframe', 'contrast', 'statement', 'vision', 'objectives']);
@@ -275,31 +274,29 @@ export function contentAwarePresentationOverrides(base, slide = {}, kind = 'cont
 const SURFACE_INK_FIELDS = [['titleColor', 'ink'], ['subtitleColor', 'ink'], ['textColor', 'muted']];
 
 /**
- * Tinta e véu da página recomposta com foto (QA 24/11). A recomposição troca a
+ * Tinta da página recomposta com foto (QA 24/11). A recomposição troca a
  * superfície atrás do texto: a capa do Executivo sai do marinho para o fundo
- * claro com a foto ao lado, e a do Ensaio fotográfico passa a ter o texto
- * sobre a foto. A tinta que a composição gravou para a página sem foto ficava
- * (#F7F7F5 sobre #F7F7F5).
+ * claro com a foto ao lado, e a tinta que a composição gravou para a página
+ * sem foto ficava (#F7F7F5 sobre #F7F7F5). A tinta gravada é medida contra a
+ * superfície nova e só dá lugar à da composição com foto se não lê (< 4,5:1);
+ * sem tinta própria, o card volta à da marca. Cor marcada pela pessoa não muda.
  *
- * - Texto que passa a ficar sobre a foto: recebe o véu da família, no teto da
- *   foto própria, e a tinta que a composição usaria com foto.
- * - Demais páginas: a tinta gravada é medida contra a superfície nova e só dá
- *   lugar à da composição com foto se não lê (< 4,5:1); sem tinta própria, o
- *   card volta à da marca.
- *
- * Cor marcada pela pessoa e escurecimento já ajustado no slide não mudam.
+ * Texto que passa a ficar sobre a foto (Ensaio fotográfico, Cinemático) fica
+ * como estava: a superfície é a foto e o escurecimento é da pessoa. A
+ * composição grava sempre um número nesse campo (0 na página sem foto), então
+ * 0 gravado não se distingue de 0 escolhido; a vista não aplica véu nenhum.
  */
 function restoredSurfaceFields(slide, kind, family, layout) {
+  const now = familyPresentationFields(layout);
+  if (now.overlay > 0) return {};
   const before = contentAwarePresentationLayout(kind, { ...slide, bgImage: '', bgImageId: null, bgImageAssetId: null, imageQuery: '' }, family);
   const was = familyPresentationFields(before);
-  const now = familyPresentationFields(layout);
-  const veil = now.overlay > 0 && !(was.overlay > 0) && !(Number(slide.overlay) > 0);
   const surface = layout.inks?.bg;
-  const out = veil ? { overlay: ownPhotoOverlay(now.overlay), overlayMode: now.overlayMode } : {};
+  const out = {};
   for (const [key, role] of SURFACE_INK_FIELDS) {
     if (slide[key] !== was[key] || was[key] === now[key]) continue;
     const current = slide[key] || before.inks?.[role];
-    if (!veil && current && surface && wcagContrast(current, surface) >= 4.5) continue;
+    if (current && surface && wcagContrast(current, surface) >= 4.5) continue;
     out[key] = now[key];
   }
   return out;
