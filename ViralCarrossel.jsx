@@ -6126,7 +6126,7 @@ ${jsonShapeLine}`;
       brandBlock,
       styleKitTextHint,
     ].filter(Boolean).join('\n');
-    const { result: generatedResult, reviewStatus, plan: generationPlan, incomplete: generationIncomplete = false, interruptionReason: generationInterruptionReason, writingDiagnostics: generationWritingDiagnostics = [], reviewDiagnostics: generationReviewDiagnostics = [], completedCount: generatedCount, totalCount: requestedCount, violations: editorialViolations = [], issues: editorialIssues = [], materialGaps = [], repetitionNotice = '' } = await generateReviewedCarousel({
+    const { result: generatedResult, reviewStatus, plan: generationPlan, incomplete: generationIncomplete = false, interruptionReason: generationInterruptionReason, writingDiagnostics: generationWritingDiagnostics = [], reviewDiagnostics: generationReviewDiagnostics = [], completedCount: generatedCount, totalCount: requestedCount, violations: editorialViolations = [], issues: editorialIssues = [], materialGaps = [], repetitionNotice = '', repetitionRemaining = [] } = await generateReviewedCarousel({
       prompt,
       config: {
         count: Number(count),
@@ -6566,8 +6566,9 @@ ${jsonShapeLine}`;
       // QA 24/11 (texto 1): a lacuna do briefing fica aqui, fora do slide.
       // RT24 (texto 1): o slide que ainda repete outro é avisado no mesmo lugar.
       materialNotice: [pathMaterialNotice, materialGapNotice(materialGaps), repetitionNotice].filter(Boolean).join(' '), presentationMaterialNotice: undefined,
-      editorialReviewIssues: reviewStatus === 'needs_attention'
-        ? (editorialViolations.length ? editorialViolations : editorialIssues).map(issue => ({
+      // Teste 4 (25/11): repetição que o reparo não resolveu entra no bloco de
+      // revisão com os slides, sem mudar o status (não vira rascunho).
+      editorialReviewIssues: [...(reviewStatus === 'needs_attention' ? (editorialViolations.length ? editorialViolations : editorialIssues) : []), ...repetitionRemaining].map(issue => ({
             slideIndex: issue.slideIndex ?? null,
             field: issue.field || null,
             kind: issue.kind || null,
@@ -6576,8 +6577,7 @@ ${jsonShapeLine}`;
             ...(Number.isInteger(issue.completedCount) ? { completedCount: issue.completedCount, totalCount: issue.totalCount } : {}),
             ...(presentationInterruptionMessage(issue.interruptionReason) ? { interruptionReason: issue.interruptionReason } : {}),
             ...(typeof issue.claim === 'string' ? { claim: issue.claim.slice(0, 240) } : {}),
-          }))
-        : [],
+          })),
       ...(generationPlan ? {
         presentationPlan: generationPlan,
         presentationQuality: {
