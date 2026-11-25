@@ -794,8 +794,10 @@ export function getPresentationCompositionOverrides(
   const contentAware = !!(presetDefinition.sourceId || slide.presentationPlan
     || (Array.isArray(slide.presentationBlocks) && slide.presentationBlocks.length));
   // Ritmo de layout (spec 1.1): com as composições anteriores, a família
-  // alterna a página que se repetiria pela terceira vez seguida.
-  const rhythmFamily = previous && contentAware && stage?.contentMode !== 'pitch'
+  // alterna a página que se repetiria pela terceira vez seguida. Vale também
+  // no caminho Pitch: as composições do pitch são as da família e os limites
+  // do pitch só distinguem capa e fecho (pitchTextLimits).
+  const rhythmFamily = previous && contentAware
     ? presentationDesignFamily({ presentationPresetId: normalizedPresetId, presentationPatternId: presetDefinition.sourceId })
     : null;
   const kind = resolvePresentationCompositionKind({ slide, stage, index, count, previous, family: rhythmFamily });
