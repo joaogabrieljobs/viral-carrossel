@@ -25,6 +25,15 @@ const COMMERCIAL_RULES = [
   { category: 'condição de pagamento', regex: /\b(?:buy now,?\s+pay later|pay(?:ing)?\s+later|pay\s+over\s+time|financ(?:ing|ed)|installment plans?|zero\s+down|no\s+upfront(?:\s+(?:cost|payment|fee)s?)?|pague\s+depois|pagamento\s+depois|parcelad[oa]s?|sem\s+entrada|entrada\s+zero)\b/giu },
 ];
 
+// Reteste real 24/11 (RT24 4): com o briefing dizendo "you see the new site
+// before any payment", a guarda marcou "no upfront cost" e "no upfront payment"
+// e Proposta e Relatório abriram como rascunho. Quando o material diz que nada
+// é pago antes, "no upfront…" é o mesmo fato. "Pay later", "zero down" e
+// parcelamento continuam exigindo a expressão no material.
+const NO_UPFRONT_CLAIM = /^no\s+upfront(?:\s+(?:cost|payment|fee)s?)?$/;
+const NOTHING_PAID_BEFORE = /\bbefore\s+any\s+payment\b|\bno\s+payment\s+(?:is\s+)?(?:(?:required|due|needed)\s+)?(?:until|before)\b|\bantes\s+de\s+qualquer\s+pagamento\b|\bnenhum\s+pagamento\s+antes\b/;
+const noUpfrontCovered = (claim, sourceText) => NO_UPFRONT_CLAIM.test(normalize(claim)) && NOTHING_PAID_BEFORE.test(sourceText);
+
 const INSTALLMENT_CLAIM = /^(?:parcelad[oa]s?|installment plans?|pay\s+over\s+time)$/;
 const INSTALLMENT_SOURCE = /\b(?:parcelas?|parcelad[oa]s?|installments?|\d+\s*x\s+de)\b/;
 
@@ -216,6 +225,7 @@ export function auditUnsupportedCommercialClaims(slides, source) {
         if (rule.category === 'item incluso' && (negatedInclusion(text, match.index) || inclusionWithoutItem(claim) || followsNotIncludes(claim))) continue;
         // Mesma equivalência da auditoria de fatos (reteste 22/11).
         if (rule.category === 'item incluso' && inclusionCovered(claim, source)) continue;
+        if (rule.category === 'condição de pagamento' && noUpfrontCovered(claim, sourceText)) continue;
         if (!sourceText.includes(normalize(claim)) && !equivalent(sourceText).includes(equivalent(normalize(claim)))) violations.push({ slideIndex, category: rule.category, claim });
       }
     }
@@ -363,6 +373,7 @@ export function auditDraftFactuality(draft, config = {}) {
         // parcelas). Só a forma parcelada é coberta; "sem entrada" e "pague
         // depois" continuam exigindo a expressão no material.
         if (rule.category === 'condição de pagamento' && INSTALLMENT_CLAIM.test(normalize(claim)) && INSTALLMENT_SOURCE.test(sourceText)) continue;
+        if (rule.category === 'condição de pagamento' && noUpfrontCovered(claim, sourceText)) continue;
         if (rule.category === 'item incluso' && inclusionCovered(claim, evidence)) continue;
         if (!sourceText.includes(normalize(claim)) && !sourceEquivalent.includes(equivalent(normalize(claim)))) add(rule.category, claim);
       }

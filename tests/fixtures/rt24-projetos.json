@@ -1,0 +1,1103 @@
+{
+ "origem": "Reteste real de 24/11/2026 sobre e6085f3: seis projetos gerados com o briefing BLK FROGDAY em inglês. Só texto dos slides, blocos, notas e lacunas e perguntas do plano. O briefing foi remontado com os trechos literais que o plano citou das fontes.",
+ "brief": "Black Frog builds websites for local businesses in San Diego. BLK FROGDAY, Nov 23 to 30: we build your new site first, and you only pay when you like it. The site is $797, and this week a new logo (or a refresh of yours) is included. Offer ends Nov 30, 11:59 PM PT. How it works: send your current link or fill the brief at blkfrog.com/brief, and you see the new site before any payment. Audience: owners of local service businesses with an old site or no site. CTA: send us your link.",
+ "projects": [
+  {
+   "name": "A1 Pitch",
+   "fmt": "apresentacao",
+   "mode": "editorial",
+   "status": "repaired",
+   "plan": {
+    "gaps": [
+     "Sem dados de tração, clientes anteriores ou portfólio documentado",
+     "Sem informações de equipe ou fundadores",
+     "Sem dimensionamento de mercado ou perfil detalhado do cliente ideal",
+     "Sem modelo de negócio recorrente ou estrutura de preços além da oferta"
+    ],
+    "slides": [
+     {
+      "index": 1,
+      "purpose": "introduction",
+      "visualRole": "cover",
+      "question": "O que é a Black Frog e para quem existe?",
+      "keyMessage": "Empresa e propósito: Black Frog constrói sites para negócios locais em San Diego."
+     },
+     {
+      "index": 2,
+      "purpose": "problem",
+      "visualRole": "content",
+      "question": "Quem é o público e qual a necessidade?",
+      "keyMessage": "Cliente e problema: donos de negócios de serviço local com site antigo ou sem site."
+     },
+     {
+      "index": 3,
+      "purpose": "solution",
+      "visualRole": "content",
+      "question": "Como a oferta funciona?",
+      "keyMessage": "Solução e mecanismo: construímos seu novo site primeiro; você só paga se gostar."
+     },
+     {
+      "index": 4,
+      "purpose": "process",
+      "visualRole": "demo",
+      "question": "Qual o fluxo para começar?",
+      "keyMessage": "Produto: envie seu link ou preencha o brief em blkfrog.com/brief e veja o site antes de pagar."
+     },
+     {
+      "index": 5,
+      "purpose": "business_model",
+      "visualRole": "data",
+      "question": "Quanto custa e o que está incluído?",
+      "keyMessage": "Modelo de negócio: site por $797; esta semana inclui logo novo ou refresh do seu."
+     },
+     {
+      "index": 6,
+      "purpose": "context",
+      "visualRole": "content",
+      "question": "Por que agir nesta semana?",
+      "keyMessage": "Mercado e urgência: oferta BLK FROGDAY de 23 a 30 de novembro, terminando em 30/11 às 23:59 PT."
+     },
+     {
+      "index": 7,
+      "purpose": "solution",
+      "visualRole": "content",
+      "question": "O que diferencia a proposta?",
+      "keyMessage": "Vantagem: você vê o site pronto antes de qualquer pagamento — sem risco de insatisfação."
+     },
+     {
+      "index": 8,
+      "purpose": "context",
+      "visualRole": "content",
+      "question": "O que está incluído além do site?",
+      "keyMessage": "Oferta completa: site novo por $797 mais logo novo ou refresh do logo existente."
+     },
+     {
+      "index": 9,
+      "purpose": "process",
+      "visualRole": "content",
+      "question": "Como enviar o link ou brief?",
+      "keyMessage": "Aquisição: acesse blkfrog.com/brief, envie seu link atual ou preencha o brief."
+     },
+     {
+      "index": 10,
+      "purpose": "summary",
+      "visualRole": "content",
+      "question": "Por que confiar antes de pagar?",
+      "keyMessage": "Resumo da proposta: site construído primeiro, pagamento só após aprovação, logo incluído."
+     },
+     {
+      "index": 11,
+      "purpose": "objection",
+      "visualRole": "content",
+      "question": "E se eu não gostar do site?",
+      "keyMessage": "Objeção: você só paga quando gosta do site — sem compromisso antes da aprovação."
+     },
+     {
+      "index": 12,
+      "purpose": "decision",
+      "visualRole": "content",
+      "question": "Qual o próximo passo?",
+      "keyMessage": "Pedido: envie seu link atual ou preencha o brief em blkfrog.com/brief para começar."
+     },
+     {
+      "index": 13,
+      "purpose": "decision",
+      "visualRole": "closing",
+      "question": "Até quando a oferta vale?",
+      "keyMessage": "Decisão e prazo: oferta termina em 30 de novembro, 23:59 PT — envie seu link agora."
+     }
+    ]
+   },
+   "slides": [
+    {
+     "title": "ABA A editou este titulo",
+     "subtitle": "We build your new site first. You only pay when you like it.",
+     "bodyAfterImage": "BLK FROGDAY: Nov 23–30.",
+     "presentationBlocks": [],
+     "speakerNotes": "This is the opening slide. The goal is to immediately communicate what Black Frog does, who it serves, and the core value proposition: we build first, you pay only if satisfied. Keep the tone direct and confident."
+    },
+    {
+     "title": "Local service businesses in San Diego with an old site or no site",
+     "subtitle": "If you run a local service business and your site is old or you don't have one yet, that's who we work with.",
+     "bodyAfterImage": "Old site or no site, we build first, you decide after.",
+     "presentationBlocks": [],
+     "speakerNotes": "The audience is defined as owners of local service businesses with an old site or no site. The material does not describe a specific cost of the problem or an alternative they currently use, so the slide focuses on the need the offer addresses without asserting unverified pain points."
+    },
+    {
+     "title": "See your new site before any payment",
+     "subtitle": "During BLK FROGDAY, Nov 23 to 30, we build your new site first. You review the finished site and decide whether you like it, no payment is required to see it.",
+     "bodyAfterImage": "No payment is required to see your new site.",
+     "presentationBlocks": [],
+     "speakerNotes": "The core mechanism is simple: build first, pay only when you like it. The offer window is Nov 23 to 30, and the condition is explicit — you only pay when you like the result."
+    },
+    {
+     "title": "Send your link or fill the brief, that's all it takes to start",
+     "subtitle": "Two ways to begin: send your current website link or fill the brief at blkfrog.com/brief. We build your new site, and you see it before any payment.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [
+      {
+       "type": "steps",
+       "items": [
+        {
+         "body": "Submit your current site link or fill out the brief at blkfrog.com/brief.",
+         "title": "Send your link or brief"
+        },
+        {
+         "body": "Black Frog constructs your new website based on your business and the information provided.",
+         "title": "We build your new site"
+        },
+        {
+         "body": "You see the new site and decide whether you like it before any payment is made.",
+         "title": "Review before paying"
+        }
+       ]
+      }
+     ],
+     "speakerNotes": "The entry barrier is zero: the business owner does not pay anything upfront. The two ways to start are sending an existing link or filling the brief at blkfrog.com/brief. The site is built and presented before payment, so the owner can evaluate the result before deciding."
+    },
+    {
+     "title": "Your new site is $797, logo included this week",
+     "subtitle": "The complete website is $797. This week only, a new logo or a refresh of your existing logo is included at no additional cost. You pay only after you see the new site and like it.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [
+      {
+       "type": "metrics",
+       "items": [
+        {
+         "label": "Site price",
+         "value": "$797",
+         "detail": "Paid only after you see and approve the finished site"
+        },
+        {
+         "label": "Logo included",
+         "value": "This week",
+         "detail": "New logo or refresh of your existing one, no extra cost"
+        }
+       ]
+      }
+     ],
+     "speakerNotes": "The price of $797 covers the website and is paid only after the owner approves the work. The logo — whether a brand-new design or a refresh of the existing one — is included exclusively during the BLK FROGDAY offer period. After Nov 30, the logo inclusion no longer applies. Keep the focus on the value of seeing the site before paying.\n\nLogo inclusion applies during the BLK FROGDAY offer week only."
+    },
+    {
+     "title": "BLK FROGDAY runs Nov 23 to 30, offer ends Nov 30",
+     "subtitle": "The BLK FROGDAY offer runs from November 23 through November 30, ending at 11:59 PM PT. The $797 price with an included logo is tied to this period.",
+     "bodyAfterImage": "After Nov 30, 11:59 PM PT, the offer terms no longer apply.",
+     "presentationBlocks": [],
+     "speakerNotes": "This slide establishes the time-sensitive nature of the offer. BLK FROGDAY runs from Nov 23 to Nov 30, ending at 11:59 PM Pacific Time. The $797 price, the included logo, and the build-first model are tied to this period."
+    },
+    {
+     "title": "You see the new site before you pay anything",
+     "subtitle": "The sequence is simple: we build your new site first, then you decide. You see the new site before any payment, and you only pay when you like it.",
+     "bodyAfterImage": "You only pay when you like the site you see.",
+     "presentationBlocks": [],
+     "speakerNotes": "This slide reinforces the core offer language: you only pay when you like it. The owner's decision point comes after the site is built and visible, not before. The material states the condition plainly: you see the new site before any payment."
+    },
+    {
+     "title": "New logo or a refresh of yours, your choice, included this week",
+     "subtitle": "During BLK FROGDAY, the $797 site comes with a logo: either a new logo designed for your business or a refresh of your existing one. Both are included through Nov 30.",
+     "bodyAfterImage": "The logo inclusion applies only during the BLK FROGDAY offer window.",
+     "presentationBlocks": [],
+     "speakerNotes": "Owners may already have a logo they are attached to, so the refresh option matters as much as the new-logo option. Both paths are available and neither carries an additional charge during BLK FROGDAY. After Nov 30, the logo inclusion no longer applies."
+    },
+    {
+     "title": "No existing site? Fill the brief and we'll build yours",
+     "subtitle": "If you don't have a website yet, fill out the brief at blkfrog.com/brief with your business details. If you do have a site, send us your link. Either way, you see the new site before any payment.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [
+      {
+       "type": "steps",
+       "items": [
+        {
+         "body": "Share your existing website URL so we can review what you have today.",
+         "title": "Send your current link"
+        },
+        {
+         "body": "Visit blkfrog.com/brief and provide your business details, with no website required.",
+         "title": "Or fill the brief"
+        },
+        {
+         "body": "We build the new site and show it to you before any payment.",
+         "title": "See the new site"
+        }
+       ]
+      }
+     ],
+     "speakerNotes": "The audience includes owners of local service businesses with an old site or no site. The brief path accommodates those starting from zero; the link path works for those who already have a web presence. Both converge on the same outcome: a built site presented before payment."
+    },
+    {
+     "title": "Site built first, payment only after approval, logo included",
+     "subtitle": "Black Frog builds your new site before any payment. You review the finished site, and only pay $797 if you like it. This week, a new logo or a refresh of yours is included at no extra cost.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [
+      {
+       "type": "metrics",
+       "items": [
+        {
+         "label": "Site price",
+         "value": "$797",
+         "detail": "Paid only after you approve the finished site"
+        },
+        {
+         "label": "Logo included",
+         "value": "This week",
+         "detail": "New logo or refresh of your existing one"
+        },
+        {
+         "label": "Payment timing",
+         "value": "After approval",
+         "detail": "You see the new site before any payment"
+        }
+       ]
+      }
+     ],
+     "speakerNotes": "This slide consolidates the three core elements of the offer: the build-first approach, the $797 price point, and the logo inclusion. The business owner sees the finished product before paying. The logo inclusion is specific to BLK FROGDAY."
+    },
+    {
+     "title": "Site built first, $797 when you like it, logo included",
+     "subtitle": "We build your new site before any payment. You see the finished site, and you only pay $797 when you like it. This week, a new logo or a refresh of yours is included.",
+     "bodyAfterImage": "You see the completed site and decide, you only pay when you like it.",
+     "presentationBlocks": [],
+     "speakerNotes": "This slide synthesizes the full offer in one place: build-first, $797 on approval, and logo inclusion during BLK FROGDAY. The owner's decision comes after seeing the finished site."
+    },
+    {
+     "title": "If you don't like the site, you don't pay",
+     "subtitle": "We build your new site first. You review it and decide. If you don't like it, you don't pay, that's the offer.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [
+      {
+       "type": "steps",
+       "items": [
+        {
+         "body": "Submit your current site link or fill the brief at blkfrog.com/brief.",
+         "title": "Send your link"
+        },
+        {
+         "body": "We build your new site. You see it before any payment.",
+         "title": "Review your new site"
+        },
+        {
+         "body": "Logo included this week. Offer ends Nov 30, 11:59 PM PT.",
+         "title": "Pay $797 if you like it"
+        }
+       ]
+      }
+     ],
+     "speakerNotes": "This slide addresses the most natural objection from a business owner hearing 'pay only when you like it.' The process starts with sending a link or filling the brief. We then build the site. Only at that point does the owner decide whether to pay $797. The material states the condition plainly: you only pay when you like it."
+    },
+    {
+     "title": "Send your link now, BLK FROGDAY ends Nov 30",
+     "subtitle": "Send your current link or fill the brief at blkfrog.com/brief. We build your new site first, you only pay $797 when you like it. Offer ends Nov 30, 11:59 PM PT.",
+     "bodyAfterImage": "You see the new site before any payment.",
+     "presentationBlocks": [],
+     "speakerNotes": "This is the final call. The offer has a hard deadline of November 30 at 11:59 PM Pacific Time. After that, the $797 price with the included logo is no longer available. The action is simple: send the current site link or fill out the brief at blkfrog.com/brief. We build the new site first, and payment of $797 only happens if the owner likes what they see."
+    }
+   ],
+   "caption": "Black Frog builds websites for local businesses in San Diego. During BLK FROGDAY (Nov 23–30), we build your new site first — you only pay $797 when you like it, and a new logo or refresh is included. Send your link or fill the brief at blkfrog.com/brief. Offer ends Nov 30, 11:59 PM PT."
+  },
+  {
+   "name": "A2 Proposta",
+   "fmt": "apresentacao",
+   "mode": "editorial",
+   "status": "needs_attention",
+   "plan": {
+    "gaps": [],
+    "slides": [
+     {
+      "index": 1,
+      "purpose": "introduction",
+      "visualRole": "cover",
+      "question": "O que é esta proposta e para quem é?",
+      "keyMessage": "Capa: BLK FROGDAY — site novo por US$797, pague só se gostar. Para negócios locais em San Diego."
+     },
+     {
+      "index": 2,
+      "purpose": "summary",
+      "visualRole": "content",
+      "question": "Qual é a oferta em uma frase?",
+      "keyMessage": "Resumo de valor: construímos seu site primeiro; você só paga US$797 se gostar, com logo incluído."
+     },
+     {
+      "index": 3,
+      "purpose": "problem",
+      "visualRole": "content",
+      "question": "Que situação esta proposta endereça?",
+      "keyMessage": "Desafio e impacto: negócios locais de serviço com site antigo ou sem site precisam de presença online atualizada."
+     },
+     {
+      "index": 4,
+      "purpose": "context",
+      "visualRole": "content",
+      "question": "O que você recebe e em que condições?",
+      "keyMessage": "Objetivos e sucesso: site novo construído antes do pagamento, logo incluído, e você aprova antes de pagar."
+     },
+     {
+      "index": 5,
+      "purpose": "process",
+      "visualRole": "demo",
+      "question": "Como funciona o processo?",
+      "keyMessage": "Abordagem e benefício: envie seu link ou preencha o brief; vemos o site pronto antes de qualquer pagamento."
+     },
+     {
+      "index": 6,
+      "purpose": "solution",
+      "visualRole": "content",
+      "question": "O que está incluído na oferta?",
+      "keyMessage": "Escopo e aceite: site novo por US$797 e logo novo ou refresh do atual, incluídos nesta semana."
+     },
+     {
+      "index": 7,
+      "purpose": "roadmap",
+      "visualRole": "content",
+      "question": "Quais são as etapas e prazos?",
+      "keyMessage": "Cronograma e dependências: BLK FROGDAY de 23 a 30 de novembro; oferta termina dia 30 às 23h59 PT."
+     },
+     {
+      "index": 8,
+      "purpose": "evidence",
+      "visualRole": "content",
+      "question": "Por que confiar nesta proposta?",
+      "keyMessage": "Prova próxima: o site fica pronto antes de qualquer pagamento — você vê o resultado antes de decidir."
+     },
+     {
+      "index": 9,
+      "purpose": "business_model",
+      "visualRole": "data",
+      "question": "Qual é o investimento e as condições?",
+      "keyMessage": "Investimento e condições: site por US$797, logo incluído, pagamento só após aprovação, até 30/11 23h59 PT."
+     },
+     {
+      "index": 10,
+      "purpose": "context",
+      "visualRole": "content",
+      "question": "Quais são os limites desta oferta?",
+      "keyMessage": "Pressupostos e exclusões: oferta válida de 23 a 30 de novembro; logo limitado a novo ou refresh nesta semana."
+     },
+     {
+      "index": 11,
+      "purpose": "decision",
+      "visualRole": "content",
+      "question": "Qual é o próximo passo?",
+      "keyMessage": "Plano mútuo: envie seu link atual ou preencha o brief em blkfrog.com/brief para iniciar."
+     },
+     {
+      "index": 12,
+      "purpose": "decision",
+      "visualRole": "closing",
+      "question": "O que decidir agora?",
+      "keyMessage": "Fecho: envie seu link até 30/11 para receber o site novo e o logo por US$797, pagando só se gostar."
+     }
+    ]
+   },
+   "slides": [
+    {
+     "title": "BLK FROGDAY, Your new site, $797, pay only if you like it",
+     "subtitle": "Black Frog builds websites for local businesses in San Diego. From Nov 23 to 30, we build your new site first, you only pay when you like it. A new logo or a refresh of yours is included this week.",
+     "bodyAfterImage": "Offer ends Nov 30, 11:59 PM PT.",
+     "presentationBlocks": [],
+     "speakerNotes": "This is the opening slide. The goal is to immediately communicate the offer, the audience, and the deadline. Emphasize that the site is built before any payment and that the logo is included during BLK FROGDAY week."
+    },
+    {
+     "title": "One offer: a new site and a logo, $797",
+     "subtitle": "Send your current link or fill the brief at blkfrog.com/brief. We build your new site, and you see it before any payment. If you like it, the site is **$797** and a new logo or a refresh of yours is included this week. If not, you walk away.",
+     "bodyAfterImage": "No payment is required to see your new site.",
+     "presentationBlocks": [],
+     "speakerNotes": "The value summary should make the client feel safe: there is no upfront cost to see the new site. The only condition is that the offer is valid during BLK FROGDAY week. The logo is included at no additional cost during this period."
+    },
+    {
+     "title": "An old site, or no site, holds back local service businesses",
+     "subtitle": "If you run a local service business in San Diego and your website is outdated or you don't have one, this offer is built for you: a new site, with no payment required until you see the result and approve it.",
+     "bodyAfterImage": "You see the new site before any payment is due.",
+     "presentationBlocks": [],
+     "speakerNotes": "The challenge here is stated as a situation: local service businesses with an old site or no site. We do not invent specific losses or metrics. The point is that the offer is designed for this audience and removes the risk of paying upfront for something unseen."
+    },
+    {
+     "title": "Your approval comes first, payment follows",
+     "subtitle": "During BLK FROGDAY, your new website is built for your review. A **new logo or a refresh of yours** is included this week. The price is $797, and your approval is the condition for payment, not the other way around.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [],
+     "speakerNotes": "The objective here is to make the success criteria unambiguous: the client receives a built site and a logo, reviews the result, and only then decides whether to pay $797. Approval precedes payment; that is the core condition of the offer."
+    },
+    {
+     "title": "How it works, three steps to your new site",
+     "subtitle": "Send your current link or fill the brief at **blkfrog.com/brief**. We build your new site, you see it before any payment.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [
+      {
+       "type": "steps",
+       "items": [
+        {
+         "body": "Share your current site link or fill the brief at blkfrog.com/brief.",
+         "title": "Send your link or brief"
+        },
+        {
+         "body": "Your new website is constructed for your review.",
+         "title": "We build your new site"
+        },
+        {
+         "body": "See the finished site first; pay only if you like it.",
+         "title": "You review before paying"
+        }
+       ]
+      }
+     ],
+     "speakerNotes": "The client's only required action is sending a link or completing the brief. Everything else — building the site and presenting it for review — happens before payment enters the conversation."
+    },
+    {
+     "title": "What's included: a new site and a logo",
+     "subtitle": "The offer covers a **new website** and, during this week, a new logo or a refresh of your existing one, both in the same package. The logo is part of the BLK FROGDAY offer, not a separate purchase.",
+     "bodyAfterImage": "Logo inclusion applies during BLK FROGDAY week only.",
+     "presentationBlocks": [],
+     "speakerNotes": "Scope is deliberately narrow and clear: one new website and one logo (new or refreshed) for a single price of $797. The logo inclusion is tied to this week's offer, which is the temporal condition the client needs to factor into their decision."
+    },
+    {
+     "title": "BLK FROGDAY timeline, Nov 23 to 30",
+     "subtitle": "The offer window is **Nov 23–30**, closing at **Nov 30, 11:59 PM PT**. Send your link or fill the brief at blkfrog.com/brief before the deadline to qualify.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [
+      {
+       "type": "steps",
+       "items": [
+        {
+         "body": "Nov 23, the offer week begins.",
+         "title": "BLK FROGDAY opens"
+        },
+        {
+         "body": "Your site is built first, you see the result before any payment.",
+         "title": "We build your new site"
+        },
+        {
+         "body": "Nov 30, 11:59 PM PT. After this, the BLK FROGDAY conditions no longer apply.",
+         "title": "Offer closes"
+        }
+       ]
+      }
+     ],
+     "speakerNotes": "The timeline is tight by design: the entire BLK FROGDAY window is November 23 through November 30. Emphasize that the offer has a hard cutoff at 11:59 PM Pacific Time on November 30. Clients who send their link or fill the brief before that deadline are within the offer; anything after falls outside these conditions."
+    },
+    {
+     "title": "Build first, review, then decide",
+     "subtitle": "The core of this proposal is sequence: your new site is built **first**, and you review it before any money changes hands. You send your current link or fill the brief at blkfrog.com/brief, the new site is delivered for your review, and only then do you decide.",
+     "bodyAfterImage": "Your link or brief is the only input needed to begin.",
+     "presentationBlocks": [],
+     "speakerNotes": "This slide carries the trust argument, and it rests entirely on the process described in the offer: the client sends a link or fills the brief, the site is built, and the client sees it before paying. Do not frame this as a guarantee of satisfaction or a proven result — it is a process that removes upfront financial risk. The client's decision to pay is the acceptance criterion. If the client does not like the site, they have not paid, so there is no refund scenario to discuss. Keep the framing on sequence and client control."
+    },
+    {
+     "title": "Investment and conditions",
+     "subtitle": "Site is **$797**, logo included this week. Pay **only after you approve** the new site. Offer valid through **Nov 30, 11:59 PM PT**.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [
+      {
+       "type": "metrics",
+       "items": [
+        {
+         "label": "Site",
+         "value": "$797",
+         "detail": "Paid only after you approve the new site, not upfront."
+        },
+        {
+         "label": "Logo",
+         "value": "Included",
+         "detail": "New logo or refresh of your current one, during BLK FROGDAY week."
+        },
+        {
+         "label": "Offer deadline",
+         "value": "Nov 30, 11:59 PM PT",
+         "detail": "Submit your link or brief before this time to qualify."
+        }
+       ]
+      }
+     ],
+     "speakerNotes": "The investment slide consolidates three conditions the client needs to evaluate: price, scope, and payment timing. The site is a flat $797. The logo is included this week only — new design or refresh of the existing one. Payment happens after approval, not before. The deadline is November 30 at 11:59 PM Pacific Time."
+    },
+    {
+     "title": "What this offer covers, and its limits",
+     "subtitle": "The BLK FROGDAY offer runs **Nov 23 to 30**. During this week, the site is $797 and a new logo or a refresh of yours is included. The logo benefit applies only within this promotional period.",
+     "bodyAfterImage": "Logo inclusion is limited to BLK FROGDAY week.",
+     "presentationBlocks": [],
+     "speakerNotes": "Keep the temporal qualifiers precise: the logo is included only during BLK FROGDAY week, not as a standing feature of every project. The $797 price and the pay-only-if-you-like-it condition are tied to this same window."
+    },
+    {
+     "title": "What you need to start, and what happens next",
+     "subtitle": "The only input needed is your current site link or a completed brief at **blkfrog.com/brief**. From there, your new site is built for review, with no payment due until you see the result.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [],
+     "speakerNotes": "The client's only required action is sending the link or completing the brief. Everything else — building the site and presenting it for review — happens before payment is due. The decision to pay follows seeing the result."
+    },
+    {
+     "title": "Send your link to start",
+     "subtitle": "Send your link or fill the brief at **blkfrog.com/brief**. You get a new site and a logo, and you pay only if you like it. Offer ends **Nov 30, 11:59 PM PT**.",
+     "bodyAfterImage": "One link starts your new site, decide before Nov 30.",
+     "presentationBlocks": [],
+     "speakerNotes": "The closing decision is simple: send the link before the deadline. The client sees the finished site before paying, and the logo is included during BLK FROGDAY week. No payment is required to see the result."
+    }
+   ],
+   "caption": "BLK FROGDAY proposal for local service businesses in San Diego: Black Frog builds your new site first, and you only pay $797 if you like it — with a new logo or refresh included. Offer runs Nov 23–30, ending Nov 30 at 11:59 PM PT. Next step: send your current link or fill the brief at blkfrog.com/brief."
+  },
+  {
+   "name": "A3 Relatorio",
+   "fmt": "apresentacao",
+   "mode": "editorial",
+   "status": "needs_attention",
+   "plan": {
+    "gaps": [
+     "Não há resultados anteriores de clientes, portfólio ou métricas de desempenho documentados no material",
+     "Não há detalhes sobre prazo de entrega do site após envio do link",
+     "Não há informações sobre manutenção, hospedagem ou custos recorrentes pós-entrega",
+     "Não há descrição do processo de revisão ou critérios do 'you only pay when you like it'"
+    ],
+    "slides": [
+     {
+      "index": 1,
+      "purpose": "introduction",
+      "visualRole": "cover",
+      "question": "O que é a BLK FROGDAY e por que ela é relevante agora?",
+      "keyMessage": "Assunto e decisão: oferta BLK FROGDAY da Black Frog, 23 a 30 de nov, para negócios locais em San Diego."
+     },
+     {
+      "index": 2,
+      "purpose": "summary",
+      "visualRole": "content",
+      "question": "Quais são os pontos essenciais da oferta em uma leitura rápida?",
+      "keyMessage": "Resumo executivo: site construído antes do pagamento, $797 com logo incluído, oferta até 30 de nov."
+     },
+     {
+      "index": 3,
+      "purpose": "metrics",
+      "visualRole": "data",
+      "question": "Quais são as condições comerciais da oferta?",
+      "keyMessage": "Scorecard: preço $797, período 23 a 30 de nov, logo incluído, pagamento após aprovação do site."
+     },
+     {
+      "index": 4,
+      "purpose": "context",
+      "visualRole": "content",
+      "question": "Quem é o público-alvo e qual problema a oferta endereça?",
+      "keyMessage": "Scorecard: donos de negócios de serviço local em San Diego com site antigo ou sem site são o foco."
+     },
+     {
+      "index": 5,
+      "purpose": "journey",
+      "visualRole": "demo",
+      "question": "Como funciona o processo do início ao pagamento?",
+      "keyMessage": "Achado: envie o link ou preencha o brief em blkfrog.com/brief; veja o novo site antes de qualquer pagamento."
+     },
+     {
+      "index": 6,
+      "purpose": "solution",
+      "visualRole": "content",
+      "question": "O que está incluído na oferta desta semana?",
+      "keyMessage": "Implicação: o site de $797 vem com logo novo ou refresh do atual, incluído apenas nesta semana da oferta."
+     },
+     {
+      "index": 7,
+      "purpose": "process",
+      "visualRole": "content",
+      "question": "Quais são as etapas e condições para participar?",
+      "keyMessage": "Fatores e hipóteses: envio do link ou brief, construção do site, visualização antes do pagamento, decisão de comprar."
+     },
+     {
+      "index": 8,
+      "purpose": "objection",
+      "visualRole": "content",
+      "question": "Quais riscos e oportunidades o proprietário deve pesar?",
+      "keyMessage": "Riscos e oportunidades: ver o site antes de pagar reduz risco; prazo até 30 de nov cria urgência; custos pós-entrega não informados."
+     },
+     {
+      "index": 9,
+      "purpose": "decision",
+      "visualRole": "content",
+      "question": "Que ação a oferta recomenda e por quê?",
+      "keyMessage": "Recomendações: enviar o link atual do site ou preenchar o brief em blkfrog.com/brief para iniciar sem custo inicial."
+     },
+     {
+      "index": 10,
+      "purpose": "comparison",
+      "visualRole": "content",
+      "question": "Quais são as opções de entrada e seus trade-offs?",
+      "keyMessage": "Opções e trade-offs: enviar o link atual é mais rápido; preencher o brief funciona para quem não tem site ainda."
+     },
+     {
+      "index": 11,
+      "purpose": "decision",
+      "visualRole": "closing",
+      "question": "Qual é a decisão requerida e o prazo?",
+      "keyMessage": "Decisão requerida: enviar o link ou preencher o brief até 30 de nov, 23:59 PT, para participar da oferta."
+     }
+    ]
+   },
+   "slides": [
+    {
+     "title": "BLK FROGDAY: New Site, Pay Only If You Like It",
+     "subtitle": "Black Frog builds websites for San Diego local businesses.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [],
+     "speakerNotes": "From **Nov 23 to 30**, your new site is built first, you pay only after seeing it.\n\nOffer ends Nov 30, 11:59 PM PT.\n\nBLK FROGDAY runs Nov 23–30. Black Frog constructs the new site before any payment. The audience is owners of local service businesses in San Diego with an old site or no site. The decision this deck supports: whether to send the current link and start the process."
+    },
+    {
+     "title": "What the Offer Covers at a Glance",
+     "subtitle": "Black Frog builds your new site **before any payment**. The price is **$797**, and this week includes a new logo or a refresh of your current one. You see the finished site first, then decide. The offer ends **Nov 30 at 11:59 PM PT**, so the window to start is limited to this week.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [],
+     "speakerNotes": "Three facts drive the summary: the site is built before payment, the price is $797 with logo included this week, and the offer has a fixed end date. No prior client results, portfolio, or performance metrics are documented in the source material."
+    },
+    {
+     "title": "Offer Terms: Price, Window, and Payment Flow",
+     "subtitle": "The commercial conditions are straightforward: a fixed price, a defined week, and payment only after you review the new site. The logo is included **only during the BLK FROGDAY week**.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [
+      {
+       "type": "metrics",
+       "items": [
+        {
+         "label": "Site price",
+         "value": "$797",
+         "detail": "Fixed price for the new site during BLK FROGDAY, Nov 23–30"
+        },
+        {
+         "label": "Logo included",
+         "value": "Yes",
+         "detail": "New logo or refresh of your current one, included this week only"
+        },
+        {
+         "label": "Payment timing",
+         "value": "After review",
+         "detail": "You see the new site before any payment is required"
+        },
+        {
+         "label": "Offer deadline",
+         "value": "Nov 30, 11:59 PM PT",
+         "detail": "Offer ends Nov 30 at 11:59 PM Pacific Time"
+        }
+       ]
+      }
+     ],
+     "speakerNotes": "All four metrics come directly from the offer terms. The $797 price, logo inclusion, post-review payment, and Nov 30 deadline are stated facts. The entry point — sending a link or filling the brief at blkfrog.com/brief — is the action that starts the process. No recurring costs, hosting, or maintenance details are provided.\n\nEntry: send your link or fill the brief at blkfrog.com/brief."
+    },
+    {
+     "title": "Built for San Diego Service Businesses",
+     "subtitle": "Black Frog builds websites for **local businesses in San Diego**. The offer targets owners of local service businesses with an old site or no site at all.",
+     "bodyAfterImage": "If your site is outdated or you never had one, this offer speaks to you.",
+     "presentationBlocks": [],
+     "speakerNotes": "The audience definition comes directly from the offer: owners of local service businesses in San Diego with an old site or no site. Black Frog positions itself as serving this specific segment, so the relevance of BLK FROGDAY depends on whether the business fits that profile."
+    },
+    {
+     "title": "See the New Site Before You Pay",
+     "subtitle": "Send your current link or fill the brief at **blkfrog.com/brief**. Black Frog builds the new site first, and you see it before any payment. You only pay when you like it.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [
+      {
+       "type": "steps",
+       "items": [
+        {
+         "body": "Submit your current site link or fill the brief at blkfrog.com/brief.",
+         "title": "Send your link or brief"
+        },
+        {
+         "body": "The new site is built first, before any payment is requested.",
+         "title": "Black Frog builds your site"
+        },
+        {
+         "body": "You see the new site and decide whether you like it before paying.",
+         "title": "Review before paying"
+        }
+       ]
+      }
+     ],
+     "speakerNotes": "The process is designed to remove upfront risk: the owner sends a link or fills a brief, Black Frog builds the site, and only then does payment come into play. The material does not specify how long the build takes after submission, nor does it describe the revision process or the exact criteria behind 'you only pay when you like it.'\n\nNo upfront payment is required to start. The decision to pay happens after you review the built site."
+    },
+    {
+     "title": "$797 Site with Logo Included This Week",
+     "subtitle": "The site costs **$797**, and during BLK FROGDAY a new logo or a refresh of your current one is included. This combination is available only during the offer week, Nov 23 to 30.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [
+      {
+       "type": "metrics",
+       "items": [
+        {
+         "label": "Site price",
+         "value": "$797",
+         "detail": "BLK FROGDAY offer, Nov 23–30"
+        },
+        {
+         "label": "Logo included",
+         "value": "New or refresh",
+         "detail": "Included this week only"
+        },
+        {
+         "label": "Payment timing",
+         "value": "After you like it",
+         "detail": "Site built before any payment"
+        }
+       ]
+      }
+     ],
+     "speakerNotes": "The $797 price covers the site, and the logo — whether a new design or a refresh of the existing one — is included specifically during the BLK FROGDAY week. The offer ends Nov 30 at 11:59 PM PT. The material does not state whether the logo inclusion extends beyond this window or what the standalone logo price would be outside the promotion."
+    },
+    {
+     "title": "Three Steps from Your Link to a New Site",
+     "subtitle": "Send your current link or fill the brief at blkfrog.com/brief. Black Frog builds the new site, and you see it before any payment. If you like it, the site is **$797** with a logo included this week.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [
+      {
+       "type": "steps",
+       "items": [
+        {
+         "body": "Share your current site link or fill the brief at blkfrog.com/brief.",
+         "title": "Send your link or brief"
+        },
+        {
+         "body": "Black Frog constructs the new site with a logo included this week.",
+         "title": "We build your new site"
+        },
+        {
+         "body": "You see the finished site and decide whether to pay $797.",
+         "title": "Review before paying"
+        }
+       ]
+      }
+     ],
+     "speakerNotes": "The process is designed to remove upfront cost as a barrier. The owner sends a link or completes a brief, Black Frog builds the site, and payment only happens after the owner reviews the result. The material does not specify a delivery timeframe after the link is sent, nor does it describe revision rounds or criteria for what counts as liking the site."
+    },
+    {
+     "title": "What to Weigh Before Sending Your Link",
+     "subtitle": "Seeing the site before paying reduces upfront risk: you review the finished work and only pay **$797** if you like it. The offer ends Nov 30, 11:59 PM PT, so the window is limited. Maintenance, hosting, and recurring costs after delivery are not described in the offer.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [],
+     "speakerNotes": "The main opportunity is evaluating a finished site with no initial payment. The main risk is that post-delivery costs and ongoing obligations are not specified in the material. The owner should ask about hosting, maintenance, and what happens after the site is delivered before committing."
+    },
+    {
+     "title": "Send Your Link to Start with No Upfront Cost",
+     "subtitle": "The recommended action is to send your current link or fill the brief at blkfrog.com/brief. You see the new site before any payment, and the $797 price with a logo included applies only through **Nov 30**.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [],
+     "speakerNotes": "This recommendation follows directly from the offer structure: no payment is required to see the site, and the logo inclusion is limited to this week. The owner can start by sending a link, which is the fastest path if a current site exists. For businesses with no site, the brief at blkfrog.com/brief is the alternative entry point."
+    }
+   ],
+   "caption": "BLK FROGDAY (Nov 23–30) is a time-limited offer from Black Frog for San Diego local service businesses: a new website is built before any payment, priced at $797 with a logo or refresh included this week. The next step is to send your current link or fill the brief at blkfrog.com/brief before Nov 30, 11:59 PM PT."
+  },
+  {
+   "name": "C1 Ensinar",
+   "fmt": "carrossel",
+   "mode": "how_to",
+   "status": "needs_attention",
+   "slides": [
+    {
+     "title": "Get your new San Diego site in 2 steps",
+     "subtitle": "BLK FROGDAY: we build it first, you pay $797 when you like it.",
+     "bodyAfterImage": ""
+    },
+    {
+     "title": "Step 1 · Send your link or fill the brief",
+     "subtitle": "Go to blkfrog.com/brief and send your current link, or fill the brief there.",
+     "bodyAfterImage": ""
+    },
+    {
+     "title": "Step 2 · Review your new site first",
+     "subtitle": "We build your new site and you see it **before any payment**.",
+     "bodyAfterImage": "A new logo or a refresh of yours is included this week."
+    },
+    {
+     "title": "Pay $797 only when you like it",
+     "subtitle": "You only pay when you like the new site. The price is $797.",
+     "bodyAfterImage": "Offer ends Nov 30, 11:59 PM PT."
+    },
+    {
+     "title": "Offer ends Nov 30, 11:59 PM PT",
+     "subtitle": "- Your new site for $797\n- A new logo or a refresh of yours",
+     "bodyAfterImage": "Available Nov 23 to Nov 30 only."
+    },
+    {
+     "title": "Send us your link",
+     "subtitle": "You see the new site before any payment. Start at blkfrog.com/brief.",
+     "bodyAfterImage": ""
+    }
+   ],
+   "caption": "Getting a new site for your local business doesn't require upfront payment. During BLK FROGDAY, Nov 23 to 30, Black Frog builds your new site first, and you only pay $797 when you like it. A new logo or a refresh of yours is included this week.\n\nTo start, send your current link or fill the brief at blkfrog.com/brief. You see the new site before any payment. The offer ends Nov 30, 11:59 PM PT.\n\nSend us your link.\n\n#blackfrog #sandiego #localbusiness #webdesign #smallbusiness"
+  },
+  {
+   "name": "C2 Alto impacto",
+   "fmt": "carrossel",
+   "mode": "sensacionalista",
+   "status": "revised",
+   "slides": [
+    {
+     "title": "We build it first. You pay when you like it.",
+     "subtitle": "BLK FROGDAY, Nov 23 to 30. For San Diego local businesses.",
+     "bodyAfterImage": ""
+    },
+    {
+     "title": "Send your link or fill the brief",
+     "subtitle": "Send your current link or fill the brief at blkfrog.com/brief.",
+     "bodyAfterImage": ""
+    },
+    {
+     "title": "Your new site is $797",
+     "subtitle": "This week, a new logo or a refresh of yours is included.",
+     "bodyAfterImage": "One price, site and logo together."
+    },
+    {
+     "title": "Built for local service businesses",
+     "subtitle": "If your site is old or you have no site at all, this is for you.",
+     "bodyAfterImage": ""
+    },
+    {
+     "title": "Two ways to start",
+     "subtitle": "- Send your current link\n- Fill the brief at blkfrog.com/brief",
+     "bodyAfterImage": ""
+    },
+    {
+     "title": "Offer ends Nov 30, 11:59 PM PT",
+     "subtitle": "Send us your link and see your new site first.",
+     "bodyAfterImage": ""
+    }
+   ],
+   "caption": "BLK FROGDAY runs Nov 23 to 30. We build your new site first, and you only pay when you like it. The site is $797, and this week a new logo or a refresh of yours is included.\n\nSend your current link or fill the brief at blkfrog.com/brief. You see the new site before any payment.\n\nOffer ends Nov 30, 11:59 PM PT. Send us your link.\n\n#BLKFROGDAY #SanDiegoBusiness #WebDesign #SmallBusiness #LocalBusiness"
+  },
+  {
+   "name": "A4 Caso",
+   "fmt": "apresentacao",
+   "mode": "editorial",
+   "status": "repaired",
+   "plan": {
+    "gaps": [
+     "Não há caso delimitado com cliente, intervenção documentada ou resultado observado — a oferta é uma promoção, não um estudo de caso.",
+     "Sem métricas de resultado, depoimentos ou evidências de projetos anteriores fornecidas.",
+     "Sem informações sobre tempo de entrega do site após o brief.",
+     "Sem detalhes sobre o que acontece se o cliente não gostar do site — se há custo ou obrigação."
+    ],
+    "slides": [
+     {
+      "index": 1,
+      "purpose": "introduction",
+      "visualRole": "cover",
+      "question": "O que é a BLK FROGDAY e por que vale atenção agora?",
+      "keyMessage": "Resultado observado: N/A — abertura da oferta BLK FROGDAY: site novo construído antes do pagamento, de 23 a 30 de novembro."
+     },
+     {
+      "index": 2,
+      "purpose": "context",
+      "visualRole": "content",
+      "question": "Para quem é esta oferta e onde a Black Frog atua?",
+      "keyMessage": "Contexto e baseline: Black Frog atende negócios locais em San Diego; foco em serviços locais com site antigo ou sem site."
+     },
+     {
+      "index": 3,
+      "purpose": "problem",
+      "visualRole": "content",
+      "question": "O que impede proprietários de atualizar o site hoje?",
+      "keyMessage": "Desafio e impacto: Proprietários com site antigo ou sem site precisam de renovação; risco de pagar antes de ver o resultado é barreira."
+     },
+     {
+      "index": 4,
+      "purpose": "solution",
+      "visualRole": "data",
+      "question": "Qual é a oferta e o que está incluído?",
+      "keyMessage": "Objetivo e métrica: Site por $797 com logo novo ou refresh incluído; cliente vê o site antes de qualquer pagamento."
+     },
+     {
+      "index": 5,
+      "purpose": "process",
+      "visualRole": "content",
+      "question": "Como funciona o processo do início ao pagamento?",
+      "keyMessage": "Diagnóstico: Cliente envia link atual ou preenche brief em blkfrog.com/brief; a Black Frog constrói o site e só então o cliente decide pagar."
+     },
+     {
+      "index": 6,
+      "purpose": "solution",
+      "visualRole": "content",
+      "question": "Por que pagar só depois de ver o site muda a decisão?",
+      "keyMessage": "Estratégia: Construir antes e cobrar só se aprovado remove o risco do cliente; o pagamento fica condicionado à aprovação do site."
+     },
+     {
+      "index": 7,
+      "purpose": "journey",
+      "visualRole": "demo",
+      "question": "Quais são os passos do cliente nesta semana?",
+      "keyMessage": "Execução e decisões: Enviar link ou brief → Black Frog constrói o site → cliente avalia → paga $797 se gostar, com logo incluído."
+     },
+     {
+      "index": 8,
+      "purpose": "comparison",
+      "visualRole": "data",
+      "question": "O que muda com esta abordagem em vez do pagamento antecipado?",
+      "keyMessage": "Antes e depois: Sem base comparável de projeto anterior do cliente; a oferta apresenta pagamento após visualização em vez de pagamento antecipado."
+     },
+     {
+      "index": 9,
+      "purpose": "metrics",
+      "visualRole": "content",
+      "question": "Quais são as condições de preço, prazo e escopo?",
+      "keyMessage": "Resultados: Site por $797, logo incluído, oferta válida de 23 a 30 de novembro até 23:59 PT; sem resultados de projeto documentados."
+     },
+     {
+      "index": 10,
+      "purpose": "objection",
+      "visualRole": "content",
+      "question": "E se eu não gostar do site — há obrigação?",
+      "keyMessage": "Atribuição e limites: O material diz que o cliente paga só se gostar; não detalha custos ou obrigações caso não aprove."
+     },
+     {
+      "index": 11,
+      "purpose": "decision",
+      "visualRole": "closing",
+      "question": "Como aproveitar a BLK FROGDAY antes do prazo?",
+      "keyMessage": "Aprendizados e aplicação: Envie seu link atual ou preencha o brief em blkfrog.com/brief antes de 30 de novembro, 23:59 PT."
+     }
+    ]
+   },
+   "slides": [
+    {
+     "title": "BLK FROGDAY: your new site built before you pay",
+     "subtitle": "From Nov 23 to 30, Black Frog builds your new website first, you only pay **when you like it**.",
+     "bodyAfterImage": "You only pay when you like it.",
+     "presentationBlocks": [],
+     "speakerNotes": "BLK FROGDAY is a time-limited offer running November 23 through 30. The core proposition is that Black Frog builds the new site before any payment is requested, and the client pays only if they like the result. This slide opens the deck by establishing what the offer is and why it matters now: the window closes November 30 at 11:59 PM Pacific Time."
+    },
+    {
+     "title": "Built for San Diego local service businesses",
+     "subtitle": "For owners of **local service businesses** in San Diego with an old site or no site at all.",
+     "bodyAfterImage": "If your current site feels outdated or you never had one, this is for you.",
+     "presentationBlocks": [],
+     "speakerNotes": "The audience is specifically owners of local service businesses in San Diego who have either an outdated website or no website. Black Frog's stated focus is building websites for local businesses in this region. This slide sets the context: who the offer is for, where Black Frog operates, and what the starting situation looks like for these business owners."
+    },
+    {
+     "title": "Paying before seeing the result is the barrier",
+     "subtitle": "Owners who need a new site face a familiar hesitation: committing money **before seeing the outcome**. When the only option is to pay upfront, the risk sits entirely with the business owner, and that risk is enough to delay the decision or abandon it altogether. The offer is designed to shift that risk away from the client.",
+     "bodyAfterImage": "The proposition: see the new site first, then decide.",
+     "presentationBlocks": [],
+     "speakerNotes": "The core problem this offer addresses is the perceived risk of paying for a website before seeing it. For owners with an old site or no site, the cost of getting it wrong — both in money and in a result that does not represent their business — is a real barrier. The material frames the solution as building first and charging only if the client approves, which directly targets this hesitation. No data on prior project outcomes or client behavior is provided, so the barrier is presented as the proposition's framing, not as a measured finding."
+    },
+    {
+     "title": "$797 for the site, logo included this week",
+     "subtitle": "During BLK FROGDAY, the new site costs **$797** and includes a new logo or a refresh of yours. You see the finished site before any payment is requested.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [
+      {
+       "type": "metrics",
+       "items": [
+        {
+         "label": "Site",
+         "value": "$797",
+         "detail": "Price during BLK FROGDAY, Nov 23–30"
+        },
+        {
+         "label": "Logo",
+         "value": "Included",
+         "detail": "New logo or refresh of your existing one"
+        },
+        {
+         "label": "Payment timing",
+         "value": "After preview",
+         "detail": "You see the new site before any payment"
+        }
+       ]
+      }
+     ],
+     "speakerNotes": "The offer bundles the site and logo at a fixed price for the promotional week. The key distinction is sequence: the site is built and shown first, and payment only enters the conversation after the owner has seen the result. The logo is included as part of this week's package, not as a separate add-on."
+    },
+    {
+     "title": "Send your link, see the site, then decide",
+     "subtitle": "Share your current link or fill the brief at **blkfrog.com/brief**. Your new site is built for your review before any payment step.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [
+      {
+       "type": "steps",
+       "items": [
+        {
+         "body": "Use your current website link or complete the brief at blkfrog.com/brief",
+         "title": "Send your link or brief"
+        },
+        {
+         "body": "Your new site is constructed based on what you provided",
+         "title": "Black Frog builds the site"
+        },
+        {
+         "body": "See the finished site first, then decide whether to proceed",
+         "title": "You review before paying"
+        }
+       ]
+      }
+     ],
+     "speakerNotes": "The process is designed to front-load the work so the owner can evaluate a tangible result rather than a proposal. The entry point is deliberately simple: an existing link or a brief form. No payment is requested until the owner has seen the new site.\n\nEntry point: blkfrog.com/brief"
+    },
+    {
+     "title": "Build first, pay on approval, the risk shifts",
+     "subtitle": "By constructing the site before charging, Black Frog removes the need to trust a proposal. **Payment is conditioned on your approval** of the finished site, so the owner's risk is addressed at the point of decision rather than before it.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [],
+     "speakerNotes": "The strategy inverts the usual sequence of pay-then-build. The owner evaluates a completed site, not a mockup or promise. This means the decision to pay follows a concrete review. The material states you pay when you like it; it does not detail what happens if you do not, so the scope of that scenario remains undefined."
+    },
+    {
+     "title": "Your steps during BLK FROGDAY week",
+     "subtitle": "You review the finished site before any payment decision. **$797 only if you like it**, with a new logo or refresh included this week.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [],
+     "speakerNotes": "The flow is designed to remove upfront commitment. The client initiates contact by sending a link or completing the brief, then reviews the finished site before any payment decision. The $797 price and included logo apply during BLK FROGDAY week, Nov 23–30."
+    },
+    {
+     "title": "Payment shifts from before to after you see the site",
+     "subtitle": "Review the built site first. **$797 on approval**, with a new logo or refresh included this week.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [
+      {
+       "rows": [
+        [
+         "When you pay",
+         "After seeing the built site, only if you approve"
+        ],
+        [
+         "What is included",
+         "New site at $797 plus logo or refresh this week"
+        ]
+       ],
+       "type": "comparison",
+       "headers": [
+        "Decision point",
+        "BLK FROGDAY offer"
+       ]
+      }
+     ],
+     "speakerNotes": "The comparison is limited to what the material describes: the offer's payment-after-approval structure. No prior client project, baseline, or market benchmark was provided, so the slide does not construct a before-and-after comparison beyond the offer's own terms."
+    },
+    {
+     "title": "Price, deadline, and scope at a glance",
+     "subtitle": "The site is **$797** with a new logo or refresh included during BLK FROGDAY, Nov 23–30.",
+     "bodyAfterImage": "",
+     "presentationBlocks": [
+      {
+       "type": "metrics",
+       "items": [
+        {
+         "label": "Site price",
+         "value": "$797",
+         "detail": "Logo or refresh included during BLK FROGDAY week"
+        },
+        {
+         "label": "Offer window",
+         "value": "Nov 23–30",
+         "detail": "Ends Nov 30 at 11:59 PM PT"
+        }
+       ]
+      }
+     ],
+     "speakerNotes": "These figures are the offer conditions, not project outcomes. The $797 price, included logo, and Nov 30 deadline are the documented terms. No metrics from completed projects, client testimonials, or performance data were provided in the material."
+    },
+    {
+     "title": "You pay only if you like the site",
+     "subtitle": "The offer states that you see the new site before any payment and pay **only when you like it**.",
+     "bodyAfterImage": "Confirm terms directly before starting.",
+     "presentationBlocks": [],
+     "speakerNotes": "The core promise is clear: the client sees the finished site before paying. However, the material does not describe what occurs if the client decides not to proceed — there is no mention of cancellation fees, deposits, or any remaining obligation. When speaking with a prospect, advise them to ask Black Frog directly about any conditions that apply if they choose not to approve the site, so they have the full picture before submitting their link or brief."
+    },
+    {
+     "title": "Send your link before Nov 30, 11:59 PM PT",
+     "subtitle": "Send your current link or fill the brief at **blkfrog.com/brief**.",
+     "bodyAfterImage": "Offer ends Nov 30, 11:59 PM PT.",
+     "presentationBlocks": [],
+     "speakerNotes": "The Black Frog team builds your new site, you review it, and you pay $797 only if you like it — with a new logo or refresh included this week.\n\nThis is the closing call to action. The deadline is firm: November 30 at 11:59 PM Pacific Time. The two entry points are sending an existing website link or completing the brief at blkfrog.com/brief. Remind the audience that the logo inclusion — whether a new design or a refresh of their current one — is specific to this offer week and is part of the $797 price. The next step is entirely in their hands: send the link or fill the brief to start the process."
+    }
+   ],
+   "caption": "BLK FROGDAY (Nov 23–30) is a time-limited offer from Black Frog for San Diego local service businesses with an old site or no site. The deck opens with the core proposition — your new site is built before any payment — then sets the audience context and identifies the key barrier: paying upfront before seeing the result. Next steps cover the offer details, the process, and how to participate before the deadline."
+  }
+ ]
+}
