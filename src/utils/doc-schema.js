@@ -15,6 +15,7 @@ import { LOGO_SIZE_DEFAULT, LOGO_SIZE_MAX, LOGO_SIZE_MIN } from './slide-logo.js
 import { normalizePresentationPath } from './presentation.js';
 import { resolvePresentationVisualPresetDefinition } from '../styles/presentation-presets.jsx';
 import { repairMissingPresentationEvidence } from './presentation-composition.js';
+import { expandDocFromLocalCopy } from './local-library-compact.js';
 
 /**
  * Logos ≤140px na escala 1080 ficavam ilegíveis / “fora” do preview (padrão
@@ -335,7 +336,9 @@ function ensureDocShape(d) {
   if (!d || typeof d !== 'object') {
     return { ...JSON.parse(JSON.stringify(DEFAULT_DOC)), __v: SCHEMA_VERSION };
   }
-  const migrated = migrateDoc(d);
+  // QA-2411: um documento na forma compacta da cópia local volta inteiro aqui,
+  // por onde todo projeto entra no app.
+  const migrated = migrateDoc(expandDocFromLocalCopy(d));
   const out = {
     ...DEFAULT_DOC,
     ...migrated,

@@ -1,5 +1,6 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import { Home } from 'lucide-react';
+import { compactLibraryForLocalCopy } from './local-library-compact.js';
 
 // ─── STORAGE KEYS ─────────────────────────────────────────────────────────────
 // Chaves centralizadas — nunca use string literal de localStorage diretamente.
@@ -58,10 +59,35 @@ let VC_QUOTA_SLIM_ALREADY_NOTIFIED = false;
 let VC_QUOTA_HARD_ALREADY_NOTIFIED = false;
 const quotaFailedKeys = new Set();
 
+/**
+ * QA-2411: o aviso vermelho de armazenamento cheio aparecia a cada abertura.
+ * Com assinatura os projetos ficam na conta, então o aviso aparece uma vez por
+ * sessão da aba (recarregar não repete); volta a valer quando a gravação se
+ * recupera e falha de novo. No plano grátis a cópia deste aparelho é a única:
+ * o aviso nunca é omitido.
+ */
+const QUOTA_NOTICE_KEY = 'vc_quota_notice_shown';
+
+export function shouldShowQuotaNotice({ free = false } = {}) {
+  if (free) return true;
+  try {
+    if (sessionStorage.getItem(QUOTA_NOTICE_KEY)) return false;
+    sessionStorage.setItem(QUOTA_NOTICE_KEY, '1');
+  } catch { /* sem sessão para lembrar: melhor avisar */ }
+  return true;
+}
+
+export function quotaExceededMessage({ free = false } = {}) {
+  return free
+    ? 'Não foi possível salvar neste aparelho: o armazenamento deste navegador está cheio. Mantenha esta aba aberta e baixe um backup do projeto antes de fechar ou recarregar. Depois, apague projetos ou fotos que não usa mais para liberar espaço.'
+    : 'Não foi possível salvar a cópia local porque o armazenamento deste navegador está cheio. Mantenha esta aba aberta e clique em Salvar para enviar as alterações à sua conta. O que já está na conta não é afetado.';
+}
+
 function confirmQuotaRecovery(key) {
   if (!quotaFailedKeys.delete(key) || quotaFailedKeys.size) return;
   VC_QUOTA_SLIM_ALREADY_NOTIFIED = false;
   VC_QUOTA_HARD_ALREADY_NOTIFIED = false;
+  try { sessionStorage.removeItem(QUOTA_NOTICE_KEY); } catch { /* sessão indisponível */ }
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('vc:quota-recovered'));
   }
@@ -334,6 +360,9 @@ const lsSet = (key, value) => {
       return false;
     }
   }
+  // QA-2411: a cópia local dos projetos guarda uma vez por projeto os blocos
+  // de tipografia repetidos em cada slide. `lsGet` desfaz ao ler.
+  if (key === SK.library) value = compactLibraryForLocalCopy(value);
   try {
     localStorage.setItem(key, JSON.stringify(value));
     confirmQuotaRecovery(key);
@@ -368,7 +397,7 @@ const lsSet = (key, value) => {
       if (!VC_QUOTA_HARD_ALREADY_NOTIFIED) {
         VC_QUOTA_HARD_ALREADY_NOTIFIED = true;
         if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('vc:quota-exceeded', {
-          detail: 'Não foi possível salvar a cópia local porque o armazenamento deste navegador está cheio. Mantenha esta aba aberta e clique em Salvar para tentar salvar as alterações na sua conta.',
+          detail: quotaExceededMessage(),
         }));
       }
     }

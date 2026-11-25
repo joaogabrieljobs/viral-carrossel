@@ -31,6 +31,7 @@ import {
 import { normalizeHookLibrary } from '../utils/hooks-library.js';
 import { isProjectOutboxUnavailable, selectRestoredProjectId } from '../utils/project-sync-control.js';
 import { readableErrorMessage } from '../utils/storage-error-message.js';
+import { readLocalLibrary } from '../utils/local-library-compact.js';
 import {
   isFreeSession, markFreePlanUse, stashFreePlanDrafts, clearFreePlanDrafts,
 } from '../utils/free-plan.js';
@@ -210,7 +211,8 @@ export async function requeueUnsentProjectsForBoot(owner, { signal, storage = gl
       activeBrandId: readJson(SK.activeBrandId, ''),
     };
     return await requeueUnsentCachedProjects({
-      owner, storage, library: readJson(SK.library, []), fingerprint: projectCacheFingerprint,
+      // QA-2411: a cópia local é compacta; o marcador foi feito do documento inteiro.
+      owner, storage, library: readLocalLibrary(storage), fingerprint: projectCacheFingerprint,
       getPendingOp: (projectId) => getPendingProjectOp(owner, projectId),
       prepare: (entry) => prepareProjectCloudPayload(entry, { snapshot, ownerId: owner, signal }),
       queue: (entry, options) => queueProjectPut(owner, entry, options),
@@ -570,8 +572,7 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
       if (session?.active) {
         let localBeforeCloud = restoredSnapshot?.library;
         if (!Array.isArray(localBeforeCloud)) {
-          try { localBeforeCloud = JSON.parse(localStorage.getItem(SK.library) || '[]'); }
-          catch { localBeforeCloud = []; }
+          localBeforeCloud = readLocalLibrary(localStorage);
         }
         freeDrafts = stashFreePlanDrafts(readDataOwner(), localBeforeCloud);
       }

@@ -5,6 +5,7 @@
  * É uma proteção local; o sync da conta restaura projetos em outro dispositivo.
  */
 import { SK } from './storage.js';
+import { expandLibraryFromLocalCopy } from './local-library-compact.js';
 import { USER_PROFILE_KEY } from './user-profile.js';
 import { CUSTOM_VISUAL_PRESETS_KEY } from './custom-visual-presets.js';
 import { FREE_PLAN_SINCE_KEY } from './free-plan.js';
@@ -416,7 +417,8 @@ async function applySlot(slot, { onRestored, isCurrent } = {}) {
   if (typeof onRestored !== 'function') return localPersisted && !emptyWithDeletes;
   try {
     const read = (key, fallback) => keys[key] ? JSON.parse(keys[key]) : fallback;
-    const snapshot = { library: read(SK.library, []), brandRoster: read(SK.brands, []),
+    // QA-2411: o cofre guarda a cópia local como está (compacta); o app a recebe inteira.
+    const snapshot = { library: expandLibraryFromLocalCopy(read(SK.library, [])), brandRoster: read(SK.brands, []),
       libraryFolders: read(SK.libraryFolders, []), activeDocId: read(SK.activeDocId, null),
       activeBrandId: read(SK.activeBrandId, null), deletedIds: deletedIdsFromBag(keys) };
     assertRestoreCurrent(isCurrent);

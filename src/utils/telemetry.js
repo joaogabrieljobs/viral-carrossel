@@ -1,4 +1,5 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
+import { expandLibraryFromLocalCopy } from './local-library-compact.js';
 
 // ─── ANALYTICS ────────────────────────────────────────────────────────────────
 // Plausible (carregado via index.html). Helper que é no-op se ad blocker bloquear
@@ -13,6 +14,15 @@ function trackEvent(name, props) {
 
 // Persistência leve em localStorage com fallback seguro
 const lsGet = (key, fallback) => {
+  // QA-2411: a cópia local dos projetos é gravada compacta (ver `lsSet`).
+  if (key === 'vc_library') {
+    const library = readJson(key, fallback);
+    return library === fallback ? fallback : expandLibraryFromLocalCopy(library);
+  }
+  return readJson(key, fallback);
+};
+
+const readJson = (key, fallback) => {
   let raw;
   try {
     raw = localStorage.getItem(key);

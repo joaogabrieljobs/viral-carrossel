@@ -433,6 +433,8 @@ import {
   areAccountDataWritesLocked,
   lockAccountDataWrites,
   unlockAccountDataWrites,
+  shouldShowQuotaNotice,
+  quotaExceededMessage,
 } from './src/utils/storage.js';
 import {
   vcHexToRgb,
@@ -4019,7 +4021,11 @@ export default function App() {
       toast('Outra aba está atualizando seus projetos. Esta alteração não foi salva; volte à aba mais recente antes de continuar.', 'warning', 8_000);
     };
     let warningId;
-    const onQuotaExceeded = (e) => { warningId = toast(e.detail, 'error', 0); };
+    // QA-2411: com assinatura, uma vez por sessão; o texto diz o que fazer em cada plano.
+    const onQuotaExceeded = () => {
+      const free = !!accessSessionRef.current?.free;
+      if (shouldShowQuotaNotice({ free })) warningId = toast(quotaExceededMessage({ free }), 'error', 0);
+    };
     const onQuotaRecovered = () => { if (warningId) dismissToast(warningId); };
     window.addEventListener('vc:quota-warning',  onQuotaWarning);
     window.addEventListener('vc:quota-exceeded', onQuotaExceeded);
