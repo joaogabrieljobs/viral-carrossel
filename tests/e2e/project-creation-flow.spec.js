@@ -44,8 +44,8 @@ const generated = (count, prefix = 'Projeto novo') => ({
 async function library(page) {
   return page.evaluate(() => JSON.parse(localStorage.getItem('vc_library') || '[]'));
 }
-function accountMock(withProject, onboarding) {
-  const cloud = {
+function accountMock(withProject, onboarding, shared) {
+  const cloud = shared || {
     rows: new Map(withProject ? [[originalProject.id, { entry: structuredClone(originalProject), version: 1 }]] : []),
     revision: 1, metaRevision: 1, puts: [], assets: new Map(),
     metadata: {
@@ -70,6 +70,8 @@ function accountMock(withProject, onboarding) {
           entry: { id: row.entry.id, name: row.entry.name, status: row.entry.status || 'draft' } })),
       } });
       if (request.method() !== 'PUT') return route.fulfill({ status: 405, json: { error: 'Método não esperado neste teste.' } });
+      // Sem rede: o pedido nem chega à conta.
+      if (cloud.offline) return route.abort('failed');
       const body = request.postDataJSON(), previous = cloud.rows.get(body.entry.id);
       if (body.baseVersion !== (previous?.version || 0)) return route.fulfill({ status: 409, json: {
         code: 'project_conflict', cloudVersion: previous?.version || 0, error: 'Conflito de versão.',
@@ -116,14 +118,15 @@ function accountMock(withProject, onboarding) {
     },
   } };
 }
-async function setup(page, { withProject = true, ai, onboarding = false } = {}) {
-  const account = accountMock(withProject, onboarding);
+async function setup(page, { withProject = true, ai, onboarding = false, cloud: shared, seed = true } = {}) {
+  const account = accountMock(withProject, onboarding, shared);
   await mockApi(page, { session, onboarding, extra: {
     ...(projectsV2 ? account.routes : {}),
     '/api/ai/compatible': ai || (route => route.fulfill({ json: completion({ edits: [] }) })),
     '/api/fetch-source': route => route.fulfill({ json: { ok: true, text: 'A empresa oferece sites com acompanhamento mensal.' } }),
   } });
-  await page.addInitScript(({ originalProject, oldBrand, newBrand, savedPreset, withProject }) => {
+  // Segunda aba do mesmo navegador: usa o que a primeira deixou, sem semear de novo.
+  if (seed) await page.addInitScript(({ originalProject, oldBrand, newBrand, savedPreset, withProject }) => {
     if (sessionStorage.getItem('creation-flow-fixture')) return;
     sessionStorage.setItem('creation-flow-fixture', '1');
     localStorage.setItem('vc_library', JSON.stringify(withProject ? [originalProject] : []));
@@ -996,4 +999,68 @@ test('repetir com a mesma marca nova atualiza perfil e pedido sem duplicar o des
     expect(cloud.rows.get(destination.id).entry.doc.brand.id).toBe(reservedBrandId);
     expect(cloud.metadata.brands).toHaveLength(3);
   }
+});
+
+
+// Reteste 24/11 (conta 6): projeto recém-gerado abria "Este projeto tem duas
+// versões" sem ninguém mais ter editado. A primeira geração falhou sem rede e o
+// rascunho ficou na fila do navegador; a abertura de outra aba (a galeria)
+// enviou esse rascunho; a aba de origem não soube da versão 1 e mandou o texto
+// gerado sobre a versão 0.
+test('gerar de novo depois de falha de rede não abre a tela de duas versões quando outra aba é aberta no meio', async ({ page }) => {
+  test.skip(!projectsV2, 'Executar com VITE_PROJECTS_V2=true');
+  test.setTimeout(120_000);
+  let online = false;
+  const ai = route => {
+    if (!online) return route.abort('failed');
+    const prompt = route.request().postDataJSON().payload.messages.find(m => m.role === 'user').content;
+    return route.fulfill({ json: completion(prompt.startsWith('REVISÃO EDITORIAL') ? { edits: [] } : generated(5, 'Retomado')) });
+  };
+  const puts = [];
+  const watch = (target, tab) => {
+    const record = (request, status) => {
+      if (!request.url().includes('/api/projects') || request.method() !== 'PUT') return;
+      const body = request.postDataJSON();
+      puts.push(`${tab} base=${body.baseVersion} "${body.entry.doc.slides[0].title}" ${status}`);
+    };
+    target.on('requestfinished', async request => record(request, (await request.response())?.status()));
+    target.on('requestfailed', request => record(request, 'sem rede'));
+  };
+  watch(page, 'origem');
+  const cloud = await setup(page, { ai });
+  const wizard = await configure(page, { name: 'RT24 A4 Caso' });
+  cloud.offline = true;
+  await wizard.getByRole('button', { name: 'Criar e gerar 5 cards', exact: true }).click();
+  await expect(wizard.getByRole('alert')).toContainText(/falha de rede/i, { timeout: 30_000 });
+  // O rascunho do projeto novo tenta subir e fica na fila deste navegador.
+  await expect.poll(() => puts.filter(item => item.endsWith('sem rede')).length, { timeout: 20_000 }).toBeGreaterThan(0);
+  const draft = (await library(page)).find(p => p.name === 'RT24 A4 Caso');
+  expect(cloud.rows.has(draft.id)).toBe(false);
+
+  // A rede volta e a pessoa abre a galeria em outra aba, que fica parada.
+  cloud.offline = false;
+  online = true;
+  const gallery = await page.context().newPage();
+  watch(gallery, 'galeria');
+  await setup(gallery, { ai, cloud, seed: false });
+  await gallery.getByRole('button', { name: /^Imagens$/ }).first().click();
+  await expect(gallery.getByRole('heading', { name: /imagens geradas/i })).toBeVisible();
+  // A abertura dessa aba envia o rascunho que estava na fila: versão 1 na conta.
+  await expect.poll(() => cloud.rows.get(draft.id)?.version).toBe(1);
+  expect(puts.some(item => item.startsWith('galeria base=0') && item.endsWith('200'))).toBe(true);
+
+  await page.bringToFront();
+  await wizard.getByRole('button', { name: 'Criar e gerar 5 cards', exact: true }).click();
+  await expect(wizard).toHaveCount(0, { timeout: 30_000 });
+  // O texto gerado entra por cima do rascunho da própria aba, sem pergunta.
+  await expect.poll(() => cloud.rows.get(draft.id)?.entry.doc.slides[0].title, { timeout: 30_000 }).toBe('Retomado 1');
+  expect(cloud.rows.get(draft.id).version).toBe(2);
+  expect(cloud.rows.has(`conflict-${draft.id}`)).toBe(false);
+  await expect(page.getByText(/^Salvo na conta às/)).toBeVisible({ timeout: 15_000 });
+  for (const tab of [page, gallery]) {
+    await expect(tab.getByRole('dialog', { name: 'Este projeto tem duas versões' })).toHaveCount(0);
+  }
+  expect(puts.filter(item => item.startsWith('origem') && !item.endsWith('sem rede')).map(item => item.replace(/"[^"]*" /, ''))).toEqual([
+    'origem base=0 409', 'origem base=1 200',
+  ]);
 });

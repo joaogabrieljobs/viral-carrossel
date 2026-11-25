@@ -19,6 +19,21 @@ const TIMEOUT_MS = 8_000;
 const PROJECT_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/;
 const MAX_ENTRY_BYTES = 2 * 1024 * 1024;
 const flushFlights = new Map();
+/**
+ * RT24 (conta 6): o que ESTA aba pôs na fila, por projeto. A fila é do
+ * navegador: a abertura de outra aba pode enviar a gravação pendente desta, e
+ * então esta aba não fica sabendo da versão confirmada. A edição seguinte
+ * leva esta lembrança junto; se a conta responder conflito com um texto que
+ * esta própria aba escreveu, não é versão de outra pessoa nem de outra aba.
+ */
+const queuedHere = new Map();
+
+function rememberQueuedHere(op) {
+  if (op?.kind !== 'put' || typeof op.entryFingerprint !== 'string' || !Number.isSafeInteger(op.baseVersion)) return;
+  const rows = queuedHere.get(op.key) || [];
+  if (rows.some((row) => row.fingerprint === op.entryFingerprint && row.baseVersion === op.baseVersion)) return;
+  queuedHere.set(op.key, [...rows, { fingerprint: op.entryFingerprint, baseVersion: op.baseVersion }].slice(-20));
+}
 
 function outboxError(message, code) {
   return new ProjectApiError(message, { code });
@@ -191,7 +206,7 @@ function persistOperation(ownerId, projectId, kind, entry, baseVersion, projectN
           // Só estes hashes permitem reconhecer um envio próprio cuja
           // resposta se perdeu. Não são uma autorização para sobrescrever
           // uma edição remota divergente.
-          ...(kind === 'put' ? { predecessors: pendingPredecessors(previous) } : {}),
+          ...(kind === 'put' ? { predecessors: withQueuedHere(pendingPredecessors(previous), key) } : {}),
           // DB-01: a contagem de 5xx seguidos acompanha o projeto até um envio
           // dar certo; uma edição nova não devolve à fila o poder de travá-la.
           ...(previous?.serverFailures && previous.kind !== 'delete' && kind !== 'delete'
@@ -224,7 +239,9 @@ export async function queueProjectPut(ownerId, entry, { baseVersion = 0, assets 
     throw outboxError('Não foi possível proteger as imagens deste projeto na fila local.', 'project_bad_assets');
   }
   const fingerprint = await savedEntryFingerprint(prepared);
-  return persistOperation(ownerId, entry.id, 'put', prepared, baseVersion, '', fingerprint, assetRows);
+  const op = await persistOperation(ownerId, entry.id, 'put', prepared, baseVersion, '', fingerprint, assetRows);
+  rememberQueuedHere(op);
+  return op;
 }
 
 export function queueProjectDelete(ownerId, projectId, { baseVersion = 0, projectName = '' } = {}) {
@@ -534,6 +551,17 @@ async function savedEntryFingerprint(entry) {
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonicalJson(content)));
     return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
   } catch { return null; } // Sem prova criptográfica, conserva o conflito.
+}
+
+/** Junta à trilha da operação o que esta aba já tinha posto na fila para o projeto. */
+function withQueuedHere(predecessors, key) {
+  const own = queuedHere.get(key) || [];
+  if (!own.length) return predecessors;
+  const merged = [...predecessors];
+  for (const row of own) {
+    if (!merged.some((item) => item.fingerprint === row.fingerprint && item.baseVersion === row.baseVersion)) merged.push(row);
+  }
+  return merged.length > 20 ? [...merged.slice(0, 10), ...merged.slice(-10)] : merged;
 }
 
 function pendingPredecessors(previous) {

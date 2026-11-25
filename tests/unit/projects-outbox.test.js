@@ -770,6 +770,116 @@ describe('outbox durável por projeto', () => {
     });
   });
 
+  // Reteste 24/11 (conta 6): projeto recém-gerado abria "Este projeto tem duas
+  // versões" sem ninguém mais ter editado. A fila é do navegador, não da aba:
+  // a primeira gravação (rascunho, sem rede) ficou na fila e foi enviada pela
+  // abertura de outra aba. A aba de origem não soube da versão 1 e mandou a
+  // edição seguinte sobre a versão 0; a conta respondeu conflito com o
+  // rascunho que a própria aba tinha escrito.
+  describe('RT24 conta 6: edição enviada por outra aba não vira conflito com a própria aba', () => {
+    const draft = { id: 'janine', name: 'Caso', doc: { title: 'Seu título aqui' } };
+    const generated = { id: 'janine', name: 'Caso', doc: { title: 'Texto gerado' } };
+
+    /** Outra aba do mesmo navegador: mesma fila (IndexedDB), outra memória. */
+    async function anotherTab() {
+      vi.resetModules();
+      const storageModule = await import('../../src/utils/storage.js');
+      storageModule.bindAccountDataWriteOwner(ALICE, { switchedHere: true });
+      return import('../../src/utils/projects-outbox.js');
+    }
+
+    it('a abertura de outra aba envia o rascunho pendente; a edição seguinte da aba de origem entra por cima dele, sem tela de escolha', async () => {
+      // Aba de origem: rascunho na fila, envio sem rede.
+      await queueProjectPut(ALICE, draft, { baseVersion: 0 });
+      fetch.mockResolvedValueOnce(session()).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+      await expect(flushProjectOutbox(ALICE, { reviewConflicts: true })).rejects.toMatchObject({ code: 'project_network_error' });
+      // Outra aba abre e a fila do navegador é enviada por ela.
+      const other = await anotherTab();
+      fetch.mockResolvedValueOnce(session())
+        .mockResolvedValueOnce(json({ ok: true, project: { id: 'janine', version: 1 } }));
+      expect(await other.flushProjectOutbox(ALICE)).toEqual({ sent: 1, pending: 0 });
+      // Aba de origem: não soube da versão 1 e salva o texto gerado sobre a 0.
+      await queueProjectPut(ALICE, generated, { baseVersion: 0 });
+      fetch.mockResolvedValueOnce(session())
+        .mockResolvedValueOnce(json({ error: 'Conflito', code: 'project_conflict', cloudVersion: 1 }, 409))
+        .mockResolvedValueOnce(json({ ok: true, project: { id: 'janine', entry: { ...draft, updatedAt: 99 }, version: 1 } }))
+        .mockResolvedValueOnce(json({ ok: true, project: { id: 'janine', version: 2 } }));
+      const confirmed = [];
+      const receipt = await flushProjectOutbox(ALICE, { reviewConflicts: true, onConfirmed: (item) => confirmed.push(item) });
+      expect(receipt).toEqual({ sent: 1, pending: 0 });
+      expect(JSON.parse(fetch.mock.calls.at(-1)[1].body)).toMatchObject({ baseVersion: 1, entry: generated });
+      expect(confirmed).toMatchObject([{ projectId: 'janine', version: 2 }]);
+      expect(await listProjectEditReviews(ALICE)).toEqual([]);
+    });
+
+    it('vale também quando é a outra aba que acaba enviando a edição seguinte', async () => {
+      await queueProjectPut(ALICE, draft, { baseVersion: 0 });
+      const other = await anotherTab();
+      fetch.mockResolvedValueOnce(session())
+        .mockResolvedValueOnce(json({ ok: true, project: { id: 'janine', version: 1 } }));
+      await other.flushProjectOutbox(ALICE);
+      await queueProjectPut(ALICE, generated, { baseVersion: 0 });
+      fetch.mockResolvedValueOnce(session())
+        .mockResolvedValueOnce(json({ error: 'Conflito', code: 'project_conflict', cloudVersion: 1 }, 409))
+        .mockResolvedValueOnce(json({ ok: true, project: { id: 'janine', entry: draft, version: 1 } }))
+        .mockResolvedValueOnce(json({ ok: true, project: { id: 'janine', version: 2 } }));
+      expect(await other.flushProjectOutbox(ALICE, { reviewConflicts: true })).toEqual({ sent: 1, pending: 0 });
+    });
+
+    it('edição feita de verdade na outra aba continua pedindo a escolha', async () => {
+      await queueProjectPut(ALICE, draft, { baseVersion: 0 });
+      fetch.mockResolvedValueOnce(session())
+        .mockResolvedValueOnce(json({ ok: true, project: { id: 'janine', version: 1 } }));
+      await flushProjectOutbox(ALICE, { reviewConflicts: true });
+      // A outra aba abriu a versão 1 e escreveu por cima: versão 2, texto dela.
+      const other = await anotherTab();
+      const theirs = { id: 'janine', name: 'Caso', doc: { title: 'Escrito na outra aba' } };
+      await other.queueProjectPut(ALICE, theirs, { baseVersion: 1 });
+      fetch.mockResolvedValueOnce(session())
+        .mockResolvedValueOnce(json({ ok: true, project: { id: 'janine', version: 2 } }));
+      await other.flushProjectOutbox(ALICE, { reviewConflicts: true });
+      // Aba de origem, ainda na versão 1, salva o texto gerado.
+      await queueProjectPut(ALICE, generated, { baseVersion: 1 });
+      fetch.mockResolvedValueOnce(session())
+        .mockResolvedValueOnce(json({ error: 'Conflito', code: 'project_conflict', cloudVersion: 2 }, 409))
+        .mockResolvedValueOnce(json({ ok: true, project: { id: 'janine', entry: theirs, version: 2 } }));
+      expect(await flushProjectOutbox(ALICE, { reviewConflicts: true })).toMatchObject({
+        sent: 0, pending: 1, needsReview: [{ kind: 'put_conflict', projectId: 'janine', reviewVersion: 2 }],
+      });
+      expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({ kind: 'review_put_conflict', entry: generated });
+    });
+
+    it('versão que esta aba nunca escreveu, mesmo logo depois da dela, também pede a escolha', async () => {
+      await queueProjectPut(ALICE, draft, { baseVersion: 0 });
+      fetch.mockResolvedValueOnce(session()).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+      await expect(flushProjectOutbox(ALICE, { reviewConflicts: true })).rejects.toBeTruthy();
+      // Outro aparelho criou a versão 1 com outro texto antes de o rascunho chegar.
+      await queueProjectPut(ALICE, generated, { baseVersion: 0 });
+      fetch.mockResolvedValueOnce(session())
+        .mockResolvedValueOnce(json({ error: 'Conflito', code: 'project_conflict', cloudVersion: 1 }, 409))
+        .mockResolvedValueOnce(json({ ok: true, project: { id: 'janine', entry: { id: 'janine', doc: { title: 'De outro aparelho' } }, version: 1 } }));
+      expect(await flushProjectOutbox(ALICE, { reviewConflicts: true })).toMatchObject({
+        sent: 0, pending: 1, needsReview: [{ kind: 'put_conflict' }],
+      });
+    });
+
+    it('a lembrança é de cada projeto e de cada conta', async () => {
+      await queueProjectPut(ALICE, draft, { baseVersion: 0 });
+      const other = await anotherTab();
+      fetch.mockResolvedValueOnce(session())
+        .mockResolvedValueOnce(json({ ok: true, project: { id: 'janine', version: 1 } }));
+      await other.flushProjectOutbox(ALICE);
+      // Outro projeto com o mesmo rascunho inicial não herda a lembrança.
+      await queueProjectPut(ALICE, { ...generated, id: 'outro' }, { baseVersion: 0 });
+      fetch.mockResolvedValueOnce(session())
+        .mockResolvedValueOnce(json({ error: 'Conflito', code: 'project_conflict', cloudVersion: 1 }, 409))
+        .mockResolvedValueOnce(json({ ok: true, project: { id: 'outro', entry: { ...draft, id: 'outro' }, version: 1 } }));
+      expect(await flushProjectOutbox(ALICE, { reviewConflicts: true })).toMatchObject({
+        needsReview: [{ kind: 'put_conflict', projectId: 'outro' }],
+      });
+    });
+  });
+
   it('servidor antigo com 409 genérico e GET 404 também não cria cópia de projeto excluído', async () => {
     const entry = { id: 'janine', doc: { title: 'Local' } };
     await queueProjectPut(ALICE, entry, { baseVersion: 2 });
