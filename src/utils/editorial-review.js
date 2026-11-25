@@ -482,6 +482,63 @@ export function repeatedPhraseSlides(slides) {
   return [...bySet.values()];
 }
 
+/**
+ * QA 24/11 (texto 3): repetição não é só título igual. Dois cards dizem o
+ * mesmo quando o menor conjunto de radicais de conteúdo cobre 80% do maior
+ * (mesma conta de radicais de inclusionCovered, em factual-grounding). No
+ * catálogo real de 22/11, de 0,80 para cima todo par era o mesmo conteúdo
+ * reescrito; em 0,70 já entrava o CTA que só retoma o assunto.
+ */
+export const REPEATED_CONTENT_THRESHOLD = 0.8;
+const MIN_CONTENT_STEMS = 4;
+const contentStems = text => new Set((plainWords(text).match(/[a-z0-9]+/g) || [])
+  .filter(word => (word.length > 2 || /\d/.test(word)) && !PHRASE_STOP.has(word)).map(word => word.slice(0, 6)));
+const visibleText = slide => [...['title', 'subtitle', 'bodyAfterImage'].map(field => String(slide?.[field] || '')), blockText(slide?.presentationBlocks)].join(' ');
+const stemOverlap = (a, b, minimum = MIN_CONTENT_STEMS) => (Math.min(a.size, b.size) < minimum ? 0
+  : [...a].filter(stem => b.has(stem)).length / Math.max(a.size, b.size));
+
+export function slideSimilarity(a, b) {
+  return stemOverlap(contentStems(visibleText(a)), contentStems(visibleText(b)));
+}
+
+/** Card ou slide que repete um anterior com outras palavras: { slideIndex, duplicateOf, score }. */
+export function repeatedContentSlides(slides) {
+  const list = (Array.isArray(slides) ? slides : []).map(slide => contentStems(visibleText(slide)));
+  return list.flatMap((current, slideIndex) => {
+    let best = null;
+    for (let duplicateOf = 0; duplicateOf < slideIndex; duplicateOf += 1) {
+      const score = stemOverlap(list[duplicateOf], current);
+      if (score >= REPEATED_CONTENT_THRESHOLD && (!best || score > best.score)) best = { slideIndex, duplicateOf, score: Math.round(score * 100) / 100 };
+    }
+    return best ? [best] : [];
+  });
+}
+
+/** O mesmo bloco de passos em mais de um slide (compara os títulos das etapas; rótulo "Passo 1" não conta). */
+export function repeatedStepBlockSlides(slides) {
+  const list = (Array.isArray(slides) ? slides : []).map((slide) => {
+    const block = (Array.isArray(slide?.presentationBlocks) ? slide.presentationBlocks : []).find(item => item?.type === 'steps' && Array.isArray(item.items));
+    if (!block) return null;
+    const titles = contentStems(block.items.map(item => String(item?.title || '').replace(/\b(?:passo|etapa|step|fase|phase)\b/giu, ' ')).join(' '));
+    for (const stem of [...titles]) if (/^\d+$/.test(stem)) titles.delete(stem);
+    return titles.size >= 2 ? titles : contentStems(blockText(block));
+  });
+  return list.flatMap((current, slideIndex) => {
+    if (!current) return [];
+    const duplicateOf = list.findIndex((previous, index) => index < slideIndex && previous && stemOverlap(previous, current, 2) >= REPEATED_CONTENT_THRESHOLD);
+    return duplicateOf >= 0 ? [{ slideIndex, duplicateOf }] : [];
+  });
+}
+
+function repeatedContentRule(slides, unit = 'CARD') {
+  const repeated = repeatedContentSlides(slides);
+  return repeated.length
+    ? `\n${unit} REPETIDO — ${repeated.map(item => `slideIndex ${item.slideIndex} repete o slideIndex ${item.duplicateOf}`).join('; ')} com outras palavras. Correção obrigatória: reescreva o que repete com outra informação do material; não copie nem parafraseie o CTA ou outro ${unit.toLowerCase()}. Não mude a quantidade.`
+    : '';
+}
+
+const slideHasText = slide => ['title', 'subtitle', 'bodyAfterImage'].some(field => String(slide?.[field] || '').trim());
+
 function repeatedFactRule(slides) {
   const repeated = [...repeatedFactSlides(slides), ...repeatedPhraseSlides(slides).map(item => ({ fact: item.phrase, slideIndexes: item.slideIndexes }))];
   return repeated.length
@@ -527,11 +584,14 @@ ${buildReviewFactCheckPrompt()}
 Verifique também: promessa da capa entregue; caminho escolhido respeitado; uma ideia por slide; progressão sem repetição; títulos legíveis a distância; argumentos e exemplos sustentados pelo material; síntese e próximo passo coerentes.${limitsBlock}
 Leia todos os campos do rascunho, inclusive blocos nativos, speakerNotes e caption. Verifique fatos, estágio e condições em cada campo, não apenas no texto principal. Decisão pendente permanece pendente; aceite não autoriza deduzir encerramento contratual. Base, período e condições essenciais de indicadores e escopo devem estar visíveis no slide correspondente, não somente nas notas.
 Corrija apenas problemas identificados. Preserve ordem, quantidade, assunto, arco, números e fatos sustentados.${lessonRepair} Remova ou qualifique alegações sem apoio; não acrescente fontes ou fatos. Não altere imageQuery nem configuração visual.
-Use slideIndex começando em zero. Não envie edições para slides que já estejam bons. Cada índice aparece no máximo uma vez. ${buildPresentationReviewRules(config.presentationPath)}${repeatedTitleRule(draft?.slides)}${repeatedFactRule(draft?.slides)}${TITLE_SUPPORT_RULE}
+Use slideIndex começando em zero. Não envie edições para slides que já estejam bons. Cada índice aparece no máximo uma vez. ${buildPresentationReviewRules(config.presentationPath)}${repeatedTitleRule(draft?.slides)}${repeatedContentRule(draft?.slides, 'SLIDE')}${repeatedFactRule(draft?.slides)}${TITLE_SUPPORT_RULE}
 Resposta: um único objeto JSON {"edits":[{"slideIndex":0,"reason":"problema concreto","title":"texto corrigido"}],"caption":"resumo geral corrigido apenas se necessário"}.
 Cada edição exige slideIndex e reason; inclua somente os campos que mudam: ${editableFields}. caption é opcional. Se estiver adequado, retorne {"edits":[]}. Sem texto fora do JSON ou campos adicionais.${plannedRules}`;
   }
-  const missingTitles = missingSocialTitleIndexes(draft?.slides, config);
+  // QA 24/11 (texto 3): o card que a IA não devolveu chega aqui vazio. Mandar
+  // "preencher o título com o que já está escrito" fazia a revisão copiar o CTA.
+  const emptyCards = (Array.isArray(draft?.slides) ? draft.slides : []).flatMap((slide, index) => slideHasText(slide) ? [] : [index]);
+  const missingTitles = missingSocialTitleIndexes(draft?.slides, config).filter(index => !emptyCards.includes(index));
   const longSupport = [...new Set(auditSocialTextDensity(draft?.slides, config).map(item => item.slideIndex))];
   const echoes = supportEchoesTitleIndexes(draft?.slides);
   const unsupportedClaims = auditDraftFactuality(draft, config);
@@ -544,7 +604,10 @@ Cada edição exige slideIndex e reason; inclua somente os campos que mudam: ${e
   const echoRule = echoes.length
     ? `\nAPOIO QUE REPETE O TÍTULO — correção obrigatória nos slideIndex ${echoes.join(', ')}: o subtitle diz de novo o que o title já diz. Reescreva o subtitle com uma informação nova do material ou deixe-o vazio.`
     : '';
-  const repeatRule = repeatedTitleRule(draft?.slides) + repeatedFactRule(draft?.slides) + TITLE_SUPPORT_RULE;
+  const emptyRule = emptyCards.length
+    ? `\nCARD SEM TEXTO — ${emptyCards.length > 1 ? `os slideIndex ${emptyCards.join(', ')} vieram vazios` : `o slideIndex ${emptyCards[0]} veio vazio`}. Só preencha com uma informação do material que ainda não está em outro card; não copie nem parafraseie o CTA ou outro card. Sem informação nova, deixe title e subtitle vazios.`
+    : '';
+  const repeatRule = repeatedTitleRule(draft?.slides) + repeatedContentRule(draft?.slides) + repeatedFactRule(draft?.slides) + TITLE_SUPPORT_RULE + emptyRule;
   const explicitScriptRule = config?.explicitCardScript?.count
     ? `\nROTEIRO EXPLÍCITO DO USUÁRIO — preserve a correspondência entre cada bloco e o slideIndex equivalente. Não funda, reordene, mova para outro card nem omita um bloco. A revisão pode melhorar clareza e encaixe dentro do próprio card, sem trocar sua função, fatos ou intenção.`
     : '';
@@ -629,8 +692,43 @@ export function auditSocialDraft(draft, config) {
     ...missingSocialTitleIndexes(draft.slides, config).map(slideIndex => ({ kind: 'missing_title', slideIndex, field: 'title' })),
     ...auditSocialTextDensity(draft.slides, config).map(item => ({ kind: 'density', ...item })),
     ...repeatedTitleIndexes(draft.slides).map(slideIndex => ({ kind: 'repeated_title', slideIndex, field: 'title', code: 'social_title_repeated' })),
+    // QA 24/11 (texto 3): corpo e paráfrase também contam, não só o título.
+    ...repeatedContentSlides(draft.slides).filter(item => !repeatedTitleIndexes(draft.slides).includes(item.slideIndex))
+      .map(item => ({ kind: 'repeated_content', slideIndex: item.slideIndex, field: 'subtitle', code: 'social_content_repeated', duplicateOf: item.duplicateOf })),
     ...auditDraftFactuality(draft, config).map(item => ({ kind: 'factual', ...item })),
   ];
+}
+
+/**
+ * QA 24/11 (texto 3): card que veio vazio e a revisão preencheu com a cópia de
+ * outro (o CTA) volta a ficar vazio. O aviso de "menos cards do que o pedido"
+ * já acompanha esse espaço.
+ */
+function withoutCopiedFills(candidate, draft) {
+  const plain = slide => plainWords(visibleText(slide)).replace(/[^a-z0-9]+/g, ' ').trim();
+  let changed = false;
+  const slides = candidate.slides.map((slide, index) => {
+    if (slideHasText(draft.slides[index]) || !slideHasText(slide)) return slide;
+    const copied = candidate.slides.some((other, otherIndex) => otherIndex !== index && slideHasText(other)
+      && (plain(other) === plain(slide) || plain(other).includes(plain(slide)) || slideSimilarity(other, slide) >= REPEATED_CONTENT_THRESHOLD));
+    if (!copied && !repeatedTitleIndexes(candidate.slides).includes(index)) return slide;
+    changed = true;
+    return draft.slides[index];
+  });
+  return changed ? { ...candidate, slides } : candidate;
+}
+
+/**
+ * Último recurso sem IA: o card que ainda repete outro sai. Só quando a
+ * quantidade pode mudar (não é "refazer" nem roteiro card a card do usuário).
+ */
+function withoutRepeatedCards(candidate, config) {
+  if (config?.keepCardCount || config?.explicitCardScript?.count) return null;
+  const drop = new Set(repeatedContentSlides(candidate.slides).map(item => item.slideIndex));
+  if (!drop.size) return null;
+  const kept = candidate.slides.filter((_, index) => !drop.has(index));
+  return { ...candidate, slides: kept.map((slide, index) => (typeof slide.bodyAfterImage === 'string' && slide.bodyAfterImage
+    && !bodyAllowed(index, kept.length, config.presetId, config.densityId) ? { ...slide, bodyAfterImage: '' } : slide)) };
 }
 
 /** Refinements are a single paid call. Reject a bad replacement and keep the
@@ -639,7 +737,9 @@ export function assertSocialRefinement(previous, candidate, config) {
   if (candidate.slides.length !== previous.slides.length) throw new Error('O refinamento mudou a quantidade de cards. Mantive o conteúdo anterior.');
   const key = issue => JSON.stringify([issue.slideIndex, issue.field, issue.category, issue.claim]);
   const priorFacts = new Set(auditDraftFactuality(previous, config).map(key));
-  const issues = auditSocialDraft(candidate, config).filter(issue => issue.kind !== 'factual' || !priorFacts.has(key(issue)));
+  const priorRepeats = new Set(repeatedContentSlides(previous.slides).map(item => item.slideIndex));
+  const issues = auditSocialDraft(candidate, config).filter(issue => (issue.kind !== 'factual' || !priorFacts.has(key(issue)))
+    && (issue.kind !== 'repeated_content' || !priorRepeats.has(issue.slideIndex)));
   if (issues.length) {
     throw Object.assign(new Error(issues.some(issue => issue.kind === 'factual')
       ? 'O refinamento acrescentou informações sem apoio no briefing. Mantive o texto anterior; inclua os dados corretos no material e tente novamente.'
@@ -779,7 +879,7 @@ async function reviewSocialDraft({ prompt, draft, config, textOptions, onStage }
       reviewResponded = responded = true;
       const proposed = applyEditorialReview(draft, salvageSocialReview(draft, review, config), config, { deferQualityChecks: true });
       const accepted = retainGroundedFields(proposed, draft, config);
-      candidate = accepted.result;
+      candidate = withoutCopiedFills(accepted.result, draft);
       // MF-04: uma revisão válida cujas edições foram todas recusadas por
       // acrescentar fato sem fonte ainda conferiu o rascunho. Não é "revisão não
       // concluída"; o rascunho segue para as auditorias como conferido.
@@ -832,7 +932,7 @@ Edite somente slideIndex ${targets.join(', ')}. Repetições: ${repeated.map(ite
 REPARO DIRECIONADO — última passagem, sem gerar outro carrossel.
 Edite somente slideIndex ${indexes.join(', ') || '(nenhum)'}.${repairCaption ? ' Corrija também caption.' : ' Preserve caption.'}
 Problemas restantes: ${JSON.stringify(repairable)}.
-Reescreva frases completas para respeitar o limite. Preserve números, condições e fatos com fonte. Remova dados sem apoio. Não corte finais de frase, não troque por promessas novas, não acrescente novos cards.`, textOptions));
+Reescreva frases completas para respeitar o limite. Preserve números, condições e fatos com fonte. Remova dados sem apoio. Card que repete outro, no título ou no texto, ganha outra informação do material; não copie o CTA. Não corte finais de frase, não troque por promessas novas, não acrescente novos cards.`, textOptions));
       throwIfGenerationCancelled(textOptions.signal);
       if (!Array.isArray(repair?.edits) || repair.edits.some(edit => !indexes.includes(edit?.slideIndex)) || (!repairCaption && hasOwn(repair, 'caption'))) {
         throw new Error('Reparo fora do escopo');
@@ -852,6 +952,14 @@ Reescreva frases completas para respeitar o limite. Preserve números, condiçõ
     }
   }
   throwIfGenerationCancelled(textOptions.signal);
+  // QA 24/11 (texto 3): a repetição era só marcada. Sem reparo da IA, o card
+  // repetido sai e o projeto avisa que ficou com menos cards.
+  const deduped = withoutRepeatedCards(candidate, config);
+  const removed = deduped ? [{ kind: 'normalization', slideIndex: null, code: 'repeated_cards_removed' }] : [];
+  if (deduped) {
+    candidate = deduped;
+    violations = auditSocialDraft(candidate, config);
+  }
   const missingTitles = missingSocialTitleIndexes(candidate.slides, config);
   if (missingTitles.length) {
     const recovered = candidate.slides.map(recoverSocialTitleForEditing);
@@ -862,7 +970,7 @@ Reescreva frases completas para respeitar o limite. Preserve números, condiçõ
       ...recoveredIndexes.map(slideIndex => ({ kind:'recovered_title', slideIndex, field:'title', code:'social_title_recovered' })),
     ];
   }
-  return finishSocialReview(candidate, 'needs_attention', violations);
+  return finishSocialReview(candidate, 'needs_attention', [...violations, ...removed]);
 }
 
 // Normalization is reversible editorial recovery, never silent proof that the
@@ -1106,27 +1214,59 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
   const repetitionOf = slides => {
     const facts = [...repeatedFactSlides(slides), ...repeatedPhraseSlides(slides).map(item => ({ fact: item.phrase, slideIndexes: item.slideIndexes }))];
     const titles = repeatedTitleIndexes(slides);
-    return { facts, titles, size: facts.reduce((sum, item) => sum + item.slideIndexes.length - 2, 0) + titles.length };
+    // QA 24/11 (texto 3): corpo, paráfrase e bloco de passos também contam.
+    const contents = repeatedContentSlides(slides);
+    const steps = repeatedStepBlockSlides(slides);
+    return { facts, titles, contents, steps, size: facts.reduce((sum, item) => sum + item.slideIndexes.length - 2, 0) + titles.length
+      + contents.filter(item => !titles.includes(item.slideIndex)).length + steps.length };
+  };
+  // Último recurso sem IA. O segundo bloco de passos igual sai do slide; o
+  // slide que ainda repete outro recebe a contribuição que o plano previa
+  // para aquela posição (pergunta no título, mensagem no apoio), quando ela
+  // está no idioma do deck, não repete nada e não traz fato novo nem excesso.
+  const english = text => (plainWords(text).match(/\b(?:the|and|of|to|is|are|you|your|with|for)\b/g) || []).length
+    > (plainWords(text).match(/\b(?:de|da|do|que|para|com|uma|um|os|as|em|nao)\b/g) || []).length;
+  const dedupeWithoutAI = (result) => {
+    const sameBlock = new Set(repeatedStepBlockSlides(result.slides).map(item => item.slideIndex));
+    let current = sameBlock.size ? { ...result, slides: result.slides.map((slide, index) => (sameBlock.has(index) ? { ...slide, presentationBlocks: [] } : slide)) } : result;
+    for (const item of repeatedContentSlides(current.slides)) {
+      const entry = plan.slides[item.slideIndex];
+      const title = String(entry?.question || '').trim();
+      const subtitle = String(entry?.keyMessage || '').replace(/^[^:.!?]{1,40}:\s*/u, '').trim();
+      if (!title || !subtitle) continue;
+      const swapped = { ...current, slides: current.slides.map((slide, index) => (index === item.slideIndex ? { ...slide, title, subtitle, bodyAfterImage: '' } : slide)) };
+      const others = current.slides.filter((_, index) => index !== item.slideIndex).map(visibleText).join(' ');
+      if (english(`${title} ${subtitle}`) !== english(others)) continue;
+      if (repeatedContentSlides(swapped.slides).some(found => found.slideIndex === item.slideIndex) || repeatedTitleIndexes(swapped.slides).includes(item.slideIndex)) continue;
+      if (factsOf(swapped).length > factsOf(current).length || overLimits(swapped.slides).length > overLimits(current.slides).length) continue;
+      current = swapped;
+    }
+    return current;
   };
   const settleRepetition = async (result, reviewStatus, extra) => {
     const repetition = repetitionOf(result.slides);
     if (!repetition.size) return finish(result, reviewStatus, extra);
-    const targets = [...new Set([...repetition.facts.flatMap(item => item.slideIndexes), ...repetition.titles])].sort((a, b) => a - b);
+    const targets = [...new Set([...repetition.facts.flatMap(item => item.slideIndexes), ...repetition.titles,
+      ...repetition.contents.map(item => item.slideIndex), ...repetition.steps.map(item => item.slideIndex)])].sort((a, b) => a - b);
+    let current = result;
+    let status = reviewStatus;
     onStage?.('repairing');
     try {
       const repair = await callAI(`${buildEditorialReviewPrompt(briefing, result, plannedConfig)}
-REPARO DE REPETIÇÃO: edite somente os slides com slideIndex ${targets.join(', ')}.${repetition.facts.length ? ` Fatos que se repetem: ${repetition.facts.map(item => `"${item.fact}" nos slideIndex ${item.slideIndexes.join(', ')}`).join('; ')}. Mantenha cada fato só nos slides em que ele é o assunto; nos outros, troque por outra informação do material ou condense.` : ''}${repetition.titles.length ? ` Títulos que repetem um anterior: slideIndex ${repetition.titles.join(', ')}; reescreva com a ideia própria do slide.` : ''} Inclua presentationBlocks quando a repetição estiver no bloco. Não acrescente fatos, não mude quantidade nem ordem.`, reviewOptions);
+REPARO DE REPETIÇÃO: edite somente os slides com slideIndex ${targets.join(', ')}.${repetition.facts.length ? ` Fatos que se repetem: ${repetition.facts.map(item => `"${item.fact}" nos slideIndex ${item.slideIndexes.join(', ')}`).join('; ')}. Mantenha cada fato só nos slides em que ele é o assunto; nos outros, troque por outra informação do material ou condense.` : ''}${repetition.titles.length ? ` Títulos que repetem um anterior: slideIndex ${repetition.titles.join(', ')}; reescreva com a ideia própria do slide.` : ''}${repetition.contents.length ? ` Slides que repetem outro com outras palavras: ${repetition.contents.map(item => `slideIndex ${item.slideIndex} (repete o ${item.duplicateOf})`).join('; ')}; reescreva com a contribuição própria da posição no roteiro.` : ''}${repetition.steps.map(item => ` Mesmo bloco de passos nos slideIndex ${item.duplicateOf} e ${item.slideIndex}: mantenha o bloco só no primeiro; no slideIndex ${item.slideIndex}, devolva presentationBlocks [] ou um bloco com outra informação do material.`).join('')} Inclua presentationBlocks quando a repetição estiver no bloco. Não acrescente fatos, não mude quantidade nem ordem.`, reviewOptions);
       throwIfGenerationCancelled(aiOptions?.signal);
       if (!Array.isArray(repair?.edits) || repair.edits.some(edit => !targets.includes(edit?.slideIndex))) throw new Error('Reparo fora do escopo');
       const repaired = applyEditorialReview(result, repair, plannedConfig, { deferQualityChecks: true });
       if (repetitionOf(repaired.slides).size < repetition.size && factsOf(repaired).length <= factsOf(result).length
         && overLimits(repaired.slides).length <= overLimits(result.slides).length) {
-        return finish(repaired, 'repaired', extra);
+        current = repaired;
+        status = 'repaired';
       }
     } catch (error) {
       if (isGenerationCancelled(error) || aiOptions?.signal?.aborted) throw error;
     }
-    return finish(result, reviewStatus, extra);
+    const deduped = dedupeWithoutAI(current);
+    return finish(deduped, deduped === current ? status : 'repaired', extra);
   };
   const settle = async (result, reviewStatus, extra = {}) => {
     const problemsOf = value => [...factsOf(value), ...gapTitlesOf(value)];

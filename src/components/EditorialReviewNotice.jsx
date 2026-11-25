@@ -26,6 +26,8 @@ function issueDescription(issue) {
   if (issue.kind === 'recovered_title' || issue.code === 'social_title_recovered') return 'título recuperado automaticamente do texto de apoio; confira antes de exportar.';
   if (issue.kind === 'factual') return `informação sem apoio suficiente no briefing${issue.claim ? `: “${issue.claim}”` : '.'}`;
   if (issue.kind === 'repeated_title') return 'o título repete o de outro card ou slide; reescreva com a ideia própria deste.';
+  if (issue.kind === 'repeated_content') return 'o texto repete o de outro card com outras palavras; reescreva com a ideia própria deste ou remova o card.';
+  if (issue.code === 'repeated_cards_removed') return 'um card repetia outro e foi removido. O projeto ficou com menos cards do que o pedido.';
   if (issue.kind === 'density') return 'texto acima do espaço previsto; reduza mantendo a ideia e as condições.';
   if (issue.code === 'missing_slides_padded') return 'a IA devolveu menos cards do que o pedido. Confira os espaços que ainda precisam de conteúdo.';
   if (issue.code === 'extra_slides_trimmed') return 'a sequência foi ajustada à quantidade pedida. Confira se a mensagem ficou completa.';

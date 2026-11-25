@@ -481,11 +481,14 @@ describe('lote B — reparo de fatos antes do aviso', () => {
   it('corrige só o slide com detalhe sem fonte e entrega sem "Rascunho preservado"', async () => {
     const raw = batch(0); raw.slides[1].subtitle = 'A encomenda é garantida em 2 horas.';
     const ai = vi.fn().mockResolvedValueOnce(plan()).mockResolvedValueOnce(raw).mockResolvedValueOnce({ edits: [] })
-      .mockResolvedValueOnce({ edits: [{ slideIndex: 1, reason: 'detalhe sem fonte', subtitle: 'A oferta continua em estudo.' }] });
+      // QA 24/11 (texto 3): a correção simulada repetia a frase do slide 1; apoio
+      // igual em dois slides agora é repetição. O reparo de fatos usa outra frase.
+      .mockResolvedValueOnce({ edits: [{ slideIndex: 1, reason: 'detalhe sem fonte', subtitle: 'A assinatura ainda está em estudo.' }] });
     const output = await generateReviewedCarousel({ prompt: '', config: config({ factualSource: sources[0].text }) }, ai);
     expect(ai.mock.calls[3][0]).toContain('slideIndex 1');
+    expect(ai).toHaveBeenCalledTimes(4);
     expect(output.reviewStatus).toBe('repaired');
-    expect(output.result.slides[1].subtitle).toBe('A oferta continua em estudo.');
+    expect(output.result.slides[1].subtitle).toBe('A assinatura ainda está em estudo.');
     expect(output.violations).toBeUndefined();
   });
 });

@@ -6015,6 +6015,8 @@ ${jsonShapeLine}`;
         presentationPath: presentationPathId,
         presentationTextLimits,
         presentationPlanning: isPresentationGeneration && !remix,
+        // QA 24/11 (texto 3): refazer mantém a quantidade; card repetido não sai.
+        keepCardCount: !!remix,
         nativeBlocks: !effectiveVisualPresetDef?.isCustom,
         planningContext: {
           brief: planningBrief,
