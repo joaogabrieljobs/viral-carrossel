@@ -251,7 +251,7 @@ import {
   applyPresentationVisualPresetToSlides,
   presentationStageAt,
 } from './src/utils/presentation-state.js';
-import { deckDesignFromBrand, freeBrandPatch, slideSkipsImageGeneration } from './src/utils/free-design.js';
+import { applyPlanEmphasisToDraft, deckDesignFromBrand, freeBrandPatch, slideSkipsImageGeneration } from './src/utils/free-design.js';
 import {
   normalizeStyleKit,
   buildProjectContextBlock,
@@ -5995,6 +5995,10 @@ ${buildGenerationLanguageGuard(cp, effectiveMode)}`;
       ? getPresentationPath(presentationPathId)
       : null;
     const presentationStages = presentationRoute?.stages || [];
+    // Modo livre (fase 2): o deck nasce do deckDesign do roteiro v3; cores e
+    // fontes do kit e as escolhas do assistente substituem as propostas.
+    const freeKitBrand = { ...explicitBrandColorsFromKit(styleKit), ...sanitizeCustomVisualPresetBrand(brandVisualOverrides) };
+    const freeDeckDesignFor = plan => (effectiveVisualPresetDef?.isFree ? deckDesignFromBrand(freeKitBrand, plan?.deckDesign || undefined) : null);
     // Ritmo de layout (spec 1.1): limites, composição e recuperação passam as
     // composições anteriores, para o texto ser pedido na caixa que o slide terá.
     const limitsRhythm = [];
@@ -6002,7 +6006,7 @@ ${buildGenerationLanguageGuard(cp, effectiveMode)}`;
       ? Array.from({ length: Number(count) }, (_, index) => {
           const stage = presentationStageAt(presentationPathId, index, Number(count));
           const composed = getPresentationCompositionOverrides(effectiveVisualPreset, {
-            slide: {}, stage, index, count: Number(count), previous: limitsRhythm,
+            slide: {}, stage, index, count: Number(count), previous: limitsRhythm, deckDesign: freeDeckDesignFor(null),
           });
           limitsRhythm.push(composed);
           const limits = composed.presentationTextLimits || {};
@@ -6122,7 +6126,7 @@ ${jsonShapeLine}`;
       brandBlock,
       styleKitTextHint,
     ].filter(Boolean).join('\n');
-    const { result, reviewStatus, plan: generationPlan, incomplete: generationIncomplete = false, interruptionReason: generationInterruptionReason, writingDiagnostics: generationWritingDiagnostics = [], reviewDiagnostics: generationReviewDiagnostics = [], completedCount: generatedCount, totalCount: requestedCount, violations: editorialViolations = [], issues: editorialIssues = [], materialGaps = [], repetitionNotice = '' } = await generateReviewedCarousel({
+    const { result: generatedResult, reviewStatus, plan: generationPlan, incomplete: generationIncomplete = false, interruptionReason: generationInterruptionReason, writingDiagnostics: generationWritingDiagnostics = [], reviewDiagnostics: generationReviewDiagnostics = [], completedCount: generatedCount, totalCount: requestedCount, violations: editorialViolations = [], issues: editorialIssues = [], materialGaps = [], repetitionNotice = '' } = await generateReviewedCarousel({
       prompt,
       config: {
         count: Number(count),
@@ -6140,6 +6144,8 @@ ${jsonShapeLine}`;
         presentationPath: presentationPathId,
         presentationTextLimits,
         presentationPlanning: isPresentationGeneration && !remix,
+        // Modo livre: o roteiro v3 traz a direção de arte (deckDesign e design).
+        freeDesign: !!effectiveVisualPresetDef?.isFree,
         // QA 24/11 (texto 3): refazer mantém a quantidade; card repetido não sai.
         keepCardCount: !!remix,
         nativeBlocks: !effectiveVisualPresetDef?.isCustom,
@@ -6158,6 +6164,8 @@ ${jsonShapeLine}`;
             const composed = getPresentationCompositionOverrides(effectiveVisualPreset, {
               ...planInput(entry, index), index, count: Number(count), previous: planRhythm,
               next: index + 1 < plan.slides.length ? planInput(plan.slides[index + 1], index + 1) : null,
+              // O design do roteiro v3 está em entry: a caixa é a da página final.
+              deckDesign: freeDeckDesignFor(plan),
             });
             planRhythm.push(composed);
             const limits = composed.presentationTextLimits || {};
@@ -6242,6 +6250,9 @@ ${jsonShapeLine}`;
       onReview: () => { checkActive(); if (!isPresentationGeneration || remix) setGenProgress({ phase: 'text', current: 2, total: 3, label: 'Etapa 2 de 3 · Conferindo fatos, clareza e tamanho do texto' }); },
     }, callAI);
     checkActive();
+    // Modo livre: os trechos de negrito do roteiro (design.emphasis) saem em
+    // **…** no texto final, uma vez cada, depois da revisão.
+    const result = effectiveVisualPresetDef?.isFree ? applyPlanEmphasisToDraft(generatedResult) : generatedResult;
     if (reviewStatus === 'unavailable') toast('Texto gerado. A revisão automática não foi concluída; mantive a primeira versão.', 'warning', 6500);
     if (reviewStatus === 'fitted') toast('Encurtei o texto que não cabia no layout da apresentação.', 'warning', 6500);
     // MF-11: Estudo de caso sem ponto de partida no material vira lista de
@@ -6285,7 +6296,7 @@ ${jsonShapeLine}`;
     // deck. Cores do kit e escolhas do assistente substituem as do padrão; o
     // código completa o resto. A marca do projeto segue o deck.
     const freeDeckDesign = effectiveVisualPresetDef?.isFree
-      ? deckDesignFromBrand({ ...explicitBrandColorsFromKit(styleKit), ...sanitizeCustomVisualPresetBrand(brandVisualOverrides) })
+      ? freeDeckDesignFor(generationPlan)
       : null;
     if (freeDeckDesign) generationBrand = { ...generationBrand, ...freeBrandPatch(freeDeckDesign) };
     if (generationBrand.logoImageId) {
@@ -6984,7 +6995,7 @@ ${jsonShapeLine}`;
         const reviewStatus = incomplete ? 'needs_attention' : 'unavailable';
         const preset = resolvePresentationVisualPresetDefinition(snapshot.visualPreset, visualPresets);
         const recoveredDeckDesign = preset?.isFree
-          ? deckDesignFromBrand({ ...explicitBrandColorsFromKit(current.styleKit), ...sanitizeCustomVisualPresetBrand(snapshot.brandVisualOverrides) })
+          ? deckDesignFromBrand({ ...explicitBrandColorsFromKit(current.styleKit), ...sanitizeCustomVisualPresetBrand(snapshot.brandVisualOverrides) }, snapshot.plan?.deckDesign || undefined)
           : null;
         const identity = {
           ...(snapshot.visualPreset && !snapshot.preserveBrandIdentity

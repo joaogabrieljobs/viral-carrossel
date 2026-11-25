@@ -45,6 +45,8 @@ export function presentationSceneQuery(scene) {
 /** Imagem planejada de uma posição do roteiro, no v1 ou no v2. */
 export function presentationPlanEntryImageQuery(entry) {
   if (!entry || typeof entry !== 'object') return '';
+  // Roteiro v3 (modo livre): página sem foto não tem imagem planejada.
+  if (entry.design?.photo === 'none') return '';
   return Object.prototype.hasOwnProperty.call(entry, 'scene') ? presentationSceneQuery(entry.scene) : String(entry.imageBrief || '').trim();
 }
 // One ceiling shared by the request and prompt. Compact output, rather than a

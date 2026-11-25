@@ -17,7 +17,8 @@
 import { imageFramingDirection } from '../../shared/image-aspect.js';
 import { composeFamilyTreatment as composeTreatmentBlock } from '../../shared/image-prompt.js';
 import { socialPhotoDirection } from './social-families.js';
-import { presentationPhotoDirection } from './presentation-families.js';
+import { FREE_PRESENTATION_PRESET_ID, presentationPhotoDirection } from './presentation-families.js';
+import { freePhotoDirectionEnglish } from './free-design.js';
 
 export const VISUAL_BIBLE_MAX_ENTITIES = 4;
 const EN_MIN = 20;
@@ -113,6 +114,8 @@ const libraryPresentationId = (slide) => {
 export function familyDirectionEnglish({ slide = null, fmt = 'carrossel', presentationFamily } = {}) {
   if (fmt === 'apresentacao') {
     const key = presentationFamily === undefined ? libraryPresentationId(slide) : presentationFamily;
+    // Modo livre (fase 2): clima e paleta do deck, não a luz de uma família.
+    if (key === FREE_PRESENTATION_PRESET_ID) return freePhotoDirectionEnglish(slide?.presentationDeckDesign);
     return key ? presentationPhotoDirection(key, 'en') : '';
   }
   return slide?.socialCompositionVersion >= 4 ? socialPhotoDirection(slide.socialFamily, 'en') : '';

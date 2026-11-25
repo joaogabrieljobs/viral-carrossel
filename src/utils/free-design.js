@@ -26,6 +26,7 @@ import { pitchCompositionOverrides } from './pitch-content.js';
 import { resolveChromeColor } from './presentation-chrome.js';
 import { titleTrackingBase } from './title-tracking.js';
 import { wcagContrast } from './wcag.js';
+import { markdownBoldAccentIntervalsUtf16 } from './text-spans.js';
 
 export { FREE_PRESENTATION_PRESET_ID };
 
@@ -356,9 +357,12 @@ export function normalizeSlideDesign(raw, slide = {}) {
   let block = enumValue(d.block, FREE_BLOCKS, BLOCK_ALIASES, 'none');
   if (!blockSupported(block, slide, icons)) block = 'none';
   const text = slideText(slide);
-  const emphasis = (Array.isArray(d.emphasis) ? d.emphasis : [])
+  // Trecho que está no texto, sem diferença de caixa; guarda a grafia do texto.
+  const lower = text.toLowerCase();
+  const emphasis = [...new Set((Array.isArray(d.emphasis) ? d.emphasis : [])
     .map(item => String(item || '').replace(/\*\*/g, '').trim())
-    .filter(item => item && text.includes(item))
+    .map((item) => { const at = item ? lower.indexOf(item.toLowerCase()) : -1; return at >= 0 ? text.slice(at, at + item.length) : ''; })
+    .filter(Boolean))]
     .slice(0, 3);
   return {
     family: normalizeFreeFamily(d.family),
@@ -452,6 +456,7 @@ export function resolveFreeKind({ family, photo, slide = {}, stage = {}, index =
 /* ------------------------------------------------------------------------ */
 
 const MAX_FAMILIES = 4;
+const MAX_PROPOSED_FAMILIES = 6;
 const ACCENT_KINDS = new Set(['cover', 'divider', 'closing']);
 
 function previousDesigns(previous = []) {
@@ -508,7 +513,10 @@ function candidatesFor({ slide, stage, index, count }) {
   return out;
 }
 
-function scoreCandidate(c, { prev, role, visual, order, enough }) {
+/** Peso da proposta da IA (roteiro v3): forte o bastante para valer, sem passar por cima das regras duras. */
+const PROPOSAL_WEIGHT = Object.freeze({ family: 10, photo: 6, ground: 6 });
+
+function scoreCandidate(c, { prev, role, visual, order, enough, proposal }) {
   const last = prev.at(-1);
   const count = (key, value) => prev.filter(p => p[key] === value).length;
   const families = new Set(prev.map(p => p.family).filter(Boolean));
@@ -523,7 +531,9 @@ function scoreCandidate(c, { prev, role, visual, order, enough }) {
   s += count('ground', c.ground);
   if (enough && grounds.size < 3 && !grounds.has(c.ground)) s -= 3;
   if (last && last.ground === c.ground) s += 2;
-  if (!families.has(c.family) && families.size >= MAX_FAMILIES) s += 20;
+  // Teto de famílias do deck: 4 quando o código decide sozinho; até 6 quando
+  // a família vem da proposta do diretor de arte da IA.
+  if (!families.has(c.family) && families.size >= (proposal?.family === c.family ? MAX_PROPOSED_FAMILIES : MAX_FAMILIES)) s += 20;
   if (last && last.family === c.family) s += 4;
   if (prev.slice(-3).some(p => p.family === c.family)) s += 2;
   s += count('family', c.family) * 0.5;
@@ -531,7 +541,38 @@ function scoreCandidate(c, { prev, role, visual, order, enough }) {
   // Mesma página (família, foto e colunas) já usada no deck: só o fundo
   // mudaria, e fundo claro e de superfície quase não se distinguem.
   s += prev.filter(p => p.shape === c.shape).length * 2.5;
+  // A IA propõe, o código garante: cada campo que bate com a proposta pesa a
+  // favor; regras de ritmo e de variedade já filtraram os candidatos.
+  if (proposal) {
+    if (c.family === proposal.family) s -= PROPOSAL_WEIGHT.family;
+    if (c.photo === proposal.photo) s -= PROPOSAL_WEIGHT.photo;
+    if (c.ground === proposal.ground) s -= PROPOSAL_WEIGHT.ground;
+  }
   return s + order.indexOf(c.family) * 0.01;
+}
+
+/**
+ * Variedade garantida (spec, regra 2): quando faltam mais fundos (ou tamanhos
+ * de foto) diferentes do que páginas para completá-los, a página só pode
+ * acrescentar um valor novo, se a família tiver algum.
+ */
+function forceVariety(allowed, { prev, index, count, visual }) {
+  if (count < 6) return allowed;
+  const remaining = count - index;
+  let out = allowed;
+  for (const [key, applies] of [['ground', true], ['photo', visual]]) {
+    if (!applies) continue;
+    const seen = new Set(prev.map(p => p[key]));
+    if (seen.size >= 3 || 3 - seen.size < remaining) continue;
+    const fresh = out.filter(c => !seen.has(c[key]));
+    if (fresh.length) out = fresh;
+  }
+  return out;
+}
+
+/** Proposta de design gravada no roteiro v3 da página, ou null. */
+export function proposedSlideDesign(slide) {
+  return normalizeProposedDesign(slide?.presentationPlan?.design);
 }
 
 /**
@@ -544,10 +585,12 @@ export function directFreeSlideDesign({ slide = {}, stage = {}, index = 0, count
   const prev = previousDesigns(previous);
   const [before, last] = prev.slice(-2);
   const role = resolvePresentationCompositionKind({ slide, stage, index, count });
-  const allowed = candidatesFor({ slide, stage, index, count }).filter(c => !(
+  const proposal = proposedSlideDesign(slide);
+  const visual = hasVisual(slide);
+  const allowed = forceVariety(candidatesFor({ slide, stage, index, count }).filter(c => !(
     (last && before && last.geometry === c.geometry && before.geometry === c.geometry)
-    || (last && last.family === c.family && last.kind === c.kind)));
-  const context = { prev, role, visual: hasVisual(slide), order: familyOrder(deckDesign), enough: count >= 6 };
+    || (last && last.family === c.family && last.kind === c.kind))), { prev, index, count, visual });
+  const context = { prev, role, visual, order: familyOrder(deckDesign), enough: count >= 6, proposal };
   let best = null;
   let bestScore = Infinity;
   for (const c of allowed) {
@@ -555,8 +598,15 @@ export function directFreeSlideDesign({ slide = {}, stage = {}, index = 0, count
     if (score < bestScore) { best = c; bestScore = score; }
   }
   const chosen = best || { family: 'executive', ground: 'bg', photo: hasVisual(slide) ? 'half' : 'none' };
-  const block = slideBlockTypes(slide).find(type => ['comparison', 'metrics', 'steps'].includes(type)) || 'none';
-  return normalizeSlideDesign({ family: chosen.family, ground: chosen.ground, photo: chosen.photo, block }, slide);
+  // Bloco nativo do roteiro manda; sem ele, o bloco proposto (citação, número
+  // grande ou ícones) fica se o texto o sustentar. Negrito e ícones propostos
+  // passam pelo mesmo normalizador.
+  const native = slideBlockTypes(slide).find(type => ['comparison', 'metrics', 'steps'].includes(type));
+  const block = native || (proposal && !['comparison', 'metrics', 'steps'].includes(proposal.block) ? proposal.block : 'none');
+  return normalizeSlideDesign({
+    family: chosen.family, ground: chosen.ground, photo: chosen.photo, block,
+    emphasis: proposal?.emphasis || [], icons: proposal?.icons || [],
+  }, slide);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -684,6 +734,70 @@ export function isFreePresentationPreset(value) {
 /** Página do modo livre sem foto: não gera imagem (spec: `photo: none`). */
 export function slideSkipsImageGeneration(slide) {
   return !!slide?.presentationFreeDesign && slide.presentationFreeDesign.photo === 'none';
+}
+
+/* ------------------------------------------------------------------------ */
+/* Negrito proposto (emphasis) e direção de foto do deck                     */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * Marca cada trecho com `**…**` (parser de text-spans.js) na primeira vez que
+ * ele aparece, sem diferença de caixa. Trecho que já está em negrito, ou que
+ * cai dentro de um negrito, fica como está: nunca duplica marcador.
+ */
+export function applyFreeEmphasis(text, phrases = []) {
+  let out = String(text ?? '');
+  for (const raw of Array.isArray(phrases) ? phrases : []) {
+    const phrase = String(raw ?? '').replace(/\*\*/g, '').trim();
+    if (!phrase) continue;
+    const lower = out.toLowerCase();
+    const wanted = phrase.toLowerCase();
+    const at = lower.indexOf(wanted);
+    if (at < 0) continue;
+    const end = at + phrase.length;
+    // Já em negrito (inteiro ou em parte): o destaque existe, não duplica.
+    if (markdownBoldAccentIntervalsUtf16(out).some(([lo, hi]) => at < hi + 2 && end > lo - 2)) continue;
+    out = `${out.slice(0, at)}**${out.slice(at, end)}**${out.slice(end)}`;
+  }
+  return out;
+}
+
+const EMPHASIS_FIELDS = ['title', 'subtitle', 'bodyAfterImage'];
+
+/**
+ * Aplica os trechos de negrito do roteiro v3 (presentationPlan.design.emphasis)
+ * no texto final de cada slide: cada trecho uma vez, no primeiro campo que o
+ * contém. Slide sem trecho volta igual (mesma referência).
+ */
+export function applyPlanEmphasisToDraft(draft) {
+  if (!Array.isArray(draft?.slides)) return draft;
+  let changed = false;
+  const slides = draft.slides.map((slide) => {
+    const phrases = slide?.presentationPlan?.design?.emphasis;
+    if (!Array.isArray(phrases) || !phrases.length) return slide;
+    const next = { ...slide };
+    for (const phrase of phrases) {
+      const field = EMPHASIS_FIELDS.find(key => typeof next[key] === 'string' && next[key].toLowerCase().includes(String(phrase || '').replace(/\*\*/g, '').trim().toLowerCase()));
+      if (field) next[field] = applyFreeEmphasis(next[field], [phrase]);
+    }
+    if (EMPHASIS_FIELDS.every(key => next[key] === slide[key])) return slide;
+    changed = true;
+    return next;
+  });
+  return changed ? { ...draft, slides } : draft;
+}
+
+const FREE_PHOTO_MOOD_MAX = 200;
+/**
+ * Direção de foto do deck no modo livre (spec, Renderização): o clima e a
+ * paleta do deck, no lugar da luz de uma família. Curta, para caber no
+ * orçamento do pedido de imagem como o tratamento das famílias.
+ */
+export function freePhotoDirectionEnglish(deckDesign) {
+  const d = normalizeDeckDesign(deckDesign);
+  const mood = d.mood.length > FREE_PHOTO_MOOD_MAX ? `${d.mood.slice(0, FREE_PHOTO_MOOD_MAX).replace(/\s+\S*$/, '')}.` : d.mood;
+  const p = d.palette;
+  return `Deck photo mood: ${mood.replace(/[.\s]+$/, '')}. Keep the colours in harmony with the deck palette (background ${p.bg}, accent ${p.accent}, secondary ${p.accent2}, dark ${p.inverse}), one consistent look for every photo.`;
 }
 
 /* ------------------------------------------------------------------------ */
