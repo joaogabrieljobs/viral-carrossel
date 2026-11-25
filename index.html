@@ -21,6 +21,8 @@
     <!-- Tailwind CDN removido: CSP bloqueia cdn.tailwindcss.com; a UI usa GLOBAL_STYLE. -->
     <!-- Convites/recuperação não carregam analytics; lógica externa para CSP sem inline. -->
     <script defer src="/analytics-loader.js"></script>
+    <!-- GA4 só após consentimento (propriedade Moont, conta Elevessy). -->
+    <script defer src="/ga4-consent.js" data-ga4-id="G-1TQ4CNN1TJ"></script>
     <style>
       html, body, #root { height: 100%; margin: 0; padding: 0; background: #090a0f; color: #f3f0e7; }
       body {
