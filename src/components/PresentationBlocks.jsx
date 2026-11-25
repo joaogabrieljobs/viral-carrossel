@@ -94,17 +94,28 @@ export function metricValueFit({ value, columnPx, unit, count, fontFamily, weigh
  * Mesmo tamanho para todos os valores da linha, como num painel: o menor que
  * cabe, com piso legível. Um valor longo demais para o piso ("Ter-Dom,
  * 7h–13h") quebra em linhas no mesmo tamanho dos outros.
+ *
+ * QA 24/11: a quebra é só entre palavras. No piso, o valor era partido em
+ * qualquer letra ("US$ 1.299,9 / 0", "41.20 / 0"); agora a linha desce de
+ * tamanho até a maior palavra caber na coluna: número fica inteiro e
+ * "US$ 1.299,90" só quebra depois da moeda.
  */
 export function metricRowFit({ values, columnPx, unit, fontFamily, weight }) {
   const count = values.length;
   const max = (count > 3 ? 72 : 96) * unit;
   const floor = 44 * unit;
+  const limit = columnPx * 0.92;
   const fits = values.map(value => metricValueFit({ value, columnPx, unit, count, fontFamily, weight }));
-  const size = Math.min(max, Math.max(floor, Math.min(...fits.map(fit => (fit.wrap ? 0 : fit.fontSize)))));
-  return values.map(value => {
-    const perPx = measureMetricText(value, fontFamily, weight);
-    return { fontSize: size, wrap: perPx * size > columnPx * 0.92 };
-  });
+  let size = Math.min(max, Math.max(floor, Math.min(...fits.map(fit => (fit.wrap ? 0 : fit.fontSize)))));
+  const widths = values.map(value => ({
+    perPx: measureMetricText(value, fontFamily, weight),
+    widestWord: Math.max(0, ...String(value || '').trim().split(/\s+/).filter(Boolean).map(word => measureMetricText(word, fontFamily, weight))),
+  }));
+  for (const { perPx, widestWord } of widths) {
+    if (perPx * size > limit && widestWord > 0) size = Math.min(size, limit / widestWord);
+  }
+  // Folga de arredondamento: o valor que desceu até caber fica numa linha.
+  return widths.map(({ perPx }) => ({ fontSize: size, wrap: perPx * size > limit * 1.0005 }));
 }
 
 /**
@@ -214,7 +225,7 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, back
         {(() => {
           const weight = numericTypography?.weight || familyFont(key, 'numeric').weight || 600;
           const fit = metricRowFit({ values: block.items.map(entry => entry.value), columnPx: metricColumnPx(block.items.length), unit, fontFamily: numberFont, weight })[index];
-          return cell(item.value, ['items', index, 'value'], `valor ${index + 1}`, { display: 'block', whiteSpace: fit.wrap ? 'normal' : 'nowrap', overflowWrap: fit.wrap ? 'anywhere' : 'normal', fontFamily: numberFont, fontVariantNumeric: 'tabular-nums', fontSize: fit.fontSize, letterSpacing: '-0.02em', lineHeight: fit.wrap ? 1.1 : 1.18, fontWeight: weight, fontSynthesisWeight: 'none' });
+          return cell(item.value, ['items', index, 'value'], `valor ${index + 1}`, { display: 'block', whiteSpace: fit.wrap ? 'normal' : 'nowrap', overflowWrap: 'normal', fontFamily: numberFont, fontVariantNumeric: 'tabular-nums', fontSize: fit.fontSize, letterSpacing: '-0.02em', lineHeight: fit.wrap ? 1.1 : 1.18, fontWeight: weight, fontSynthesisWeight: 'none' });
         })()}
         {cell(item.label, ['items', index, 'label'], `indicador ${index + 1}`, { display: 'block', fontSize: 26 * unit, marginTop: 18 * unit, fontWeight: 600 })}
         {item.detail && cell(item.detail, ['items', index, 'detail'], `condição ${index + 1}`, { display: 'block', fontSize: 23 * unit, marginTop: 8 * unit, opacity: 0.75 })}
