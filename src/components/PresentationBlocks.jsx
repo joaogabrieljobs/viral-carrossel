@@ -288,7 +288,10 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, stro
         {(() => {
           const weight = numericTypography?.weight || familyFont(key, 'numeric').weight || 600;
           const fit = metricRowFit({ values: block.items.map(entry => entry.value), columnPx: metricColumnPx(block.items.length), unit, fontFamily: numberFont, weight })[index];
-          return cell(item.value, ['items', index, 'value'], `valor ${index + 1}`, { display: 'block', whiteSpace: fit.wrap ? 'normal' : 'nowrap', overflowWrap: 'normal', fontFamily: numberFont, fontVariantNumeric: 'tabular-nums', fontSize: fit.fontSize, letterSpacing: '-0.02em', lineHeight: fit.wrap ? 1.1 : 1.18, fontWeight: weight, fontSynthesisWeight: 'none' });
+          return cell(item.value, ['items', index, 'value'], `valor ${index + 1}`, { display: 'block', whiteSpace: fit.wrap ? 'normal' : 'nowrap', overflowWrap: 'normal', fontFamily: numberFont, fontVariantNumeric: 'tabular-nums', fontSize: fit.fontSize, letterSpacing: '-0.02em', lineHeight: fit.wrap ? 1.1 : 1.18, fontWeight: weight, fontSynthesisWeight: 'none',
+            // QA livre-f2: sobre a superfície o número saía no cinza do apoio.
+            // No modo livre ele usa a tinta do título, medida contra o quadro.
+            ...(strongInk ? { color: strong } : {}) });
         })()}
         {cell(item.label, ['items', index, 'label'], `indicador ${index + 1}`, { display: 'block', fontSize: 26 * unit, marginTop: 18 * unit, fontWeight: 600 })}
         {item.detail && cell(item.detail, ['items', index, 'detail'], `condição ${index + 1}`, { display: 'block', fontSize: st.detailPx * unit, marginTop: 8 * unit, color: metricDetail.color, opacity: metricDetail.opacity })}

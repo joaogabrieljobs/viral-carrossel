@@ -245,3 +245,18 @@ describe('fase 3: blocos novos na composição do modo livre', () => {
     expect(auditPresentationLayout(out[2], { index: 2 }).ok).toBe(true);
   });
 });
+
+describe('fase 3, defeitos da fase 2', () => {
+  it('número da métrica sobre a superfície usa a tinta do título no modo livre, não o cinza do apoio', () => {
+    const metrics = { type: 'metrics', items: [1, 2, 3].map(n => ({ label: `Rótulo ${n}`, value: `${n * 12}%`, detail: 'festa cidade ritmo' })) };
+    const html = render(metrics);
+    const value = html.match(/aria-label="Editar valor 1"[^>]*style="([^"]*)"|style="([^"]*)"[^>]*>12%</);
+    const style = (value?.[1] || value?.[2] || '');
+    expect(color(style)).toBeTruthy();
+    expect(color(style).toLowerCase()).toBe(palette.ink.toLowerCase());
+    expect(wcagContrast(color(style), palette.surface)).toBeGreaterThanOrEqual(4.5);
+    // Fora do modo livre (sem tinta forte) nada muda.
+    const comum = renderToStaticMarkup(React.createElement(PresentationBlocks, { blocks: [metrics], rect: RECT, frame: FRAME, ink: '#555555', background: '#E2D7C1', fontFamily: 'Inter', family: 'executive', artDirectionVersion: 2 }));
+    expect(comum.match(/style="([^"]*)"[^>]*>12%</)[1]).not.toMatch(/(?:^|;)color:/);
+  });
+});
