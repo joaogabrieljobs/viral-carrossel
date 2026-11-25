@@ -37,7 +37,9 @@ describe('padrões visuais de apresentação', () => {
     }
     expect(LEGACY_PRESENTATION_VISUAL_PRESETS).toHaveLength(6);
     expect(LEGACY_PRESENTATION_VISUAL_PRESETS.every((item) => item.hidden)).toBe(true);
-    expect(PRESENTATION_VISUAL_PRESET_CATALOG).toHaveLength(16);
+    // 10 padrões + 6 legados + o preset virtual do modo livre (oculto).
+    expect(PRESENTATION_VISUAL_PRESET_CATALOG).toHaveLength(17);
+    expect(PRESENTATION_VISUAL_PRESET_CATALOG.filter((item) => item.isFree).map((item) => [item.id, item.hidden])).toEqual([['presentation_free', true]]);
   });
 
   it('todo caminho sugere um padrão existente', () => {

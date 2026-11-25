@@ -19,6 +19,12 @@ import {
   GENERATED_PRESENTATION_COMPOSITIONS,
   GENERATED_PRESENTATION_PATTERNS,
 } from '../generated/presentation-design-system.generated.js';
+import {
+  DEFAULT_DECK_DESIGN,
+  FREE_PRESENTATION_PRESET_ID,
+  freeBrandPatch,
+  freePresentationCompositionOverrides,
+} from '../utils/free-design.js';
 
 export const DEFAULT_PRESENTATION_VISUAL_PRESET_ID = 'presentation_executive_minimal';
 
@@ -529,10 +535,31 @@ export const PRESENTATION_VISUAL_PRESETS = Object.freeze(
   GENERATED_PRESENTATION_PATTERNS.map((definition) => preset(definition)),
 );
 
+/**
+ * Modo livre ("O Moont decide", docs/product/modo-livre-apresentacao.md): preset
+ * virtual. Cada página escolhe família, fundo e foto; paleta e fontes são do
+ * deck. Fase 1: fora do seletor (`hidden`), reconhecido pelo catálogo, pela
+ * composição e pelo estado. A base (limites, autofit, perfis) é a do Executivo.
+ */
+const FREE_BASE = GENERATED_PRESENTATION_PATTERNS.find(item => item.id === DEFAULT_PRESENTATION_VISUAL_PRESET_ID) || GENERATED_PRESENTATION_PATTERNS[0];
+export const FREE_PRESENTATION_VISUAL_PRESET = preset({
+  ...FREE_BASE,
+  id: FREE_PRESENTATION_PRESET_ID,
+  sourceId: undefined,
+  sourceVersion: undefined,
+  isFree: true,
+  hidden: true,
+  label: 'Livre: o Moont decide',
+  desc: 'Cada página com a sua composição; paleta e par de fontes do deck inteiro.',
+  previewVariant: 'editorial',
+  brand: { ...FREE_BASE.brand, ...freeBrandPatch(DEFAULT_DECK_DESIGN) },
+});
+
 /** Registro completo para abrir projetos antigos sem alterar seu visual. */
 export const PRESENTATION_VISUAL_PRESET_CATALOG = Object.freeze([
   ...PRESENTATION_VISUAL_PRESETS,
   ...LEGACY_PRESENTATION_VISUAL_PRESETS,
+  FREE_PRESENTATION_VISUAL_PRESET,
 ]);
 
 export const PRESENTATION_VISUAL_PRESET_BY_ID = Object.freeze(
@@ -754,7 +781,8 @@ function normalizeCompositionInput(input, stageArg, indexArg, countArg) {
   const count = Math.max(1, Math.trunc(Number(rawCount) || 1));
   const previous = isOptions && Array.isArray(objectInput.previous) ? objectInput.previous : null;
   const next = isOptions && objectInput.next?.slide && typeof objectInput.next.slide === 'object' ? objectInput.next : null;
-  return { slide, stage, index, count, previous, next };
+  const deckDesign = isOptions && objectInput.deckDesign && typeof objectInput.deckDesign === 'object' ? objectInput.deckDesign : null;
+  return { slide, stage, index, count, previous, next, deckDesign };
 }
 
 function clonePresentationZones(zones) {
@@ -786,7 +814,7 @@ export function getPresentationCompositionOverrides(
 ) {
   const normalizedPresetId = normalizePresentationVisualPreset(presetId);
   const presetDefinition = getPresentationVisualPreset(normalizedPresetId);
-  const { slide, stage, index, count, previous, next } = normalizeCompositionInput(
+  const { slide, stage, index, count, previous, next, deckDesign } = normalizeCompositionInput(
     input,
     stageArg,
     indexArg,
@@ -798,7 +826,7 @@ export function getPresentationCompositionOverrides(
   // alterna a página que se repetiria pela terceira vez seguida. Vale também
   // no caminho Pitch: as composições do pitch são as da família e os limites
   // do pitch só distinguem capa e fecho (pitchTextLimits).
-  const rhythmFamily = previous && contentAware
+  const rhythmFamily = previous && contentAware && !presetDefinition.isFree
     ? presentationDesignFamily({ presentationPresetId: normalizedPresetId, presentationPatternId: presetDefinition.sourceId })
     : null;
   const kind = resolvePresentationCompositionKind({ slide, stage, index, count, previous, next, family: rhythmFamily });
@@ -854,6 +882,10 @@ export function getPresentationCompositionOverrides(
       visualRole,
     },
   };
+  // Modo livre: o diretor de arte escolhe família, fundo e foto da página.
+  if (presetDefinition.isFree) {
+    return freePresentationCompositionOverrides(composition, { slide, stage, index, count, previous, deckDesign });
+  }
   if (stage?.contentMode === 'pitch') return pitchCompositionOverrides(composition, slide, kind);
   // Os dez presets atuais usam a biblioteca também na edição manual, sem IA.
   // IDs legados continuam no catálogo oculto para leitura de projetos antigos.

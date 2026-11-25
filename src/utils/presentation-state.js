@@ -22,6 +22,13 @@ import {
   slideDefaultsForAllCards,
 } from './custom-visual-presets.js';
 import { resolvePresentationVisualRole } from './presentation-composition.js';
+import {
+  deckDesignFromBrand,
+  freeBrandPatch,
+  normalizeDeckDesign,
+  stripFreeSlideFields,
+} from './free-design.js';
+import { explicitBrandColorsFromKit } from './style-kit-design.js';
 import { presentationRoadmap } from './presentation-roadmap.js';
 
 export const DEFAULT_CAROUSEL_VISUAL_PRESET_ID = 'minimal_clean';
@@ -47,7 +54,9 @@ export function presentationStageAt(pathId, index, count) {
   return roadmap[Math.max(0, Math.min(roadmap.length - 1, Math.round(index)))] || stages[0];
 }
 
-function applyResolvedPresentationPresetToSlide(slide, preset, normalizedPath, index, count, previous = null, nextSlide = null) {
+function applyResolvedPresentationPresetToSlide(sourceSlide, preset, normalizedPath, index, count, previous = null, nextSlide = null, deckDesign = null) {
+  // Página que estava no modo livre volta ao neutro antes de outro preset.
+  const slide = preset?.isFree ? sourceSlide : stripFreeSlideFields(sourceSlide);
   const resolvedPresetId = preset?.id || DEFAULT_PRESENTATION_VISUAL_PRESET_ID;
   const stage = {
     ...presentationStageAt(normalizedPath, index, count),
@@ -151,6 +160,7 @@ function applyResolvedPresentationPresetToSlide(slide, preset, normalizedPath, i
         slide: nextSlide,
         stage: { ...presentationStageAt(normalizedPath, index + 1, count), deliveryMode: stage.deliveryMode },
       } : null,
+      ...(preset?.isFree && deckDesign ? { deckDesign } : {}),
     }),
     ...stageMeta,
     bodyAfterImage: slide.bodyAfterImage || '',
@@ -166,7 +176,7 @@ export function applyPresentationVisualPresetToSlide(
   presetId = DEFAULT_PRESENTATION_VISUAL_PRESET_ID,
   pathId = 'auto',
   presets = PRESENTATION_VISUAL_PRESETS,
-  { index = 0, count = 1 } = {},
+  { index = 0, count = 1, previous = null, deckDesign = null } = {},
 ) {
   const preset = resolvePresentationPreset(presetId, presets);
   const normalizedPath = normalizePresentationPath(pathId);
@@ -178,6 +188,9 @@ export function applyPresentationVisualPresetToSlide(
     normalizedPath,
     safeIndex,
     safeCount,
+    Array.isArray(previous) ? previous : null,
+    null,
+    deckDesign,
   );
 }
 
@@ -191,6 +204,7 @@ export function applyPresentationVisualPresetToSlides(
   presetId = DEFAULT_PRESENTATION_VISUAL_PRESET_ID,
   pathId = 'auto',
   presets = PRESENTATION_VISUAL_PRESETS,
+  { deckDesign = null } = {},
 ) {
   const source = Array.isArray(slides) ? slides : [];
   const preset = resolvePresentationPreset(presetId, presets);
@@ -201,7 +215,7 @@ export function applyPresentationVisualPresetToSlides(
   // anteriores, para a mesma página não sair três vezes seguidas.
   const composed = [];
   for (const [index, slide] of source.entries()) {
-    composed.push(applyResolvedPresentationPresetToSlide(slide, preset, normalizedPath, index, count, composed, source[index + 1] || null));
+    composed.push(applyResolvedPresentationPresetToSlide(slide, preset, normalizedPath, index, count, composed, source[index + 1] || null, deckDesign));
   }
   return composed;
 }
@@ -222,6 +236,10 @@ export function applyPresentationVisualPresetToDoc(
         slideCount: source.quickCardCount,
       })
     : {};
+  // Modo livre: paleta e fontes do deck; cores do kit substituem as propostas.
+  const deckDesign = preset?.isFree
+    ? deckDesignFromBrand(explicitBrandColorsFromKit(source.styleKit), normalizeDeckDesign(source.presentationDeckDesign))
+    : null;
 
   return {
     ...source,
@@ -233,18 +251,22 @@ export function applyPresentationVisualPresetToDoc(
     visualPreset: resolvedPresetId,
     presentationDesignSystemId: preset?.sourceId || null,
     presentationDesignSystemVersion: preset?.sourceVersion || null,
+    ...(deckDesign ? { presentationDeckDesign: deckDesign } : {}),
     brand: preset?.isCustom
       ? applyVisualPreset(
           source.brand || {},
           resolvedPresetId,
           [{ ...preset, brand: sanitizeCustomVisualPresetBrand(preset.brand || {}) }],
         )
-      : applyPresentationVisualPreset(source.brand || {}, resolvedPresetId),
+      : deckDesign
+        ? { ...applyPresentationVisualPreset(source.brand || {}, resolvedPresetId), ...freeBrandPatch(deckDesign) }
+        : applyPresentationVisualPreset(source.brand || {}, resolvedPresetId),
     slides: applyPresentationVisualPresetToSlides(
       source.slides,
       resolvedPresetId,
       presentationPath,
       presets,
+      { deckDesign },
     ),
   };
 }

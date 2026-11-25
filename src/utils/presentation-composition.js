@@ -2,7 +2,8 @@
 import { FORMATS } from './formats.js';
 import { presentationFamily, presentationArtLayout } from './presentation-art-direction.js';
 import {
-  familyFont, familyPhotoFilter, familySpec, rendererSubtitleSizePercent, rendererTitleSizePercent,
+  FREE_PRESENTATION_PRESET_ID, familyFont, familyPhotoFilter, familySpec, normalizeFamilyKey,
+  rendererSubtitleSizePercent, rendererTitleSizePercent,
 } from './presentation-families.js';
 import { titleTrackingBase } from './title-tracking.js';
 import { wcagContrast } from './wcag.js';
@@ -158,7 +159,7 @@ function composedGeometry(slide = {}) {
   });
 }
 
-const manuallyPositioned = slide => slide.canvas?.enabled === true
+export const manuallyPositioned = slide => slide.canvas?.enabled === true
   || ['title', 'subtitle', 'bodyAfterImage', 'text', 'photo'].some((key) => {
     const offset = slide.elementOffsets?.[key];
     return offset && Object.values(offset).some(value => Number(value) !== 0);
@@ -166,8 +167,8 @@ const manuallyPositioned = slide => slide.canvas?.enabled === true
 
 const rect = (x, y, w, h) => ({ x, y, w, h });
 const inactivePhoto = () => rect(96, 94, 1, 1);
-const hasVisual = slide => !!(slide.bgImage || slide.bgImageId || slide.bgImageAssetId || text(slide.imageQuery));
-const hasBlocks = slide => Array.isArray(slide.presentationBlocks)
+export const hasVisual = slide => !!(slide.bgImage || slide.bgImageId || slide.bgImageAssetId || text(slide.imageQuery));
+export const hasBlocks = slide => Array.isArray(slide.presentationBlocks)
   && slide.presentationBlocks.some(block => ['comparison', 'metrics', 'steps'].includes(block?.type));
 
 /**
@@ -176,6 +177,10 @@ const hasBlocks = slide => Array.isArray(slide.presentationBlocks)
  * A ausência de foto expande a leitura, em vez de deixar um placeholder vazio.
  */
 export function presentationDesignFamily(base = {}) {
+  // Modo livre: a família é de cada página (design do slide), não do preset.
+  if (base.presentationPresetId === FREE_PRESENTATION_PRESET_ID && base.presentationFreeDesign?.family) {
+    return normalizeFamilyKey(base.presentationFreeDesign.family);
+  }
   return presentationFamily(base.presentationPresetId || base.presentationPatternId);
 }
 
@@ -260,7 +265,7 @@ function titleLinesAt(value, width, size, fontFamily = '') {
 }
 
 /** Escalas fechadas e piso legível; o texto nunca é cortado para caber. */
-function fittedTitleSize(defaultSize, value, zone, fontFamily = '') {
+export function fittedTitleSize(defaultSize, value, zone, fontFamily = '') {
   if (!String(value || '').trim()) return defaultSize;
   const width = 1920 * zone.w / 100 - 24;
   const height = 1080 * zone.h / 100 - 14;

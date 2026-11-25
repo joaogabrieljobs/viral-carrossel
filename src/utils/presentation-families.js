@@ -26,6 +26,13 @@ export const FAMILY_KEYS = Object.freeze([
 
 export const PAGE_KINDS = Object.freeze(['cover', 'divider', 'content', 'demo', 'data', 'closing']);
 
+/**
+ * Modo livre (docs/product/modo-livre-apresentacao.md): preset virtual em que
+ * cada página escolhe a família, o fundo e o tamanho da foto, com a paleta e o
+ * par de fontes do deck. Definido aqui porque este módulo não depende de nada.
+ */
+export const FREE_PRESENTATION_PRESET_ID = 'presentation_free';
+
 export const FORMAT_SPECS = Object.freeze({
   '16:9': { w: 1920, h: 1080 },
   '4:5': { w: 1080, h: 1350 },
@@ -731,6 +738,16 @@ export function brandPaletteOverrides(key, brand = {}) {
   return darkest ? { accent, inverse: darkest.trim() } : { accent };
 }
 
+/**
+ * Paleta que o renderer usa para o slide. Página do modo livre grava a paleta
+ * do deck (`presentationPaletteOverrides`); as demais seguem o destaque da marca.
+ */
+export function slidePaletteOverrides(slide, key, brand = {}) {
+  const own = slide?.presentationPaletteOverrides;
+  if (own && typeof own === 'object' && !Array.isArray(own)) return own;
+  return brandPaletteOverrides(key, brand);
+}
+
 export function groundInks(key, ground = 'bg', overrides = {}) {
   const p = { ...familySpec(key).palette, ...(overrides || {}) };
   const raw = ground === 'inverse' ? { bg: p.inverse, ink: p.inverseInk, muted: p.inverseMuted }
@@ -993,9 +1010,14 @@ export function evidenceDetailInk(ink, surface, opacity = 1) {
 }
 
 /** Tratamento de evidência (tabela, métricas e etapas) por família. */
-export function familyEvidenceStyle(key) {
+export function familyEvidenceStyle(key, overrides = null) {
   const family = normalizeFamilyKey(key);
-  const p = familySpec(family).palette;
+  // Paleta do deck no modo livre: tinta, apoio, fio e superfície também mudam.
+  // O destaque continua no caminho de sempre (evidenceStyleForBrand).
+  const own = overrides && typeof overrides === 'object' && overrides.ink && overrides.surface
+    ? { ink: overrides.ink, muted: overrides.muted, rule: overrides.rule, surface: overrides.surface }
+    : {};
+  const p = { ...familySpec(family).palette, ...Object.fromEntries(Object.entries(own).filter(([, v]) => v)) };
   const base = {
     headerRule: 2, headerColor: p.ink, ruleColor: p.rule, zebra: 'rgba(127,127,127,0.06)',
     panel: false, panelColor: p.surface, radius: 0, metricRule: 2, metricRuleColor: p.accent,
@@ -1012,7 +1034,7 @@ export function familyEvidenceStyle(key) {
     cinematic: { ...base, zebra: 'rgba(255,255,255,0.04)', ruleColor: '#3A3A3E', headerRole: 'display', headerCase: 'upper', headerTracking: 0.08 },
     luxury: { ...base, headerRule: 1, metricRule: 1, zebra: 'transparent', ruleColor: p.rule, stepMarker: 'roman' },
     typographic: { ...base, headerRule: 6, metricRule: 8, zebra: 'transparent', metricRuleColor: p.accent, headerRole: 'display', headerCase: 'upper' },
-    cultural: { ...base, panel: true, panelColor: '#F7F2EA', radius: 0, metricRuleColor: p.accent2, zebra: 'transparent', offsetShadow: p.accent },
+    cultural: { ...base, panel: true, panelColor: own.surface ? p.surface : '#F7F2EA', radius: 0, metricRuleColor: p.accent2, zebra: 'transparent', offsetShadow: p.accent },
     technical: { ...base, headerRole: 'label', headerCase: 'upper', headerTracking: 0.06, zebra: 'rgba(92,225,165,0.04)', ruleColor: p.rule, metricRuleColor: p.accent, stepMarker: 'code' },
     photo: { ...base, zebra: 'transparent', headerRule: 1, metricRule: 1, metricRuleColor: p.ink },
     modular: { ...base, panel: true, panelColor: p.surface, radius: 22, zebra: 'transparent', metricRule: 0, stepMarker: 'pill' },
