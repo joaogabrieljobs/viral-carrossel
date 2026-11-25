@@ -147,6 +147,19 @@ const GENERALIZATION = /\b(?:costuma(?:m)?|geralmente|normalmente|em geral|a mai
 // ownership").
 const ADVANTAGE = /\b(?:aparece(?:m)?\s+primeiro|sai(?:em)?\s+na\s+frente|fica(?:m)?\s+na\s+frente|primeiro\s+lugar\s+no\s+google|show(?:s)?\s+up\s+first|ranks?\s+(?:first|higher)|stand(?:s)?\s+out\s+from\s+(?:the\s+)?competition)\b/gu;
 const OWNERSHIP = /\b(?:full\s+ownership|you\s+own\s+(?:it|everything|the\s+site)|(?:é|e)\s+(?:todo\s+)?(?:seu|sua)\s+para\s+sempre|tod[oa]\s+seu|propriedade\s+(?:total|completa)|seu\s+para\s+sempre|forever\s+yours)\b/gu;
+// QA 24/11 (texto 8), BLK FROGDAY: tabelas comparavam a oferta com "Typical
+// upfront engagement" e com o "old model", que o briefing não descreve.
+// Comparação com terceiros (mercado, concorrentes, outras agências, o jeito
+// tradicional) só passa quando o material também fala desse outro lado. O
+// "modelo antigo" do próprio cliente passa quando o material descreve o antes.
+// O texto chega aqui sem acento e em minúsculas.
+const THIRD_PARTY = /\b(?:typical\s+(?:upfront\s+)?(?:agency|agencies|engagements?|freelancers?|providers?|vendors?|studios?|projects?|contracts?|pricing|prices?|process|approach|models?|deals?|builds?|web\s+design)|upfront\s+engagements?|(?:traditional|conventional)\s+(?:models?|agency|agencies|approach|way|methods?|process|engagements?|route|web\s+design|providers?|studios?|builds?|contracts?)|industry\s+(?:standards?|averages?|norms?|benchmarks?)|market\s+(?:averages?|standards?|rates?|norms?|prices?)|(?:other|most)\s+(?:agencies|providers|companies|studios|freelancers|vendors|web\s+designers|bakeries|brands|shops)|competitors?|competition|(?:compared\s+(?:to|with)|unlike|versus|vs\.?)\s+(?:the\s+)?(?:others?|market|traditional|typical|agenc[a-z]+|industry|usual)|the\s+usual\s+(?:way|model|process|approach|route)|agencias?\s+(?:tradiciona(?:l|is)|comuns?|convenciona(?:l|is))|modelo\s+(?:tradicional|convencional|d[eo]\s+mercado)|(?:jeito|forma|caminho|contratacao|processo)\s+(?:tradicional|convencional)|(?:outr[oa]s|demais)\s+(?:agencias|empresas|fornecedores|marcas|padarias|lojas|opcoes\s+do\s+mercado)|concorrentes?|concorrencia|(?:media|padrao|pratica|preco)\s+d[eo]\s+mercado|(?:em\s+comparacao\s+com|comparad[oa]s?\s+(?:com|a|ao)|diferente\s+d[aeo]s?|ao\s+contrario\s+d[aeo]s?)\s+(?:[oa]s?\s+)?(?:outr[a-z]+|mercado|maioria|agencias?|tradiciona[a-z]+)|(?:contrat[a-z]+|projeto|orcamento|engajamento|modelo|processo)\s+tipic[oa]s?)\b/gu;
+const OWN_PAST = /\b(?:(?:the\s+)?old\s+(?:models?|way|approach|methods?|process|route)|(?:modelo|jeito|processo|metodo)\s+(?:antigo|anterior)|forma\s+antiga)\b/gu;
+// O material fala de terceiros: qualquer expressão acima ou o outro lado no
+// plural ("agencies charge…"). "Somos uma agência" não é comparação.
+const SOURCE_THIRD_PARTY = /\b(?:agencies|agencias|freelancers|competitors?|competition|concorr[a-z]+)\b/;
+// O material descreve o antes do próprio cliente.
+const SOURCE_BEFORE = /\b(?:before|previously|formerly|used\s+to|no\s+longer|until\s+(?:19|20)\d{2}|switched\s+from|changed\s+from|replaced|old\s+(?:site|website|system|models?|way|approach|methods?|process)|antes|anteriormente|antigamente|costumav(?:a|am)|deix(?:ou|amos|aram)\s+de|ate\s+(?:19|20)\d{2}|substitui[a-z]*|troc(?:ou|amos|aram)|mud(?:ou|amos|aram)|(?:site|sistema|modelo|processo|jeito|metodo)\s+antigo)\b/;
 // Atributo físico do produto marca sozinho. "Sabor", "aroma" e "textura"
 // também são linguagem figurada ("um cardápio com mais sabor"): só marcam em
 // par ou ao lado de um atributo físico (auditoria 23/11, IA-04).
@@ -324,6 +337,8 @@ export function auditDraftFactuality(draft, config = {}) {
   const sourceText = normalize(evidence);
   const sourceEquivalent = equivalent(sourceText);
   const countedSpots = COUNTED_SPOTS.test(sourceText);
+  const sourceThirdParty = SOURCE_THIRD_PARTY.test(sourceText) || new RegExp(THIRD_PARTY.source, 'u').test(sourceText);
+  const sourceBefore = SOURCE_BEFORE.test(sourceText);
   const quantities = quantityKeys(evidence);
   const channels = new Set([...evidence.matchAll(CHANNEL_WORDS)].map(match => channelKey(match[0])));
   const numbers = evidenceNumbers(evidence);
@@ -403,6 +418,12 @@ export function auditDraftFactuality(draft, config = {}) {
       for (const match of normalized.matchAll(OWNERSHIP)) {
         if (!sourceText.includes(match[0])) add('propriedade ou posse sem fonte', match[0]);
       }
+      for (const match of normalized.matchAll(THIRD_PARTY)) {
+        if (!sourceText.includes(match[0]) && !sourceThirdParty) add('comparação com o mercado sem fonte', match[0]);
+      }
+      for (const match of normalized.matchAll(OWN_PAST)) {
+        if (!sourceText.includes(match[0]) && !sourceThirdParty && !sourceBefore) add('comparação com o mercado sem fonte', match[0]);
+      }
       for (const match of sentence.matchAll(CHANNELS)) {
         if (!channels.has(channelKey(match[0])) && !CONDITIONAL.test(normalized)) add('canal ou serviço não informado', match[0]);
       }
@@ -415,6 +436,9 @@ export function auditDraftFactuality(draft, config = {}) {
  * Lacuna do material é bastidor (MF-12, reteste 21/11: "Não há dados de
  * concorrentes…", "…não foram documentados", "Faltam combinar o endereço…").
  */
+// QA 24/11 (texto 8): tabelas "Typical upfront engagement" e "old model" sem
+// que o briefing falasse de mercado. Vale para carrossel e apresentação.
+export const MARKET_COMPARISON_RULE = 'Não compare a oferta com o mercado, concorrentes, outras agências, o "jeito tradicional" ou um "modelo antigo" quando o material não descreve esse outro lado: nada de coluna, linha ou frase como "Typical upfront engagement", "Old model", "agência tradicional" ou "média do mercado". Antes e depois do próprio cliente só entra quando o material descreve o antes. Sem o outro lado, apresente só a oferta, com o que o material informa.';
 export const NO_GAP_NOTE_RULE = 'Nunca escreva no card ou slide que um dado falta, não foi informado, não foi documentado ou não existe (ex.: "não há dados de…", "não foram documentados", "faltam definir o endereço"). Mostre o que o material traz; o que falta fica fora do texto visível.';
 // QA 24/11 (texto 1): a apresentação não recebia a regra acima (só a ressalva
 // essencial) e a lacuna virou slide inteiro em Pitch, Proposta, Relatório e
@@ -434,6 +458,7 @@ Não acrescente duração, frequência, números por extenso, maioria, históric
 Não transforme benefício esperado em garantia. Não use garantir, garante, garantia nem garantido quando o material não usa essa palavra: uma encomenda reserva o pedido, não garante disponibilidade, frescor ou resultado. Não invente preço, prazo, taxas, serviços inclusos, gratuidade, agendamento ou WhatsApp/DM/comentários como canal da oferta. Preserve o público e os termos do usuário (clientes não viram pacientes).
 Quando um dado não foi informado (endereço, telefone, preço, horário), não escreva isso no card nem no slide: nada de "não foi informado", "não informado", "o briefing não traz", "a confirmar" ou colchetes para preencher. O texto é para o público final, não um bilhete para quem pediu. Omita o dado e siga a sequência.
 Não use travessão (—): use vírgula, dois-pontos ou ponto.
+${MARKET_COMPARISON_RULE}
 O CTA usa a ação pedida. Não acrescente canal, recompensa ou condição comercial. Não repita o mesmo fato/argumento para preencher cards; cada card deve avançar a sequência. Quando faltar informação, mantenha uma formulação útil e neutra, sem completar com um detalhe plausível.
 ${NO_GAP_NOTE_RULE}`;
 }
@@ -458,6 +483,7 @@ Leia cada frase do rascunho, inclusive títulos, blocos e legenda, e confira no 
 - escassez, disponibilidade ou superioridade: "pode ficar sem", "quem chega cedo leva", "esgota", "no horário que você escolher", "nenhum concorrente consegue imitar".
 - generalização apresentada como regra: "costuma levar", "geralmente", "a maioria das padarias", "muitos acham", "most people think".
 - vantagem ou posse prometida: "quem tem site aparece primeiro", "you keep full ownership", "é todo seu".
+- comparação com o mercado, concorrentes ou um "modelo antigo" que o material não descreve, inclusive em coluna ou linha de tabela ("typical upfront engagement", "old model", "agência tradicional", "média do mercado").
 Corrija também erros de digitação e palavras inexistentes. Uma frase verdadeira e simples vale mais que um detalhe específico inventado. Ao corrigir, mantenha a função do card no arco.`;
 }
 
