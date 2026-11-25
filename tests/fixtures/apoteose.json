@@ -332,5 +332,30 @@
   "objective": "Apresentar a festa Apoteose como o esquenta de Carnaval mais badalado de São Paulo, comunicando conceito, identidade e posicionamento.",
   "promptVersion": "presentation-plan-v1",
   "schemaVersion": 1
+ },
+ "styleKit": {
+  "stylePrompt": "Crie imagens de tela cheia seguindo a referência anexada . Deve ser visualmente bonito e nas cores da referência.",
+  "refImages": [
+   {
+    "id": "img_ref",
+    "name": "referencia.jpeg"
+   }
+  ],
+  "nota": "No projeto real, uma imagem de referência sem papel declarado (vai como moodboard em todas as imagens). Bytes fora do repositório."
+ },
+ "imagePromptsV1": {
+  "nota": "sha256 (16 primeiros) dos pedidos de imagem montados com o roteiro v1 salvo, calculados no commit c46f91a, antes do roteiro v2. Família presentation_cinematic, rota sjinn, 1 referência.",
+  "sha": [
+   "b22112cb31cd76b0",
+   "b8f32f1cc4ee7e67",
+   "83a0f09a55967d14",
+   "d9bff874ffd2bd7f",
+   "554322b6ba2eb763",
+   "836c9c97263327a0",
+   "a5c67ab465fe4da0",
+   "1e7be50eb81fd1aa",
+   "1fc43d7f116c52a4",
+   "9cdd4a7ac8cf4e8f"
+  ]
  }
 }

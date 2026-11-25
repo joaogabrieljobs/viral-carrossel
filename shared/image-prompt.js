@@ -84,6 +84,8 @@ export const IMAGE_PROMPT_TEXT = Object.freeze({
   presentationPanel: 'PRESENTATION IMAGE PANEL: Supply an illustrative visual for this panel. Keep the important action and subject features inside its crop. Text, values and diagrams are added separately. Do not simulate product captures, charts, customer evidence, testimonials or before-and-after results.',
   // I26 — fecho do tratamento da família visual.
   treatmentTail: 'Apply this treatment to the requested scene within the specified crop. Explicit project or slide style takes precedence.',
+  // Spec 1.1, entrega 1 — cabeçalho do bloco AVOID (rules de imagem do briefing e avoid do slide).
+  avoidHeader: 'AVOID (from the brief and this slide plan; keep these out of the image):',
   // I31 — regras fixas da rota do agente.
   agentRules: 'Output an illustrative image for this card. Keep the subject and essential action clear in the final crop, with room around key features. Do not depict a screenshot, chart, testimonial or evidence of a real event. No lettering, captions, logos or watermarks.',
 });
@@ -186,10 +188,18 @@ function shrinkBody(head, body, tail, max) {
 
 const OPTIONAL_DROP_ORDER = Object.freeze(['defaultArtDirection', 'medium', 'treatment']);
 const OPTIONAL_DROP_ORDER_CAROUSEL = Object.freeze(['medium', 'defaultArtDirection', 'treatment']);
-const REQUIRED_SHRINK_ORDER = Object.freeze(['style', 'subjects', 'slideAction']);
+// O bloco AVOID é o último texto do usuário a ceder: só depois de estilo,
+// ficha e direção do slide, e sai inteiro só depois deles.
+const REQUIRED_SHRINK_ORDER = Object.freeze(['style', 'subjects', 'slideAction', 'avoid']);
 const REQUIRED_DROP_ORDER = Object.freeze([
-  'slideAction', 'style', 'moodboardOnly', 'subjects', 'framing', 'presentationPanel', 'referenceMap', 'identityAnchor', 'referenceRoles',
+  'slideAction', 'style', 'moodboardOnly', 'subjects', 'avoid', 'framing', 'presentationPanel', 'referenceMap', 'identityAnchor', 'referenceRoles',
 ]);
+
+/** Bloco AVOID: cabeçalho fixo e uma linha por item; '' sem itens. */
+export function composeAvoidBlock(avoid) {
+  const itens = (Array.isArray(avoid) ? avoid : [avoid]).filter(presente).map((texto) => texto.replace(/\s+/g, ' ').trim());
+  return itens.length ? `${IMAGE_PROMPT_TEXT.avoidHeader}\n${[...new Set(itens)].map((texto) => `- ${texto}`).join('\n')}` : '';
+}
 
 const tamanhoTotal = (blocos) => blocos.reduce((soma, bloco) => soma + bloco.text.length, 0) + Math.max(0, blocos.length - 1) * 2;
 
@@ -199,7 +209,8 @@ const tamanhoTotal = (blocos) => blocos.reduce((soma, bloco) => soma + bloco.tex
  * `parts` (strings já compostas por quem é dono de cada bloco):
  *   scene, axisTags, format ('carousel' | 'presentation'), framing,
  *   referenceCount, styleMoodboard, referenceMap, identityAnchor,
- *   presentationPanel, slideAction, subjects, styleBody, familyEnglish.
+ *   presentationPanel, slideAction, subjects, styleBody, familyEnglish, avoid
+ *   (string ou lista: o que a imagem não pode mostrar).
  * `styleBody` aceita uma string ou segmentos `[estilo do projeto, direção do
  * slide]`; se precisar reduzir, o primeiro segmento cede antes dos demais.
  *
@@ -248,6 +259,7 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
   }
   // No agente, I31 já proíbe captura, gráfico e depoimento.
   if (parts.presentationPanel && !agente) add('presentationPanel', T.presentationPanel, 'required');
+  add('avoid', composeAvoidBlock(parts.avoid), 'required', keepWholeLines);
   add('slideAction', parts.slideAction, 'required', (texto, max) => {
     const [cabecalho, ...resto] = texto.split('\n');
     return shrinkBody(`${cabecalho}\n`, resto.join('\n'), '', max);

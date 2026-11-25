@@ -18,6 +18,20 @@ import { isAestheticDirection } from '../../shared/image-prompt.js';
 const SLIDE_DIRECTION_MAX = 1200;
 
 /**
+ * Spec 1.1, entrega 1: o que a imagem do slide não pode mostrar, vindo do
+ * roteiro v2 (rules de imagem que proíbem algo e o avoid da posição). O slide
+ * guarda isso em presentationPlan, então vale também ao regenerar a imagem.
+ * Plano v1 não tem esses campos: lista vazia, pedido igual ao de antes.
+ */
+export function presentationImageAvoid(slide) {
+  const plan = slide?.presentationPlan;
+  if (!plan || typeof plan !== 'object') return [];
+  const lines = [...(Array.isArray(plan.imageRules) ? plan.imageRules : []), plan.avoid]
+    .filter((line) => typeof line === 'string' && line.trim()).map((line) => line.replace(/\s+/g, ' ').trim().slice(0, 240));
+  return [...new Set(lines)].slice(0, 8);
+}
+
+/**
  * Anexos na ordem real de envio, como `resolveImageReferences` os entrega:
  * as referências do card substituem o moodboard do projeto; a âncora de
  * identidade, quando existe, vai por último.
@@ -68,6 +82,7 @@ export function composeImageDirection({
   const cena = composeSceneParts({
     visualBible, slide: card, fmt, excludeEntityIds: anchorPlan?.excludeEntityIds || [], presentationFamily,
   });
+  const avoid = fmt === 'apresentacao' ? presentationImageAvoid(card) : [];
   return {
     format: fmt === 'apresentacao' ? 'presentation' : 'carousel',
     framing: cena.framing,
@@ -82,5 +97,6 @@ export function composeImageDirection({
     // antes da direção escrita para este slide.
     styleBody: [composeImgExtraPrompt(kit, ''), estetica ? composeImgExtraPrompt(null, direcao) : ''].filter(Boolean),
     familyEnglish: cena.familyEnglish,
+    ...(avoid.length ? { avoid } : {}),
   };
 }

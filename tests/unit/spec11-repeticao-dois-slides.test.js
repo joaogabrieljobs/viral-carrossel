@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import * as review from '../../src/utils/editorial-review.js';
-import { PRESENTATION_PLAN_PROMPT_VERSION, PRESENTATION_PLAN_SCHEMA_VERSION } from '../../src/utils/presentation-plan.js';
 
 // Spec 1.1, entrega 3 (QA Ingrid, 24/11): na Apoteose real (10 slides,
 // Cinemático) a mesma frase aparecia em dois slides e a revisão não pegou.
@@ -71,7 +70,8 @@ describe('Spec 1.1 entrega 3: última linha do apoio igual ao título', () => {
 });
 
 describe('Spec 1.1 entrega 3: a Apoteose vai ao reparo de repetição que já existe', () => {
-  const plan = () => ({ ...apoteose.presentationPlan, schemaVersion: PRESENTATION_PLAN_SCHEMA_VERSION, promptVersion: PRESENTATION_PLAN_PROMPT_VERSION });
+  // O roteiro real da Apoteose é v1 (imageBrief); o formato antigo continua aceito.
+  const plan = () => structuredClone(apoteose.presentationPlan);
   const sources = [{ id: 'source-base', text: apoteose.presentationPlan.evidence.map(item => item.quote).join('\n') }];
   const config = () => ({
     count: 10, presetId: 'apresentacao', presentationPath: 'pitch', presentationPlanning: true,

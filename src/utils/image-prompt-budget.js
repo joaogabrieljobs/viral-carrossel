@@ -13,6 +13,7 @@ const USER_BLOCKS = Object.freeze({
   subjects: 'a ficha visual',
   referenceMap: 'o mapa das referências',
   identityAnchor: 'a referência da pessoa',
+  avoid: 'o que a imagem deve evitar',
 });
 
 const lista = (itens) => (itens.length < 2 ? itens.join('') : `${itens.slice(0, -1).join(', ')} e ${itens[itens.length - 1]}`);

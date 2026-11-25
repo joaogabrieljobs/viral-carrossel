@@ -104,6 +104,7 @@ import { propagateBrandTypography } from './src/utils/brand-typography.js';
 import { imageAspectRatioForSlide } from './shared/image-aspect.js';
 import { normalizeVisualBible, visualBibleHasPerson, planPersonAnchor, pickPersonAnchorSlide } from './src/utils/visual-bible.js';
 import { composeImageDirection } from './src/utils/image-direction.js';
+import { presentationPlanEntryImageQuery } from './src/utils/presentation-plan.js';
 import {
   PRESENTATION_VISUAL_PRESETS,
   PRESENTATION_VISUAL_PRESET_CATALOG,
@@ -6121,7 +6122,7 @@ ${jsonShapeLine}`;
           return plan.slides.map((entry, index) => {
             const stage = { ...presentationStageAt(presentationPathId, index, Number(count)), deliveryMode: presentationRoute?.deliveryMode, visualRole: entry.visualRole };
             const limits = getPresentationCompositionOverrides(effectiveVisualPreset, {
-              slide: { ...(draftedSlides[index] || {}), presentationPlan: entry, imageQuery: entry.imageBrief || '' },
+              slide: { ...(draftedSlides[index] || {}), presentationPlan: entry, imageQuery: presentationPlanEntryImageQuery(entry) },
               stage, index, count: Number(count),
             }).presentationTextLimits || {};
             return { title: limits.title, subtitle: limits.subtitle, bodyAfterImage: limits.body };

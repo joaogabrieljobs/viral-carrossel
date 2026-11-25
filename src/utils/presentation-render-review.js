@@ -1,7 +1,7 @@
 import { isGenerationCancelled, throwIfGenerationCancelled } from './generation-control.js';
 import { presentationAIOptions } from './presentation.js';
 import { normalizePresentationBlocks } from './presentation-quality.js';
-import { PRESENTATION_PLAN_PROMPT_VERSION } from './presentation-plan.js';
+import { presentationPlanSchema } from './presentation-plan.js';
 import { parsePresentationPlanResponse } from './presentation-planning.js';
 
 const TEXT_FIELDS = ['title', 'subtitle', 'bodyAfterImage', 'caption'];
@@ -105,7 +105,7 @@ export async function waitForRenderedSlides({
 export async function repairRenderedPresentation({ slides, plan, issues, presentationPath = 'auto', aiOptions = {} } = {}, callAI) {
   const unavailable = () => ({ patches: [], status: 'unavailable' });
   throwIfGenerationCancelled(aiOptions.signal);
-  if (!Array.isArray(slides) || !object(plan) || plan.schemaVersion !== 1 || plan.promptVersion !== PRESENTATION_PLAN_PROMPT_VERSION || !Array.isArray(plan.slides)
+  if (!Array.isArray(slides) || !object(plan) || !presentationPlanSchema(plan) || !Array.isArray(plan.slides)
     || plan.slides.length !== slides.length || typeof callAI !== 'function') return unavailable();
   const selected = new Set();
   for (const issue of Array.isArray(issues) ? issues : []) {
