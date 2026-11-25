@@ -169,7 +169,7 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, back
   // Tratamento de evidência da família (fios, zebra, painel, numeração).
   const key = normalizeFamilyKey(family);
   // Reteste 22/11: números e fios dos blocos seguem o destaque da marca própria.
-  const st = evidenceStyleForBrand(familyEvidenceStyle(key), paletteOverrides?.accent, background);
+  const st = evidenceStyleForBrand(familyEvidenceStyle(key, paletteOverrides), paletteOverrides?.accent, background);
   const panel = st.panel;
   const ruleColor = st.metricRuleColor || accent || ink;
   const headerFont = familyFont(key, st.headerRole === 'display' ? 'display' : st.headerRole === 'label' ? 'label' : 'text');

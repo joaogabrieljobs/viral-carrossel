@@ -96,7 +96,10 @@ export function chromeElements(layout, { frame, tokens = {}, overrides = {}, lan
     } else if (d.t === 'text' || d.t === 'pill') {
       const text = fillChromeTokens(localizeLabelTemplate(d.text, lang), tokens);
       if (text === null || !text.trim()) return;
-      const f = familyFont(family, d.role === 'numeric' ? 'numeric' : d.role === 'display' ? 'display' : d.role === 'text' ? 'text' : 'label');
+      const role = d.role === 'numeric' ? 'numeric' : d.role === 'display' ? 'display' : d.role === 'text' ? 'text' : 'label';
+      // Modo livre: numerais e rótulos com o par de fontes do deck.
+      const f = (layout.fonts && (role === 'numeric' || role === 'display' ? layout.fonts.display : layout.fonts.text))
+        || familyFont(family, role);
       const size = d.size * scale;
       const style = {
         left: pct(d.x), top: pct(d.y), fontFamily: f.css, fontSize: size,

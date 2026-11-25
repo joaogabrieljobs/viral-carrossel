@@ -11,8 +11,8 @@ import { ContentLabelLanguageContext } from '../../utils/content-label-language.
 export default function PresentationArtChrome({ slide, frame, accent, ink, index = 0, total = 1, paletteOverrides = {} }) {
   const lang = React.useContext(ContentLabelLanguageContext);
   if (slide.presentationArtDirectionVersion === 2 && slide.presentationChrome?.chrome) {
-    const { family, format, ground, chrome } = slide.presentationChrome;
-    const elements = chromeElements({ family, format, ground, chrome }, {
+    const { family, format, ground, chrome, fonts } = slide.presentationChrome;
+    const elements = chromeElements({ family, format, ground, chrome, fonts }, {
       frame, tokens: chromeTokensForSlide(slide, { index, total }), overrides: paletteOverrides, lang,
     });
     return <div aria-hidden="true" data-vc-presentation-art={family}>

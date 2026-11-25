@@ -23,7 +23,7 @@ import { useTitleStackingGuard } from './useTitleStackingGuard.js';
 import { titleBottomReservePx } from '../../utils/title-stacking.js';
 import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks, inkIfReadable, accentInkOnSurface } from '../../utils/brand-visuals.js';
 import { displayListMarkers } from '../../utils/list-markers.js';
-import { brandPaletteOverrides, groundInks } from '../../utils/presentation-families.js';
+import { groundInks, slidePaletteOverrides } from '../../utils/presentation-families.js';
 import { resolvePresetChrome, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
 import { localizeFixedLabel } from '../../utils/fixed-labels.js';
 import { ContentLabelLanguageContext } from '../../utils/content-label-language.js';
@@ -1000,7 +1000,7 @@ const ClassicCanvasInner = React.forwardRef(({
     >
       <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
       <PresentationArtChrome slide={slide} frame={f} accent={brand.accent} ink={titleInk} index={num - 1} total={total}
-        paletteOverrides={brandPaletteOverrides(slide.presentationChrome?.family || slide.presentationDesignFamily, brand)} />
+        paletteOverrides={slidePaletteOverrides(slide, slide.presentationChrome?.family || slide.presentationDesignFamily, brand)} />
       <SocialArtChrome slide={slide} brand={brand} frame={f} titleFont={titleFF} bodyFont={bodyFF} index={num - 1} total={total} titleInsetPx={padTitleXp} />
       {!slide.presentationSuppressPhoto && <div
         {...movOu('photo', photoZoneBoxStyle)}
@@ -1272,7 +1272,7 @@ const ClassicCanvasInner = React.forwardRef(({
         fontFamily={bodyAfterFF}
         family={slide.presentationDesignFamily}
         accent={brand.accent}
-        paletteOverrides={brandPaletteOverrides(slide.presentationDesignFamily, brand)}
+        paletteOverrides={slidePaletteOverrides(slide, slide.presentationDesignFamily, brand)}
         numericTypography={slide.presentationNumericTypography}
         forExport={forExport}
         onChange={(blocks) => onInlineTextChange?.('presentationBlocks', blocks)}
@@ -2210,7 +2210,8 @@ const SlideCardInner = React.forwardRef(({
   // Badge "N/M" canto sup direito — ativado por brand.showPageBadge
   // (era hardcoded false; agora opt-in via preset visual Sports Editorial etc).
   const showCultureIdx = !!brand.showPageBadge;
-  const brandAccent = brand.accent || '#000000';
+  // Modo livre: o destaque é o do deck, gravado na página, não o da marca.
+  const brandAccent = (slide.presentationFreeDesign && slide.presentationPaletteOverrides?.accent) || brand.accent || '#000000';
 
   // Página da família com fundo próprio (inverso, acento, superfície): o fundo
   // é pintado pela camada de chrome, não pela marca. A tinta do texto precisa
@@ -2218,7 +2219,7 @@ const SlideCardInner = React.forwardRef(({
   // marinho do fechamento do Executivo).
   const familyGround = slide.presentationArtDirectionVersion === 2 && slide.presentationChrome?.family
     && slide.presentationChrome.ground && slide.presentationChrome.ground !== 'bg'
-    ? groundInks(slide.presentationChrome.family, slide.presentationChrome.ground, brandPaletteOverrides(slide.presentationChrome.family, brand)) : null;
+    ? groundInks(slide.presentationChrome.family, slide.presentationChrome.ground, slidePaletteOverrides(slide, slide.presentationChrome.family, brand)) : null;
   const slideCardBg = familyGround?.bg || resolveSlideBrandBg(brand, slideIdx, slide) || '#fafafc';
   const photoInk = needsLightPhotoText(slide);
   const inkSurface = photoInk ? '#111111' : slideCardBg;
@@ -2228,7 +2229,8 @@ const SlideCardInner = React.forwardRef(({
   // destaque aparece dentro do apoio, que é texto de corpo: 4,5:1, não 3:1.
   if (familyGround && !photoInk) cultureAccentCol = accentInkOnSurface(brandAccent, familyGround.bg, 4.5);
   let displayTitleInk = carouselTitleInk;
-  let displayBodyInk = familyGround ? (slide.textColor || familyGround.muted || carouselBodyInk) : carouselBodyInk;
+  let displayBodyInk = familyGround ? (slide.textColor || familyGround.muted || carouselBodyInk)
+    : (slide.presentationFreeDesign && slide.textColor) || carouselBodyInk;
   if (culturePack || sandwichSkin) {
     displayTitleInk = readableInks.titleInk;
     displayBodyInk = readableInks.bodyInk;

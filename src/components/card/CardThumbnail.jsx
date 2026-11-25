@@ -2,7 +2,7 @@ import React from 'react';
 import { resolveSlideBrandBg } from '../../utils/brand-helpers.js';
 import { sanitizeCustomVisualPresetBrand } from '../../utils/custom-visual-presets.js';
 import { brandForFormatDisplay, slideForFormatDisplay } from '../../utils/format-view.js';
-import { brandPaletteOverrides, groundInks } from '../../utils/presentation-families.js';
+import { groundInks, slidePaletteOverrides } from '../../utils/presentation-families.js';
 import { wcagContrast } from '../../utils/wcag.js';
 import { stripAccentMarkers } from '../../utils/text-spans.js';
 
@@ -33,7 +33,7 @@ export function cardThumbnailModel(slide = {}, brand = {}, index = 0) {
   // fundo é pintado pela camada da família, não pela marca. A miniatura segue
   // o fundo real do slide (MF-09: slide escuro aparecia branco na faixa).
   const chrome = slide?.presentationArtDirectionVersion === 2 ? slide.presentationChrome : null;
-  const familyGround = chrome?.family && chrome.ground && chrome.ground !== 'bg' ? groundInks(chrome.family, chrome.ground, brandPaletteOverrides(chrome.family, effectiveBrand)) : null;
+  const familyGround = chrome?.family && chrome.ground && chrome.ground !== 'bg' ? groundInks(chrome.family, chrome.ground, slidePaletteOverrides(slide, chrome.family, effectiveBrand)) : null;
   const background = familyGround?.bg || resolveSlideBrandBg(effectiveBrand, index, slide) || '#fafafc';
   const savedInk = slide?.titleColor || familyGround?.ink || effectiveBrand?.titleColor || effectiveBrand?.textColor || '#111111';
   const titleColor = photo
