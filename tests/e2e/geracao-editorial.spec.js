@@ -115,7 +115,8 @@ test('card repetido que o reparo não corrige sai do projeto e a tela avisa', as
   await expect(modal).toHaveCount(0, { timeout: 25_000 });
   await expect.poll(async () => (await persistedDoc(page))?.editorialReviewStatus).toBe('needs_attention');
   const doc = await persistedDoc(page);
-  expect(doc.slides.map(slide => slide.title)).toEqual(cards.slice(0, 5).map(([title]) => title));
+  // RT24 (25/11): quando o repetido é o último card, ele é o fecho e fica; sai o anterior.
+  expect(doc.slides.map(slide => slide.title)).toEqual([...cards.slice(0, 4), cards[5]].map(([title]) => title));
   expect(doc.editorialReviewIssues).toContainEqual(expect.objectContaining({ code: 'repeated_cards_removed' }));
   await expect(page.getByText('Um card repetia outro e foi removido. O projeto ficou com menos cards do que o pedido.', { exact: true })).toBeVisible();
   // Rascunho, revisão e um único reparo dirigido.
