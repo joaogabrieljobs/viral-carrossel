@@ -38,6 +38,7 @@ import { headerCenterText, dedupeHeaderColumns } from '../../utils/card-header.j
 import { useElementDrag } from './useElementDrag.js';
 import { textNudgePosition } from '../../utils/text-nudge-position.js';
 import { slideHasPendingPhotoIntent, inferCanvasDefaults, sandwichPhotoZoneImgStyle } from '../../utils/canvas-zones.js';
+import { cardPhotoZoneHasMedia } from '../../utils/card-photo-zone.js';
 import { DEFAULT_SLIDE_TEXT_INSET, SANDWICH_PHOTO_ZONE_MIN_H_PCT, clampRect, DEFAULT_CANVAS_ZONES_CLASSIC, CANVAS_AUTO_EDGE_PCT } from '../../utils/canvas-layout.js';
 
 /**
@@ -1425,6 +1426,8 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
   mov = null,
   fallbackLogo = '',
   presentationMode = false,
+  /** Há foto (ou foto a caminho) para a faixa; sem ela o card é só de texto. */
+  photoZoneHasMedia = true,
 }, ref) => {
   void imgModeNorm;
   const logoFallback = fallbackLogo && fallbackLogo !== brand?.logo ? fallbackLogo : '';
@@ -1656,7 +1659,20 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
   const textColClips = !presentationMode && textColBase.overflow === 'hidden';
 
   let mainColumn = null;
-  if (pr === 'inset_h_top') {
+  if (!photoZoneHasMedia) {
+    // Sem foto, a faixa não guarda espaço: título e apoio formam um bloco só
+    // no centro do card, igual no editor e no arquivo.
+    mainColumn = (
+      <OverflowFlagZone active={textColClips} {...movOu('text', {
+        ...textColBase,
+        justifyContent: 'safe center',
+        padding: `${f.h * 0.04}px ${padH}px`,
+        gap: f.h * 0.014,
+      })}>
+        {bothText}
+      </OverflowFlagZone>
+    );
+  } else if (pr === 'inset_h_top') {
     mainColumn = (
       <>
         {photoBand}
@@ -2128,6 +2144,10 @@ const SlideCardInner = React.forwardRef(({
     || (slide.bgImageId && !slide.bgImageFailed && !hydrateStale)
   );
   const showAiGeneratingOverlay = !!generateImageBusy;
+  // Faixa de foto e texto + foto + texto: sem mídia para a zona, o card é
+  // recomposto como card só de texto (ver card-photo-zone.js).
+  const photoArriving = showPhotoSpinner || showAiGeneratingOverlay;
+  const photoZoneHasMedia = cardPhotoZoneHasMedia(slide, { loadFailed: imgErr, arriving: photoArriving });
 
   const derivedStoredPresentationFilter = slideStoredPresentationCssFilter(slide);
 
@@ -2149,6 +2169,8 @@ const SlideCardInner = React.forwardRef(({
     sandwichSkin &&
     !!bodyAfterCulture &&
     (!!slide.bgImage || slideHasPendingPhotoIntent(slide));
+  const sandwichTextOnly = sandwich
+    && !cardPhotoZoneHasMedia(slide, { loadFailed: imgErr, arriving: photoArriving, video: true });
   const cultureStatFlat =
     sandwichSkin &&
     !slide.bgImage &&
@@ -2639,7 +2661,10 @@ const SlideCardInner = React.forwardRef(({
   const useCultureCanvasZones =
     cvHasZones &&
     (sandwich || cultureStatFlat) &&
-    (cultureVariantForLayout === 'sandwich' || cultureVariantForLayout === 'stat');
+    (cultureVariantForLayout === 'sandwich' || cultureVariantForLayout === 'stat') &&
+    // Sem foto, a zona vazia não vai para o card: vale a variante fluida, só
+    // de texto. Com as molduras abertas para edição, as zonas continuam à vista.
+    !(sandwichTextOnly && cultureVariantForLayout === 'sandwich' && !showCanvasChrome);
 
   if (useCultureCanvasZones) {
     const z = cultureZonesForLayout;
@@ -3048,7 +3073,9 @@ const SlideCardInner = React.forwardRef(({
             // Sempre flex-start: space-between empurrava o primeiro item PRA CIMA quando havia
             // overflow. Agrupado, o scaler reduz e a zona recorta o excesso; separado, filhos
             // deslocados podem atravessar a antiga zona e só a borda do card os limita.
-            justifyContent: 'flex-start',
+            // Sem foto entre os textos, o bloco fica no centro do card (`safe`:
+            // se não couber, volta a começar do topo).
+            justifyContent: sandwichTextOnly ? 'safe center' : 'flex-start',
             ...VC_TEXT_ZONE_STYLE,
             overflow: overflowDosElementosSeparados(
               elementsUnlocked,
@@ -3134,8 +3161,9 @@ const SlideCardInner = React.forwardRef(({
               ) : null}
             </div>
           )}
-          {/* Moldura de convite: só no editor. No arquivo, o texto ocupa o lugar dela. */}
-          {sandwich && !hasRuntimePhoto && !showPhotoSpinner && slideHasPendingPhotoIntent(slide) && !forExport && (
+          {/* Moldura de convite: só no editor e só quando há mídia na zona (vídeo).
+              Sem foto o card é só de texto, igual no editor e no arquivo. */}
+          {sandwich && !sandwichTextOnly && !hasRuntimePhoto && !showPhotoSpinner && slideHasPendingPhotoIntent(slide) && !forExport && (
             <div
               data-vc-photo-zone="1"
               {...movSeparate('photo', {
@@ -3426,6 +3454,7 @@ const SlideCardInner = React.forwardRef(({
         bgPos={bgPos}
         bgScale={bgScale}
         photoRegionId={normalizePhotoRegion(slide)}
+        photoZoneHasMedia={photoZoneHasMedia}
         brandFooterChrome={brandFooterChrome}
         onPhotoZoneClick={onPhotoZoneClick}
         showCanvasChrome={showCanvasChrome}

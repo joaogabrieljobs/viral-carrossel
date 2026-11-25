@@ -19,6 +19,9 @@ async function seedLegacyCultureCard(page) {
           subtitle: 'Primeiro argumento do card.\n\nSegundo argumento do mesmo bloco.',
           bodyAfterImage: 'A criação volta a ser uma conversa com critério.',
           imageQuery: 'cadeira de direção em estúdio',
+          // QA-2411 item 5: sem foto o card é só de texto; a zona de foto (e o
+          // alvo móvel dela) existe quando a foto existe.
+          bgImage: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
           useCultureLayout: true,
           elementOffsets: { text: { x: 4, y: 2 } },
           // Campo ausente simula um card salvo antes da edição individual.

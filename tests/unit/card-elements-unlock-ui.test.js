@@ -84,7 +84,15 @@ describe('desbloqueio individual de elementos do card Cultura', () => {
   });
 
   it('expõe título, subtítulo, foto e texto final como alvos separados após desbloquear', () => {
-    const slide = cultureSandwichSlide({ elementsUnlocked: true });
+    // QA-2411 item 5: sem foto o card é só de texto e não há zona de foto para
+    // mover; o alvo "foto" existe quando a foto existe (aqui, já carregada).
+    const slide = cultureSandwichSlide({ elementsUnlocked: true, bgImage: 'data:image/png;base64,AAAA' });
+    const realUseState = React.useState;
+    let fotoPronta = false;
+    const spy = vi.spyOn(React, 'useState').mockImplementation((inicial) => {
+      if (!fotoPronta && inicial === false) { fotoPronta = true; return [true, () => {}]; }
+      return realUseState(inicial);
+    });
     const html = renderToStaticMarkup(React.createElement(SlideCardInner, {
       slide,
       fmt: 'carrossel',
@@ -95,6 +103,7 @@ describe('desbloqueio individual de elementos do card Cultura', () => {
       movableElements: true,
       onElementOffsetChange: vi.fn(),
     }));
+    spy.mockRestore();
 
     for (const key of ['title', 'subtitle', 'photo', 'bodyAfterImage']) {
       expect(html, `faltou alvo independente para ${key}`)

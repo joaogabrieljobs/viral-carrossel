@@ -73,9 +73,12 @@ describe('GA-02: zonas de texto sem ajuste automático também são medidas', ()
   const render = (slide) => renderToStaticMarkup(React.createElement(SlideCardInner, { slide, brand, fmt: 'carrossel', num: 1, total: 1, forExport: true }));
 
   it('foto em faixa: cada coluna de texto é uma zona medida', () => {
-    expect(render({ ...base(), photoRegion: 'inset_h_top' }).match(/data-vc-fit-zone="column"/g)).toHaveLength(1);
-    expect(render({ ...base(), photoRegion: 'inset_h_bottom' }).match(/data-vc-fit-zone="column"/g)).toHaveLength(1);
-    expect(render({ ...base(), photoRegion: 'inset_h_middle' }).match(/data-vc-fit-zone="column"/g)).toHaveLength(2);
+    const comFoto = { bgImage: 'data:image/png;base64,AAAA' };
+    expect(render({ ...base(), ...comFoto, photoRegion: 'inset_h_top' }).match(/data-vc-fit-zone="column"/g)).toHaveLength(1);
+    expect(render({ ...base(), ...comFoto, photoRegion: 'inset_h_bottom' }).match(/data-vc-fit-zone="column"/g)).toHaveLength(1);
+    expect(render({ ...base(), ...comFoto, photoRegion: 'inset_h_middle' }).match(/data-vc-fit-zone="column"/g)).toHaveLength(2);
+    // QA-2411 item 5: sem foto o card é só de texto, com uma zona medida.
+    expect(render({ ...base(), photoRegion: 'inset_h_middle' }).match(/data-vc-fit-zone="column"/g)).toHaveLength(1);
   });
 
   it('fundo inteiro: a moldura do texto é uma zona medida', () => {
