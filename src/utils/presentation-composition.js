@@ -50,7 +50,14 @@ export function resolvePresentationVisualRole(slide = {}, stage = {}) {
   return planned || text(stage.visualRole) || text(slide.presentationVisualRole) || text(slide.visualRole) || 'content';
 }
 
-export function resolvePresentationCompositionKind({ slide = {}, stage = {}, index = 0, count = 1 } = {}) {
+/**
+ * @param {object} options
+ * @param {object[]} [options.previous] slides já compostos antes deste, na
+ *   ordem do deck (saída de getPresentationCompositionOverrides). Sem eles, a
+ *   escolha é a de sempre.
+ * @param {string} [options.family] família visual; liga o ritmo de layout.
+ */
+export function resolvePresentationCompositionKind({ slide = {}, stage = {}, index = 0, count = 1, previous = null, family = null } = {}) {
   // Bloco nativo (tabela, métricas, etapas) só tem onde ser desenhado na página
   // de dados: é a única composição com zona de evidência. Em capa, conteúdo ou
   // fechamento o bloco ficava sem área, o slide saía com metade vazia e a
@@ -59,12 +66,72 @@ export function resolvePresentationCompositionKind({ slide = {}, stage = {}, ind
   if (index === 0) return 'cover';
   if (index >= count - 1) return 'closing';
   const role = resolvePresentationVisualRole(slide, stage);
-  if (DATA_ROLES.has(role)) return 'data';
-  if (DEMO_ROLES.has(role)) return 'demo';
-  if (DIVIDER_ROLES.has(role) || role === 'cover') return 'divider';
-  if (role === 'closing' || role === 'close') return 'closing';
-  return 'content';
+  const kind = DATA_ROLES.has(role) ? 'data'
+    : DEMO_ROLES.has(role) ? 'demo'
+      : DIVIDER_ROLES.has(role) || role === 'cover' ? 'divider'
+        : role === 'closing' || role === 'close' ? 'closing'
+          : 'content';
+  return family && Array.isArray(previous) ? rhythmKind(kind, slide, family, previous) : kind;
 }
+
+/**
+ * Ritmo de layout (spec 1.1, entrega 2). Na Apoteose (QA 24/11, Cinemático)
+ * seis páginas de conteúdo saíram com a mesma geometria, texto numa coluna de
+ * 30% e foto em 60%, porque cada slide era composto sem olhar as vizinhas.
+ *
+ * Se as duas páginas anteriores têm a geometria que este slide teria, ele
+ * passa para outra função de página que a família já desenha: primeiro a de
+ * demonstração (no Cinemático, foto em tela cheia com scrim; no Editorial e no
+ * Suíço, foto do lado oposto), depois a abertura de seção (página de frase).
+ * Nenhuma geometria nova. A alternativa precisa mudar o que se vê e manter a
+ * foto que o roteiro pediu; se nenhuma serve, fica a composição de sempre.
+ * Ajuste manual de posição feito pela pessoa é respeitado.
+ *
+ * Vale só ao compor (geração e "aplicar estilo"): projeto salvo guarda a
+ * composição no slide e não é recomposto ao abrir.
+ */
+const RHYTHM_ALTERNATIVES = ['demo', 'divider'];
+
+function rhythmKind(kind, slide, family, previous) {
+  const [before, last] = previous.slice(-2);
+  if (!before || !last || manuallyPositioned(slide)) return kind;
+  const own = layoutGeometry(kind, slide, family);
+  if (composedGeometry(before) !== own || composedGeometry(last) !== own) return kind;
+  const visual = hasVisual(slide);
+  return RHYTHM_ALTERNATIVES.find((alt) => {
+    if (alt === kind) return false;
+    const layout = contentAwarePresentationLayout(alt, slide, family);
+    return (!visual || !!layout.photo) && layoutGeometry(alt, slide, family) !== own;
+  }) || kind;
+}
+
+/** O que o olho vê como "mesma página": chão, lado e largura da foto, texto sobre a foto e coluna do texto. */
+function geometryKey({ ground, photo, scrim, title, subtitle }) {
+  const r = value => Math.round(Number(value) || 0);
+  return [ground || 'bg', photo ? `${r(photo.x)}:${r(photo.w)}` : 'sem-foto', photo && scrim ? 'scrim' : '', r(title?.x), r(subtitle?.x)].join('|');
+}
+
+function layoutGeometry(kind, slide, family) {
+  const layout = contentAwarePresentationLayout(kind, slide, family);
+  return geometryKey({ ...layout, photo: hasVisual(slide) ? layout.photo : null, scrim: !!layout.scrim });
+}
+
+function composedGeometry(slide = {}) {
+  const zones = slide.canvas?.zones || {};
+  return geometryKey({
+    ground: slide.presentationGround,
+    photo: slide.presentationSuppressPhoto ? null : zones.photo,
+    scrim: Number(slide.overlay) > 0,
+    title: zones.title,
+    subtitle: zones.subtitle,
+  });
+}
+
+const manuallyPositioned = slide => slide.canvas?.enabled === true
+  || ['title', 'subtitle', 'bodyAfterImage', 'text', 'photo'].some((key) => {
+    const offset = slide.elementOffsets?.[key];
+    return offset && Object.values(offset).some(value => Number(value) !== 0);
+  });
 
 const rect = (x, y, w, h) => ({ x, y, w, h });
 const inactivePhoto = () => rect(96, 94, 1, 1);

@@ -10,6 +10,7 @@ import React from 'react';
 import { isPitchPath, buildPitchFieldRules, pitchCompositionOverrides } from '../utils/pitch-content.js';
 import {
   contentAwarePresentationOverrides,
+  presentationDesignFamily,
   resolvePresentationCompositionKind,
   resolvePresentationVisualRole,
 } from '../utils/presentation-composition.js';
@@ -751,7 +752,8 @@ function normalizeCompositionInput(input, stageArg, indexArg, countArg) {
   const rawCount = isOptions ? objectInput.count : countArg;
   const index = Math.max(0, Math.trunc(Number(rawIndex) || 0));
   const count = Math.max(1, Math.trunc(Number(rawCount) || 1));
-  return { slide, stage, index, count };
+  const previous = isOptions && Array.isArray(objectInput.previous) ? objectInput.previous : null;
+  return { slide, stage, index, count, previous };
 }
 
 function clonePresentationZones(zones) {
@@ -783,13 +785,20 @@ export function getPresentationCompositionOverrides(
 ) {
   const normalizedPresetId = normalizePresentationVisualPreset(presetId);
   const presetDefinition = getPresentationVisualPreset(normalizedPresetId);
-  const { slide, stage, index, count } = normalizeCompositionInput(
+  const { slide, stage, index, count, previous } = normalizeCompositionInput(
     input,
     stageArg,
     indexArg,
     countArg,
   );
-  const kind = resolvePresentationCompositionKind({ slide, stage, index, count });
+  const contentAware = !!(presetDefinition.sourceId || slide.presentationPlan
+    || (Array.isArray(slide.presentationBlocks) && slide.presentationBlocks.length));
+  // Ritmo de layout (spec 1.1): com as composições anteriores, a família
+  // alterna a página que se repetiria pela terceira vez seguida.
+  const rhythmFamily = previous && contentAware && stage?.contentMode !== 'pitch'
+    ? presentationDesignFamily({ presentationPresetId: normalizedPresetId, presentationPatternId: presetDefinition.sourceId })
+    : null;
+  const kind = resolvePresentationCompositionKind({ slide, stage, index, count, previous, family: rhythmFamily });
   const defaults = presetDefinition.presentationDefaults || {};
   const field = kind === 'closing' ? 'closingComposition' : `${kind}Composition`;
   const configuredComposition = defaults[field]
@@ -845,7 +854,7 @@ export function getPresentationCompositionOverrides(
   if (stage?.contentMode === 'pitch') return pitchCompositionOverrides(composition, slide, kind);
   // Os dez presets atuais usam a biblioteca também na edição manual, sem IA.
   // IDs legados continuam no catálogo oculto para leitura de projetos antigos.
-  return presetDefinition.sourceId || slide.presentationPlan || (Array.isArray(slide.presentationBlocks) && slide.presentationBlocks.length)
+  return contentAware
     ? contentAwarePresentationOverrides(composition, slide, kind, { deliveryMode: stage.deliveryMode })
     : composition;
 }

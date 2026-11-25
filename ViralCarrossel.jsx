@@ -5970,12 +5970,17 @@ ${buildGenerationLanguageGuard(cp, effectiveMode)}`;
       ? getPresentationPath(presentationPathId)
       : null;
     const presentationStages = presentationRoute?.stages || [];
+    // Ritmo de layout (spec 1.1): limites, composição e recuperação passam as
+    // composições anteriores, para o texto ser pedido na caixa que o slide terá.
+    const limitsRhythm = [];
     const presentationTextLimits = isPresentationGeneration && !effectiveVisualPresetDef?.isCustom
       ? Array.from({ length: Number(count) }, (_, index) => {
           const stage = presentationStageAt(presentationPathId, index, Number(count));
-          const limits = getPresentationCompositionOverrides(effectiveVisualPreset, {
-            slide: {}, stage, index, count: Number(count),
-          }).presentationTextLimits || {};
+          const composed = getPresentationCompositionOverrides(effectiveVisualPreset, {
+            slide: {}, stage, index, count: Number(count), previous: limitsRhythm,
+          });
+          limitsRhythm.push(composed);
+          const limits = composed.presentationTextLimits || {};
           return {
             title: limits.title,
             subtitle: limits.subtitle,
@@ -6119,12 +6124,15 @@ ${jsonShapeLine}`;
         },
         presentationLimitsForPlan: (plan, draftedSlides = []) => {
           if (effectiveVisualPresetDef?.isCustom) return null;
+          const planRhythm = [];
           return plan.slides.map((entry, index) => {
             const stage = { ...presentationStageAt(presentationPathId, index, Number(count)), deliveryMode: presentationRoute?.deliveryMode, visualRole: entry.visualRole };
-            const limits = getPresentationCompositionOverrides(effectiveVisualPreset, {
+            const composed = getPresentationCompositionOverrides(effectiveVisualPreset, {
               slide: { ...(draftedSlides[index] || {}), presentationPlan: entry, imageQuery: presentationPlanEntryImageQuery(entry) },
-              stage, index, count: Number(count),
-            }).presentationTextLimits || {};
+              stage, index, count: Number(count), previous: planRhythm,
+            });
+            planRhythm.push(composed);
+            const limits = composed.presentationTextLimits || {};
             return { title: limits.title, subtitle: limits.subtitle, bodyAfterImage: limits.body };
           });
         },
@@ -6278,6 +6286,7 @@ ${jsonShapeLine}`;
     const generationVisualBible = isPresentationGeneration
       ? null
       : (remix ? (doc.visualBible || null) : normalizeVisualBible(result.visualBible));
+    const generationRhythm = [];
     let newSlides = remix ? mergeRemixedSlides(sourceSlides, result.slides, fetchImagesNow) : (
       attachGenerationCanvasLayouts(
       result.slides.map((s, i) => {
@@ -6306,8 +6315,10 @@ ${jsonShapeLine}`;
             stage,
             index: i,
             count: nSlides,
+            previous: generationRhythm,
           })
         : {};
+      generationRhythm.push(compositionOverrides);
       // Fallback: capa e encerramento de Cultura/Perso Hybrid SEMPRE devem ter foto
       // (full-bleed). Se a IA omitiu imageQuery, gera uma a partir do título+subtitle
       // em inglês básico — o pipeline DALL·E ainda passa.
@@ -6911,11 +6922,13 @@ ${jsonShapeLine}`;
         const presetOverrides = getSlideOverridesForPreset(snapshot.visualPreset, visualPresets);
         const sourceHosts = collectSourceHosts(current.material?.content, current.material?.sources, current.material?.context, current.styleKit?.contextMd, current.styleKit?.stylePrompt);
         const text = value => restoreSourceHosts(stripLeadingSlideCardLabel(String(value || '').trim()), sourceHosts);
+        const recoveredRhythm = [];
         const recovered = snapshot.draft.slides.map((slide, index) => {
           const stageIndex = totalCount > 1 ? Math.round(index * (route.stages.length - 1) / (totalCount - 1)) : 0;
           const stage = { ...route.stages[stageIndex], deliveryMode: route.deliveryMode,
             visualRole: slide.presentationPlan?.visualRole, purpose: slide.presentationPlan?.purpose };
-          const composition = preset?.isCustom ? {} : getPresentationCompositionOverrides(snapshot.visualPreset, { slide, stage, index, count: totalCount });
+          const composition = preset?.isCustom ? {} : getPresentationCompositionOverrides(snapshot.visualPreset, { slide, stage, index, count: totalCount, previous: recoveredRhythm });
+          recoveredRhythm.push(composition);
           return {
             ...mkSlide(index + 1, identity), ...presetOverrides, ...composition,
             title: text(slide.title), subtitle: text(slide.subtitle), bodyAfterImage: text(slide.bodyAfterImage),

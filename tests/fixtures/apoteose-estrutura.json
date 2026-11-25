@@ -1,0 +1,16 @@
+{
+  "_sobre": "Estrutura do deck Apoteose (10 slides, QA 24/11, spec 1.1). Só o que decide a composição: função e finalidade do roteiro, se há foto, tipo de bloco e o tamanho de cada texto em caracteres. O texto do cliente não fica no repositório; os testes preenchem com palavras neutras do mesmo tamanho.",
+  "familia": "presentation_cinematic",
+  "slides": [
+    { "visualRole": "cover", "purpose": "introduction", "foto": true, "titulo": 55, "apoio": 40, "final": 0 },
+    { "visualRole": "content", "purpose": "context", "foto": true, "titulo": 42, "apoio": 179, "final": 73 },
+    { "visualRole": "content", "purpose": "vision", "foto": true, "titulo": 53, "apoio": 160, "final": 75 },
+    { "visualRole": "content", "purpose": "solution", "foto": true, "titulo": 46, "apoio": 254, "final": 59 },
+    { "visualRole": "content", "purpose": "solution", "foto": true, "titulo": 43, "apoio": 179, "final": 0 },
+    { "visualRole": "content", "purpose": "context", "foto": true, "titulo": 31, "apoio": 124, "final": 0 },
+    { "visualRole": "content", "purpose": "solution", "foto": true, "titulo": 42, "apoio": 149, "final": 0 },
+    { "visualRole": "content", "purpose": "vision", "foto": true, "titulo": 48, "apoio": 57, "final": 0 },
+    { "visualRole": "content", "purpose": "summary", "foto": false, "titulo": 32, "apoio": 156, "final": 0, "bloco": "metrics" },
+    { "visualRole": "closing", "purpose": "decision", "foto": true, "titulo": 45, "apoio": 144, "final": 46 }
+  ]
+}
