@@ -872,6 +872,54 @@ function compactReading({ zones, chrome, slide, titleSize, subSize, display, tex
 }
 
 /**
+ * Cartão atrás do apoio (Modular) com texto curto (conferência da fase 2, kit,
+ * página 7): o cartão da família ocupa até o pé da coluna e o texto curto
+ * deixava a metade de baixo vazia. O corpo cresce até 32 px enquanto couber;
+ * o cartão sobe para logo abaixo do título (largura medida da fonte do deck) e
+ * abraça o texto, com as mesmas margens internas. Nunca passa do cartão da
+ * família nem diminui o texto.
+ */
+function panelReading({ zones, chrome, slide, titleSize, subSize, display, text, kind, leading, titleLeading }) {
+  const t = zones.title;
+  const sub = zones.subtitle;
+  if (!t || !sub || !['content', 'demo'].includes(kind)) return null;
+  const panel = textPanel({ chrome }, sub);
+  if (!panel || textPanel({ chrome }, t) || !(sub.y >= t.y + 1)) return null;
+  const index = chrome.indexOf(panel);
+  const padTop = sub.y - panel.y;
+  const padBottom = panel.y + panel.h - (sub.y + sub.h);
+  const copy = String(slide.subtitle || '').replace(/\*\*/g, '').trim();
+  const tail = String(slide.bodyAfterImage || '').replace(/\*\*/g, '').trim();
+  if (!copy) return null;
+  const widthPx = 1920 * sub.w / 100 - 24;
+  const heightPx = 1080 * sub.h / 100 - 14;
+  const lines = (value, px) => freeTextLines(value, widthPx, px, text.family, 'text');
+  const height = px => lines(copy, px) * px * leading + (tail ? 0.8 * px + lines(tail, px * 0.85) * px * 0.85 * leading : 0);
+  const startPx = subPxOf(subSize);
+  let px = startPx;
+  for (let next = Math.ceil(startPx / 2) * 2; next <= SUPPORT_MAX_PX && height(next) <= heightPx; next += 2) px = Math.max(px, next);
+  // Altura do texto com a folga de leitura da zona (14 px) e 1% de margem.
+  const textH = Math.round(((height(px) + 14) / 1080 * 100 + 1) * 100) / 100;
+  const subH = Math.min(sub.h, textH);
+  const titlePx = titlePxOf(titleSize);
+  const titleLines = freeTextLines(String(slide.title || ''), 1920 * t.w / 100 - 24, titlePx, display.family, 'display',
+    { trackingEm: (display.tracking || 0) / 100, upper: display.case === 'upper' });
+  const breathing = Math.max(20, titlePx * 0.44 + 1080 * 0.012);
+  const needed = Math.round(((titleLines * titlePx * titleLeading + breathing) / 1080) * 10000) / 100 + 0.5;
+  const titleZone = needed < t.h - 1 ? { ...t, h: needed } : t;
+  const cardY = Math.round(Math.min(panel.y, titleZone.y + titleZone.h + STACK_GAP) * 100) / 100;
+  const delta = panel.y - cardY;
+  if (sub.h - subH < 3 && delta < 1 && px === startPx) return null;
+  const card = { ...panel, y: cardY, h: Math.round((padTop + subH + padBottom) * 100) / 100 };
+  return {
+    zone: { ...sub, y: Math.round((sub.y - delta) * 100) / 100, h: subH },
+    titleZone: delta >= 1 ? titleZone : t,
+    subSize: px === startPx ? subSize : rendererSubtitleSizePercent(px),
+    chrome: chrome.map((d, i) => (i === index ? card : d.follow === 'subtitle' ? { ...d, y: Math.round((d.y - delta) * 100) / 100 } : d)),
+  };
+}
+
+/**
  * Compõe a página no modo livre: geometria da família escolhida, fundo e
  * tinta pela paleta do deck, fontes do deck e foto no tamanho decidido.
  */
@@ -926,11 +974,11 @@ export function freePresentationCompositionOverrides(base, {
   const typo = typographyAll[kind] || {};
   const photoZone = composed.presentationSuppressPhoto ? null : zones.photo;
   const familyChrome = composed.presentationChrome?.chrome || [];
-  // Cartão atrás do texto (Modular): o texto fica no cartão; não recompõe.
-  const reading = !onPhoto && !hasBlocks(layoutSlide) && !hasTextPanel(layout)
-    ? compactReading({ zones, chrome: familyChrome, slide: layoutSlide, titleSize, subSize: composed.subSize, display, text, kind,
-      leading: (composed.subLeading || 150) / 100, titleLeading: familySpec(family).type.titleLeading || 1.05 })
-    : null;
+  // Cartão atrás do texto (Modular): o texto fica no cartão, que abraça o texto.
+  const readingInput = { zones, chrome: familyChrome, slide: layoutSlide, titleSize, subSize: composed.subSize, display, text, kind,
+    leading: (composed.subLeading || 150) / 100, titleLeading: familySpec(family).type.titleLeading || 1.05 };
+  const reading = onPhoto || hasBlocks(layoutSlide) ? null
+    : hasTextPanel(layout) ? panelReading(readingInput) : compactReading(readingInput);
   const subSize = reading ? reading.subSize : composed.subSize;
   const chrome = freeChromeDevices(reading ? reading.chrome : familyChrome, { family, ground: chromeGround, palette, photoZone });
   return {

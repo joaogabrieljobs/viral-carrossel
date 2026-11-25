@@ -296,3 +296,49 @@ describe('fase 3, defeitos da fase 2: vão entre título e apoio (deck padrão, 
     expect(subtitle.y - (title.y + title.h)).toBeLessThanOrEqual(4);
   });
 });
+
+describe('fase 3, defeitos da fase 2: cartão do Modular com texto curto (kit, página 7)', async () => {
+  const { applyPresentationVisualPresetToDoc } = await import('../../src/utils/presentation-state.js');
+  const { freeTextLines } = await import('../../src/utils/free-design.js');
+  const KIT_ESCURO = { contextMd: 'Fundo: #0D1B2A\nDestaque: #E0A458\nTítulo: #F4F1DE' };
+  const MODULAR = { family: 'modular', ground: 'bg', photo: 'half', block: 'none', emphasis: [], icons: [] };
+  const pagina = (subtitle, body = '') => {
+    const slides = Array.from({ length: 6 }, (_, i) => ({
+      id: `m${i}`, title: i === 3 ? 'Festa cidade ritmo encontro noite cultura' : `Título da página ${i + 1}`,
+      subtitle: i === 3 ? subtitle : 'Apoio da página com algumas palavras.', bodyAfterImage: i === 3 ? body : '',
+      bgImage: 'data:image/png;base64,iVBORw0KGgo=', imageQuery: 'editorial photo',
+      presentationPlan: { schemaVersion: 3, visualRole: i === 0 ? 'cover' : i === 5 ? 'closing' : 'content', purpose: 'context', ...(i === 3 ? { design: MODULAR } : {}) },
+    }));
+    const doc = applyPresentationVisualPresetToDoc({ presentationPath: 'auto', brand: {}, slides, styleKit: KIT_ESCURO }, FREE_PRESENTATION_PRESET_ID);
+    return doc.slides[3];
+  };
+  const cartao = s => s.presentationChrome.chrome.find(d => d.t === 'block' && d.y <= s.canvas.zones.subtitle.y && d.y + d.h >= s.canvas.zones.subtitle.y + s.canvas.zones.subtitle.h);
+  const textoPct = (s) => {
+    const px = s.subSize * 1920 * 0.028 / 100;
+    const lines = freeTextLines(s.subtitle, 1920 * s.canvas.zones.subtitle.w / 100 - 24, px, s.presentationDeckDesign.fonts.text, 'text');
+    return lines * px * ((s.subLeading || 150) / 100) / 1080 * 100;
+  };
+
+  it('o cartão abraça o texto: sem metade vazia embaixo, com a mesma margem interna', () => {
+    const s = pagina('Festa cidade ritmo encontro noite cultura festa cidade ritmo encontro noite cultura festa cidade ritmo encontro noite cultura festa cidade ritmo enco');
+    expect(s.presentationFreeDesign.family).toBe('modular');
+    const card = cartao(s);
+    const sub = s.canvas.zones.subtitle;
+    expect(card).toBeTruthy();
+    expect(textoPct(s)).toBeLessThanOrEqual(sub.h + 0.5);
+    const vazioEmbaixo = (card.y + card.h) - (sub.y + textoPct(s));
+    const margemCima = sub.y - card.y;
+    expect(vazioEmbaixo).toBeLessThanOrEqual(margemCima + 4);
+    expect(card.h).toBeLessThan(40);
+  });
+
+  it('texto mais longo: o cartão cresce com o texto, sem passar do fim da coluna', () => {
+    for (const n of [260, 340, 520]) {
+      const s = pagina(palavrasLongas(n));
+      const card = cartao(s);
+      expect(textoPct(s), `${n} caracteres`).toBeLessThanOrEqual(s.canvas.zones.subtitle.h + 0.5);
+      if (card) expect(card.y + card.h, `${n} caracteres`).toBeLessThanOrEqual(92.5);
+    }
+  });
+});
+function palavrasLongas(n) { const base = 'festa cidade ritmo encontro noite cultura'; let out = ''; while (out.length < n) out += (out ? ' ' : '') + base; return out.slice(0, n).trim(); }
