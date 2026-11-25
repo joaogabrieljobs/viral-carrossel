@@ -351,7 +351,7 @@ function ProjectStyleKitPanel({
         </div>
         {isPresentation && refs.length ? (
           <p style={{ fontSize: 11, lineHeight: 1.5, color: 'var(--text-muted)', margin: '8px 0 0' }}>
-            Na apresentação, estas imagens guiam só a foto da capa e a do fecho. Nos outros slides, a foto segue o estilo escrito acima e a cena de cada slide, para não repetir a mesma imagem.
+            Na apresentação, estas imagens guiam o visual de todas as fotos (paleta, luz e textura); a cena de cada slide é nova, sem repetir as pessoas, os objetos nem a composição da referência.
           </p>
         ) : null}
       </Fold>
