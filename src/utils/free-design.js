@@ -20,7 +20,7 @@ import {
 } from './presentation-families.js';
 import {
   contentAwarePresentationLayout, contentAwarePresentationOverrides, fittedTitleSize, hasBlocks,
-  hasVisual, resolvePresentationCompositionKind,
+  hasVisual, photoSizeOfLayout, resolvePresentationCompositionKind,
 } from './presentation-composition.js';
 import { pitchCompositionOverrides } from './pitch-content.js';
 import { titleTrackingBase } from './title-tracking.js';
@@ -331,14 +331,7 @@ export function normalizeSlideDesign(raw, slide = {}) {
 /* ------------------------------------------------------------------------ */
 
 const PHOTO_RANK = { none: 0, small: 1, half: 2, full: 3 };
-/** Tamanho da foto que a página desenha (área da moldura no slide). */
-export function photoSizeOfLayout(layout) {
-  const p = layout?.photo;
-  if (!p) return 'none';
-  const area = (p.w * p.h) / 100;
-  if (layout.scrim || layout.inkOnPhoto || area > 75) return 'full';
-  return area <= 20 ? 'small' : 'half';
-}
+export { photoSizeOfLayout };
 const textOnPhoto = layout => !!(layout?.photo && (layout.scrim || layout.inkOnPhoto));
 const withoutVisual = slide => ({ ...slide, bgImage: '', bgImageId: null, bgImageAssetId: null, imageQuery: '' });
 const r = value => Math.round(Number(value) || 0);

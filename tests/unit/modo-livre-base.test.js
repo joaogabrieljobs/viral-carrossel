@@ -29,6 +29,7 @@ import {
 } from '../../src/utils/free-design.js';
 import { FAMILY_KEYS, brandPaletteOverrides, familyEvidenceStyle, slidePaletteOverrides } from '../../src/utils/presentation-families.js';
 import { chromeElements } from '../../src/utils/presentation-chrome.js';
+import { restorePresentationPhotoComposition } from '../../src/utils/presentation-composition.js';
 import { PRESENTATION_LIBRARY_FONTS } from '../../src/utils/presentation-font-manifest.js';
 import { wcagContrast } from '../../src/utils/wcag.js';
 import { ensureDocShape } from '../../src/utils/doc-schema.js';
@@ -296,5 +297,24 @@ describe('modo livre, fase 1: renderização por slide', () => {
     const p = livre()[8].presentationPaletteOverrides;
     expect(familyEvidenceStyle('editorial', p)).toMatchObject({ ink: p.ink, muted: p.muted, ruleColor: p.rule });
     expect(familyEvidenceStyle('editorial', { accent: '#B4235A', inverse: '#101010' })).toEqual(familyEvidenceStyle('editorial'));
+  });
+});
+
+describe('modo livre, fase 1: foto importada numa página sem foto', () => {
+  it('a página ganha a foto e mantém fundo, paleta, fontes e leitura do deck', () => {
+    const semFoto = deck().map(({ bgImage, imageQuery, ...slide }, i) => (i === 3 ? slide : { ...slide, bgImage: FOTO, imageQuery: 'editorial photo' }));
+    const slides = livre(semFoto);
+    const antes = slides[3];
+    expect(antes.presentationFreeDesign.photo).toBe('none');
+    expect(antes.presentationSuppressPhoto).toBe(true);
+    const depois = restorePresentationPhotoComposition({ ...antes, bgImage: FOTO });
+    expect(depois.presentationSuppressPhoto).toBe(false);
+    expect(depois.presentationFreeDesign.photo).not.toBe('none');
+    expect(depois.presentationFreeDesign.family).toBe(antes.presentationFreeDesign.family);
+    expect(depois.presentationChrome.fonts).toEqual(antes.presentationChrome.fonts);
+    expect(depois.customBg).toBe(antes.customBg);
+    const fundo = depois.presentationFreeDesign.ground === 'photo' ? '#111111' : depois.customBg;
+    for (const cor of [depois.titleColor, depois.subtitleColor, depois.textColor]) expect(wcagContrast(cor, fundo)).toBeGreaterThanOrEqual(4.5);
+    expect(depois.presentationChrome.ground).toBe(depois.presentationGround);
   });
 });

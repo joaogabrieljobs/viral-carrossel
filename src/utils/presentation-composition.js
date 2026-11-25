@@ -469,13 +469,14 @@ export function restorePresentationPhotoComposition(slide) {
   const typography = previousTypography[kind] || {};
   const titleSize = fittedTitleSize(typography.title?.sizePercent || slide.titleSize || 44, slide.title, zones.title, typography.title?.fontFamily);
   const imagePosition = layout.photo && layout.photo.x + layout.photo.w / 2 < 50 ? 'left-evidence' : 'right-evidence';
+  const free = slide.presentationFreeDesign ? restoredFreeFields(slide, layout) : null;
   return {
     ...slide,
-    ...(slide.presentationArtDirectionVersion === 2 ? {
+    ...(free ? free : slide.presentationArtDirectionVersion === 2 ? {
       presentationChrome: familyPresentationFields(layout).presentationChrome,
       presentationGround: layout.ground,
     } : {}),
-    ...(slide.presentationArtDirectionVersion === 2 ? restoredSurfaceFields(slide, kind, presentationDesignFamily(slide), layout) : {}),
+    ...(!free && slide.presentationArtDirectionVersion === 2 ? restoredSurfaceFields(slide, kind, presentationDesignFamily(slide), layout) : {}),
     presentationSuppressPhoto: false,
     align: 'left',
     layout: 'tl',
@@ -490,6 +491,34 @@ export function restorePresentationPhotoComposition(slide) {
   };
 }
 const rolesForRestoredPhoto = new Set(['cover', 'content', 'divider', 'data', 'demo', 'closing']);
+
+/** Tamanho da foto que a página desenha (área da moldura no slide), no vocabulário do modo livre. */
+export function photoSizeOfLayout(layout) {
+  const p = layout?.photo;
+  if (!p) return 'none';
+  const area = (p.w * p.h) / 100;
+  if (layout.scrim || layout.inkOnPhoto || area > 75) return 'full';
+  return area <= 20 ? 'small' : 'half';
+}
+
+/**
+ * Modo livre: a foto entra na geometria da mesma família e o fundo, a paleta
+ * e as fontes do deck ficam. Se a página passa a ter texto sobre a foto, a
+ * tinta vira a clara do deck (lida sobre o véu escuro).
+ */
+function restoredFreeFields(slide, layout) {
+  const onPhoto = !!(layout.photo && (layout.scrim || layout.inkOnPhoto));
+  const palette = slide.presentationPaletteOverrides || {};
+  const lightInk = [palette.inverseInk, palette.bg, '#FFFFFF'].find(c => c && wcagContrast(c, '#111111') >= 4.5) || '#FFFFFF';
+  const ground = onPhoto ? 'photo' : slide.presentationFreeDesign.ground;
+  const chromeGround = onPhoto ? layout.ground : slide.presentationGround;
+  return {
+    presentationFreeDesign: { ...slide.presentationFreeDesign, photo: photoSizeOfLayout(layout), ground },
+    presentationGround: chromeGround,
+    presentationChrome: { ...familyPresentationFields(layout).presentationChrome, ground: chromeGround, fonts: slide.presentationChrome?.fonts },
+    ...(onPhoto ? { titleColor: lightInk, subtitleColor: lightInk, textColor: lightInk, customBg: palette.inverse || slide.customBg } : {}),
+  };
+}
 
 /** Gera a foto na proporção mais próxima da moldura; cover mantém escala uniforme. */
 export function presentationPhotoAspectRatio(slide) {
