@@ -68,3 +68,94 @@ export function validateImageAuditResponse(raw, { slides = [], rules = [] } = {}
   }
   return out;
 }
+
+// ─── Mosaico ────────────────────────────────────────────────────────────────
+// Um JPEG só, em baixa resolução, montado no navegador com as imagens que o
+// laço acabou de gerar (data URL em memória). Nada é baixado de novo: URL
+// http(s) ou blob fica de fora. O teto de caracteres mantém o pedido abaixo de
+// PLATFORM_MAX_PROMPT_CHARS (120 mil) com folga para o texto.
+export const IMAGE_AUDIT_MOSAIC_MAX_CHARS = 90_000;
+const MOSAIC_WIDTHS = [1024, 768, 512];
+const MOSAIC_QUALITIES = [0.6, 0.45, 0.3];
+
+export function imageAuditMosaicLayout(count, { maxWidth = 1024 } = {}) {
+  const total = Math.max(0, Math.floor(Number(count) || 0));
+  const columns = total <= 1 ? 1 : total <= 4 ? 2 : total <= 9 ? 3 : 4;
+  const cellWidth = Math.floor(maxWidth / columns);
+  const cellHeight = Math.round(cellWidth * 9 / 16);
+  const rows = Math.max(1, Math.ceil(total / columns));
+  return { columns, rows, cellWidth, cellHeight, width: cellWidth * columns, height: cellHeight * rows };
+}
+
+const inMemoryImage = (value) => typeof value === 'string' && /^data:image\/[a-z0-9.+-]+;base64,/i.test(value);
+
+function browserCanvas(width, height) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  return canvas;
+}
+
+function browserImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('image_decode_failed'));
+    img.src = src;
+  });
+}
+
+function drawMosaic(loaded, layout, createCanvas) {
+  const canvas = createCanvas(layout.width, layout.height);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, layout.width, layout.height);
+  const labelSize = Math.max(14, Math.round(layout.cellHeight * 0.16));
+  loaded.forEach(({ img, slideIndex }, position) => {
+    const dx = (position % layout.columns) * layout.cellWidth;
+    const dy = Math.floor(position / layout.columns) * layout.cellHeight;
+    const iw = Number(img.naturalWidth || img.width) || layout.cellWidth;
+    const ih = Number(img.naturalHeight || img.height) || layout.cellHeight;
+    // Cobre a célula sem distorcer: recorta o excesso do centro.
+    const scale = Math.max(layout.cellWidth / iw, layout.cellHeight / ih);
+    const sw = layout.cellWidth / scale;
+    const sh = layout.cellHeight / scale;
+    ctx.drawImage(img, (iw - sw) / 2, (ih - sh) / 2, sw, sh, dx, dy, layout.cellWidth, layout.cellHeight);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(dx, dy, labelSize * 1.8, labelSize * 1.4);
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${labelSize}px sans-serif`;
+    ctx.textBaseline = 'top';
+    ctx.fillText(String(slideIndex + 1), dx + labelSize * 0.3, dy + labelSize * 0.2);
+  });
+  return canvas;
+}
+
+/**
+ * `entries`: [{ slideId, slideIndex, dataUrl }]. Devolve
+ * { dataUrl, width, height, slides } ou null quando não há imagem em memória
+ * ou o mosaico não cabe no teto mesmo reduzido.
+ */
+export async function buildImageAuditMosaic(entries, { createCanvas = browserCanvas, loadImage = browserImage } = {}) {
+  const candidates = (Array.isArray(entries) ? entries : [])
+    .filter(entry => entry?.slideId && Number.isInteger(entry.slideIndex) && inMemoryImage(entry.dataUrl));
+  const loaded = [];
+  for (const entry of candidates) {
+    try {
+      loaded.push({ img: await loadImage(entry.dataUrl), slideId: entry.slideId, slideIndex: entry.slideIndex });
+    } catch { /* imagem que não decodifica fica de fora */ }
+  }
+  if (!loaded.length) return null;
+  for (const maxWidth of MOSAIC_WIDTHS) {
+    const layout = imageAuditMosaicLayout(loaded.length, { maxWidth });
+    const canvas = drawMosaic(loaded, layout, createCanvas);
+    for (const quality of MOSAIC_QUALITIES) {
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/jpeg') && dataUrl.length <= IMAGE_AUDIT_MOSAIC_MAX_CHARS) {
+        return { dataUrl, width: layout.width, height: layout.height,
+          slides: loaded.map(({ slideId, slideIndex }) => ({ slideId, slideIndex })) };
+      }
+    }
+  }
+  return null;
+}
