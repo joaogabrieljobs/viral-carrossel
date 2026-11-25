@@ -71,6 +71,9 @@ function ReviewNotice({ status, issues = [], isPresentation = false, onReviewed 
   const total = Number(incomplete?.totalCount);
   const hasIncompleteCount = incomplete && Number.isInteger(completed) && Number.isInteger(total) && total > completed;
   const interruptionMessage = incomplete ? presentationInterruptionMessage(incomplete.interruptionReason) : '';
+  // QA 24/11 (texto 3): a pessoa pediu N cards e recebeu menos. Isso não pode
+  // ficar só dentro de "O que conferir", que nasce fechado.
+  const cardsRemoved = items.some(issue => issue.code === 'repeated_cards_removed');
   const pages = [...new Set(items.filter(issue => Number.isInteger(issue.slideIndex) && issue.slideIndex >= 0)
     .map(issue => issue.slideIndex + 1))].sort((a, b) => a - b);
   const locations = [
@@ -83,6 +86,7 @@ function ReviewNotice({ status, issues = [], isPresentation = false, onReviewed 
       ? `${completed} de ${total} slides preservados. A geração parou antes de escrever os ${total - completed} restantes.`
       : 'Os slides concluídos foram preservados, mas a geração parou antes de completar a apresentação.'} Complete a sequência antes de exportar.</p>}
     {interruptionMessage && <p>{interruptionMessage}</p>}
+    {cardsRemoved && <p>Um card repetia outro e foi removido. O projeto ficou com menos cards do que o pedido.</p>}
     <p>{incomplete
       ? 'Confira as informações, os títulos e o tamanho dos textos dos slides disponíveis. A sequência ainda precisa ser completada.'
       : status === 'unavailable'

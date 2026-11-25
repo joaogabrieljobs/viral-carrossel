@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import * as review from '../../src/utils/editorial-review.js';
 import { PRESENTATION_PLAN_PROMPT_VERSION } from '../../src/utils/presentation-plan.js';
+import EditorialReviewNotice from '../../src/components/EditorialReviewNotice.jsx';
 
 const { generateReviewedCarousel, buildEditorialReviewPrompt } = review;
 
@@ -217,5 +220,87 @@ describe('QA 24/11 texto 3: apresentação repara slide e bloco de passos repeti
     expect(output.result.slides[1].presentationBlocks).toEqual(steps());
     expect(output.result.slides[3].presentationBlocks).toEqual([]);
     expect(review.repeatedStepBlockSlides(output.result.slides)).toEqual([]);
+  });
+});
+
+// Integração das cinco frentes (24/11): 13 testes de navegador quebraram. Os
+// fixtures usam cards que só mudam um contador ("Projeto novo 1" / "Projeto
+// novo 2"), e a regra de paráfrase os tirava do projeto. A regra não sabe
+// distinguir contador de dado: "Plano de 3 meses" e "Plano de 12 meses" são
+// ofertas diferentes. Paráfrase repete os mesmos fatos, então número que só
+// existe de um lado e número que só existe do outro desfazem a repetição. Nos
+// 85 textos reais, nenhum dos 19 pares marcados tem números em conflito.
+describe('QA 24/11 texto 3: números diferentes não são paráfrase', () => {
+  it('cards iguais que só mudam o número são conteúdo diferente', () => {
+    const plans = [
+      card('Plano de 3 meses', 'Acesso completo à plataforma e suporte por e-mail.'),
+      card('Plano de 12 meses', 'Acesso completo à plataforma e suporte por e-mail.'),
+    ];
+    expect(review.slideSimilarity(plans[0], plans[1])).toBe(0);
+    expect(review.repeatedContentSlides(plans)).toEqual([]);
+    const fixture = [1, 2].map(n => card(`Projeto novo ${n}`, `Orientação concreta ${n} para organizar o trabalho.`));
+    expect(review.repeatedContentSlides(fixture)).toEqual([]);
+  });
+
+  it('com os mesmos números, ou com o número escrito por extenso de um lado só, continua paráfrase', () => {
+    const same = [
+      card('Fermentação de 36 horas', 'O pão da Fermento Lento passa por fermentação natural.'),
+      card('36 horas de fermentação', 'A fermentação natural do pão da Fermento Lento.'),
+    ];
+    expect(review.repeatedContentSlides(same).map(item => [item.slideIndex, item.duplicateOf])).toEqual([[1, 0]]);
+    const spelled = [
+      card('Encomende pelo WhatsApp', 'A Fermento Lento recebe encomendas com 1 dia de antecedência.'),
+      card('Encomende pelo WhatsApp', 'A Fermento Lento recebe encomendas com um dia de antecedência.'),
+    ];
+    expect(review.repeatedContentSlides(spelled).map(item => [item.slideIndex, item.duplicateOf])).toEqual([[1, 0]]);
+  });
+
+  it('a geração com cards numerados não gasta reparo nem perde card', async () => {
+    const draft = { caption: 'Legenda.', slides: [1, 2, 3].map(n => card(`Projeto novo ${n}`, `Orientação concreta ${n} para organizar o trabalho.`)) };
+    const ai = vi.fn().mockResolvedValueOnce(draft).mockResolvedValueOnce({ edits: [] });
+    const output = await generateReviewedCarousel({ prompt: 'Material.', config: { count: 3, presetId: 'livre', densityId: '1_1', factualSource: 'Projeto novo. Orientação concreta para organizar o trabalho.' } }, ai);
+    expect(ai).toHaveBeenCalledTimes(2);
+    expect(output.result.slides).toHaveLength(3);
+    expect(output.reviewStatus).toBe('unchanged');
+  });
+});
+
+describe('QA 24/11 texto 3: o reparo de repetição é uma tentativa só', () => {
+  const source = 'Padaria Fermento Lento, no Rio Vermelho. Pão de fermentação natural de 36 horas. Três pães: camponês, integral e brioche. Encomenda pelo WhatsApp com 1 dia de antecedência.';
+  const draft = () => ({ caption: 'Legenda.', slides: [
+    card('Fermento Lento, no Rio Vermelho', 'Pão de fermentação natural de 36 horas.'),
+    card('Três pães para escolher', 'Camponês, integral e brioche.'),
+    card('Encomende pelo WhatsApp', 'A Fermento Lento recebe encomendas com 1 dia de antecedência.'),
+    card('Um dia antes', 'Encomendas na Fermento Lento pelo WhatsApp, com 1 dia de antecedência.'),
+  ] });
+  it('carrossel: reparo que responde sem corrigir não é repetido; o card sai', async () => {
+    const ai = vi.fn().mockResolvedValueOnce(draft()).mockResolvedValue({ edits: [] });
+    const output = await generateReviewedCarousel({ prompt: 'Material.', config: { count: 4, presetId: 'livre', densityId: '1_1', factualSource: source } }, ai);
+    // Rascunho, revisão e um reparo dirigido: três pedidos, nunca um quarto.
+    expect(ai).toHaveBeenCalledTimes(3);
+    expect(output.result.slides).toHaveLength(3);
+  });
+});
+
+describe('QA 24/11 texto 3: refinar não passa a ser recusado por paráfrase', () => {
+  it('o refinamento em lote com cards parecidos é aceito como antes', () => {
+    const previous = { slides: [card('Site por US$ 797', 'Você só paga quando gosta.'), card('Logo novo incluso', 'Nesta semana o logo entra junto.')] };
+    const refined = { slides: [
+      card('Pague quando gostar do site', 'O site custa US$ 797 e você só paga quando gosta.'),
+      card('Só pague se gostar', 'Você só paga o site de US$ 797 quando gosta.'),
+    ] };
+    const config = { count: 2, presetId: 'livre', densityId: '1_1', factualSource: 'O site custa US$ 797. Você só paga quando gosta. Nesta semana o logo entra junto.' };
+    expect(review.repeatedContentSlides(refined.slides)).toHaveLength(1);
+    expect(() => review.assertSocialRefinement(previous, refined, config)).not.toThrow();
+  });
+});
+
+describe('QA 24/11 texto 3: card removido é avisado na tela sem abrir a lista', () => {
+  it('o aviso de revisão diz, fora do "O que conferir", que o projeto ficou com menos cards', () => {
+    const html = renderToStaticMarkup(React.createElement(EditorialReviewNotice, {
+      status: 'needs_attention', issues: [{ kind: 'normalization', slideIndex: null, code: 'repeated_cards_removed' }],
+    }));
+    const outsideDetails = html.replace(/<details>.*<\/details>/s, '');
+    expect(outsideDetails).toContain('Um card repetia outro e foi removido. O projeto ficou com menos cards do que o pedido.');
   });
 });

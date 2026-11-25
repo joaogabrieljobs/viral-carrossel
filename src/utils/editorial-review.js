@@ -494,7 +494,13 @@ const MIN_CONTENT_STEMS = 4;
 const contentStems = text => new Set((plainWords(text).match(/[a-z0-9]+/g) || [])
   .filter(word => (word.length > 2 || /\d/.test(word)) && !PHRASE_STOP.has(word)).map(word => word.slice(0, 6)));
 const visibleText = slide => [...['title', 'subtitle', 'bodyAfterImage'].map(field => String(slide?.[field] || '')), blockText(slide?.presentationBlocks)].join(' ');
-const stemOverlap = (a, b, minimum = MIN_CONTENT_STEMS) => (Math.min(a.size, b.size) < minimum ? 0
+// Integração de 24/11: a regra tirava do projeto cards que só mudavam o
+// número. Ela não distingue contador de dado ("Plano de 3 meses" e "Plano de
+// 12 meses" são ofertas diferentes), e paráfrase repete os mesmos fatos.
+// Número só de um lado e número só do outro: não é repetição. "1 dia" de um
+// lado e "um dia" do outro continua sendo (só um lado tem número a mais).
+const numbersConflict = (a, b) => [...a].some(stem => /\d/.test(stem) && !b.has(stem)) && [...b].some(stem => /\d/.test(stem) && !a.has(stem));
+const stemOverlap = (a, b, minimum = MIN_CONTENT_STEMS) => (Math.min(a.size, b.size) < minimum || numbersConflict(a, b) ? 0
   : [...a].filter(stem => b.has(stem)).length / Math.max(a.size, b.size));
 
 export function slideSimilarity(a, b) {
@@ -737,9 +743,11 @@ export function assertSocialRefinement(previous, candidate, config) {
   if (candidate.slides.length !== previous.slides.length) throw new Error('O refinamento mudou a quantidade de cards. Mantive o conteúdo anterior.');
   const key = issue => JSON.stringify([issue.slideIndex, issue.field, issue.category, issue.claim]);
   const priorFacts = new Set(auditDraftFactuality(previous, config).map(key));
-  const priorRepeats = new Set(repeatedContentSlides(previous.slides).map(item => item.slideIndex));
+  // Paráfrase entre cards é assunto da geração (reparo e aviso próprios). No
+  // refinamento ela não recusa o texto: a mensagem abaixo fala de título e
+  // tamanho, e recusar por outro motivo deixaria a pessoa sem saber o que mudar.
   const issues = auditSocialDraft(candidate, config).filter(issue => (issue.kind !== 'factual' || !priorFacts.has(key(issue)))
-    && (issue.kind !== 'repeated_content' || !priorRepeats.has(issue.slideIndex)));
+    && issue.kind !== 'repeated_content');
   if (issues.length) {
     throw Object.assign(new Error(issues.some(issue => issue.kind === 'factual')
       ? 'O refinamento acrescentou informações sem apoio no briefing. Mantive o texto anterior; inclua os dados corretos no material e tente novamente.'
