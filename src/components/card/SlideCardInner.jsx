@@ -1276,6 +1276,7 @@ const ClassicCanvasInner = React.forwardRef(({
         accent={brand.accent}
         paletteOverrides={slidePaletteOverrides(slide, slide.presentationDesignFamily, brand)}
         numericTypography={slide.presentationNumericTypography}
+        anchor={slide.presentationBlockAnchor}
         forExport={forExport}
         onChange={(blocks) => onInlineTextChange?.('presentationBlocks', blocks)}
       />}

@@ -319,17 +319,21 @@ describe('fase 3, defeitos da fase 2: cartão do Modular com texto curto (kit, p
     return lines * px * ((s.subLeading || 150) / 100) / 1080 * 100;
   };
 
-  it('o cartão abraça o texto: sem metade vazia embaixo, com a mesma margem interna', () => {
+  // Revisão da folha livre-f3: o cartão que abraçava o texto terminava no meio
+  // da foto. Com foto ao lado, o cartão fica da altura da foto e leva título e
+  // apoio no meio dele, como na demonstração do Modular.
+  it('com foto ao lado: cartão da altura da foto, com título e apoio no meio', () => {
     const s = pagina('Festa cidade ritmo encontro noite cultura festa cidade ritmo encontro noite cultura festa cidade ritmo encontro noite cultura festa cidade ritmo enco');
     expect(s.presentationFreeDesign.family).toBe('modular');
-    const card = cartao(s);
-    const sub = s.canvas.zones.subtitle;
+    const { title, subtitle: sub, photo: foto } = s.canvas.zones;
+    const card = s.presentationChrome.chrome.find(d => d.t === 'block' && d.y <= title.y && d.y + d.h >= sub.y + sub.h);
     expect(card).toBeTruthy();
     expect(textoPct(s)).toBeLessThanOrEqual(sub.h + 0.5);
-    const vazioEmbaixo = (card.y + card.h) - (sub.y + textoPct(s));
-    const margemCima = sub.y - card.y;
-    expect(vazioEmbaixo).toBeLessThanOrEqual(margemCima + 4);
-    expect(card.h).toBeLessThan(40);
+    expect(Math.abs(card.y - foto.y)).toBeLessThanOrEqual(0.5);
+    expect(Math.abs((card.y + card.h) - (foto.y + foto.h))).toBeLessThanOrEqual(0.5);
+    const acima = title.y - card.y;
+    const abaixo = (card.y + card.h) - (sub.y + textoPct(s));
+    expect(Math.abs(acima - abaixo), `acima ${acima} abaixo ${abaixo}`).toBeLessThanOrEqual(6);
   });
 
   it('título e apoio no mesmo cartão (demonstração, v3 página 5): o conteúdo fica no meio do cartão', () => {

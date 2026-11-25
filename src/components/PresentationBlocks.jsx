@@ -180,14 +180,36 @@ export function quoteTextFit({ text, author, widthPx, heightPx, unit, fontFamily
   return { fontSize: 40 * unit, lines: wrappedLines(text, widthPx, 40 * unit, fontFamily, weight) };
 }
 
-/** Número grande (fase 3): enche a largura da zona numa linha, entre 96 e 260 px. */
+/**
+ * Número grande (fase 3): enche a largura da zona numa linha, entre 96 e
+ * 400 px (revisão livre-f3: a 260 px o número ficava miúdo na coluna larga).
+ */
 export function bigNumberFit({ value, widthPx, heightPx, unit, fontFamily, weight }) {
   const perPx = measureMetricText(value, fontFamily, weight);
-  const byWidth = perPx > 0 ? (widthPx * 0.95) / perPx : 260 * unit;
-  return Math.max(Math.min(96 * unit, byWidth), Math.min(260 * unit, heightPx * 0.5, byWidth));
+  const byWidth = perPx > 0 ? (widthPx * 0.95) / perPx : 400 * unit;
+  return Math.max(Math.min(96 * unit, byWidth), Math.min(400 * unit, heightPx * 0.5, byWidth));
 }
 
-export default function PresentationBlocks({ blocks: raw, rect, frame, ink, strongInk, background, fontFamily, family = 'executive', accent, numericTypography, onChange, forExport = false, artDirectionVersion = 2, paletteOverrides = {} }) {
+/** Mistura duas cores hex (t = 1 é `a`); cor sólida, que o html2canvas desenha igual à tela. */
+function mixSolid(a, b, t) {
+  const rgb = hex => [1, 3, 5].map(i => parseInt(String(hex).slice(i, i + 2), 16));
+  if (!/^#[0-9a-f]{6}$/i.test(a) || !/^#[0-9a-f]{6}$/i.test(b)) return b;
+  const A = rgb(a); const B = rgb(b);
+  return `#${A.map((c, i) => Math.round(c * t + B[i] * (1 - t)).toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+}
+
+/**
+ * Selo dos ícones (revisão da folha livre-f3): o ícone de 60 px ficava pequeno
+ * no slide. Círculo de até 160 px na cor de destaque suave, que encolhe com a
+ * coluna (no máximo 60% dela), e o desenho a 54% do selo.
+ */
+export function iconBadgeSize({ zoneWidthPx, columns, gapPx, unit, panelPadPx = 0 }) {
+  const column = (zoneWidthPx - (columns - 1) * gapPx) / columns - panelPadPx;
+  const badge = Math.round(Math.min(160 * unit, column * 0.6));
+  return { badge, glyph: Math.round(badge * 0.54) };
+}
+
+export default function PresentationBlocks({ blocks: raw, rect, frame, ink, strongInk, background, fontFamily, family = 'executive', accent, numericTypography, onChange, forExport = false, artDirectionVersion = 2, paletteOverrides = {}, anchor }) {
   // Mede de novo quando as fontes terminam de carregar (a exportação espera
   // por elas; a primeira medida pode usar a fonte de reserva).
   const [, setFontsReady] = useState(0);
@@ -252,6 +274,13 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, stro
   const displayFont = numericTypography?.fontFamily || familyFont(key, 'display').css || fontFamily;
   const displayWeight = numericTypography?.weight || familyFont(key, 'display').weight || 600;
   const zonePx = { w: (rect.w / 100) * frame.w, h: (rect.h / 100) * frame.h };
+  // Âncora da citação e do número grande (modo livre): começo ou fim da zona.
+  const justify = anchor === 'start' ? 'flex-start' : anchor === 'end' ? 'flex-end' : 'center';
+  const iconColumns = frame.h > frame.w ? Math.min(block.items?.length || 1, 2) : (block.items?.length || 1);
+  const iconGap = 48 * unit;
+  const iconSize = iconBadgeSize({ zoneWidthPx: zonePx.w, columns: iconColumns, gapPx: iconGap, unit, panelPadPx: panel ? 52 * unit : 0 });
+  const badgeColor = mixSolid(st.accent, detailSurface, 0.14);
+  const badgeInk = accentInkOnSurface(st.accent, badgeColor, 3);
   const panelBox = panel ? { backgroundColor: st.panelColor, borderRadius: st.radius * unit, padding: `${36 * unit}px ${40 * unit}px`, boxSizing: 'border-box' } : {};
   const inner = { w: zonePx.w - (panel ? 80 * unit : 0), h: zonePx.h - (panel ? 72 * unit : 0) };
   const cell = (value, path, label, style, attrs) => <EditableCell
@@ -298,7 +327,7 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, stro
       </div>)}
     </div> : block.type === 'quote' ? (() => {
       const fit = quoteTextFit({ text: block.text, author: block.author, widthPx: inner.w - 8 * unit, heightPx: inner.h, unit, fontFamily: displayFont, weight: displayWeight });
-      return <figure style={{ margin: 0, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', color: strong, ...panelBox }}>
+      return <figure style={{ margin: 0, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: justify, color: strong, ...panelBox }}>
         <span aria-hidden style={{ display: 'block', fontFamily: displayFont, fontWeight: displayWeight, fontSize: 96 * unit, lineHeight: 0.62, height: 96 * unit * 0.62, color: accentInk }}>“</span>
         <blockquote style={{ margin: 0 }}>
           {cell(block.text, ['text'], 'citação', { display: 'block', fontFamily: displayFont, fontWeight: displayWeight, fontSynthesisWeight: 'none', fontSize: fit.fontSize, lineHeight: 1.18, letterSpacing: '-0.01em', color: strong }, { 'data-vc-quote-text': 'true' })}
@@ -310,13 +339,13 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, stro
       </figure>;
     })() : block.type === 'bignumber' ? (() => {
       const size = bigNumberFit({ value: block.value, widthPx: inner.w, heightPx: inner.h, unit, fontFamily: displayFont, weight: displayWeight });
-      return <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', color: strong, ...panelBox }}>
+      return <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: justify, color: strong, ...panelBox }}>
         {cell(block.value, ['value'], 'número', { display: 'block', whiteSpace: 'nowrap', overflowWrap: 'normal', fontFamily: displayFont, fontWeight: displayWeight, fontSynthesisWeight: 'none', fontSize: size, lineHeight: 1.02, letterSpacing: '-0.03em', color: accentInk }, { 'data-vc-bignumber-value': 'true' })}
         {cell(block.label, ['label'], 'rótulo do número', { display: 'block', marginTop: 18 * unit, fontSize: 36 * unit, lineHeight: 1.2, fontWeight: 600, color: strong }, { 'data-vc-bignumber-label': 'true' })}
         {block.detail && cell(block.detail, ['detail'], 'apoio do número', { display: 'block', marginTop: 10 * unit, fontSize: Math.max(26, st.detailPx) * unit, lineHeight: 1.35, color: metricDetail.color, opacity: metricDetail.opacity }, { 'data-vc-bignumber-detail': 'true' })}
       </div>;
-    })() : block.type === 'icons' ? <ul style={{ margin: 0, padding: 0, listStyle: 'none', height: '100%', alignContent: 'center', display: 'grid',
-      gridTemplateColumns: `repeat(${frame.h > frame.w ? Math.min(block.items.length, 2) : block.items.length}, minmax(0, 1fr))`, gap: 32 * unit }}>
+    })() : block.type === 'icons' ? <ul style={{ margin: 0, padding: 0, listStyle: 'none', height: '100%', alignContent: anchor === 'start' ? 'start' : 'center', display: 'grid',
+      gridTemplateColumns: `repeat(${iconColumns}, minmax(0, 1fr))`, gap: iconGap }}>
       {block.items.map((item, index) => {
         const Icon = ICON_COMPONENTS[item.icon] || Check;
         const next = PRESENTATION_ICON_NAMES[(PRESENTATION_ICON_NAMES.indexOf(item.icon) + 1) % PRESENTATION_ICON_NAMES.length];
@@ -329,10 +358,10 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, stro
             title={editable ? 'Clique para trocar o ícone' : undefined}
             onClick={editable ? (event) => { event.stopPropagation(); commitBlock(['items', index, 'icon'], next); } : undefined}
             onKeyDown={editable ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); commitBlock(['items', index, 'icon'], next); } } : undefined}
-            style={{ display: 'inline-flex', marginBottom: 18 * unit, cursor: editable ? 'pointer' : undefined }}
-          ><Icon aria-hidden="true" size={Math.round(60 * unit)} color={accentInk} strokeWidth={1.75} /></span>
-          {cell(item.title, ['items', index, 'title'], `título do item ${index + 1}`, { display: 'block', fontWeight: 600, fontSize: 30 * unit, lineHeight: 1.2, color: strong }, { 'data-vc-icons-title': 'true' })}
-          {item.body && cell(item.body, ['items', index, 'body'], `linha do item ${index + 1}`, { display: 'block', marginTop: 8 * unit, fontSize: Math.max(26, st.detailPx) * unit, lineHeight: 1.35, color: stepBody.color, opacity: stepBody.opacity }, { 'data-vc-icons-body': 'true' })}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: iconSize.badge, height: iconSize.badge, borderRadius: '50%', backgroundColor: badgeColor, marginBottom: 28 * unit, cursor: editable ? 'pointer' : undefined }}
+          ><Icon aria-hidden="true" size={iconSize.glyph} color={badgeInk} strokeWidth={1.75} /></span>
+          {cell(item.title, ['items', index, 'title'], `título do item ${index + 1}`, { display: 'block', fontWeight: 600, fontSize: 38 * unit, lineHeight: 1.18, color: strong }, { 'data-vc-icons-title': 'true' })}
+          {item.body && cell(item.body, ['items', index, 'body'], `linha do item ${index + 1}`, { display: 'block', marginTop: 12 * unit, fontSize: Math.max(28, st.detailPx) * unit, lineHeight: 1.4, color: stepBody.color, opacity: stepBody.opacity }, { 'data-vc-icons-body': 'true' })}
         </li>;
       })}
     </ul> : <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gridTemplateColumns: `repeat(${stepColumns}, minmax(0, 1fr))`, gap: 24 * unit }}>

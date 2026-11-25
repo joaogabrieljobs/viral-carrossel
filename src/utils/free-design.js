@@ -928,15 +928,252 @@ function panelReading({ zones, chrome, slide, titleSize, subSize, display, text,
       chrome: chrome.map(d => (d.follow === 'subtitle' ? { ...d, y: Math.round((d.y + subY - sub.y) * 100) / 100 } : d)),
     };
   }
+  // Revisão da folha livre-f3 (kit, página 7): o cartão que abraçava o texto
+  // terminava no meio da foto ao lado. Com foto ao lado, o cartão fica da
+  // altura da foto e leva o título e o apoio no meio dele, como na
+  // demonstração do Modular (cartão e foto lado a lado, do mesmo tamanho).
+  const photo = zones.photo && zones.photo.w > 1 && zones.photo.h > 1
+    && Math.min(panel.x + panel.w, zones.photo.x + zones.photo.w) - Math.max(panel.x, zones.photo.x) <= 0 ? zones.photo : null;
+  if (photo) {
+    const inTitle = measuredTitleZone({ ...t, x: sub.x, w: sub.w, y: 0, h: 100 }, { slide, titleSize, display, titleLeading });
+    const inner = photo.h - padTop - padBottom;
+    const group = inTitle.h + 1 + subH;
+    if (group <= inner) {
+      const card = { ...panel, y: photo.y, h: photo.h };
+      const y = Math.round((photo.y + padTop + (inner - group) / 2) * 100) / 100;
+      const subY = Math.round((y + inTitle.h + 1) * 100) / 100;
+      return {
+        titleZone: { ...inTitle, y }, zone: { ...sub, y: subY, h: subH }, subSize: grownSize, titlePanel: card,
+        chrome: chrome.map((d, i) => (i === index ? card : d)),
+      };
+    }
+  }
+  // Sem foto ao lado (ou texto que não cabe com o título): o cartão sobe para
+  // logo abaixo do título, termina onde a coluna da família termina e o texto
+  // fica no meio dele.
   const cardY = Math.round(Math.min(panel.y, titleZone.y + titleZone.h + STACK_GAP) * 100) / 100;
   const delta = panel.y - cardY;
   if (sub.h - subH < 3 && delta < 1 && px === startPx) return null;
-  const card = { ...panel, y: cardY, h: Math.round((padTop + subH + padBottom) * 100) / 100 };
+  const bottom = panel.y + panel.h;
+  const card = { ...panel, y: cardY, h: Math.round((bottom - cardY) * 100) / 100 };
+  const innerTop = cardY + padTop;
+  const innerBottom = bottom - padBottom;
+  const subY = Math.round((innerTop + Math.max(0, (innerBottom - innerTop - subH) / 2)) * 100) / 100;
   return {
-    zone: { ...sub, y: Math.round((sub.y - delta) * 100) / 100, h: subH },
+    zone: { ...sub, y: subY, h: Math.round(Math.min(subH, innerBottom - subY) * 100) / 100 },
     titleZone: delta >= 1 ? titleZone : t,
     subSize: grownSize,
-    chrome: chrome.map((d, i) => (i === index ? card : d.follow === 'subtitle' ? { ...d, y: Math.round((d.y - delta) * 100) / 100 } : d)),
+    chrome: chrome.map((d, i) => {
+      if (i === index) return card;
+      if (d.follow !== 'subtitle') return d;
+      // Cartão vizinho que acompanha o apoio cresce junto; o número dele fica no meio.
+      if (d.t === 'block') return { ...d, y: Math.round((d.y - delta) * 100) / 100, h: Math.round((d.h + delta) * 100) / 100 };
+      return { ...d, y: Math.round((d.y - delta / 2) * 100) / 100 };
+    }),
+  };
+}
+
+/* Acabamento antes de publicar (revisão da folha livre-f3) ------------------- */
+
+/**
+ * Adornos narrativos das famílias que não fazem sentido fora delas: o "CENA nn"
+ * do Cinemático e os rótulos de ficha do Técnico ("FIG.", "TAB.", "§", "NOTA",
+ * "FIM") apareciam em páginas do modo livre que não são cinema nem ficha. O
+ * número da página em pílula (Modular) repetia o fólio do deck. Saem; o fólio
+ * do deck continua numerando as páginas. O número de seção do divisor fica,
+ * sem o "§". Presets comuns não passam por aqui.
+ */
+const NARRATIVE_CHROME = /CENA|TAB\.|FIG\.|NOTA|FIM\b|§/;
+export function freeNeutralChrome(chrome) {
+  return (Array.isArray(chrome) ? chrome : []).flatMap((d) => {
+    if (d.t !== 'text' && d.t !== 'pill') return [d];
+    const value = String(d.text || '');
+    if (d.t === 'pill' && /\{index\}/.test(value)) return [];
+    if (/^§\{section\}$/.test(value)) return [{ ...d, text: '{section}' }];
+    return NARRATIVE_CHROME.test(value) ? [] : [d];
+  });
+}
+
+const round2 = value => Math.round(value * 100) / 100;
+/** Inset do texto dentro da zona (12 px de cada lado num slide de 1920). */
+const TEXT_INSET = 0.625;
+
+/** Zona do título do tamanho das linhas que o título ocupa, com a fonte do deck. */
+function measuredTitleZone(t, { slide, titleSize, display, titleLeading }) {
+  const titlePx = titlePxOf(titleSize);
+  const lines = freeTextLines(String(slide.title || ''), 1920 * t.w / 100 - 24, titlePx, display.family, 'display',
+    { trackingEm: (display.tracking || 0) / 100, upper: display.case === 'upper' });
+  const breathing = Math.max(20, titlePx * 0.44 + 1080 * 0.012);
+  const needed = round2((lines * titlePx * titleLeading + breathing) / 1080 * 100) + 0.5;
+  return needed < t.h - 1 ? { ...t, h: needed } : t;
+}
+
+/** Altura (% do slide) do apoio e do texto final numa coluna, sem folga. */
+function supportHeightPct(slide, widthPct, px, text, leading) {
+  const copy = String(slide.subtitle || '').replace(/\*\*/g, '').trim();
+  const tail = String(slide.bodyAfterImage || '').replace(/\*\*/g, '').trim();
+  const widthPx = 1920 * widthPct / 100 - 24;
+  const lines = (value, size) => (text?.family ? freeTextLines(value, widthPx, size, text.family, 'text') : estimateLines(value, widthPx, size, 0.55));
+  const h = (copy ? lines(copy, px) * px * leading : 0) + (tail ? 0.8 * px + lines(tail, px * 0.85) * px * 0.85 * leading : 0);
+  return h / 1080 * 100;
+}
+
+/** Adornos logo acima de uma zona, na coluna dela (fio ou barra de destaque que a abre). */
+function anchoredAbove(d, zone, reach = 8) {
+  if (!['rule', 'block', 'text', 'pill'].includes(d.t) || d.w >= 99 || d.follow) return false;
+  return d.y < zone.y && d.y >= zone.y - reach && d.x >= zone.x - 1 && d.x < zone.x + zone.w;
+}
+const crosses = (d, r) => (d.t === 'rule' || d.t === 'block') && d.w > 0 && d.h > 0
+  && d.x < r.x + r.w && d.x + d.w > r.x && d.y < r.y + r.h && d.y + d.h > r.y;
+
+/** Teto do número grande (PresentationBlocks.bigNumberFit). */
+const BIG_NUMBER_MAX_PX = 400;
+
+/** Altura estimada (% do slide) da linha de ícones, como PresentationBlocks a desenha. */
+function iconsHeightPct(block, widthPct, text) {
+  const items = block.items || [];
+  const n = Math.max(1, items.length);
+  const column = (1920 * widthPct / 100 - (n - 1) * 48) / n;
+  const badge = Math.min(160, column * 0.6);
+  const lines = (value, px) => (value ? freeTextLines(value, column * 0.95, px, text.family, 'text') : 0);
+  const titleLines = Math.max(1, ...items.map(item => lines(item.title, 38)));
+  const bodyLines = Math.max(0, ...items.map(item => lines(item.body, 28)));
+  return (badge + 28 + titleLines * 38 * 1.18 + (bodyLines ? 12 + bodyLines * 28 * 1.4 : 0)) / 1080 * 100;
+}
+
+/** Altura estimada (% do slide) da citação e do número grande, como PresentationBlocks os desenha. */
+function blockHeightPct(block, ev, heightPct, { display, text }) {
+  const widthPx = 1920 * ev.w / 100;
+  const heightPx = 1080 * heightPct / 100;
+  if (block.type === 'quote') {
+    const author = block.author ? 26 * 1.4 + 22 : 0;
+    let total = 0;
+    for (let size = 72; size >= 40; size -= 4) {
+      const lines = freeTextLines(block.text, widthPx - 8, size, display.family, 'display', { trackingEm: -0.01 });
+      total = 96 * 0.62 + lines * size * 1.18 + author;
+      if (total <= heightPx) break;
+    }
+    return total / 1080 * 100;
+  }
+  const perPx = freeTextWidth(block.value, 1, display.family, 'display', { trackingEm: -0.03 });
+  const byWidth = perPx > 0 ? (widthPx * 0.95) / perPx : 260;
+  const size = Math.max(Math.min(96, byWidth), Math.min(BIG_NUMBER_MAX_PX, heightPx * 0.5, byWidth));
+  const label = freeTextLines(block.label, widthPx, 36, text.family, 'text') * 36 * 1.2;
+  const detail = block.detail ? 10 + freeTextLines(block.detail, widthPx, 26, text.family, 'text') * 26 * 1.35 : 0;
+  return (size * 1.02 + 18 + label + detail) / 1080 * 100;
+}
+
+/**
+ * Página de dados com citação, número grande ou ícones e o apoio numa coluna ao
+ * lado do bloco (revisão da folha livre-f3):
+ * - ícones: o bloco ficava espremido na coluna da direita, com a metade
+ *   esquerda e a base vazias. Agora o apoio vem logo abaixo do título e os
+ *   ícones ocupam a largura útil abaixo dele, na linha do texto do título, com
+ *   margens iguais; o bloco vai até o pé da área de leitura e os ícones ficam
+ *   no meio dela. Fio ou cartão que cruzaria o bloco sai.
+ * - citação e número grande com o título em cima: apoio e bloco formam uma
+ *   linha que começa no mesmo ponto (âncora `start`), no meio da área abaixo
+ *   do título; o fio que acompanha o apoio vai do começo ao fim da linha.
+ * - citação e número grande com o título na coluna (Suíço): título no alto,
+ *   bloco e apoio terminam na linha de baixo da coluna (âncora `end`).
+ */
+function blockReading({ zones, chrome, slide, titleSize, subSize, display, text, kind, leading, titleLeading }) {
+  const t = zones.title;
+  const sub = zones.subtitle;
+  const ev = zones.evidence;
+  const block = (Array.isArray(slide.presentationBlocks) ? slide.presentationBlocks : [])[0];
+  if (kind !== 'data' || !t || !sub || !ev || !['quote', 'bignumber', 'icons'].includes(block?.type)) return null;
+  if (!(ev.x >= sub.x + sub.w - 0.5)) return null;
+  const column = ev.y <= t.y + 1;
+  const px = subPxOf(subSize);
+  const measureInput = { slide, titleSize, display, titleLeading };
+  const bandBottom = Math.min(91, Math.max(ev.y + ev.h, sub.y + sub.h));
+  const hasCopy = !!String(slide.subtitle || slide.bodyAfterImage || '').trim();
+
+  if (block.type === 'icons') {
+    const margin = t.x;
+    const titleZone = measuredTitleZone({ ...t, w: column ? Math.min(62, 100 - 2 * margin) : t.w }, measureInput);
+    const subW = Math.min(100 - 2 * margin, Math.max(sub.w, 56));
+    const subY = round2(titleZone.y + titleZone.h + 1);
+    const subH = hasCopy ? round2(supportHeightPct(slide, subW, px, text, leading) + 1.5) : 0;
+    const top = subY + subH + 4;
+    const w = round2(100 - 2 * margin - 2 * TEXT_INSET);
+    const free = bandBottom - top - iconsHeightPct(block, w, text);
+    // Os ícones ficam no terço de cima do espaço livre (centro óptico).
+    const evY = round2(top + Math.max(0, free / 3));
+    const evidence = { x: round2(margin + TEXT_INSET), y: evY, w, h: round2(bandBottom - evY) };
+    if (evidence.h < 25) return null;
+    const zone = { ...sub, x: t.x, y: subY, w: subW, h: Math.max(subH, 1) };
+    const delta = subY - sub.y;
+    const moved = chrome
+      .filter(d => !(d.follow === 'subtitle' && crosses(d, evidence)))
+      .map(d => (d.follow === 'subtitle' || anchoredAbove(d, sub, 4) ? { ...d, y: round2(d.y + delta) } : d))
+      .filter(d => !crosses(d, evidence));
+    return { titleZone, zone, evidence, chrome: moved, anchor: 'start' };
+  }
+
+  const titleZone = measuredTitleZone(t, measureInput);
+  const subH = hasCopy ? supportHeightPct(slide, sub.w, px, text, leading) : 0;
+  if (column) {
+    const subY = round2(Math.max(titleZone.y + titleZone.h + STACK_GAP, bandBottom - subH));
+    return {
+      titleZone, zone: { ...sub, y: subY, h: round2(Math.max(1, bandBottom - subY + 1.5)) },
+      evidence: { ...ev, y: t.y, h: round2(bandBottom - t.y) },
+      chrome, anchor: 'end',
+    };
+  }
+  const bandTop = titleZone.y + titleZone.h + STACK_GAP;
+  const band = bandBottom - bandTop;
+  let rowTop = bandTop;
+  let rowH = Math.max(subH, blockHeightPct(block, ev, band, { display, text }));
+  // A linha fica no terço de cima do espaço livre (centro óptico), não no meio.
+  for (let pass = 0; pass < 2; pass += 1) {
+    rowTop = bandTop + Math.max(0, (band - rowH) / 3);
+    rowH = Math.max(subH, blockHeightPct(block, ev, bandBottom - rowTop, { display, text }));
+  }
+  rowTop = round2(rowTop);
+  const h = round2(bandBottom - rowTop);
+  if (h < 25) return null;
+  const delta = rowTop - sub.y;
+  const moved = chrome.map((d) => {
+    if (d.follow === 'subtitle' && d.h > d.w) return { ...d, y: rowTop, h: round2(Math.min(rowH, h)) };
+    if (d.follow === 'subtitle' || anchoredAbove(d, sub, 4)) return { ...d, y: round2(d.y + delta) };
+    return d;
+  });
+  return { titleZone, zone: { ...sub, y: rowTop, h }, evidence: { ...ev, y: rowTop, h }, chrome: moved, anchor: 'start' };
+}
+
+/**
+ * Fecho com título e apoio na mesma coluna (revisão da folha livre-f3, fecho
+ * do Cultural): a zona do título tinha 40% da altura para um título de 2
+ * linhas e o apoio ficava lá embaixo, com um vão no meio. O apoio vem logo
+ * abaixo das linhas do título e o par fica no meio da coluna da família; o fio
+ * ou a barra que abre o título desce junto.
+ */
+function closingReading({ zones, chrome, slide, titleSize, subSize, display, text, kind, leading, titleLeading }) {
+  const t = zones.title;
+  const sub = zones.subtitle;
+  if (kind !== 'closing' || !t || !sub || !(sub.y >= t.y + 1)) return null;
+  if (Math.min(t.x + t.w, sub.x + sub.w) - Math.max(t.x, sub.x) <= Math.min(t.w, sub.w) * 0.4) return null;
+  const titleZone = measuredTitleZone(t, { slide, titleSize, display, titleLeading });
+  if (t.h - titleZone.h < 3) return null;
+  const gap = 1.5;
+  const subH = supportHeightPct(slide, sub.w, subPxOf(subSize), text, leading);
+  const stack = titleZone.h + gap + subH;
+  // Com foto ao lado, o par fica no meio da foto; sem foto, no meio da coluna.
+  const photo = zones.photo && zones.photo.w > 1 && zones.photo.h >= stack
+    && Math.min(t.x + t.w, zones.photo.x + zones.photo.w) - Math.max(t.x, zones.photo.x) <= 0 ? zones.photo : null;
+  const spanTop = photo ? photo.y : t.y;
+  const spanBottom = photo ? photo.y + photo.h : sub.y + sub.h;
+  const y = round2(spanTop + Math.max(0, (spanBottom - spanTop - stack) / 2));
+  const subY = round2(y + titleZone.h + gap);
+  if (subY >= sub.y - 1) return null;
+  const shift = y - t.y;
+  return {
+    titleZone: { ...titleZone, y },
+    zone: { ...sub, y: subY, h: round2(Math.max(subH + 2, sub.y + sub.h - subY)) },
+    chrome: chrome.map(d => (d.follow === 'subtitle' ? { ...d, y: round2(d.y + subY - sub.y) }
+      : anchoredAbove(d, t) ? { ...d, y: round2(d.y + shift) } : d)),
   };
 }
 
@@ -974,9 +1211,9 @@ export function freePresentationCompositionOverrides(base, {
     const panel = !onPhoto && textPanel(layout, zone);
     return panel ? resolveChromeColor(family, chromeGround, panel.color, palette) : null;
   };
-  const surfaceTitle = panelColor(zonesNow.title) || (onPhoto ? '#111111' : inks.bg);
+  let surfaceTitle = panelColor(zonesNow.title) || (onPhoto ? '#111111' : inks.bg);
   const surfaceText = panelColor(zonesNow.subtitle) || (onPhoto ? '#111111' : inks.bg);
-  const titleInk = readable(surfaceTitle, [inks.ink, palette.ink, palette.inverseInk]);
+  let titleInk = readable(surfaceTitle, [inks.ink, palette.ink, palette.inverseInk]);
   const textInk = readable(surfaceText, [inks.ink, palette.ink, palette.inverseInk]);
   const mutedInk = readable(surfaceText, [inks.muted, palette.muted, palette.inverseMuted, textInk]);
   const display = freeFontSpec(deck.fonts.display, 'display');
@@ -994,13 +1231,21 @@ export function freePresentationCompositionOverrides(base, {
   const typographyAll = composed.presentationTypographyByComposition || {};
   const typo = typographyAll[kind] || {};
   const photoZone = composed.presentationSuppressPhoto ? null : zones.photo;
-  const familyChrome = composed.presentationChrome?.chrome || [];
+  // Sem os adornos narrativos da família (CENA, FIG., §…): só o fólio do deck.
+  const familyChrome = freeNeutralChrome(composed.presentationChrome?.chrome || []);
   // Cartão atrás do texto (Modular): o texto fica no cartão, que abraça o texto.
   const readingInput = { zones, chrome: familyChrome, slide: layoutSlide, titleSize, subSize: composed.subSize, display, text, kind,
     leading: (composed.subLeading || 150) / 100, titleLeading: familySpec(family).type.titleLeading || 1.05 };
-  const reading = onPhoto || hasBlocks(layoutSlide) ? null
-    : hasTextPanel(layout) ? panelReading(readingInput) : compactReading(readingInput);
-  const subSize = reading ? reading.subSize : composed.subSize;
+  const reading = onPhoto ? null
+    : hasBlocks(layoutSlide) ? blockReading(readingInput)
+      : hasTextPanel(layout) ? panelReading(readingInput)
+        : kind === 'closing' ? closingReading(readingInput) : compactReading(readingInput);
+  const subSize = reading?.subSize ?? composed.subSize;
+  // Título que entrou no cartão (Modular ao lado da foto) lê contra o cartão.
+  if (reading?.titlePanel) {
+    surfaceTitle = resolveChromeColor(family, chromeGround, reading.titlePanel.color, palette);
+    titleInk = readable(surfaceTitle, [inks.ink, palette.ink, palette.inverseInk]);
+  }
   const chrome = freeChromeDevices(reading ? reading.chrome : familyChrome, { family, ground: chromeGround, palette, photoZone });
   return {
     ...composed,
@@ -1016,7 +1261,9 @@ export function freePresentationCompositionOverrides(base, {
       chrome,
       fonts: { display, text },
     },
-    ...(reading ? { canvas: { ...composed.canvas, zones: { ...zones, title: reading.titleZone, subtitle: reading.zone } } } : {}),
+    ...(reading ? { canvas: { ...composed.canvas, zones: { ...zones, title: reading.titleZone, subtitle: reading.zone, ...(reading.evidence ? { evidence: reading.evidence } : {}) } } } : {}),
+    // Âncora da citação e do número grande na zona de dados (início ou fim).
+    presentationBlockAnchor: reading?.anchor || undefined,
     subSize,
     presentationNumericTypography: { fontFamily: display.css, weight: display.weight },
     customBg: inks.bg,
@@ -1047,7 +1294,7 @@ export function freePresentationCompositionOverrides(base, {
 export const FREE_SLIDE_FIELDS = Object.freeze([
   'presentationFreeDesign', 'presentationDeckDesign', 'presentationPaletteOverrides',
   'presentationNumericTypography', 'presentationFreeTextSurfaces', 'customBg', 'titleColor', 'subtitleColor', 'textColor',
-  'titleWeight', 'titleCase',
+  'titleWeight', 'titleCase', 'presentationBlockAnchor',
 ]);
 
 /** Slide composto no modo livre volta ao estado neutro antes de outro preset. */
