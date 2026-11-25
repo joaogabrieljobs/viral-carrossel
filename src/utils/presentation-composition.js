@@ -275,7 +275,9 @@ export function contentAwarePresentationOverrides(base, slide = {}, kind = 'cont
   const typography = previousTypography[kind] || {};
   const displaySize = fields.titleSize;
   const titleSize = fittedTitleSize(structured ? Math.min(46, displaySize) : displaySize, slide.title, zones.title, fields.typography.title.fontFamily);
-  const support = kind === 'content' && visual && !pitch ? grownSupport(layout, slide, base) : null;
+  // Vale também no Pitch: a caixa cresce só com o texto já escrito; os limites
+  // pedidos ao modelo continuam os do pitch.
+  const support = kind === 'content' && visual ? grownSupport(layout, slide, base) : null;
   if (support) zones.subtitle = support.zone;
   const subSize = support ? rendererSubtitleSizePercent(support.px) : fields.subSize;
   const titleLeading = fields.titleLeading;
