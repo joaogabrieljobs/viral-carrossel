@@ -148,11 +148,16 @@ describe('fase 1 → 2: leitura longa sem vazios grandes', () => {
     fazer().forEach((s, i) => {
       const { title, subtitle } = s.canvas.zones;
       const mesmaColuna = Math.min(title.x + title.w, subtitle.x + subtitle.w) - Math.max(title.x, subtitle.x) > 0 && subtitle.y > title.y;
-      if (!mesmaColuna || s.presentationFreeDesign.ground === 'photo' || s.presentationFreeDesign.block !== 'none' || !['content', 'demo'].includes(s.presentationComposition)) return;
+      // Cartões do Modular: título e apoio em cartões próprios, de propósito.
+      const emCartao = s.presentationFreeTextSurfaces?.subtitle !== s.customBg;
+      if (!mesmaColuna || emCartao || s.presentationFreeDesign.ground === 'photo' || s.presentationFreeDesign.block !== 'none' || !['content', 'demo'].includes(s.presentationComposition)) return;
       const tituloPx = s.titleSize * 1920 * 0.084 / 100;
       const linhas = Math.max(1, Math.ceil(s.title.length * 0.55 * tituloPx / (1920 * title.w / 100 - 24)));
       const fimDoTitulo = title.y + (linhas * tituloPx * 1.1) / 10.8;
-      expect(subtitle.y - fimDoTitulo, `slide ${i + 1} (${s.presentationFreeDesign.family})`).toBeLessThanOrEqual(9);
+      // Estimativa folgada: inclui o respiro que o renderer reserva abaixo da
+      // última linha (~0,44 do corpo do título) e uma linha a mais quando o
+      // título fica no limite. Na fase 1 o Executivo passava de 20%.
+      expect(subtitle.y - fimDoTitulo, `slide ${i + 1} (${s.presentationFreeDesign.family})`).toBeLessThanOrEqual(15);
       // As zonas não se sobrepõem (a conferência de exportação mede as duas).
       expect(title.y + title.h, `slide ${i + 1}: zona do título invade o apoio`).toBeLessThanOrEqual(subtitle.y + 0.01);
     });

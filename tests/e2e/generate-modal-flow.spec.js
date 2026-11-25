@@ -136,7 +136,9 @@ test('apresentação abre um fluxo próprio com caminhos e padrões 16:9', async
     exact: true,
   });
   await expect(presentationStyles).toBeVisible();
-  await expect(presentationStyles.getByRole('button')).toHaveCount(10);
+  // Modo livre (fase 2): "Livre: o Moont decide" abre o seletor, antes dos 10 padrões.
+  await expect(presentationStyles.getByRole('button')).toHaveCount(11);
+  await expect(presentationStyles.getByRole('button').first()).toHaveAccessibleName(/^Livre: o Moont decide\./);
 
   const slideCount = modal.getByRole('group', { name: 'Número de slides', exact: true });
   await expect(slideCount.getByRole('button', { name: '6', exact: true })).toBeVisible();

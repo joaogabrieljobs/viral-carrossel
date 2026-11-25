@@ -170,19 +170,20 @@ describe('modo livre, fase 1: diretor de arte determinístico na Apoteose', () =
   it('sequência de design da Apoteose (paleta padrão)', () => {
     const linha = s => [s.presentationComposition, s.presentationFreeDesign.family, s.presentationFreeDesign.ground, s.presentationFreeDesign.photo, s.presentationFreeDesign.block].join(' · ');
     // Fase 2: superfície distinta do fundo (muda a ordem das famílias, que
-    // depende da paleta), foto que alterna de lado e página com foto que não
-    // perde a foto para variar.
+    // depende da paleta), todas as geometrias da família como candidatas (a
+    // demonstração traz a foto à esquerda), foto que alterna de lado e página
+    // com foto que não perde a foto para variar.
     expect(livre().map(linha)).toEqual([
       'cover · typographic · inverse · small · none',
       'content · cultural · bg · half · none',
       'demo · cinematic · photo · full · none',
-      'content · technical · bg · small · none',
-      'demo · cinematic · photo · full · none',
-      'divider · technical · surface · small · none',
-      'content · cultural · bg · half · none',
-      'content · technical · surface · half · none',
-      'data · typographic · bg · none · metrics',
-      'closing · cinematic · accent · half · none',
+      'demo · technical · bg · small · none',
+      'content · typographic · surface · small · none',
+      'divider · cultural · inverse · half · none',
+      'content · cinematic · bg · half · none',
+      'divider · technical · accent · small · none',
+      'data · typographic · surface · none · metrics',
+      'closing · cultural · accent · small · none',
     ]);
   });
 

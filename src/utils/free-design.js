@@ -433,6 +433,8 @@ const hasTextPanel = layout => !!(textPanel(layout, layout.title) || textPanel(l
 export const FREE_PHOTO_TREATMENT = 'saturate(0.94) contrast(1.03)';
 
 const ALTERNATIVE_KINDS = ['content', 'demo', 'divider'];
+const DIVIDER_COPY_MAX = 180;
+const shortCopy = slide => `${slide?.subtitle || ''}${slide?.bodyAfterImage || ''}`.replace(/\*\*/g, '').trim().length <= DIVIDER_COPY_MAX;
 /** Função de página fixa (capa, fecho, bloco nativo) ou null quando o diretor pode alternar. */
 function fixedKind(slide, index, count) {
   if (hasBlocks(slide)) return 'data';
@@ -503,9 +505,21 @@ function candidatesFor({ slide, stage, index, count }) {
   const out = [];
   for (const family of FAMILY_KEYS) {
     const seen = new Set();
+    // Cada geometria que a família desenha para esta página: a função pedida
+    // pelo tamanho da foto e, fora de capa, fecho e bloco nativo, as outras
+    // funções intercambiáveis (conteúdo, demonstração e divisor), que trazem a
+    // foto do outro lado. Sem elas o diretor só via a foto à direita.
+    const role = resolvePresentationCompositionKind({ slide, stage, index, count });
+    const tries = [];
     for (const photo of visual ? ['full', 'half', 'small', 'none'] : ['none']) {
       const layoutSlide = photo === 'none' ? withoutVisual(slide) : slide;
-      const kind = resolveFreeKind({ family, photo, slide: layoutSlide, stage, index, count });
+      tries.push([resolveFreeKind({ family, photo, slide: layoutSlide, stage, index, count }), layoutSlide]);
+    }
+    if (visual && !fixedKind(slide, index, count)) {
+      // Divisor tem caixa de apoio curta: só para página de texto curto.
+      for (const kind of [role, ...ALTERNATIVE_KINDS]) if (kind !== 'divider' || shortCopy(slide)) tries.push([kind, slide]);
+    }
+    for (const [kind, layoutSlide] of tries) {
       const layout = contentAwarePresentationLayout(kind, layoutSlide, family);
       const size = photoSizeOfLayout(layout);
       if (seen.has(`${kind}|${size}`)) continue;
@@ -610,15 +624,38 @@ export function proposedSlideDesign(slide) {
  * Regras duras: nunca 3 geometrias iguais seguidas; nunca 2 seguidas com a
  * mesma família e a mesma função de página.
  */
-export function directFreeSlideDesign({ slide = {}, stage = {}, index = 0, count = 1, previous = [], deckDesign } = {}) {
+export function directFreeSlideDesign(input = {}) {
+  return directFreeSlide(input).design;
+}
+
+/**
+ * Design e função de página do candidato escolhido. A composição usa a mesma
+ * função de página que o candidato mediu: recalcular a função pelo tamanho da
+ * foto trocava a demonstração (foto à esquerda) pelo conteúdo (foto à
+ * direita) e o diretor nunca conseguia trocar a foto de lado.
+ */
+function directFreeSlide({ slide = {}, stage = {}, index = 0, count = 1, previous = [], deckDesign } = {}) {
   const prev = previousDesigns(previous);
   const [before, last] = prev.slice(-2);
   const role = resolvePresentationCompositionKind({ slide, stage, index, count });
   const proposal = proposedSlideDesign(slide);
   const visual = hasVisual(slide);
-  const allowed = forceVariety(candidatesFor({ slide, stage, index, count }).filter(c => !(
+  let allowed = forceVariety(candidatesFor({ slide, stage, index, count }).filter(c => !(
     (last && before && last.geometry === c.geometry && before.geometry === c.geometry)
     || (last && last.family === c.family && last.kind === c.kind))), { prev, index, count, visual });
+  // Página com foto não perde a foto (a imagem existe ou foi pedida): sem
+  // isso, abrir o projeto restaurava a foto e recompunha a página.
+  const withPhoto = visual ? allowed.filter(c => c.photo !== 'none') : allowed;
+  if (withPhoto.length) allowed = withPhoto;
+  // Nunca 3 fotos laterais seguidas do mesmo lado quando há outra geometria
+  // com foto (também com a proposta da IA): o código garante o ritmo do lado.
+  const sides = prev.map(p => p.side).filter(Boolean);
+  const sameSide = sides.length >= 2 && sides.at(-1) === sides.at(-2) ? sides.at(-1) : null;
+  const alternated = sameSide ? allowed.filter(c => c.side !== sameSide && !(visual && c.photo === 'none')) : allowed;
+  // Com proposta da IA, troca de lado só se a família proposta desenha o
+  // outro lado: o lado não troca a família que o diretor de arte escolheu.
+  const familyAlternates = !proposal || alternated.some(c => c.family === proposal.family);
+  if (alternated.length && familyAlternates) allowed = alternated;
   const context = { prev, role, visual, order: familyOrder(deckDesign), enough: count >= 6, proposal };
   let best = null;
   let bestScore = Infinity;
@@ -632,10 +669,11 @@ export function directFreeSlideDesign({ slide = {}, stage = {}, index = 0, count
   // passam pelo mesmo normalizador.
   const native = slideBlockTypes(slide).find(type => ['comparison', 'metrics', 'steps'].includes(type));
   const block = native || (proposal && !['comparison', 'metrics', 'steps'].includes(proposal.block) ? proposal.block : 'none');
-  return normalizeSlideDesign({
+  const design = normalizeSlideDesign({
     family: chosen.family, ground: chosen.ground, photo: chosen.photo, block,
     emphasis: proposal?.emphasis || [], icons: proposal?.icons || [],
   }, slide);
+  return { design, kind: chosen.kind || null };
 }
 
 /* ------------------------------------------------------------------------ */
@@ -786,11 +824,11 @@ export function freePresentationCompositionOverrides(base, {
   slide = {}, stage = {}, index = 0, count = 1, previous = [], deckDesign = null,
 } = {}) {
   const deck = resolveDeckDesign(deckDesign, slide, previous);
-  const directed = directFreeSlideDesign({ slide, stage, index, count, previous, deckDesign: deck });
+  const { design: directed, kind: chosenKind } = directFreeSlide({ slide, stage, index, count, previous, deckDesign: deck });
   const visual = hasVisual(slide);
   const layoutSlide = directed.photo === 'none' || !visual ? withoutVisual(slide) : slide;
   const family = directed.family;
-  const kind = resolveFreeKind({ family, photo: directed.photo, slide: layoutSlide, stage, index, count });
+  const kind = chosenKind || resolveFreeKind({ family, photo: directed.photo, slide: layoutSlide, stage, index, count });
   const layout = contentAwarePresentationLayout(kind, layoutSlide, family);
   const photo = visual ? photoSizeOfLayout(layout) : 'none';
   const onPhoto = photo !== 'none' && textOnPhoto(layout);

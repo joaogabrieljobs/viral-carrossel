@@ -67,7 +67,9 @@ describe('modo livre, fase 2: o diretor corrige a proposta da IA', () => {
       const c = campos(s);
       return c.family === PROPOSTA[i].family && c.ground === PROPOSTA[i].ground && c.photo === PROPOSTA[i].photo;
     }).length;
-    expect(iguais).toBeGreaterThanOrEqual(8);
+    // O código ainda garante o lado da foto (nunca 3 seguidas do mesmo lado)
+    // e o teto de 6 famílias: 2 ou 3 páginas trocam de geometria por isso.
+    expect(iguais).toBeGreaterThanOrEqual(7);
     expect(slides.filter((s, i) => s.presentationFreeDesign.family === PROPOSTA[i].family).length).toBeGreaterThanOrEqual(9);
     expect(freeDeckViolations(slides)).toEqual([]);
   });
@@ -82,10 +84,23 @@ describe('modo livre, fase 2: o diretor corrige a proposta da IA', () => {
     });
   });
 
-  it('proposta que a família não desenha cai para a geometria mais próxima, sem layout novo', () => {
-    // Fundo de destaque no conteúdo e foto cheia no tipográfico não existem.
+  it('foto lateral troca de lado quando a família proposta desenha os dois lados (nunca 3 seguidas do mesmo lado)', () => {
+    // Famílias com foto à direita no conteúdo e à esquerda na demonstração; a IA pede tudo "half" em fundo claro.
+    const familias = ['editorial', 'cultural', 'technical', 'photo', 'modular'];
+    const lados = livre(deck(i => (i === 0 || i === 8 || i === 9 ? PROPOSTA[i] : { family: familias[i % familias.length], ground: 'bg', photo: 'half', block: 'none', emphasis: [] }))).filter(s => !s.presentationSuppressPhoto && ['small', 'half'].includes(s.presentationFreeDesign.photo))
+      .map(s => (s.canvas.zones.photo.x + s.canvas.zones.photo.w / 2 < 50 ? 'E' : 'D'));
+    expect(lados).toContain('E');
+    lados.forEach((l, i) => { if (i >= 2) expect(lados.slice(i - 2, i + 1).every(x => x === l), lados.join('')).toBe(false); });
+  });
+
+  it('proposta que a família não desenha cai para uma geometria que as famílias já desenham, sem perder a foto', () => {
+    // Foto cheia no Tipográfico não existe; fundo de destaque só em capa, divisor e fecho.
     const slides = livre(deck(i => (i === 3 ? { family: 'typographic', ground: 'accent', photo: 'full', block: 'none', emphasis: [] } : PROPOSTA[i])));
-    expect(slides[3].presentationFreeDesign.ground).not.toBe('accent');
+    const s = slides[3];
+    expect(['content', 'demo', 'divider']).toContain(s.presentationComposition);
+    if (s.presentationFreeDesign.ground === 'accent') expect(s.presentationComposition).toBe('divider');
+    expect(s.presentationSuppressPhoto).toBe(false);
+    expect(s.presentationFreeDesign.photo).not.toBe('none');
     expect(freeDeckViolations(slides)).toEqual([]);
   });
 
