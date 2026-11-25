@@ -56,11 +56,38 @@ function MovedToNotesNotice({ quality, slides, onDismiss }) {
   </section>;
 }
 
-export default function EditorialReviewNotice({ materialNotice = '', onDismissMaterialNotice, presentationQuality = null, slides = [], onDismissMovedToNotes, ...props }) {
+/**
+ * Spec 1.1, entrega 5: o que a auditoria de imagem apontou (slide, regra e o
+ * que se vê na imagem). Nada foi trocado: o botão de cada slide pede outra
+ * imagem, e quem o recebe pergunta antes com o custo.
+ */
+function ImageAuditNotice({ findings, slides, isPresentation, onRegenerate, onDismiss }) {
+  const positions = new Map((Array.isArray(slides) ? slides : []).map((slide, index) => [slide?.id, index]));
+  const items = (Array.isArray(findings) ? findings : [])
+    .filter(item => item && positions.has(item.slideId) && item.rule && item.evidence)
+    .map(item => ({ ...item, number: positions.get(item.slideId) + 1 }));
+  if (!items.length) return null;
+  const label = isPresentation ? 'Slide' : 'Card';
+  return <section className="vc-editor-review-notice" aria-label="Imagens para conferir">
+    <strong>Imagens para conferir</strong>
+    <p>A conferência das imagens achou {items.length === 1 ? 'uma imagem que não segue' : 'imagens que não seguem'} o briefing. Nada foi trocado. Se quiser outra imagem, o app mostra o custo antes de gerar.</p>
+    <ul>{items.map(item => <li key={`${item.slideId}-${item.ruleId}`}>
+      <strong>{label} {item.number}: </strong>
+      regra “{item.rule}”. Na imagem: {item.evidence}
+      {onRegenerate && <> <button type="button" className="vc-btn vc-btn-ghost" aria-label={`Gerar outra imagem do ${label.toLowerCase()} ${item.number}`} onClick={() => onRegenerate(item)}>Gerar outra imagem</button></>}
+    </li>)}</ul>
+    {onDismiss && <button type="button" className="vc-btn vc-btn-ghost" onClick={onDismiss}>Conferi as imagens</button>}
+  </section>;
+}
+
+export default function EditorialReviewNotice({ materialNotice = '', onDismissMaterialNotice, presentationQuality = null, slides = [], onDismissMovedToNotes,
+  imageAuditFindings = [], onRegenerateAuditImage, onDismissImageAudit, ...props }) {
   const material = <MaterialNotice text={materialNotice} onDismiss={onDismissMaterialNotice} />;
   const moved = <MovedToNotesNotice quality={presentationQuality} slides={slides} onDismiss={onDismissMovedToNotes} />;
+  const imageAudit = <ImageAuditNotice findings={imageAuditFindings} slides={slides} isPresentation={props.isPresentation}
+    onRegenerate={onRegenerateAuditImage} onDismiss={onDismissImageAudit} />;
   const review = <ReviewNotice {...props} />;
-  return materialNotice || presentationQuality ? <>{material}{moved}{review}</> : review;
+  return materialNotice || presentationQuality || imageAuditFindings?.length ? <>{material}{moved}{imageAudit}{review}</> : review;
 }
 
 function ReviewNotice({ status, issues = [], isPresentation = false, onReviewed }) {

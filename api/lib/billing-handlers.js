@@ -37,6 +37,7 @@ import {
   revokeAccountSessions,
 } from './account-identity-postgres.js';
 import { invalidateActiveAccessForCustomer } from './require-access.js';
+import { imageAuditEnabledFor } from './image-audit-flag.js';
 import { consumeRateLimit, rateLimitResponse } from './rate-limit.js';
 
 import { applyCors } from './cors.js';
@@ -178,6 +179,8 @@ export async function handleSession(req, res) {
       tier,
       plan: getPlan(tier),
       imageQuota,
+      // Spec 1.1 entrega 5: auditoria de imagem só para contas da lista.
+      imageAudit: imageAuditEnabledFor(access.customerId),
     });
   } catch (e) {
     console.error('[auth/session]', e?.message || e);

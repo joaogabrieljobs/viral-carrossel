@@ -92,6 +92,8 @@ export function accessStateFromSession(session = {}, current = {}) {
     tier: session.tier || null,
     plan: session.plan || null,
     imageQuota: session.imageQuota || null,
+    // Spec 1.1 entrega 5: flag por conta da auditoria de imagem (só true literal).
+    imageAudit: session.active === true && session.imageAudit === true,
   };
 }
 

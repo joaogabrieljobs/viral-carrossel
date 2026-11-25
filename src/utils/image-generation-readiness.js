@@ -107,6 +107,27 @@ export function importedPhotoRegenerationPrompt(slide = {}, {
 }
 
 /**
+ * Spec 1.1, entrega 5: a auditoria de imagem só aponta. Gerar outra imagem para
+ * o slide apontado é escolha da pessoa e sempre pergunta antes, com o custo,
+ * no mesmo formato de importedPhotoRegenerationPrompt.
+ */
+export function imageAuditRegenerationPrompt({
+  slideNumber = null, useOwnImageKey = false, billingDisabled = false, imageQuota = null, planTier = null,
+} = {}) {
+  const target = Number.isInteger(slideNumber) && slideNumber > 0 ? `o slide ${slideNumber}` : 'este slide';
+  const intro = `Gerar outra imagem para ${target} troca a imagem atual.`;
+  if (useOwnImageKey) {
+    return `${intro}\n\nA nova imagem é gerada com a sua chave de imagem e a cobrança é do provedor da chave.\n\nCancelar mantém a imagem atual e não gera nada.`;
+  }
+  if (billingDisabled) {
+    return `${intro}\n\nA cobrança está desativada neste ambiente.\n\nCancelar mantém a imagem atual e não gera nada.`;
+  }
+  const usage = normalizeAccountUsage({ imageQuota, planTier });
+  const left = usage.hasUsage && !usage.unlimited && usage.remaining > 0 ? ` Restam ${usage.remaining} neste ciclo.` : '';
+  return `${intro}\n\nA nova imagem usa 1 crédito de imagem do plano.${left}\n\nCancelar mantém a imagem atual e não usa crédito.`;
+}
+
+/**
  * Cards que "Gerar imagens" pode gerar em lote: têm pedido de imagem e não têm
  * foto. Foto que existe na conta (`bgImageAssetId`) conta como foto mesmo
  * enquanto baixa ou quando o download falhou; gerar por cima gastaria crédito
