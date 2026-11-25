@@ -2427,6 +2427,7 @@ function SidebarContent({
                   hasOpenAI={hasTextAI}
                   onNeedKeys={() => setKeysOpen?.(true)}
                   material={material}
+                  isPresentation={fmt === 'apresentacao'}
                 />
               </S>
             )}

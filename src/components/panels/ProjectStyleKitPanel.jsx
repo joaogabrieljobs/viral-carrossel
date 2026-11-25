@@ -94,6 +94,7 @@ function ProjectStyleKitPanel({
   onNeedKeys = null,
   material = null,
   projectId = null,
+  isPresentation = false,
 }) {
   const alive = useRef(true);
   const uploadVersion = useRef(0);
@@ -348,6 +349,11 @@ function ProjectStyleKitPanel({
             </button>
           ) : null}
         </div>
+        {isPresentation && refs.length ? (
+          <p style={{ fontSize: 11, lineHeight: 1.5, color: 'var(--text-muted)', margin: '8px 0 0' }}>
+            Na apresentação, estas imagens guiam só a foto da capa e a do fecho. Nos outros slides, a foto segue o estilo escrito acima e a cena de cada slide, para não repetir a mesma imagem.
+          </p>
+        ) : null}
       </Fold>
 
       {hasContent ? (

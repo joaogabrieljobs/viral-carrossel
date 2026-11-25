@@ -11,7 +11,7 @@ Na aba **Marca**, abra **Deste projeto**. Esse painel pertence ao projeto aberto
 | Nome do contexto | Identifica a direção em uso, como `MUSA — Contexto ON`. |
 | Brief do projeto | Conhecimento do produto, público, fatos, voz e restrições. Aceita Markdown de até 48 mil caracteres. |
 | Estilo visual | Composição, tipografia, paleta, luz e atmosfera desejadas. |
-| Referências de imagem | Até quatro imagens de moodboard; enviadas aos geradores compatíveis. |
+| Referências de imagem | Até quatro imagens de moodboard; enviadas aos geradores compatíveis. Na apresentação, vão só na imagem da capa e na do fecho (sem capa ou fecho no deck, na primeira e na última posição); os outros slides seguem o estilo escrito, a família visual e a cena de cada slide. Referência do próprio card não muda. |
 | Logo do projeto | PNG de até 2 MB; mantém a transparência e fica disponível para aplicar nos cards. |
 
 **Contexto ON** aparece quando existe brief, estilo ou referência. Salvar só um nome ou uma logo não ativa esse aviso. Nome, logo e kit acompanham o projeto; um projeto novo começa com kit vazio.

@@ -103,7 +103,7 @@ import { socialFamilyFor } from './src/utils/social-families.js';
 import { propagateBrandTypography } from './src/utils/brand-typography.js';
 import { imageAspectRatioForSlide } from './shared/image-aspect.js';
 import { normalizeVisualBible, visualBibleHasPerson, planPersonAnchor, pickPersonAnchorSlide } from './src/utils/visual-bible.js';
-import { composeImageDirection } from './src/utils/image-direction.js';
+import { composeImageDirection, presentationStyleKitForSlide } from './src/utils/image-direction.js';
 import { presentationPlanEntryImageQuery } from './src/utils/presentation-plan.js';
 import {
   PRESENTATION_VISUAL_PRESETS,
@@ -5426,7 +5426,11 @@ export default function App() {
     setSlideImgGenBusy(prev => ({ ...prev, [slideId]: true }));
     const job = startAIJob(parentSignal);
     try {
-      const baseRefs = await runAIJob(() => resolveImageReferences(styleKit, generationSnap.refImage, generationSnap.refImageId || generationSnap.refImageAssetId, generationSnap.imageReferences), job.signal);
+      // Spec 1.1 (referência): na apresentação, a referência sem papel vai só na capa e no fecho.
+      const imageKit = fmt === 'apresentacao'
+        ? presentationStyleKitForSlide(styleKit, liveSlides, liveSlides.findIndex((slide) => slide.id === slideId))
+        : styleKit;
+      const baseRefs = await runAIJob(() => resolveImageReferences(imageKit, generationSnap.refImage, generationSnap.refImageId || generationSnap.refImageAssetId, generationSnap.imageReferences), job.signal);
       // MF-03: refazer uma imagem só também segura o rosto da pessoa da ficha,
       // usando a foto já gerada de um card em que ela aparece.
       // Reteste 0b1cb62 (E04): cena sem pessoa tira a pessoa da ficha e não
@@ -5444,7 +5448,7 @@ export default function App() {
         // Estilo, anexos, âncora, ficha visual, família e enquadramento seguem
         // separados por papel; a proporção acompanha a zona real da foto.
         imageDirection: composeImageDirection({
-          styleKit, slide: generationSnap, fmt, visualBible: doc.visualBible,
+          styleKit: imageKit, slide: generationSnap, fmt, visualBible: doc.visualBible,
           slideDirection: imageState.extraPrompt, anchorPlan, baseReferenceCount: baseRefs.length,
           presentationPanel: fmt === 'apresentacao' && [2, 3].includes(generationSnap.presentationCompositionVersion),
         }),
@@ -6622,7 +6626,9 @@ ${jsonShapeLine}`;
           });
           try {
             checkActive();
-            const baseRefs = await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId, newSlides[i]?.imageReferences);
+            // Spec 1.1 (referência): na apresentação, a referência sem papel vai só na capa e no fecho.
+            const imageKit = isPresentationGeneration ? presentationStyleKitForSlide(styleKit, newSlides, i) : styleKit;
+            const baseRefs = await resolveImageReferences(imageKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId, newSlides[i]?.imageReferences);
             // Reteste T04: a âncora vai em toda imagem com pessoa na cena. Reteste
             // 0b1cb62 (E04): cena sem pessoa não recebe a âncora nem a pessoa da ficha.
             const anchorPlan = anchorPerson
@@ -6637,7 +6643,7 @@ ${jsonShapeLine}`;
               signal: job.signal,
               refImages: [...baseRefs, ...anchorPlan.refImages],
               imageDirection: composeImageDirection({
-                styleKit,
+                styleKit: imageKit,
                 slide: newSlides[i],
                 fmt: isPresentationGeneration ? 'apresentacao' : (fmt && fmt !== 'apresentacao' ? fmt : 'carrossel'),
                 visualBible: isPresentationGeneration ? null : generationVisualBible,

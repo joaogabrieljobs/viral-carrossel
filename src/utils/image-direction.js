@@ -31,6 +31,38 @@ export function presentationImageAvoid(slide) {
   return [...new Set(lines)].slice(0, 8);
 }
 
+const PRESENTATION_REFERENCE_ROLES = Object.freeze(['cover', 'closing']);
+const visualRoleOf = (slide) => String(slide?.presentationPlan?.visualRole || slide?.presentationVisualRole || slide?.visualRole || '');
+
+/**
+ * Spec 1.1, referência (decisão do João, 25/11): na Apoteose a referência do
+ * kit, sem papel declarado, ia como moodboard em todas as imagens, e a mesma
+ * mulher de máscara saiu em 7 de 10 slides. Na apresentação ela vai só na capa
+ * e no fecho (papel visual cover e closing). Deck sem esse papel (gerado sem
+ * roteiro, cujas etapas usam outros nomes) usa a primeira e a última posição
+ * no lugar do que falta. Referência com @rótulo no kit tem papel declarado e
+ * continua em toda imagem.
+ */
+export function presentationStyleReferenceAllowed(slides, index) {
+  const list = Array.isArray(slides) ? slides : [];
+  const roles = list.map(visualRoleOf);
+  if (PRESENTATION_REFERENCE_ROLES.includes(roles[index])) return true;
+  if (index === 0 && !roles.includes('cover')) return true;
+  return index === list.length - 1 && list.length > 0 && !roles.includes('closing');
+}
+
+/**
+ * Kit para a imagem de um slide de apresentação: fora da capa e do fecho,
+ * sem as referências sem papel. O estilo escrito fica; ele e a família passam
+ * a guiar a imagem, e o assunto vem da cena do slide. Carrossel e referência
+ * do próprio slide não passam por aqui.
+ */
+export function presentationStyleKitForSlide(styleKit, slides, index) {
+  const kit = normalizeStyleKit(styleKit);
+  if (presentationStyleReferenceAllowed(slides, index)) return kit;
+  return { ...kit, refImages: kit.refImages.filter((ref) => String(ref.mention || '').trim()) };
+}
+
 /**
  * Anexos na ordem real de envio, como `resolveImageReferences` os entrega:
  * as referências do card substituem o moodboard do projeto; a âncora de

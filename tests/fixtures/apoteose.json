@@ -338,14 +338,15 @@
   "refImages": [
    {
     "id": "img_ref",
-    "name": "referencia.jpeg"
+    "name": "referencia.jpeg",
+    "imageId": "img_ref"
    }
   ],
   "nota": "No projeto real, uma imagem de referência sem papel declarado (vai como moodboard em todas as imagens). Bytes fora do repositório."
  },
  "imagePromptsV1": {
-  "nota": "sha256 (16 primeiros) dos pedidos de imagem montados com o roteiro v1 salvo, calculados no commit c46f91a, antes do roteiro v2. Família presentation_cinematic, rota sjinn, 1 referência.",
-  "sha": [
+  "nota": "sha256 (16 primeiros) dos pedidos de imagem com o roteiro v1 salvo. Família presentation_cinematic, rota sjinn, kit com 1 referência sem papel. shaAntesDaReferencia: calculado antes do roteiro v2 (c46f91a), referência em todas as imagens. sha: desde a regra da referência (spec 1.1), que muda de propósito os slides 2 a 9: a referência vai só na capa e no fecho, que ficam iguais.",
+  "shaAntesDaReferencia": [
    "b22112cb31cd76b0",
    "b8f32f1cc4ee7e67",
    "83a0f09a55967d14",
@@ -355,6 +356,18 @@
    "a5c67ab465fe4da0",
    "1e7be50eb81fd1aa",
    "1fc43d7f116c52a4",
+   "9cdd4a7ac8cf4e8f"
+  ],
+  "sha": [
+   "b22112cb31cd76b0",
+   "51d68542a3a88893",
+   "f628b30629687f49",
+   "e32da9a197b2a7ae",
+   "b0a3f8a1272bb8fd",
+   "e7bf0e8ece8ba637",
+   "52239fdd7d71295b",
+   "c553de93d61d2e3c",
+   "4ef07121741692a4",
    "9cdd4a7ac8cf4e8f"
   ]
  }
