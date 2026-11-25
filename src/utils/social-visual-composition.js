@@ -299,6 +299,34 @@ function linesFor(text, px, widthPx, cw) {
 }
 
 /**
+ * Layout dividido (título numa coluna de cerca de 40% do card, ao lado do
+ * apoio ou da foto): acima deste número de linhas o título vira uma tira de
+ * palavras soltas, e a página volta para o layout empilhado.
+ */
+export const COLUMN_TITLE_MAX_LINES = 4;
+/** Coluna estreita: caixa de título com menos de 60% da largura do card. */
+const NARROW_TITLE_PCT = 60;
+
+/**
+ * Linhas do título numa coluna, antes de a coluna ser escolhida: quebra por
+ * palavra inteira (como o navegador faz), no corpo planejado e na largura
+ * útil da caixa (a caixa menos o respiro lateral do renderer, 32 px por lado).
+ */
+export function columnTitleLines(title, { titlePx, widthPct, frameWidth = 1080, titleFont = '', upper = false } = {}) {
+  const widthPx = (widthPct / 100) * frameWidth - 64;
+  const capacity = Math.max(1, widthPx / (titlePx * charWidthEm(titleFont, upper)));
+  return String(title || '').split('\n').map((p) => visibleSocialText(p).trim()).filter(Boolean).reduce((total, paragraph) => {
+    let lines = 1; let used = 0;
+    for (const word of paragraph.split(/\s+/).filter(Boolean)) {
+      const n = Array.from(word).length;
+      if (used && used + 1 + n > capacity) { lines += 1; used = 0; }
+      if (n > capacity) { lines += Math.ceil(n / capacity) - 1; used = n % Math.max(1, Math.floor(capacity)); } else used += (used ? 1 : 0) + n;
+    }
+    return total + lines;
+  }, 0);
+}
+
+/**
  * Ajuste de densidade: estima linhas de título e apoio no corpo planejado.
  * 1. a fronteira título/apoio anda para quem precisa (caixas empilhadas);
  * 2. o apoio desce até o piso legível (28 px em 1080) e o título até 70%;
@@ -462,12 +490,24 @@ export function socialFormatPatch(slide, formato = 'carrossel') {
   const zoned = guardChrome(L, F, { footerPct: art.footer?.[F.key] || 0, logoCorner: null });
   const center = !L.photo && ['opener', 'development', 'list'].includes(art.fn);
   let fit = fitDensity({ ...L, center, photo: zoned.photo, title: zoned.title, subtitle: zoned.subtitle }, slide, F, typo);
-  // Título que só caberia com letra pequena numa coluna estreita: a página
-  // troca para foto em faixa e texto na largura toda.
-  if (fit.wordLimited && L.photo && !L.onPhoto && L.title.w < 60) {
-    L = socialCardLayout(art.family, art.fn, { formato, photo, structured: art.structured, variant: art.variant, topReserve: logoTopReserve(art.logo, F), wide: true });
-    const z2 = guardChrome(L, F, { footerPct: art.footer?.[F.key] || 0, logoCorner: null });
-    fit = fitDensity({ ...L, center, photo: z2.photo, title: z2.title, subtitle: z2.subtitle }, slide, F, typo);
+  // Layout dividido (título em coluna estreita): o título é medido na coluna,
+  // no corpo que teria nela, antes de a coluna valer. Se só caberia com letra
+  // pequena, ou se passa de 4 linhas, a página volta para o empilhado: foto em
+  // faixa e texto na largura toda, ou a outra geometria da função (sem foto).
+  const narrowColumn = L.title.w < NARROW_TITLE_PCT && !L.onPhoto;
+  const tallInColumn = narrowColumn && columnTitleLines(slide.title, {
+    titlePx: fit.titlePx, widthPct: fit.title.w, frameWidth: F.w, titleFont: typo.titleFont, upper: typo.titleCase === 'upper',
+  }) > COLUMN_TITLE_MAX_LINES;
+  if (narrowColumn && ((fit.wordLimited && L.photo) || tallInColumn)) {
+    const base = { formato, photo, structured: art.structured, topReserve: logoTopReserve(art.logo, F) };
+    const stacked = L.photo
+      ? socialCardLayout(art.family, art.fn, { ...base, variant: art.variant, wide: true })
+      : [1, 2, 3].map((k) => socialCardLayout(art.family, art.fn, { ...base, variant: (art.variant || 0) + k })).find((alt) => alt.title.w >= NARROW_TITLE_PCT && !alt.photo);
+    if (stacked) {
+      L = stacked;
+      const z2 = guardChrome(L, F, { footerPct: art.footer?.[F.key] || 0, logoCorner: null });
+      fit = fitDensity({ ...L, center: !L.photo && ['opener', 'development', 'list'].includes(art.fn), photo: z2.photo, title: z2.title, subtitle: z2.subtitle }, slide, F, typo);
+    }
   }
   const hasSub = !!String(slide.subtitle || slide.bodyAfterImage || '').trim();
   // Trava final do rodapé (selo/barra): depois do ajuste de densidade nada
