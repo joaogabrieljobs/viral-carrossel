@@ -159,3 +159,93 @@ export async function buildImageAuditMosaic(entries, { createCanvas = browserCan
   }
   return null;
 }
+
+// ─── Pedido ao modelo ───────────────────────────────────────────────────────
+/**
+ * Nenhum modelo de texto da rota do plano lê imagem hoje: a chave da
+ * plataforma só serve glm-4.7, glm-4.7-flashx, glm-4.7-flash e glm-5.2
+ * (shared/ai-models.js), todos só texto. Enquanto este valor estiver vazio a
+ * auditoria não monta mosaico nem chama nada. Para ligar: escolher um modelo
+ * de visão do provedor, pô-lo na allowlist da plataforma e aqui.
+ */
+export const IMAGE_AUDIT_MODEL = '';
+const IMAGE_AUDIT_URL = '/api/ai/compatible';
+const IMAGE_AUDIT_MAX_TOKENS = 600;
+
+export function buildImageAuditMessages({ slides = [], rules = [], mosaicDataUrl = '' } = {}) {
+  const ruleLines = rules.map(rule => `- ${rule.id} (${rule.level === 'avoid' ? 'proíbe' : 'exige'}): ${rule.instruction}`);
+  const slideLines = slides.map(slide => `- Slide ${slide.slideIndex + 1}: ${text(slide.title) || '(sem título)'}`);
+  const prompt = [
+    'Você confere imagens de uma apresentação contra as regras do briefing.',
+    'O mosaico anexo traz uma miniatura por slide; o número no canto de cada miniatura é o número do slide.',
+    'Títulos dos slides do mosaico:', ...slideLines,
+    'Regras de imagem do briefing:', ...ruleLines,
+    'Aponte só a imagem que viola uma dessas regras de forma visível na miniatura. Em evidence, descreva em português, de forma concreta, o que aparece na imagem e mostra a violação (objeto, pessoa, roupa, lugar). Não aponte suspeita nem o que não dá para ver. Use só os números de slide e os ids de regra acima.',
+    `Responda só JSON: {"findings":[{"slide":2,"ruleId":"${rules[0]?.id || 'r1'}","evidence":"o que se vê na imagem"}]}. Sem violação visível, responda {"findings":[]}.`,
+  ].join('\n');
+  return [
+    { role: 'system', content: 'Responda apenas com o JSON pedido.' },
+    { role: 'user', content: [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: mosaicDataUrl } }] },
+  ];
+}
+
+/**
+ * A chamada isolada: UM pedido de texto pela rota do plano, que conta 1 na
+ * cota diária de texto (api/ai/compatible.js → consumeTextCredit). Sem
+ * cascata de modelo e sem nova tentativa.
+ */
+export async function requestImageAuditCompletion(messages, { model, signal, fetchImpl = globalThis.fetch } = {}) {
+  const res = await fetchImpl(IMAGE_AUDIT_URL, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ provider: 'zai', operation: 'chat', payload: {
+      model, messages, max_tokens: IMAGE_AUDIT_MAX_TOKENS, temperature: 0, response_format: { type: 'json_object' },
+    } }),
+    signal,
+  });
+  const raw = await res.text();
+  let data = null;
+  try { data = JSON.parse(raw); } catch { /* tratado abaixo */ }
+  if (!res.ok || !data || data.error) {
+    throw Object.assign(new Error(String(data?.error?.message || `HTTP ${res.status}`)), {
+      status: res.status, code: data?.error?.code || 'image_audit_failed',
+    });
+  }
+  return data.choices?.[0]?.message?.content || '';
+}
+
+/**
+ * Roda a auditoria uma vez. `images`: [{ slideId, dataUrl }] das imagens que o
+ * laço acabou de gerar. Não gera imagem, não grava nada: devolve
+ * { status, findings } e, quando não roda, `reason`.
+ */
+export async function runImageAudit({
+  enabled = false, plan = null, slides = [], images = [], model = IMAGE_AUDIT_MODEL,
+  buildMosaic = buildImageAuditMosaic, transport = requestImageAuditCompletion, signal,
+} = {}) {
+  if (enabled !== true) return { status: 'disabled', findings: [] };
+  if (!text(model)) return { status: 'unavailable', reason: 'model_not_configured', findings: [] };
+  const rules = imageAuditRules(plan);
+  if (!rules.length) return { status: 'skipped', reason: 'no_image_rules', findings: [] };
+  const positions = new Map((Array.isArray(slides) ? slides : []).map((slide, index) => [slide?.id, { slide, index }]));
+  const entries = (Array.isArray(images) ? images : [])
+    .filter(image => positions.has(image?.slideId) && inMemoryImage(image.dataUrl))
+    .map(image => ({ slideId: image.slideId, slideIndex: positions.get(image.slideId).index, dataUrl: image.dataUrl }))
+    .sort((a, b) => a.slideIndex - b.slideIndex);
+  if (!entries.length) return { status: 'skipped', reason: 'no_images', findings: [] };
+  let mosaic = null;
+  try { mosaic = await buildMosaic(entries); } catch { mosaic = null; }
+  if (!mosaic?.dataUrl || !Array.isArray(mosaic.slides) || !mosaic.slides.length) {
+    return { status: 'skipped', reason: 'mosaic_unavailable', findings: [] };
+  }
+  const audited = mosaic.slides.map(({ slideId, slideIndex }) => ({ slideId, slideIndex, title: positions.get(slideId)?.slide?.title }));
+  let raw;
+  try {
+    raw = await transport(buildImageAuditMessages({ slides: audited, rules, mosaicDataUrl: mosaic.dataUrl }), { model, signal });
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    return { status: 'failed', reason: error?.code || 'image_audit_failed', findings: [] };
+  }
+  return { status: 'done', findings: validateImageAuditResponse(raw, { slides: audited, rules }) };
+}
