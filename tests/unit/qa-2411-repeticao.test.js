@@ -97,7 +97,8 @@ describe('QA 24/11 texto 3: carrossel repara o card repetido', () => {
   it('se o reparo por IA falha, o card repetido sai e o projeto avisa que ficou com menos cards', async () => {
     const ai = vi.fn().mockResolvedValueOnce(draft()).mockResolvedValueOnce({ edits: [] }).mockRejectedValueOnce(new Error('fora do ar'));
     const output = await generateReviewedCarousel({ prompt: 'Material.', config: config() }, ai);
-    expect(output.result.slides.map(slide => slide.title)).toEqual(['Fermento Lento, no Rio Vermelho', 'Três pães para escolher', 'Encomende pelo WhatsApp']);
+    // RT24 (texto 1): o repetido é o último card; sai o anterior e o fecho fica.
+    expect(output.result.slides.map(slide => slide.title)).toEqual(['Fermento Lento, no Rio Vermelho', 'Três pães para escolher', 'Um dia antes']);
     expect(output.reviewStatus).toBe('needs_attention');
     expect(output.violations).toContainEqual({ kind: 'normalization', slideIndex: null, code: 'repeated_cards_removed' });
     expect(output.violations.some(item => item.kind === 'repeated_content')).toBe(false);
@@ -195,14 +196,16 @@ describe('QA 24/11 texto 3: apresentação repara slide e bloco de passos repeti
     expect(output.reviewStatus).toBe('repaired');
   });
 
-  it('se o reparo por IA falha, o slide repetido recebe a contribuição própria do plano', async () => {
+  // RT24 (texto 1): até o reteste de 24/11 o slide repetido recebia a pergunta
+  // e a mensagem do plano. Os planos reais mostraram que esse texto é anotação
+  // de planejamento; o slide fica como está e o aviso sai fora do slide.
+  it('se o reparo por IA falha, o slide repetido não recebe texto do plano e é avisado fora do slide', async () => {
     const ai = written(vi.fn(), duplicated()).mockResolvedValueOnce({ edits: [] }).mockRejectedValueOnce(new Error('fora do ar'));
     const output = await generateReviewedCarousel({ prompt: 'Material.', config: config() }, ai);
     expect(output.result.slides).toHaveLength(4);
-    expect(output.result.slides[2]).toMatchObject({ title: 'Do que o pão é feito?', subtitle: 'O pão leva farinha, água e sal.' });
-    expect(output.result.slides[1].title).toBe('O pedido chega pelo WhatsApp');
-    expect(review.repeatedContentSlides(output.result.slides)).toEqual([]);
-    expect(output.reviewStatus).toBe('repaired');
+    expect(output.result.slides[2]).toMatchObject({ title: 'Pedido recebido pelo WhatsApp', subtitle: 'O pedido chega à padaria pelo WhatsApp.' });
+    expect(output.repetitionNotice).toMatch(/^Os slides 2 e 3 dizem o mesmo com outras palavras\./);
+    expect(output.violations).toBeUndefined();
   });
 
   it('o mesmo bloco de passos não fica em dois slides, mesmo sem a IA', async () => {

@@ -495,8 +495,21 @@ export function repeatedPhraseSlides(slides) {
  */
 export const REPEATED_CONTENT_THRESHOLD = 0.8;
 const MIN_CONTENT_STEMS = 4;
+// Reteste real 24/11 (RT24 1): as repetições que a pessoa viu não eram pegas.
+// A conta acima soma título, apoio, corpo e blocos e divide pelo slide maior:
+// um título diferente ou um bloco a mais derrubava o resultado (Pitch 10~11 =
+// 0,56; Alto impacto 2~5 = 0,67 com o corpo idêntico). O corpo (apoio e
+// texto, sem título nem bloco) passa a ser comparado à parte. Nos textos
+// reais, os pares apontados dão 0,76, 0,80 e 1,00 e o par mais próximo que
+// não é repetição dá 0,65: o limiar do corpo é 0,70. Corpo com menos de seis
+// radicais não entra: uma linha curta de apoio se repete sem ser a mesma ideia.
+export const REPEATED_BODY_THRESHOLD = 0.7;
+const MIN_BODY_STEMS = 6;
+// "builds" e "build", "negócios" e "negócio" são a mesma palavra.
+const stemOf = word => (word.length > 4 && /[^s]s$/.test(word) ? word.slice(0, -1) : word).slice(0, 6);
 const contentStems = text => new Set((plainWords(text).match(/[a-z0-9]+/g) || [])
-  .filter(word => (word.length > 2 || /\d/.test(word)) && !PHRASE_STOP.has(word)).map(word => word.slice(0, 6)));
+  .filter(word => (word.length > 2 || /\d/.test(word)) && !PHRASE_STOP.has(word)).map(stemOf));
+const bodyText = slide => ['subtitle', 'bodyAfterImage'].map(field => String(slide?.[field] || '')).join(' ');
 const visibleText = slide => [...['title', 'subtitle', 'bodyAfterImage'].map(field => String(slide?.[field] || '')), blockText(slide?.presentationBlocks)].join(' ');
 // Integração de 24/11: a regra tirava do projeto cards que só mudavam o
 // número. Ela não distingue contador de dado ("Plano de 3 meses" e "Plano de
@@ -511,14 +524,25 @@ export function slideSimilarity(a, b) {
   return stemOverlap(contentStems(visibleText(a)), contentStems(visibleText(b)));
 }
 
-/** Card ou slide que repete um anterior com outras palavras: { slideIndex, duplicateOf, score }. */
+export function bodySimilarity(a, b) {
+  return stemOverlap(contentStems(bodyText(a)), contentStems(bodyText(b)), MIN_BODY_STEMS);
+}
+
+/**
+ * Card ou slide que repete um anterior com outras palavras: { slideIndex,
+ * duplicateOf, score }. Vale o texto inteiro (0,80) ou só o corpo (0,70).
+ */
 export function repeatedContentSlides(slides) {
-  const list = (Array.isArray(slides) ? slides : []).map(slide => contentStems(visibleText(slide)));
+  const safe = Array.isArray(slides) ? slides : [];
+  const list = safe.map(slide => contentStems(visibleText(slide)));
+  const bodies = safe.map(slide => contentStems(bodyText(slide)));
   return list.flatMap((current, slideIndex) => {
     let best = null;
     for (let duplicateOf = 0; duplicateOf < slideIndex; duplicateOf += 1) {
-      const score = stemOverlap(list[duplicateOf], current);
-      if (score >= REPEATED_CONTENT_THRESHOLD && (!best || score > best.score)) best = { slideIndex, duplicateOf, score: Math.round(score * 100) / 100 };
+      const whole = stemOverlap(list[duplicateOf], current);
+      const body = stemOverlap(bodies[duplicateOf], bodies[slideIndex], MIN_BODY_STEMS);
+      const score = whole >= REPEATED_CONTENT_THRESHOLD ? whole : body >= REPEATED_BODY_THRESHOLD ? body : 0;
+      if (score && (!best || score > best.score)) best = { slideIndex, duplicateOf, score: Math.round(score * 100) / 100 };
     }
     return best ? [best] : [];
   });
@@ -535,9 +559,46 @@ export function repeatedStepBlockSlides(slides) {
   });
   return list.flatMap((current, slideIndex) => {
     if (!current) return [];
-    const duplicateOf = list.findIndex((previous, index) => index < slideIndex && previous && stemOverlap(previous, current, 2) >= REPEATED_CONTENT_THRESHOLD);
+    // RT24 1: Relatório real, slides 5 e 7, dois de três passos com o mesmo
+    // título e o terceiro reescrito: 0,80 com "builds" = "build", 0,70 sem.
+    const duplicateOf = list.findIndex((previous, index) => index < slideIndex && previous && stemOverlap(previous, current, 2) >= REPEATED_BODY_THRESHOLD);
     return duplicateOf >= 0 ? [{ slideIndex, duplicateOf }] : [];
   });
+}
+
+/**
+ * RT24 1: o mesmo bloco de métricas em mais de um slide (Relatório real, 3 e
+ * 6: "Site price", "Logo included", "Payment timing"). Vale quando os rótulos
+ * do bloco menor estão no outro (70%), cada bloco tem ao menos duas métricas
+ * e os valores não trazem números diferentes: "Pães vendidos 35.000" em 2024
+ * e "41.200" em 2025 são dados novos.
+ */
+export function repeatedMetricBlockSlides(slides) {
+  const list = (Array.isArray(slides) ? slides : []).map((slide) => {
+    const block = (Array.isArray(slide?.presentationBlocks) ? slide.presentationBlocks : []).find(item => item?.type === 'metrics' && Array.isArray(item.items));
+    if (!block || block.items.length < 2) return null;
+    return { labels: contentStems(block.items.map(item => item?.label).join(' ')), values: contentStems(block.items.map(item => item?.value).join(' ')) };
+  });
+  const sameLabels = (a, b) => {
+    const [small, large] = a.size <= b.size ? [a, b] : [b, a];
+    return small.size >= 2 && [...small].filter(stem => large.has(stem)).length / small.size >= REPEATED_BODY_THRESHOLD;
+  };
+  return list.flatMap((current, slideIndex) => {
+    if (!current) return [];
+    const duplicateOf = list.findIndex((previous, index) => index < slideIndex && previous
+      && sameLabels(previous.labels, current.labels) && !numbersConflict(previous.values, current.values));
+    return duplicateOf >= 0 ? [{ slideIndex, duplicateOf }] : [];
+  });
+}
+
+/** Aviso fora do slide: repetição que o reparo não resolveu numa apresentação. */
+export function repeatedSlidesNotice(repeated) {
+  const list = (Array.isArray(repeated) ? repeated : []).map(item => `${item.duplicateOf + 1} e ${item.slideIndex + 1}`);
+  if (!list.length) return '';
+  const advice = `O material rende menos slides do que o pedido: ${list.length > 1 ? 'junte cada par' : 'junte os dois'}, reescreva um deles ou gere de novo com menos slides.`;
+  return list.length > 1
+    ? `Estes slides dizem o mesmo com outras palavras: ${list.join('; ')}. ${advice}`
+    : `Os slides ${list[0]} dizem o mesmo com outras palavras. ${advice}`;
 }
 
 /**
@@ -753,7 +814,9 @@ function withoutCopiedFills(candidate, draft) {
  */
 function withoutRepeatedCards(candidate, config) {
   if (config?.keepCardCount || config?.explicitCardScript?.count) return null;
-  const drop = new Set(repeatedContentSlides(candidate.slides).map(item => item.slideIndex));
+  // RT24 1: quando o repetido é o último card (o fecho), sai o anterior.
+  const last = candidate.slides.length - 1;
+  const drop = new Set(repeatedContentSlides(candidate.slides).map(item => (item.slideIndex === last && item.duplicateOf > 0 ? item.duplicateOf : item.slideIndex)));
   if (!drop.size) return null;
   const kept = candidate.slides.filter((_, index) => !drop.has(index));
   return { ...candidate, slides: kept.map((slide, index) => (typeof slide.bodyAfterImage === 'string' && slide.bodyAfterImage
@@ -1198,9 +1261,12 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
     const result = questions.length ? { ...moved.draft, slides: moved.draft.slides.map((slide, index) => (questions.includes(index) ? { ...slide, title: '' } : slide)) } : moved.draft;
     const facts = [...[...moved.emptiedTitles, ...questions].sort((a, b) => a - b).map(slideIndex => ({ kind: 'missing_title', slideIndex, field: 'title' })), ...factsOf(result)];
     const materialGaps = [...(Array.isArray(plan.gaps) ? plan.gaps : []), ...moved.gaps];
+    // RT24 1: slide que ainda diz o mesmo que outro não vira rascunho; é
+    // avisado fora do slide, junto do aviso sobre o material.
+    const repetitionNotice = repeatedSlidesNotice(repeatedContentSlides(result.slides));
     return { result, plan, planningDiagnostics, writingDiagnostics, reviewDiagnostics, reviewStatus: facts.length ? 'needs_attention' : reviewStatus, ...extra,
       ...((facts.length || extra.violations?.length) ? { violations: [...(extra.violations || []), ...facts] } : {}),
-      ...(materialGaps.length ? { materialGaps } : {}) };
+      ...(materialGaps.length ? { materialGaps } : {}), ...(repetitionNotice ? { repetitionNotice } : {}) };
   };
   const plannedConfig = {
     ...factualConfig, presentationPlan: plan,
@@ -1250,43 +1316,31 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
     // QA 24/11 (texto 3): corpo, paráfrase e bloco de passos também contam.
     const contents = repeatedContentSlides(slides);
     const steps = repeatedStepBlockSlides(slides);
-    return { facts, titles, contents, steps, size: facts.reduce((sum, item) => sum + item.slideIndexes.length - 2, 0) + titles.length
-      + contents.filter(item => !titles.includes(item.slideIndex)).length + steps.length };
+    const metrics = repeatedMetricBlockSlides(slides);
+    return { facts, titles, contents, steps, metrics, size: facts.reduce((sum, item) => sum + item.slideIndexes.length - 2, 0) + titles.length
+      + contents.filter(item => !titles.includes(item.slideIndex)).length + steps.length + metrics.length };
   };
-  // Último recurso sem IA. O segundo bloco de passos igual sai do slide; o
-  // slide que ainda repete outro recebe a contribuição que o plano previa
-  // para aquela posição (pergunta no título, mensagem no apoio), quando ela
-  // está no idioma do deck, não repete nada e não traz fato novo nem excesso.
-  const english = text => (plainWords(text).match(/\b(?:the|and|of|to|is|are|you|your|with|for)\b/g) || []).length
-    > (plainWords(text).match(/\b(?:de|da|do|que|para|com|uma|um|os|as|em|nao)\b/g) || []).length;
+  // Último recurso sem IA: o segundo bloco igual (passos ou métricas) sai do
+  // slide. O texto do slide não é trocado. Até o reteste de 24/11 o slide
+  // repetido recebia a pergunta e a mensagem do plano; os planos reais mostram
+  // que esse texto é anotação de planejamento ("Resultado observado: N/A",
+  // "sem resultados de projeto documentados"), em português mesmo com o deck em
+  // inglês. O slide que continua repetido é avisado fora do slide (finish).
   const dedupeWithoutAI = (result) => {
-    const sameBlock = new Set(repeatedStepBlockSlides(result.slides).map(item => item.slideIndex));
-    let current = sameBlock.size ? { ...result, slides: result.slides.map((slide, index) => (sameBlock.has(index) ? { ...slide, presentationBlocks: [] } : slide)) } : result;
-    for (const item of repeatedContentSlides(current.slides)) {
-      const entry = plan.slides[item.slideIndex];
-      const title = String(entry?.question || '').trim();
-      const subtitle = String(entry?.keyMessage || '').replace(/^[^:.!?]{1,40}:\s*/u, '').trim();
-      if (!title || !subtitle) continue;
-      const swapped = { ...current, slides: current.slides.map((slide, index) => (index === item.slideIndex ? { ...slide, title, subtitle, bodyAfterImage: '' } : slide)) };
-      const others = current.slides.filter((_, index) => index !== item.slideIndex).map(visibleText).join(' ');
-      if (english(`${title} ${subtitle}`) !== english(others)) continue;
-      if (repeatedContentSlides(swapped.slides).some(found => found.slideIndex === item.slideIndex) || repeatedTitleIndexes(swapped.slides).includes(item.slideIndex)) continue;
-      if (factsOf(swapped).length > factsOf(current).length || overLimits(swapped.slides).length > overLimits(current.slides).length) continue;
-      current = swapped;
-    }
-    return current;
+    const sameBlock = new Set([...repeatedStepBlockSlides(result.slides), ...repeatedMetricBlockSlides(result.slides)].map(item => item.slideIndex));
+    return sameBlock.size ? { ...result, slides: result.slides.map((slide, index) => (sameBlock.has(index) ? { ...slide, presentationBlocks: [] } : slide)) } : result;
   };
   const settleRepetition = async (result, reviewStatus, extra) => {
     const repetition = repetitionOf(result.slides);
     if (!repetition.size) return finish(result, reviewStatus, extra);
     const targets = [...new Set([...repetition.facts.flatMap(item => item.slideIndexes), ...repetition.titles,
-      ...repetition.contents.map(item => item.slideIndex), ...repetition.steps.map(item => item.slideIndex)])].sort((a, b) => a - b);
+      ...repetition.contents.map(item => item.slideIndex), ...repetition.steps.map(item => item.slideIndex), ...repetition.metrics.map(item => item.slideIndex)])].sort((a, b) => a - b);
     let current = result;
     let status = reviewStatus;
     onStage?.('repairing');
     try {
       const repair = await callAI(`${buildEditorialReviewPrompt(briefing, result, plannedConfig)}
-REPARO DE REPETIÇÃO: edite somente os slides com slideIndex ${targets.join(', ')}.${repetition.facts.length ? ` Fatos que se repetem: ${repetition.facts.map(item => `"${item.fact}" nos slideIndex ${item.slideIndexes.join(', ')}`).join('; ')}. Mantenha cada fato só nos slides em que ele é o assunto; nos outros, troque por outra informação do material ou condense.` : ''}${repetition.titles.length ? ` Títulos que repetem um anterior: slideIndex ${repetition.titles.join(', ')}; reescreva com a ideia própria do slide.` : ''}${repetition.contents.length ? ` Slides que repetem outro com outras palavras: ${repetition.contents.map(item => `slideIndex ${item.slideIndex} (repete o ${item.duplicateOf})`).join('; ')}; reescreva com a contribuição própria da posição no roteiro.` : ''}${repetition.steps.map(item => ` Mesmo bloco de passos nos slideIndex ${item.duplicateOf} e ${item.slideIndex}: mantenha o bloco só no primeiro; no slideIndex ${item.slideIndex}, devolva presentationBlocks [] ou um bloco com outra informação do material.`).join('')} Inclua presentationBlocks quando a repetição estiver no bloco. Não acrescente fatos, não mude quantidade nem ordem.`, reviewOptions);
+REPARO DE REPETIÇÃO: edite somente os slides com slideIndex ${targets.join(', ')}.${repetition.facts.length ? ` Fatos que se repetem: ${repetition.facts.map(item => `"${item.fact}" nos slideIndex ${item.slideIndexes.join(', ')}`).join('; ')}. Mantenha cada fato só nos slides em que ele é o assunto; nos outros, troque por outra informação do material ou condense.` : ''}${repetition.titles.length ? ` Títulos que repetem um anterior: slideIndex ${repetition.titles.join(', ')}; reescreva com a ideia própria do slide.` : ''}${repetition.contents.length ? ` Slides que repetem outro com outras palavras: ${repetition.contents.map(item => `slideIndex ${item.slideIndex} (repete o ${item.duplicateOf})`).join('; ')}; reescreva com a contribuição própria da posição no roteiro.` : ''}${repetition.steps.map(item => ` Mesmo bloco de passos nos slideIndex ${item.duplicateOf} e ${item.slideIndex}: mantenha o bloco só no primeiro; no slideIndex ${item.slideIndex}, devolva presentationBlocks [] ou um bloco com outra informação do material.`).join('')}${repetition.metrics.map(item => ` Mesmo bloco de métricas nos slideIndex ${item.duplicateOf} e ${item.slideIndex}: mantenha o bloco só no primeiro; no slideIndex ${item.slideIndex}, devolva presentationBlocks [] ou um bloco com outra informação do material.`).join('')} Inclua presentationBlocks quando a repetição estiver no bloco. Não acrescente fatos, não mude quantidade nem ordem.`, reviewOptions);
       throwIfGenerationCancelled(aiOptions?.signal);
       if (!Array.isArray(repair?.edits) || repair.edits.some(edit => !targets.includes(edit?.slideIndex))) throw new Error('Reparo fora do escopo');
       const repaired = applyEditorialReview(result, repair, plannedConfig, { deferQualityChecks: true });

@@ -6091,7 +6091,7 @@ ${jsonShapeLine}`;
       brandBlock,
       styleKitTextHint,
     ].filter(Boolean).join('\n');
-    const { result, reviewStatus, plan: generationPlan, incomplete: generationIncomplete = false, interruptionReason: generationInterruptionReason, writingDiagnostics: generationWritingDiagnostics = [], reviewDiagnostics: generationReviewDiagnostics = [], completedCount: generatedCount, totalCount: requestedCount, violations: editorialViolations = [], issues: editorialIssues = [], materialGaps = [] } = await generateReviewedCarousel({
+    const { result, reviewStatus, plan: generationPlan, incomplete: generationIncomplete = false, interruptionReason: generationInterruptionReason, writingDiagnostics: generationWritingDiagnostics = [], reviewDiagnostics: generationReviewDiagnostics = [], completedCount: generatedCount, totalCount: requestedCount, violations: editorialViolations = [], issues: editorialIssues = [], materialGaps = [], repetitionNotice = '' } = await generateReviewedCarousel({
       prompt,
       config: {
         count: Number(count),
@@ -6500,7 +6500,8 @@ ${jsonShapeLine}`;
       slideTextDensity: td, contentObjective: objective, editorialReviewStatus: reviewStatus,
       // MF-11 / reteste 22/11: aviso de modo sem base no material, fixo no projeto.
       // QA 24/11 (texto 1): a lacuna do briefing fica aqui, fora do slide.
-      materialNotice: [pathMaterialNotice, materialGapNotice(materialGaps)].filter(Boolean).join(' '), presentationMaterialNotice: undefined,
+      // RT24 (texto 1): o slide que ainda repete outro é avisado no mesmo lugar.
+      materialNotice: [pathMaterialNotice, materialGapNotice(materialGaps), repetitionNotice].filter(Boolean).join(' '), presentationMaterialNotice: undefined,
       editorialReviewIssues: reviewStatus === 'needs_attention'
         ? (editorialViolations.length ? editorialViolations : editorialIssues).map(issue => ({
             slideIndex: issue.slideIndex ?? null,
