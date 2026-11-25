@@ -20,8 +20,15 @@ const connectSrc = () => {
 };
 
 describe('CSP connect-src mínimo (MOO-42)', () => {
-  it('libera apenas self, OpenAI (BYOK direto) e Plausible', () => {
-    expect(connectSrc()).toEqual(["'self'", 'https://api.openai.com', 'https://plausible.io']);
+  // blob: (reteste RT24, 25/11): o app lê de volta as imagens que ele mesmo
+  // guardou na memória do navegador (URL.createObjectURL) com fetch. Sem blob:
+  // a leitura é recusada no site no ar: confirmado em moont.ai com
+  // "Refused to connect because it violates the document's Content Security
+  // Policy". Quebrava "Aplicar logo em todos", a cópia de imagens em edição ao
+  // trocar de conta e guardar foto vinda de endereço blob. Uma URL blob: só
+  // existe para a origem que a criou; liberar não abre saída para outro site.
+  it('libera apenas self, blob: (imagens do próprio app), OpenAI (BYOK direto) e Plausible', () => {
+    expect(connectSrc()).toEqual(["'self'", 'blob:', 'https://api.openai.com', 'https://plausible.io']);
   });
 
   it('build da Vercel força o proxy da Anthropic — sem ele, api.anthropic.com seria bloqueado', () => {

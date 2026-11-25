@@ -45,6 +45,25 @@ test.describe('Galeria com imagem que só existe na conta', () => {
   const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
   const ASSET = `original_${createHash('sha256').update(PNG).digest('hex')}`;
 
+  // Reteste RT24 (25/11): a mesma política recusava qualquer fetch de blob:,
+  // usado por "Aplicar logo em todos", pela cópia de imagens em edição ao
+  // trocar de conta e por guardar foto vinda de endereço blob.
+  test('com a política do site no ar, o app lê de volta um endereço blob: que ele criou', async ({ page }) => {
+    await page.route('**/*', async (route) => {
+      if (route.request().resourceType() !== 'document') return route.fallback();
+      const response = await route.fetch();
+      return route.fulfill({ response, headers: { ...response.headers(), 'content-security-policy': CSP } });
+    });
+    await mockApi(page, { session: SESSAO_COM_QUOTA });
+    await page.goto('/?app=1');
+    const lido = await page.evaluate(async () => {
+      const url = URL.createObjectURL(new Blob(['logo'], { type: 'text/plain' }));
+      try { return await (await fetch(url)).text(); } catch (error) { return `recusado: ${error.message}`; }
+      finally { URL.revokeObjectURL(url); }
+    });
+    expect(lido).toBe('logo');
+  });
+
   test('a miniatura aparece com o armazenamento do navegador cheio', async ({ page }) => {
     test.setTimeout(60_000);
     await page.route('**/*', async (route) => {
