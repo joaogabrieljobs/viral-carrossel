@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import smartcrop from 'smartcrop';
-import { topSkinRegion } from '../../src/utils/photo-framing.js';
+import { portraitTopAnchor, topSkinRegion } from '../../src/utils/photo-framing.js';
 
 // Auditoria 23/11 (FE-16): o reforço "pele mais alta = rosto" (reteste 22/11)
 // depende de um limiar RGB. Não vê pele escura nem foto em preto e branco, e
 // trata parede bege ou madeira como pele. Reprodução com o smartcrop real, sem
-// navegador. A correção muda o enquadramento automático de projetos já vistos
-// e depende de decisão (âncora fixa para retrato ou detector de rosto): os
-// dois casos abaixo ficam como `it.fails` até lá.
+// navegador.
+//
+// Decisão de 24/11 (reteste real, RT24 item 8): foto retrato em zona paisagem
+// ou quadrada enquadra pelo topo (`portraitTopAnchor`), sem depender da cor da
+// pele. O caso da pele escura passou a valer. O da natureza-morta continua
+// `it.fails`: é o custo aceito da âncora (objeto no pé de uma foto retrato fica
+// fora do recorte até a pessoa ajustar à mão).
 function image(width, height, paint) {
   const data = new Uint8ClampedArray(width * height * 4);
   for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
@@ -24,6 +28,8 @@ const imageOperations = {
 };
 /** O mesmo caminho de `analyze` em photo-framing.js quando não há FaceDetector. */
 async function squareCrop(img) {
+  const anchor = portraitTopAnchor(img.width, img.height, 1080, 1080);
+  if (anchor) return { x: 0, y: Math.round((anchor.bgY / 100) * (img.height - img.width)), width: img.width, height: img.width };
   const head = topSkinRegion(img.data, img.width, img.height);
   const result = await smartcrop.crop(img, {
     width: 1080, height: 1080, minScale: 1, maxScale: 1, prescale: false, boost: head ? [head] : [], imageOperations,
@@ -49,11 +55,15 @@ describe('auditoria 23/11 FE-16: enquadramento automático sem detector de rosto
     expect(containsFace(await squareCrop(portrait([210, 150, 120], NEUTRAL_WALL)))).toBe(true);
   });
 
-  it.fails('pele escura em fundo neutro: o rosto fica no recorte 1:1 (decisão pendente)', async () => {
+  it('pele escura em fundo neutro: o rosto fica no recorte 1:1', async () => {
     expect(containsFace(await squareCrop(portrait([80, 50, 35], NEUTRAL_WALL)))).toBe(true);
   });
 
-  it.fails('fundo bege sem pessoa não puxa o recorte para o topo (decisão pendente)', async () => {
+  it('foto em preto e branco: o rosto fica no recorte 1:1', async () => {
+    expect(containsFace(await squareCrop(portrait([120, 120, 120], [40, 40, 40])))).toBe(true);
+  });
+
+  it.fails('fundo bege sem pessoa não puxa o recorte para o topo (custo aceito da âncora pelo topo)', async () => {
     // Objeto detalhado na parte de baixo, parede bege lisa em cima.
     const still = image(W, H, (x, y) => (y > H * 0.62 && y < H * 0.95 && Math.abs(x - W / 2) < 70
       ? detail(x, y, [40, 90, 60], [230, 230, 220]) : [210, 180, 140]));

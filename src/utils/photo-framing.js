@@ -49,6 +49,35 @@ export function cropToBackgroundPosition(crop, width, height) {
   };
 }
 
+/**
+ * Ponto da foto retrato (fração da altura, de cima para baixo) que o recorte
+ * automático mantém no meio da zona. Em retrato o rosto fica no terço de cima:
+ * com 0,22 a cabeça inteira aparece nos retratos de teste com o rosto a 15%,
+ * 22% e 25% da altura, nas zonas de foto do Feed, do Quadrado e do Stories
+ * (tests/unit/rt24-carrossel-8.test.js). Com 0,25 a 0,30 a janela desce e corta
+ * o alto da cabeça quando o rosto está a 15%.
+ */
+export const PORTRAIT_FOCUS_Y = 0.22;
+
+/**
+ * Foto retrato numa zona paisagem (ou quadrada): o corte é só em altura, e o
+ * recorte automático enquadra pelo topo em vez de procurar a região de mais
+ * detalhe, que em retrato costuma ser tronco e mãos (reteste 24/11: cabeça
+ * cortada, e a detecção por cor de pele não vê pele escura, sombra nem P&B).
+ * A janela fica centrada em `PORTRAIT_FOCUS_Y` e nunca sobe além do topo.
+ *
+ * Devolve `null` quando não se aplica: foto paisagem, zona retrato, ou foto
+ * que cabe inteira. Recorte feito pela pessoa nem chega aqui
+ * (`photoFramingRequest` só pede enquadramento automático).
+ */
+export function portraitTopAnchor(imgWidth, imgHeight, zoneWidth, zoneHeight) {
+  if (!(imgWidth > 0) || !(imgHeight > imgWidth) || !(zoneHeight > 0) || !(zoneWidth >= zoneHeight)) return null;
+  const visible = (zoneHeight / zoneWidth) / (imgHeight / imgWidth);
+  if (!(visible < 1)) return null;
+  const top = Math.max(0, Math.min(1 - visible, PORTRAIT_FOCUS_Y - visible / 2));
+  return { bgX: 50, bgY: Math.round(clamp((top / (1 - visible)) * 100) * 100) / 100 };
+}
+
 export function photoFramingRequest(slide, fmt) {
   if (!slide?.bgImage || !usesAutomaticPhotoFraming(slide) || slide.bgFit !== 'cover') return null;
   const f = FORMATS[fmt] || FORMATS.carrossel;
@@ -144,6 +173,9 @@ async function analyze({ src, width, height }) {
     canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
     const faces = await faceBoosts(canvas);
     let boost = faces;
+    // Sem detector de rosto, retrato em zona paisagem enquadra pelo topo.
+    const anchor = faces.length ? null : portraitTopAnchor(img.naturalWidth, img.naturalHeight, width, height);
+    if (anchor) return anchor;
     if (!faces.length) {
       const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
       const head = topSkinRegion(pixels, canvas.width, canvas.height);
