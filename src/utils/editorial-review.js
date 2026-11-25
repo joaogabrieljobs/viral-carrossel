@@ -423,7 +423,11 @@ export function repeatedTitleIndexes(slides) {
     const hit = list.slice(0, index).some(previous => {
       if (previous.size < 2) return false;
       const shared = [...current].filter(word => previous.has(word)).length;
-      return shared >= 3 ? shared / Math.min(current.size, previous.size) >= 0.6 : shared === current.size && shared === previous.size;
+      // Reteste real 24/11 (RT24 2): a divisão era pelo título MENOR, e "Send
+      // us your link" virou repetição de "Step 1 · Send your link or fill the
+      // brief" (3 palavras em comum de 3). Vale a média dos dois tamanhos: os
+      // dois títulos precisam ser quase o mesmo, não um caber dentro do outro.
+      return shared >= 3 ? (2 * shared) / (current.size + previous.size) >= 0.6 : shared === current.size && shared === previous.size;
     });
     if (hit) repeated.push(index);
   });
