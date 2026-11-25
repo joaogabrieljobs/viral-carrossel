@@ -286,9 +286,9 @@ describe('modo livre, fase 1: renderização por slide', () => {
   it('chrome usa as fontes do deck quando a página as traz', () => {
     const s = livre().find(item => item.presentationFreeDesign.family !== 'editorial');
     const layout = { ...s.presentationChrome, chrome: [{ t: 'text', x: 5, y: 5, w: 20, text: '{index}', role: 'numeric', size: 40, color: 'accent' }] };
-    const [el] = chromeElements(layout, { frame: { w: 1920, h: 1080 }, tokens: { index: '01' }, overrides: s.presentationPaletteOverrides });
+    const el = chromeElements(layout, { frame: { w: 1920, h: 1080 }, tokens: { index: '01' }, overrides: s.presentationPaletteOverrides }).find(item => item.text);
     expect(el.style.fontFamily).toMatch(/^"Fraunces"/);
-    const [comum] = chromeElements({ ...layout, fonts: undefined }, { frame: { w: 1920, h: 1080 }, tokens: { index: '01' } });
+    const comum = chromeElements({ ...layout, fonts: undefined }, { frame: { w: 1920, h: 1080 }, tokens: { index: '01' } }).find(item => item.text);
     expect(comum.style.fontFamily).not.toMatch(/^"Fraunces"/);
   });
 
