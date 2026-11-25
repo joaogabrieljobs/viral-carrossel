@@ -439,6 +439,66 @@ function fitDensity(L, slide, F, typo) {
 }
 const round2 = (v) => Math.round(v * 100) / 100;
 
+/** Margem mínima entre a caixa da logo e o texto do card (px num card de 1080 de largura). */
+export const LOGO_TEXT_MIN_GAP_PX = 24;
+/** Menor caixa de título depois de ceder espaço à logo (% da altura). */
+const LOGO_MIN_TITLE_PCT = 10;
+
+/**
+ * Caixa em que o card desenha a logo, em % (a mesma conta do renderer: canto,
+ * margem de 4,5% da largura, lado igual ao tamanho da logo; com o @ ligado, a
+ * logo do canto superior direito desce 5% da altura). A imagem pode ocupar
+ * menos que a caixa (logo horizontal); a margem é garantida contra a caixa.
+ */
+export function logoBoxPct(logo, F) {
+  if (!logo || !/^[tb][lr]$/.test(String(logo.pos || ''))) return null;
+  const size = Number(logo.size) || SOCIAL_LOGO_SIZE_DEFAULT;
+  const margin = F.w * 0.045;
+  const top = String(logo.pos).startsWith('t');
+  const left = String(logo.pos).endsWith('l');
+  const x0 = left ? margin : F.w - margin - size;
+  const y0 = top ? margin + (logo.drop && !left ? F.h * 0.05 : 0) : F.h - margin - size;
+  return {
+    top, x0: (x0 / F.w) * 100, x1: ((x0 + size) / F.w) * 100, y0: (y0 / F.h) * 100, y1: ((y0 + size) / F.h) * 100,
+    gapX: (LOGO_TEXT_MIN_GAP_PX / F.w) * 100, gapY: (LOGO_TEXT_MIN_GAP_PX / F.h) * 100,
+  };
+}
+
+/** A caixa de texto passa ao lado da logo (mesma faixa horizontal, contando a margem). */
+const besideLogo = (zone, box) => zone.x < box.x1 + box.gapX && zone.x + zone.w > box.x0 - box.gapX;
+
+/**
+ * Logo embaixo: faixa (% da altura, a partir da base) que o texto ao lado dela
+ * não ocupa. Entra na mesma conta do rodapé: o bloco título + apoio sobe junto.
+ */
+function logoFooterPct(L, box) {
+  if (!box || box.top) return 0;
+  const limit = box.y0 - box.gapY;
+  return [L.title, L.subtitle].some((zone) => zone && besideLogo(zone, box) && zone.y + zone.h > limit) ? 100 - limit : 0;
+}
+
+/**
+ * Logo em cima: a caixa do título ao lado dela começa abaixo da logo, com a
+ * margem mínima. A caixa encurta por cima (o texto ancorado embaixo nem se
+ * mexe); se ficaria curta demais, o apoio empilhado cede altura.
+ */
+function clearTopLogo(zones, box) {
+  if (!box || !box.top) return zones;
+  const limit = round2(box.y1 + box.gapY);
+  const T = zones.title;
+  if (!T || !besideLogo(T, box) || T.y >= limit || T.y + T.h <= box.y0 - box.gapY) return zones;
+  const bottom = T.y + T.h;
+  const title = { ...T, y: limit, h: round2(Math.max(LOGO_MIN_TITLE_PCT, bottom - limit)) };
+  const S = zones.subtitle;
+  const push = title.y + title.h - bottom;
+  if (!(push > 0) || !S || S.y < bottom - 0.01 || S.x >= T.x + T.w || S.x + S.w <= T.x) return { ...zones, title };
+  const move = Math.min(push, Math.max(0, S.h - 6));
+  return { ...zones, title, subtitle: { ...S, y: round2(S.y + move), h: round2(S.h - move) } };
+}
+
+/** A caixa do título está na faixa de uma logo de cima. */
+const besideLogoTop = (zone, box) => !!(box && box.top && zone && besideLogo(zone, box));
+
 /** Texto e dispositivos acima do rodapé (selo/barra) e longe do canto da logo. */
 function guardChrome(L, F, { footerPct = 0, logoCorner = null }) {
   const base = 100 - footerPct;
@@ -487,9 +547,16 @@ export function socialFormatPatch(slide, formato = 'carrossel') {
   const photo = hasPhoto(slide);
   let L = socialCardLayout(art.family, art.fn, { formato, photo, structured: art.structured, variant: art.variant, topReserve: logoTopReserve(art.logo, F) });
   const typo = art.typo || {};
-  const zoned = guardChrome(L, F, { footerPct: art.footer?.[F.key] || 0, logoCorner: null });
+  // Margem mínima entre a logo e o texto: logo embaixo entra na conta do
+  // rodapé (o bloco sobe); logo em cima encurta a caixa do título por cima, e
+  // o ajuste de densidade não cresce de volta para dentro dela.
+  const logoBox = logoBoxPct(art.logo, F);
+  const footerFor = (layout) => Math.max(art.footer?.[F.key] || 0, logoFooterPct(layout, logoBox));
+  const zonesFor = (layout) => clearTopLogo(guardChrome(layout, F, { footerPct: footerFor(layout), logoCorner: null }), logoBox);
+  const fitFrame = logoBox?.top ? { ...F, t: Math.max(F.t, logoBox.y1 + logoBox.gapY - 1) } : F;
+  const zoned = zonesFor(L);
   const center = !L.photo && ['opener', 'development', 'list'].includes(art.fn);
-  let fit = fitDensity({ ...L, center, photo: zoned.photo, title: zoned.title, subtitle: zoned.subtitle }, slide, F, typo);
+  let fit = fitDensity({ ...L, center, photo: zoned.photo, title: zoned.title, subtitle: zoned.subtitle }, slide, besideLogoTop(zoned.title, logoBox) ? fitFrame : F, typo);
   // Layout dividido (título em coluna estreita): o título é medido na coluna,
   // no corpo que teria nela, antes de a coluna valer. Se só caberia com letra
   // pequena, ou se passa de 4 linhas, a página volta para o empilhado: foto em
@@ -505,14 +572,14 @@ export function socialFormatPatch(slide, formato = 'carrossel') {
       : [1, 2, 3].map((k) => socialCardLayout(art.family, art.fn, { ...base, variant: (art.variant || 0) + k })).find((alt) => alt.title.w >= NARROW_TITLE_PCT && !alt.photo);
     if (stacked) {
       L = stacked;
-      const z2 = guardChrome(L, F, { footerPct: art.footer?.[F.key] || 0, logoCorner: null });
-      fit = fitDensity({ ...L, center: !L.photo && ['opener', 'development', 'list'].includes(art.fn), photo: z2.photo, title: z2.title, subtitle: z2.subtitle }, slide, F, typo);
+      const z2 = zonesFor(L);
+      fit = fitDensity({ ...L, center: !L.photo && ['opener', 'development', 'list'].includes(art.fn), photo: z2.photo, title: z2.title, subtitle: z2.subtitle }, slide, besideLogoTop(z2.title, logoBox) ? fitFrame : F, typo);
     }
   }
   const hasSub = !!String(slide.subtitle || slide.bodyAfterImage || '').trim();
   // Trava final do rodapé (selo/barra): depois do ajuste de densidade nada
   // termina abaixo da faixa; se o apoio ficaria curto demais, o bloco sobe.
-  const baseY = 100 - (art.footer?.[F.key] || 0);
+  const baseY = 100 - footerFor(L);
   if (fit.subtitle.y + fit.subtitle.h > baseY) {
     const minH = Math.max(6, Math.min(fit.subUsed || 6, 14));
     fit.subtitle.h = round2(baseY - fit.subtitle.y);
@@ -524,7 +591,8 @@ export function socialFormatPatch(slide, formato = 'carrossel') {
         // limite, a caixa do título encurta (nunca invade foto nem cabeçalho).
         const need = fit.title.y + fit.title.h - (fit.subtitle.y - 0.5);
         const P = fit.photo || L.photo;
-        const floorY = P && !L.onPhoto && P.y + P.h <= fit.title.y + 0.5 ? Math.max(F.t, P.y + 26) : F.t;
+        const topY = besideLogoTop(fit.title, logoBox) ? fitFrame.t + 1 : F.t;
+        const floorY = P && !L.onPhoto && P.y + P.h <= fit.title.y + 0.5 ? Math.max(topY, P.y + 26) : topY;
         const move = Math.max(0, Math.min(need, fit.title.y - floorY));
         if (move > 0 && P && !L.onPhoto && P.y + P.h > fit.title.y - move) fit.photo = { ...P, h: round2(Math.max(26 - P.y, fit.title.y - move - P.y)) };
         fit.title.y = round2(fit.title.y - move);
@@ -546,7 +614,7 @@ export function socialFormatPatch(slide, formato = 'carrossel') {
       // A caixa cresce para cima, sem entrar na foto acima, no cabeçalho ou na logo.
       const P = fit.photo || L.photo;
       const photoAbove = P && !L.onPhoto && P.w > 2 && P.y + P.h <= fit.title.y + 0.5;
-      const floorY = photoAbove ? P.y + P.h + 0.5 : Math.max(F.t + 1, logoTopReserve(art.logo, F));
+      const floorY = photoAbove ? P.y + P.h + 0.5 : Math.max(F.t + 1, logoTopReserve(art.logo, F), besideLogoTop(fit.title, logoBox) ? fitFrame.t + 1 : 0);
       const up = Math.max(0, Math.min(needPct - fit.title.h, fit.title.y - floorY));
       fit.title.y = round2(fit.title.y - up);
       fit.title.h = round2(fit.title.h + up);
@@ -554,6 +622,8 @@ export function socialFormatPatch(slide, formato = 'carrossel') {
     fit.titlePx = px;
     fit.titleUsed = round2(Math.min(fit.title.h, needPct));
   }
+  // Depois de todos os ajustes, a caixa do título continua fora da logo.
+  ({ title: fit.title, subtitle: fit.subtitle } = clearTopLogo({ title: fit.title, subtitle: fit.subtitle }, logoBox));
   const finalL = { ...L, photo: fit.photo || L.photo, title: fit.title, subtitle: fit.subtitle, hasSub, subUsed: fit.subUsed, titleUsed: fit.titleUsed };
   const guarded = guardChrome({ ...finalL, chrome: socialDevices(art.family, art.fn, finalL, formato, { photo: !!L.photo, topReserve: logoTopReserve(art.logo, F) }) }, F,
     { footerPct: art.footer?.[F.key] || 0, logoCorner: art.logoCorner });
@@ -675,7 +745,7 @@ function composeSocialLibrary(slides, { preset, brand, formato, narrative }) {
     const structured = normalizePresentationBlocks(slide.presentationBlocks).length > 0;
     const art = {
       family: familyKey, fn, variant: variants[index], structured, typo, footer,
-      logoCorner: logoCornerFor(base, slide), logo: logoCornerFor(base, slide) ? { pos: logoCornerFor(base, slide), size: slide.logoSize ?? base.logoSize ?? SOCIAL_LOGO_SIZE_DEFAULT } : null, labelFont: ownType ? (family.type.label || null) : null, ownType, viral,
+      logoCorner: logoCornerFor(base, slide), logo: logoCornerFor(base, slide) ? { pos: logoCornerFor(base, slide), size: slide.logoSize ?? base.logoSize ?? SOCIAL_LOGO_SIZE_DEFAULT, ...(base.showHandle ? { drop: true } : {}) } : null, labelFont: ownType ? (family.type.label || null) : null, ownType, viral,
       signatureOnPhoto: viral && luminance(base.titleColor) != null && luminance(base.titleColor) < 0.6,
     };
     const patch = socialFormatPatch({ ...slide, socialArt: art }, formato);
