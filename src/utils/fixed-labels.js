@@ -56,3 +56,20 @@ export function localizeLabelTemplate(template, lang) {
     .map((part, index) => (index % 2 ? part : part.replace(LABEL_WORD, (_, before, label) => `${before}${translated(label, lang)}`)))
     .join('');
 }
+
+/**
+ * Rótulo que nomeia a foto do card → rótulo do card de texto da mesma família
+ * (Ficha técnica: "FIGURA" → "PONTO"). A composição marca como figura o card
+ * que tem foto ou só o pedido de foto; enquanto a foto não existe, o card não
+ * pode dizer "FIGURA" em cima de uma zona vazia.
+ */
+const PHOTO_LABELS = Object.freeze({ FIGURA: 'PONTO' });
+const PHOTO_LABEL_WORD = new RegExp(`(^|[^\\p{L}\\p{N}])(${Object.keys(PHOTO_LABELS).map(escapeRegExp).join('|')})(?![\\p{L}\\p{N}])`, 'gu');
+
+/** Molde do dispositivo para um card sem foto. Feito antes da troca de idioma. */
+export function labelTemplateWithoutPhoto(template) {
+  if (typeof template !== 'string') return template;
+  return template.split(TOKEN)
+    .map((part, index) => (index % 2 ? part : part.replace(PHOTO_LABEL_WORD, (_, before, label) => `${before}${PHOTO_LABELS[label]}`)))
+    .join('');
+}

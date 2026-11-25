@@ -13,6 +13,8 @@ export default function SocialArtChrome({ slide, brand, frame, titleFont, bodyFo
   if (!art || slide.socialCompositionVersion < 4) return null;
   const elements = socialChromeElements(art, {
     frame, brand, lang,
+    // Foto no card, lida ou ainda a caminho; pedido de foto sozinho não conta.
+    hasPhoto: !!(slide.bgImage || slide.bgImageId || slide.bgImageAssetId || slide.videoId),
     tokens: socialChromeTokens(brand, { index, total, slide }),
     fonts: { title: titleFont, body: bodyFont, label: art.labelFont || bodyFont, titleWeight: slide.titleWeight, titleInsetPx },
   });

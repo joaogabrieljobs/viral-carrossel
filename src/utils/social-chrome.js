@@ -6,7 +6,7 @@
  * Só recursos que o html2canvas desenha: cor sólida, borda, raio, rotação
  * simples. Sem mix-blend-mode, sem filtros, sem máscaras.
  */
-import { localizeLabelTemplate } from './fixed-labels.js';
+import { labelTemplateWithoutPhoto, localizeLabelTemplate } from './fixed-labels.js';
 
 function hexToRgb(hex) {
   let s = String(hex || '').replace('#', '').trim();
@@ -93,8 +93,10 @@ export function fillSocialTokens(value, tokens = {}) {
  * @param {{chrome: object[], ground: string}} art  (slide.socialArt)
  * @param {{ frame:{w:number,h:number}, brand:object, tokens:object, fonts:{title:string, body:string, label?:string}, lang?:string }} ctx
  *   `lang`: idioma do conteúdo, para os rótulos fixos da família ("CENA", "PONTO").
+ *   `hasPhoto`: `false` quando o card não tem foto (nem a caminho): o rótulo
+ *   de figura dá lugar ao rótulo do card de texto.
  */
-export function socialChromeElements(art, { frame, brand, tokens = {}, fonts = {}, lang }) {
+export function socialChromeElements(art, { frame, brand, tokens = {}, fonts = {}, lang, hasPhoto = true }) {
   if (!art || !Array.isArray(art.chrome) || !frame) return [];
   const inks = socialGround(brand, art.ground);
   const scale = frame.w / 1080;
@@ -137,7 +139,7 @@ export function socialChromeElements(art, { frame, brand, tokens = {}, fonts = {
         bands.forEach(([y0, y1], bi) => out.push({ key: `${key}-${c}-${bi}`, z: 0.5, style: { left: pct(m + c * colW), top: pct(y0), width: px, height: pct(y1 - y0), background: color, opacity: d.opacity ?? 0.3 } }));
       }
     } else if (d.t === 'text') {
-      const t = fillSocialTokens(localizeLabelTemplate(d.text, lang), tokens);
+      const t = fillSocialTokens(localizeLabelTemplate(hasPhoto === false ? labelTemplateWithoutPhoto(d.text) : d.text, lang), tokens);
       if (!t) return;
       const family = d.role === 'title' ? fonts.title : d.role === 'label' ? (fonts.label || fonts.body) : fonts.body;
       out.push({ key, z: zIndex, text: t, style: {
