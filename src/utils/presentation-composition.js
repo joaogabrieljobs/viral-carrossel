@@ -427,6 +427,11 @@ export function restorePresentationPhotoComposition(slide) {
     })) return slide;
   const kind = rolesForRestoredPhoto.has(slide.presentationComposition) ? slide.presentationComposition : 'content';
   const layout = contentAwarePresentationLayout(kind, slide, presentationDesignFamily(slide));
+  // Página que a família desenha sem foto (fecho e abertura do Tipográfico,
+  // abertura do Cinemático): não há onde pôr a foto. Sem esta saída a zona
+  // inativa (96, 94, 1, 1) era desenhada no tamanho mínimo de zona e a foto
+  // aparecia num recorte de ~150 × 65 px no canto inferior direito.
+  if (!layout.photo) return slide;
   const zones = contentAwarePresentationZones(kind, slide, presentationDesignFamily(slide));
   const previousTypography = slide.presentationTypographyByComposition || {};
   const typography = previousTypography[kind] || {};
