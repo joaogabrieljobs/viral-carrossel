@@ -106,7 +106,10 @@ test('histórico comparável orienta geração e pode ser desativado', async ({ 
     await modal.getByPlaceholder(/como freelancers/i).fill('Reuniões sem pauta');
     await modal.getByPlaceholder('Ex: marketing digital').fill('Reuniões');
     await expect(modal).toContainText(enabled ? 'Seu histórico será considerado' : 'Histórico desativado');
-    for (let i = 0; i < 3; i++) await modal.getByRole('button', { name: /continuar/i }).click();
+    await modal.getByRole('button', { name: /continuar/i }).click();
+    // QA 24/11: gerar de novo abre com a quantidade atual do projeto; o rascunho simulado tem 6 cards.
+    await modal.getByRole('group', { name: 'Número de cards', exact: true }).getByRole('button', { name: '6', exact: true }).click();
+    for (let i = 0; i < 2; i++) await modal.getByRole('button', { name: /continuar/i }).click();
     await modal.getByRole('button', { name: 'Gerar só texto', exact: true }).click();
     await page.getByRole('dialog', { name:'Substituir os cards?', exact:true })
       .getByRole('button', { name:'Substituir', exact:true }).click();

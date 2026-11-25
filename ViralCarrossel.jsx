@@ -473,6 +473,7 @@ import {
   ensureDocShape,
 } from './src/utils/doc-schema.js';
 import { projectHasCarouselContent } from './src/utils/context-status.js';
+import { importedPhotosWarning, regenerationDefaults, resolveGenerationLanguage, slidesContentSample } from './src/utils/regeneration-defaults.js';
 import { docAfterReadyTemplate } from './src/utils/ready-template.js';
 import {
   mergeUtf16AccentIntervals,
@@ -2995,6 +2996,11 @@ export default function App() {
     setSetupProductKind(normalizedKind);
     setSetupOpen(true);
   }, [activeProductKind]);
+  // QA 24/11: gerar de novo abre com tema, quantidade e idioma do projeto atual.
+  const regenerationSetup = useMemo(() => regenerationDefaults({
+    slides: setupProductKind === activeProductKind ? slides : [],
+    editorialContext: doc.editorialContext,
+  }), [setupProductKind, activeProductKind, slides, doc.editorialContext]);
   const generateProjectByKind = useCallback((kind = activeProductKind) => (
     createProjectByKind(kind)
   ), [activeProductKind, createProjectByKind]);
@@ -5894,16 +5900,15 @@ ${buildGenerationLanguageGuard(cp, effectiveMode)}`;
     const remixBlock = remix ? buildRemixBlock(sourceSlides, fetchImagesNow) : '';
     const jsonShapeLine = buildGenerationJsonContract(cp, td, count, projectDesignInstructions ? PROJECT_DESIGN_SCHEMA : null, presentationPathId);
 
-    const requestedContentLanguage = resolveRequestedContentLanguage({
+    // QA 24/11: sem idioma reconhecível no pedido, vale o do conteúdo atual.
+    const languageInput = resolveGenerationLanguage({
       instructions: material?.context,
       topic,
       content: material?.content,
-    });
-    const idiomaRegra = buildContentLanguageRule({
-      instructions: material?.context,
-      topic,
-      content: material?.content,
-    });
+      currentContent: !remix && projectHasCarouselContent(sourceSlides) ? slidesContentSample(sourceSlides) : '',
+    }).input;
+    const requestedContentLanguage = resolveRequestedContentLanguage(languageInput);
+    const idiomaRegra = buildContentLanguageRule(languageInput);
 
     const contextoModoPerso =
       isPresentationGeneration
@@ -9511,7 +9516,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
         previewTotalCount={creationPreviewTotalCount}
         generationStartedAt={generationPreviewContext?.startedAt}
         defaultNiche={niche}
-        defaultTopic={prefilledTopic}
+        defaultTopic={prefilledTopic || regenerationSetup.topic}
+        currentProject={regenerationSetup}
         defaultTone={brand.defaultTone || ''}
         defaultAudience={brand.defaultAudience || ''}
         hasOpenAI={hasOpenAI}
@@ -9652,7 +9658,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
       <ConfirmDialog
         open={!!replaceCardsPrompt}
         title="Substituir os cards?"
-        body="Este projeto já tem cards. Gerar substitui os cards atuais. Desfazer recupera esta versão."
+        body={['Este projeto já tem cards. Gerar substitui os cards atuais.',
+          replaceCardsPrompt && importedPhotosWarning(regenerationDefaults({ slides }).importedPhotos),
+          'Desfazer recupera esta versão.'].filter(Boolean).join(' ')}
         confirmLabel="Substituir"
         onCancel={() => {
           replaceCardsPrompt?.resolve(false);

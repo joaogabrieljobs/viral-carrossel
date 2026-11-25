@@ -5,7 +5,7 @@ import { getHooksForNiche } from '../../utils/hooks-library.js';
 import VisualStylePicker from '../VisualStylePicker.jsx';
 import GenerationPreview, { PresentationStructureSummary } from '../GenerationPreview.jsx';
 import { VISUAL_PRESETS } from '../../styles/visual-presets.jsx';
-import { GEN_MODE_BY_ID, CREATIVE_PRESETS, CREATIVE_PRESET_BY_ID, GENERATION_TOPIC_MAX_CHARS, SLIDE_TEXT_DENSITY_OPTIONS, quickTemplateIdFromPreset, isQuickTemplatePreset, resolveRequestedContentLanguage } from '../../utils/generation-prompts.js';
+import { GEN_MODE_BY_ID, CREATIVE_PRESETS, CREATIVE_PRESET_BY_ID, GENERATION_TOPIC_MAX_CHARS, SLIDE_TEXT_DENSITY_OPTIONS, quickTemplateIdFromPreset, isQuickTemplatePreset } from '../../utils/generation-prompts.js';
 import { ModePicker, ReferenceProfilesCuradoria, ImgParamsPanel } from './generate-modal-parts.jsx';
 import { PhotoRegionMiniIcon } from '../ui/mini-icons.jsx';
 import { CONTENT_OBJECTIVES, normalizeContentObjective } from '../../utils/editorial-strategy.js';
@@ -29,6 +29,7 @@ import {
 import { moontNarrative } from '../../config/moont-brand.js';
 import { genModeUiLabel } from '../../utils/ui-depth-labels.js';
 import { canAutoApplyExplicitCardScript, parseExplicitCardScript } from '../../utils/structured-card-script.js';
+import { importedPhotosWarning, resolveGenerationLanguage } from '../../utils/regeneration-defaults.js';
 
 function normalizeCardVisualStyle(v) {
   const r = typeof v === 'string' ? v : 'full';
@@ -154,8 +155,13 @@ function GenerateModal({
   material = { content: '', sources: '', context: '', refProfileId: null },
   setMaterial = () => {},
   hookLibrary = [],
+  // QA 24/11: dados do projeto que já tem cards (ver regeneration-defaults.js).
+  currentProject = null,
 }) {
   const isPresentation = productKind === 'apresentacao';
+  // Gerar de novo mantém a quantidade atual quando ela cabe na faixa do produto.
+  const currentCount = Number.isInteger(currentProject?.count)
+    && !customCountIssue(String(currentProject.count), { isPresentation }) ? currentProject.count : null;
   const productNarrative = moontNarrative(productKind);
   const productFlow = isPresentation ? 'Faça uma ideia avançar' : 'Faça uma ideia circular';
   const initialPresentationPath = normalizePresentationPath(defaultPresentationPath);
@@ -165,9 +171,9 @@ function GenerateModal({
   );
   const [topic, setTopic] = useState(() => String(defaultTopic || '').slice(0, GENERATION_TOPIC_MAX_CHARS));
   const [count, setCount] = useState(() => (
-    isPresentation ? getPresentationPath(initialPresentationPath).defaultSlideCount : 6
+    currentCount ?? (isPresentation ? getPresentationPath(initialPresentationPath).defaultSlideCount : 6)
   ));
-  const countEditedRef = useRef(false);
+  const countEditedRef = useRef(currentCount != null);
   const visualEditedRef = useRef(false);
   // GB-07: texto digitado em "Outro" enquanto ainda não é uma quantidade válida.
   const [countDraft, setCountDraft] = useState(null);
@@ -192,12 +198,13 @@ function GenerateModal({
     if (!open) return;
     const nextPath = normalizePresentationPath(defaultPresentationPath);
     setPresentationPath(nextPath);
-    countEditedRef.current = false;
+    // A quantidade do projeto atual conta como escolha: trocar de caminho não a muda.
+    countEditedRef.current = currentCount != null;
     visualEditedRef.current = false;
     setCountDraft(null);
-    setCount(isPresentation ? getPresentationPath(nextPath).defaultSlideCount : 6);
+    setCount(currentCount ?? (isPresentation ? getPresentationPath(nextPath).defaultSlideCount : 6));
     setPackCreative(resolveCreativePresetForProduct(defaultCreativePreset, productKind));
-  }, [open, defaultCreativePreset, defaultPresentationPath, isPresentation, productKind]);
+  }, [open, defaultCreativePreset, defaultPresentationPath, isPresentation, productKind, currentCount]);
   const explicitCardScript = useMemo(() => {
     if (isPresentation) return null;
     const candidate = parseExplicitCardScript(topic) || parseExplicitCardScript(material?.content);
@@ -382,16 +389,20 @@ function GenerateModal({
     if (hasContextPack) return 'Conteúdo baseado no material de referência e na identidade da marca.';
     return '';
   })();
-  const requestedContentLanguage = resolveRequestedContentLanguage({
+  const requestedContentLanguage = resolveGenerationLanguage({
     instructions: material?.context,
     topic: resolvedGenerationTopic || topic,
     content: material?.content,
-  });
+    currentContent: currentProject?.contentSample,
+  }).language;
   const requestedLanguageSource = requestedContentLanguage.source === 'instructions'
     ? 'definido nas instruções'
     : requestedContentLanguage.source === 'brief'
       ? 'identificado no briefing'
-      : 'padrão do projeto';
+      : requestedContentLanguage.source === 'current'
+        ? 'igual ao conteúdo atual'
+        : 'padrão do projeto';
+  const photosWarning = importedPhotosWarning(currentProject?.importedPhotos, isPresentation ? 'slides' : 'cards');
 
   // A etapa 1 exige tema válido (resolvedGenerationTopic já cobre alternativas
   // de nicho e contexto). As demais etapas permitem revisar os valores padrão.
@@ -1188,6 +1199,11 @@ function GenerateModal({
           {step === 4 && !busy && (
             <>
               {isPresentation && <PresentationStructureSummary presentationPath={presentationPath} count={count}/>}
+              {photosWarning && (
+                <div role="status" style={{ padding:'9px 11px', border:'1px solid var(--accent)', borderRadius:9, background:'var(--accent-surface)', color:'var(--text-secondary)', fontSize:12, lineHeight:1.45 }}>
+                  {photosWarning} Desfazer recupera esta versão.
+                </div>
+              )}
               {/* Resumo das escolhas antes da ação final. */}
               <div style={{
                 padding:'14px 16px', borderRadius:11,
@@ -1280,7 +1296,7 @@ function GenerateModal({
               </div>
 
               {/* Contexto que será incluído no pedido enviado à IA. */}
-              {((brandSummary && brandSummary.length) || (materialSummary && materialSummary.length)) && (
+              {((brandSummary && brandSummary.length > 0) || (materialSummary && materialSummary.length > 0)) && (
                 <div style={{
                   fontSize:13, color:'var(--text-secondary)', background:'var(--success-surface)',
                   border:'1px solid var(--success-border)', borderRadius:8, padding:'10px 12px', letterSpacing:'-0.011em',
