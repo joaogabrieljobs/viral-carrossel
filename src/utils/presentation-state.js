@@ -47,7 +47,7 @@ export function presentationStageAt(pathId, index, count) {
   return roadmap[Math.max(0, Math.min(roadmap.length - 1, Math.round(index)))] || stages[0];
 }
 
-function applyResolvedPresentationPresetToSlide(slide, preset, normalizedPath, index, count, previous = null) {
+function applyResolvedPresentationPresetToSlide(slide, preset, normalizedPath, index, count, previous = null, nextSlide = null) {
   const resolvedPresetId = preset?.id || DEFAULT_PRESENTATION_VISUAL_PRESET_ID;
   const stage = {
     ...presentationStageAt(normalizedPath, index, count),
@@ -147,6 +147,10 @@ function applyResolvedPresentationPresetToSlide(slide, preset, normalizedPath, i
       index,
       count,
       previous,
+      next: nextSlide && index + 1 < count ? {
+        slide: nextSlide,
+        stage: { ...presentationStageAt(normalizedPath, index + 1, count), deliveryMode: stage.deliveryMode },
+      } : null,
     }),
     ...stageMeta,
     bodyAfterImage: slide.bodyAfterImage || '',
@@ -197,7 +201,7 @@ export function applyPresentationVisualPresetToSlides(
   // anteriores, para a mesma página não sair três vezes seguidas.
   const composed = [];
   for (const [index, slide] of source.entries()) {
-    composed.push(applyResolvedPresentationPresetToSlide(slide, preset, normalizedPath, index, count, composed));
+    composed.push(applyResolvedPresentationPresetToSlide(slide, preset, normalizedPath, index, count, composed, source[index + 1] || null));
   }
   return composed;
 }

@@ -753,7 +753,8 @@ function normalizeCompositionInput(input, stageArg, indexArg, countArg) {
   const index = Math.max(0, Math.trunc(Number(rawIndex) || 0));
   const count = Math.max(1, Math.trunc(Number(rawCount) || 1));
   const previous = isOptions && Array.isArray(objectInput.previous) ? objectInput.previous : null;
-  return { slide, stage, index, count, previous };
+  const next = isOptions && objectInput.next?.slide && typeof objectInput.next.slide === 'object' ? objectInput.next : null;
+  return { slide, stage, index, count, previous, next };
 }
 
 function clonePresentationZones(zones) {
@@ -785,7 +786,7 @@ export function getPresentationCompositionOverrides(
 ) {
   const normalizedPresetId = normalizePresentationVisualPreset(presetId);
   const presetDefinition = getPresentationVisualPreset(normalizedPresetId);
-  const { slide, stage, index, count, previous } = normalizeCompositionInput(
+  const { slide, stage, index, count, previous, next } = normalizeCompositionInput(
     input,
     stageArg,
     indexArg,
@@ -800,7 +801,7 @@ export function getPresentationCompositionOverrides(
   const rhythmFamily = previous && contentAware
     ? presentationDesignFamily({ presentationPresetId: normalizedPresetId, presentationPatternId: presetDefinition.sourceId })
     : null;
-  const kind = resolvePresentationCompositionKind({ slide, stage, index, count, previous, family: rhythmFamily });
+  const kind = resolvePresentationCompositionKind({ slide, stage, index, count, previous, next, family: rhythmFamily });
   const defaults = presetDefinition.presentationDefaults || {};
   const field = kind === 'closing' ? 'closingComposition' : `${kind}Composition`;
   const configuredComposition = defaults[field]

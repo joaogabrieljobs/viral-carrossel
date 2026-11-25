@@ -6147,11 +6147,14 @@ ${jsonShapeLine}`;
         presentationLimitsForPlan: (plan, draftedSlides = []) => {
           if (effectiveVisualPresetDef?.isCustom) return null;
           const planRhythm = [];
+          const planInput = (entry, index) => ({
+            slide: { ...(draftedSlides[index] || {}), presentationPlan: entry, imageQuery: presentationPlanEntryImageQuery(entry) },
+            stage: { ...presentationStageAt(presentationPathId, index, Number(count)), deliveryMode: presentationRoute?.deliveryMode, visualRole: entry.visualRole },
+          });
           return plan.slides.map((entry, index) => {
-            const stage = { ...presentationStageAt(presentationPathId, index, Number(count)), deliveryMode: presentationRoute?.deliveryMode, visualRole: entry.visualRole };
             const composed = getPresentationCompositionOverrides(effectiveVisualPreset, {
-              slide: { ...(draftedSlides[index] || {}), presentationPlan: entry, imageQuery: presentationPlanEntryImageQuery(entry) },
-              stage, index, count: Number(count), previous: planRhythm,
+              ...planInput(entry, index), index, count: Number(count), previous: planRhythm,
+              next: index + 1 < plan.slides.length ? planInput(plan.slides[index + 1], index + 1) : null,
             });
             planRhythm.push(composed);
             const limits = composed.presentationTextLimits || {};
@@ -6309,6 +6312,12 @@ ${jsonShapeLine}`;
       ? null
       : (remix ? (doc.visualBible || null) : normalizeVisualBible(result.visualBible));
     const generationRhythm = [];
+    const generationStageAt = (index, raw) => {
+      const stageIndex = presentationStages.length <= 1 || nSlides <= 1
+        ? 0
+        : Math.round((index * (presentationStages.length - 1)) / (nSlides - 1));
+      return { ...(presentationStages[stageIndex] || {}), deliveryMode: presentationRoute?.deliveryMode, ...(raw?.presentationPlan ? { visualRole: raw.presentationPlan.visualRole, purpose: raw.presentationPlan.purpose } : {}) };
+    };
     let newSlides = remix ? mergeRemixedSlides(sourceSlides, result.slides, fetchImagesNow) : (
       attachGenerationCanvasLayouts(
       result.slides.map((s, i) => {
@@ -6322,12 +6331,7 @@ ${jsonShapeLine}`;
       );
       const title = restoreSourceHosts(stripLeadingSlideCardLabel(String(s.title ?? '').trim()), sourceHosts);
       const subtitle = restoreSourceHosts(stripLeadingSlideCardLabel(String(s.subtitle ?? '').trim()), sourceHosts);
-      const stageIndex = presentationStages.length <= 1 || nSlides <= 1
-        ? 0
-        : Math.round((i * (presentationStages.length - 1)) / (nSlides - 1));
-      const stage = isPresentationGeneration
-        ? { ...(presentationStages[stageIndex] || {}), deliveryMode: presentationRoute?.deliveryMode, ...(s.presentationPlan ? { visualRole: s.presentationPlan.visualRole, purpose: s.presentationPlan.purpose } : {}) }
-        : {};
+      const stage = isPresentationGeneration ? generationStageAt(i, s) : {};
       // Resolve uma única vez a composição efetiva antes de decidir se o
       // slide precisa de imagem. Presets personalizados mantêm a composição
       // livre do usuário e, por isso, não recebem fallback automático.
@@ -6338,6 +6342,7 @@ ${jsonShapeLine}`;
             index: i,
             count: nSlides,
             previous: generationRhythm,
+            next: i + 1 < nSlides ? { slide: result.slides[i + 1], stage: generationStageAt(i + 1, result.slides[i + 1]) } : null,
           })
         : {};
       generationRhythm.push(compositionOverrides);
@@ -6974,11 +6979,17 @@ ${jsonShapeLine}`;
         const sourceHosts = collectSourceHosts(current.material?.content, current.material?.sources, current.material?.context, current.styleKit?.contextMd, current.styleKit?.stylePrompt);
         const text = value => restoreSourceHosts(stripLeadingSlideCardLabel(String(value || '').trim()), sourceHosts);
         const recoveredRhythm = [];
-        const recovered = snapshot.draft.slides.map((slide, index) => {
+        const recoveredInput = (slide, index) => {
           const stageIndex = totalCount > 1 ? Math.round(index * (route.stages.length - 1) / (totalCount - 1)) : 0;
-          const stage = { ...route.stages[stageIndex], deliveryMode: route.deliveryMode,
-            visualRole: slide.presentationPlan?.visualRole, purpose: slide.presentationPlan?.purpose };
-          const composition = preset?.isCustom ? {} : getPresentationCompositionOverrides(snapshot.visualPreset, { slide, stage, index, count: totalCount, previous: recoveredRhythm });
+          return { slide, stage: { ...route.stages[stageIndex], deliveryMode: route.deliveryMode,
+            visualRole: slide.presentationPlan?.visualRole, purpose: slide.presentationPlan?.purpose } };
+        };
+        const recovered = snapshot.draft.slides.map((slide, index) => {
+          const { stage } = recoveredInput(slide, index);
+          const composition = preset?.isCustom ? {} : getPresentationCompositionOverrides(snapshot.visualPreset, {
+            slide, stage, index, count: totalCount, previous: recoveredRhythm,
+            next: index + 1 < snapshot.draft.slides.length ? recoveredInput(snapshot.draft.slides[index + 1], index + 1) : null,
+          });
           recoveredRhythm.push(composition);
           return {
             ...mkSlide(index + 1, identity), ...presetOverrides, ...composition,

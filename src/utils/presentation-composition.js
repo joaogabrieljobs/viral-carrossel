@@ -56,8 +56,10 @@ export function resolvePresentationVisualRole(slide = {}, stage = {}) {
  *   ordem do deck (saída de getPresentationCompositionOverrides). Sem eles, a
  *   escolha é a de sempre.
  * @param {string} [options.family] família visual; liga o ritmo de layout.
+ * @param {{slide: object, stage?: object}} [options.next] slide seguinte (ainda
+ *   não composto) e a etapa dele; o ritmo olha se ele tem outra página.
  */
-export function resolvePresentationCompositionKind({ slide = {}, stage = {}, index = 0, count = 1, previous = null, family = null } = {}) {
+export function resolvePresentationCompositionKind({ slide = {}, stage = {}, index = 0, count = 1, previous = null, family = null, next = null } = {}) {
   // Bloco nativo (tabela, métricas, etapas) só tem onde ser desenhado na página
   // de dados: é a única composição com zona de evidência. Em capa, conteúdo ou
   // fechamento o bloco ficava sem área, o slide saía com metade vazia e a
@@ -71,7 +73,9 @@ export function resolvePresentationCompositionKind({ slide = {}, stage = {}, ind
       : DIVIDER_ROLES.has(role) || role === 'cover' ? 'divider'
         : role === 'closing' || role === 'close' ? 'closing'
           : 'content';
-  return family && Array.isArray(previous) ? rhythmKind(kind, slide, family, previous) : kind;
+  return family && Array.isArray(previous)
+    ? rhythmKind(kind, slide, family, previous, next?.slide ? { ...next, index: index + 1, count } : null)
+    : kind;
 }
 
 /**
@@ -96,17 +100,40 @@ export function resolvePresentationCompositionKind({ slide = {}, stage = {}, ind
 // página de conteúdo da família entra por último.
 const RHYTHM_ALTERNATIVES = ['demo', 'divider', 'content'];
 
-function rhythmKind(kind, slide, family, previous) {
+// Conferência visual (25/11, Tipográfico): o slide seguinte pode não ter
+// alternativa. Leitura longa (apoio > 300) vira leitura larga em toda página
+// com foto, e no Tipográfico a leitura larga tem a geometria da página de
+// conteúdo (foto 70:26, texto em x = 4). Na Apoteose o slide 4 é assim: o 2 e
+// o 3 saíam como conteúdo e o 4 fechava a trinca sem ter para onde ir. Quando
+// o seguinte está preso à geometria que este repetiria, este alterna agora.
+function rhythmKind(kind, slide, family, previous, next = null) {
   const [before, last] = previous.slice(-2);
-  if (!before || !last || manuallyPositioned(slide)) return kind;
+  if (!last || manuallyPositioned(slide)) return kind;
   const own = layoutGeometry(kind, slide, family);
-  if (composedGeometry(before) !== own || composedGeometry(last) !== own) return kind;
+  if (composedGeometry(last) !== own) return kind;
+  const third = !!before && composedGeometry(before) === own;
+  if (!third && lockedGeometry(next, family) !== own) return kind;
+  return alternativeKind(kind, slide, family, own) || kind;
+}
+
+/** Outra página que a família já desenha, com a foto pedida e geometria diferente. */
+function alternativeKind(kind, slide, family, own) {
   const visual = hasVisual(slide);
   return RHYTHM_ALTERNATIVES.find((alt) => {
     if (alt === kind) return false;
     const layout = contentAwarePresentationLayout(alt, slide, family);
     return (!visual || !!layout.photo) && layoutGeometry(alt, slide, family) !== own;
-  }) || kind;
+  }) || null;
+}
+
+/** Geometria de que o slide não sai (sem alternativa, capa, fecho, bloco ou ajuste manual); null se pode alternar. */
+function lockedGeometry(next, family) {
+  if (!next?.slide) return null;
+  const { slide, stage = {}, index, count } = next;
+  const kind = resolvePresentationCompositionKind({ slide, stage, index, count });
+  const own = layoutGeometry(kind, slide, family);
+  if (index === 0 || index >= count - 1 || hasBlocks(slide) || manuallyPositioned(slide)) return own;
+  return alternativeKind(kind, slide, family, own) ? null : own;
 }
 
 /** O que o olho vê como "mesma página": chão, lado e largura da foto, texto sobre a foto e coluna do texto. */
