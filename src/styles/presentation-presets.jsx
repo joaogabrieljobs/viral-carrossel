@@ -538,8 +538,9 @@ export const PRESENTATION_VISUAL_PRESETS = Object.freeze(
 /**
  * Modo livre ("O Moont decide", docs/product/modo-livre-apresentacao.md): preset
  * virtual. Cada página escolhe família, fundo e foto; paleta e fontes são do
- * deck. Fase 1: fora do seletor (`hidden`), reconhecido pelo catálogo, pela
- * composição e pelo estado. A base (limites, autofit, perfis) é a do Executivo.
+ * deck. Oculto das listas de estilos (`hidden`); desde a fase 2 o
+ * VisualStylePicker o mostra como primeiro cartão do seletor da apresentação.
+ * Reconhecido pelo catálogo, pela composição e pelo estado. A base (limites, autofit, perfis) é a do Executivo.
  */
 const FREE_BASE = GENERATED_PRESENTATION_PATTERNS.find(item => item.id === DEFAULT_PRESENTATION_VISUAL_PRESET_ID) || GENERATED_PRESENTATION_PATTERNS[0];
 export const FREE_PRESENTATION_VISUAL_PRESET = preset({
@@ -550,7 +551,7 @@ export const FREE_PRESENTATION_VISUAL_PRESET = preset({
   isFree: true,
   hidden: true,
   label: 'Livre: o Moont decide',
-  desc: 'Cada página com a sua composição; paleta e par de fontes do deck inteiro.',
+  desc: 'Cada página com a sua composição, com uma paleta e um par de fontes.',
   previewVariant: 'editorial',
   brand: { ...FREE_BASE.brand, ...freeBrandPatch(DEFAULT_DECK_DESIGN) },
 });

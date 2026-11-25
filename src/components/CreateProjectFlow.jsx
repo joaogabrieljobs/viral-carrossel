@@ -127,10 +127,13 @@ export default function CreateProjectFlow({
   const visualSummary = visualSelection.automatic
     ? `${selectedVisualLabel} · recomendado${visualSelection.preserveBrandIdentity ? ' · cores e fontes da marca' : ''}`
     : selectedVisualLabel;
-  const recommendedPresets = [visualSelection.preset,
+  // Modo livre: "Livre: o Moont decide" abre os estilos para começar da apresentação.
+  const recommendedPresets = [
+    ...(isPresentation ? presets.filter(p => p.isFree) : []),
+    visualSelection.preset,
     ...['tabloid_keywords', 'social_revista', 'minimal_clean', 'social_documental', 'presentation_editorial_magazine', 'presentation_modular_cards', 'presentation_premium_dark'].map(id => presets.find(p => p.id === id)),
     ...presets.filter(p => !p.hidden && !p.isCustom)]
-    .filter((p, i, all) => p && all.findIndex(item => item?.id === p.id) === i).slice(0, 3);
+    .filter((p, i, all) => p && all.findIndex(item => item?.id === p.id) === i).slice(0, isPresentation && presets.some(p => p.isFree) ? 4 : 3);
   const identitySummary = creationIdentitySummary(brand, styleKit);
   const identityLabel = identityPath === 'moont' ? 'Padrão do Moont' : identityPath === 'saved' ? (brandRoster.find(b => b.id === brandId)?.name || (visualPreset ? presets.find(p => p.id === visualPreset)?.label : 'Preset salvo')) : 'Identidade personalizada';
   const canContinue = step === 0 ? !!name.trim() : step === 1 ? brandId !== '__new__' || !!brand.name?.trim() : step === 2 ? sourceReady && !hasMaterialOverage : step === 4 ? countValid : true;

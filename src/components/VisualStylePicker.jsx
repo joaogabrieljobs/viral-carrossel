@@ -8,6 +8,43 @@ import { Check } from 'lucide-react';
 import { renderPresetPreview } from '../styles/visual-presets.jsx';
 import { renderPresentationPresetPreview } from '../styles/presentation-presets.jsx';
 
+/**
+ * Miniatura do modo livre ("Livre: o Moont decide"): três mini-páginas com
+ * composições diferentes (foto ao lado em fundo claro, título grande em fundo
+ * escuro, foto inteira com fundo de destaque), na paleta padrão do deck.
+ * Só CSS: nenhuma imagem nova.
+ */
+const FREE_MINI = [
+  { id: 'claro-foto', bg: '#F5F2EC', ink: '#15171C', photo: { left: '56%', top: '12%', width: '36%', height: '76%' }, title: { left: '9%', top: '26%', width: '38%' } },
+  { id: 'escuro-titulo', bg: '#15171C', ink: '#F5F2EC', photo: null, title: { left: '10%', top: '22%', width: '74%' }, big: true },
+  { id: 'destaque-foto', bg: '#C2410C', ink: '#F5F2EC', photo: { left: '0%', top: '0%', width: '46%', height: '100%' }, title: { left: '54%', top: '34%', width: '36%' } },
+];
+const MINI_PHOTO = 'linear-gradient(160deg, #D9A36A 0%, #9C5B3B 55%, #3E2A24 100%)';
+
+function FreePresetPreview() {
+  return (
+    <div data-vc-free-preview="" aria-hidden style={{
+      width: '100%', height: '100%', background: '#E7E1D6', position: 'relative', overflow: 'hidden',
+    }}>
+      {FREE_MINI.map((mini, i) => (
+        <div key={mini.id} data-vc-free-mini={mini.id} style={{
+          position: 'absolute', width: '58%', aspectRatio: '16 / 9',
+          left: `${4 + i * 19}%`, top: `${6 + i * 22}%`,
+          background: mini.bg, borderRadius: 3, overflow: 'hidden',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+        }}>
+          {mini.photo ? <div style={{ position: 'absolute', ...mini.photo, background: MINI_PHOTO }} /> : null}
+          <div style={{ position: 'absolute', ...mini.title, display: 'flex', flexDirection: 'column', gap: mini.big ? 4 : 3 }}>
+            <span style={{ display: 'block', height: mini.big ? 7 : 4, width: '100%', background: mini.ink, borderRadius: 1 }} />
+            <span style={{ display: 'block', height: mini.big ? 7 : 4, width: '72%', background: mini.ink, borderRadius: 1 }} />
+            <span style={{ display: 'block', height: 2, width: '56%', marginTop: 3, background: mini.ink, opacity: 0.55, borderRadius: 1 }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** Fundo, título e acento que o estilo aplica; também usado nos Ajustes rápidos (UX-04). */
 export function paletteSwatches(preset) {
   const b = preset?.brand || {};
@@ -27,10 +64,14 @@ export default function VisualStylePicker({
   const catalog = Array.isArray(presets) ? presets : [];
   // Os 12 estilos de carrossel primeiro; as 9 famílias editoriais (biblioteca
   // v4) num grupo próprio logo abaixo.
+  // Modo livre ("Livre: o Moont decide") é o primeiro cartão quando a lista o
+  // traz; fica fora das outras listas de estilos (oculto no catálogo).
+  const free = catalog.filter((preset) => preset?.isFree);
   const visible = catalog.filter((preset) => !preset?.hidden);
   const main = visible.filter((preset) => preset?.presetGroup !== 'familias-editoriais');
   const families = visible.filter((preset) => preset?.presetGroup === 'familias-editoriais');
   const visiblePresets = [
+    ...free,
     ...main,
     ...(families.length ? [{ __heading: true, id: '__families_heading' }] : []),
     ...families,
@@ -182,7 +223,9 @@ export default function VisualStylePicker({
                   overflow: 'hidden',
                   boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
                 }}>
-                  {isPresentationPreview
+                  {p.isFree
+                    ? <FreePresetPreview />
+                    : isPresentationPreview
                     ? renderPresentationPresetPreview(p, { width: '100%', height: '100%' })
                     : renderPresetPreview(p, { width: '100%', height: '100%' })}
                 </div>
@@ -205,6 +248,13 @@ export default function VisualStylePicker({
                 }}>
                   {p.label}
                 </div>
+                {p.isFree ? (
+                  <div data-vc-free-desc="" style={{
+                    fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.35, letterSpacing: '-0.005em',
+                  }}>
+                    {p.desc}
+                  </div>
+                ) : null}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   {swatches.map((c, i) => (
                     <span
@@ -246,7 +296,7 @@ export default function VisualStylePicker({
             marginBottom: 4,
             fontFamily: 'var(--font-ui)',
           }}>
-            {selected.hidden ? `Padrão legado em uso · ${selected.label}` : selected.label}
+            {selected.hidden && !selected.isFree ? `Padrão legado em uso · ${selected.label}` : selected.label}
           </div>
           <div style={{
             fontSize: 12,
