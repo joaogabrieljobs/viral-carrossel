@@ -153,6 +153,8 @@ describe('fase 1 → 2: leitura longa sem vazios grandes', () => {
       const linhas = Math.max(1, Math.ceil(s.title.length * 0.55 * tituloPx / (1920 * title.w / 100 - 24)));
       const fimDoTitulo = title.y + (linhas * tituloPx * 1.1) / 10.8;
       expect(subtitle.y - fimDoTitulo, `slide ${i + 1} (${s.presentationFreeDesign.family})`).toBeLessThanOrEqual(9);
+      // As zonas não se sobrepõem (a conferência de exportação mede as duas).
+      expect(title.y + title.h, `slide ${i + 1}: zona do título invade o apoio`).toBeLessThanOrEqual(subtitle.y + 0.01);
     });
   });
 });

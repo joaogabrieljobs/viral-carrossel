@@ -48,4 +48,9 @@ describe('modo livre, fase 2: cartão Livre no seletor', () => {
     const source = readFileSync(new URL('../../src/components/CreateProjectFlow.jsx', import.meta.url), 'utf8');
     expect(source).toMatch(/const recommendedPresets = \[\s*\.\.\.\(isPresentation \? presets\.filter\(p => p\.isFree\) : \[\]\)/);
   });
+
+  it('escolher o Livre não grava as cores padrão do Livre como escolha da pessoa (a paleta é do roteiro)', () => {
+    const source = readFileSync(new URL('../../src/components/CreateProjectFlow.jsx', import.meta.url), 'utf8');
+    expect(source).toMatch(/\.\.\.\(preset && !preset\.isFree \? sanitizeCustomVisualPresetBrand\(preset\.brand\) : \{\}\)/);
+  });
 });

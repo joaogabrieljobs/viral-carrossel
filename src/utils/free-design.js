@@ -22,7 +22,7 @@ import {
   contentAwarePresentationLayout, contentAwarePresentationOverrides, fittedTitleSize, hasBlocks,
   hasVisual, photoSizeOfLayout, resolvePresentationCompositionKind,
 } from './presentation-composition.js';
-import { rendererSubtitleSizePercent, rendererTitleSizePercent } from './presentation-families.js';
+import { estimateTitleLines, rendererSubtitleSizePercent, rendererTitleSizePercent } from './presentation-families.js';
 import { pitchCompositionOverrides } from './pitch-content.js';
 import { resolveChromeColor } from './presentation-chrome.js';
 import { titleTrackingBase } from './title-tracking.js';
@@ -743,16 +743,21 @@ function estimateLines(value, widthPx, px, widthFactor) {
  * fim da área de leitura ao lado da foto e o corpo cresce em passos de 2 px até
  * 32 px enquanto o texto estimado couber. Nunca diminui.
  */
-function compactReading({ zones, chrome, slide, titleSize, subSize, display, text, kind, leading }) {
+function compactReading({ zones, chrome, slide, titleSize, subSize, display, kind, leading, titleLeading }) {
   const t = zones.title;
   const sub = zones.subtitle;
   if (!t || !sub || !['content', 'demo'].includes(kind)) return null;
   if (!(sub.y >= t.y + 1) || Math.min(t.x + t.w, sub.x + sub.w) - Math.max(t.x, sub.x) <= Math.min(t.w, sub.w) * 0.4) return null;
+  // Mesma conta do aperto da pilha das famílias (tightenStack), com a fonte do
+  // deck e folga de 6% na largura: a zona do título encolhe para o que o
+  // título ocupa, e o apoio começa logo abaixo, sem sobrepor.
   const titlePx = titlePxOf(titleSize);
-  const lines = estimateLines(slide.title, 1920 * t.w / 100 - 24, titlePx, display.widthFactor);
-  const titleBottom = t.y + ((lines * titlePx * 1.1 + 20) / 1080) * 100;
+  const lines = estimateTitleLines(String(slide.title || '').replace(/\*\*/g, ''), 1920 * t.w / 100 - 24, titlePx, (display.widthFactor || 0.55) * 1.06, display.case === 'upper');
+  const breathing = Math.max(20, titlePx * 0.44 + 1080 * 0.012);
+  const needed = Math.round(((lines * titlePx * titleLeading + breathing) / 1080) * 10000) / 100 + 0.5;
+  const titleZone = needed < t.h - 1 ? { ...t, h: needed } : t;
   const photo = zones.photo && zones.photo.w > 0 && Math.min(sub.x + sub.w, zones.photo.x + zones.photo.w) - Math.max(sub.x, zones.photo.x) <= 0 ? zones.photo : null;
-  const top = Math.round(Math.min(sub.y, Math.max(titleBottom + STACK_GAP, t.y + 6)) * 100) / 100;
+  const top = Math.round(Math.min(sub.y, titleZone.y + titleZone.h + STACK_GAP) * 100) / 100;
   const bottom = Math.max(sub.y + sub.h, photo ? Math.min(90, photo.y + photo.h) : 0);
   const zone = { ...sub, y: top, h: Math.round((bottom - top) * 100) / 100 };
   const delta = sub.y - top;
@@ -767,6 +772,7 @@ function compactReading({ zones, chrome, slide, titleSize, subSize, display, tex
   if (delta < 1 && px === startPx) return null;
   return {
     zone,
+    titleZone: delta >= 1 ? titleZone : t,
     subSize: px === startPx ? subSize : rendererSubtitleSizePercent(px),
     chrome: delta >= 1 ? chrome.map(d => (d.follow === 'subtitle' ? { ...d, y: Math.round((d.y - delta) * 100) / 100 } : d)) : chrome,
   };
@@ -829,7 +835,8 @@ export function freePresentationCompositionOverrides(base, {
   const familyChrome = composed.presentationChrome?.chrome || [];
   // Cartão atrás do texto (Modular): o texto fica no cartão; não recompõe.
   const reading = !onPhoto && !hasBlocks(layoutSlide) && !hasTextPanel(layout)
-    ? compactReading({ zones, chrome: familyChrome, slide: layoutSlide, titleSize, subSize: composed.subSize, display, text, kind, leading: (composed.subLeading || 150) / 100 })
+    ? compactReading({ zones, chrome: familyChrome, slide: layoutSlide, titleSize, subSize: composed.subSize, display, kind,
+      leading: (composed.subLeading || 150) / 100, titleLeading: familySpec(family).type.titleLeading || 1.05 })
     : null;
   const subSize = reading ? reading.subSize : composed.subSize;
   const chrome = freeChromeDevices(reading ? reading.chrome : familyChrome, { family, ground: chromeGround, palette, photoZone });
@@ -847,7 +854,7 @@ export function freePresentationCompositionOverrides(base, {
       chrome,
       fonts: { display, text },
     },
-    ...(reading ? { canvas: { ...composed.canvas, zones: { ...zones, subtitle: reading.zone } } } : {}),
+    ...(reading ? { canvas: { ...composed.canvas, zones: { ...zones, title: reading.titleZone, subtitle: reading.zone } } } : {}),
     subSize,
     presentationNumericTypography: { fontFamily: display.css, weight: display.weight },
     customBg: inks.bg,

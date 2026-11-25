@@ -197,7 +197,9 @@ export default function CreateProjectFlow({
     const preset = presets.find(p => p.id === id);
     setVisualPreset(id === 'auto' ? 'auto' : preset?.id || null);
     setBrand(current => applyCreationVisualChoice(current, identityVisualBase.current, preset));
-    setBrandVisualOverrides({ ...identityBaseOverrides.current, ...(preset ? sanitizeCustomVisualPresetBrand(preset.brand) : {}) });
+    // Livre: a paleta e as fontes vêm do roteiro (deckDesign); as cores padrão do
+    // cartão não são escolha da pessoa e não sobrepõem a proposta.
+    setBrandVisualOverrides({ ...identityBaseOverrides.current, ...(preset && !preset.isFree ? sanitizeCustomVisualPresetBrand(preset.brand) : {}) });
     setIdentityVisualEdited(!preset && Object.keys(identityBaseOverrides.current).length > 0);
   };
   const editIdentityVisual = patch => {
