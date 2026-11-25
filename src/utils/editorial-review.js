@@ -536,6 +536,25 @@ export function repeatedStepBlockSlides(slides) {
   });
 }
 
+/**
+ * Reteste real 24/11 (RT24 3): Caso, slide 10, tinha como título "What happens
+ * if you don't like the site?", a mesma lacuna que o plano listou ("Sem
+ * detalhes sobre o que acontece se o cliente não gostar do site"). O slide é
+ * em inglês e a lacuna em português: a comparação usa a pergunta que o plano
+ * deu à posição, escrita no idioma das lacunas. Vale só para título que é
+ * pergunta, com três quartos dos radicais da pergunta dentro de uma lacuna.
+ */
+export function gapQuestionSlides(slides, plan) {
+  const gaps = (Array.isArray(plan?.gaps) ? plan.gaps : []).map(gap => contentStems(gap)).filter(gap => gap.size);
+  if (!gaps.length) return [];
+  const covered = (text) => {
+    const stems = [...contentStems(text)];
+    return stems.length >= 2 && gaps.some(gap => stems.filter(stem => gap.has(stem)).length / stems.length >= 0.75);
+  };
+  return (Array.isArray(slides) ? slides : []).flatMap((slide, index) => (/\?\s*$/.test(String(slide?.title || '').trim())
+    && (covered(slide.title) || covered(plan.slides?.[index]?.question)) ? [index] : []));
+}
+
 function repeatedContentRule(slides, unit = 'CARD') {
   const repeated = repeatedContentSlides(slides);
   return repeated.length
@@ -1164,14 +1183,16 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
   })) }, factualConfig).map(issue => ({ ...issue, kind: 'factual' }));
   // QA 24/11 (texto 1): slide cujo título é só a lacuna ("No prior results
   // documented") entra no reparo de fatos que já existe; o resto sai sem IA.
-  const gapTitlesOf = result => moveGapNotesOutOfSlides(result).emptiedTitles
+  // RT24 3: a pergunta-título cujo assunto é uma lacuna do plano segue o mesmo caminho.
+  const gapTitlesOf = result => [...new Set([...moveGapNotesOutOfSlides(result).emptiedTitles, ...gapQuestionSlides(result.slides, plan)])].sort((a, b) => a - b)
     .map(slideIndex => ({ slideIndex, field: 'title', category: 'lacuna do material', claim: String(result.slides[slideIndex].title).trim(), kind: 'factual' }));
   const finish = (reviewed, reviewStatus, extra = {}) => {
     // A lacuna sai do texto visível e vai, com as do plano, para o aviso de
     // material. Título que ficou vazio é marcado para revisão.
     const moved = moveGapNotesOutOfSlides(reviewed);
-    const result = moved.draft;
-    const facts = [...moved.emptiedTitles.map(slideIndex => ({ kind: 'missing_title', slideIndex, field: 'title' })), ...factsOf(result)];
+    const questions = gapQuestionSlides(moved.draft.slides, plan);
+    const result = questions.length ? { ...moved.draft, slides: moved.draft.slides.map((slide, index) => (questions.includes(index) ? { ...slide, title: '' } : slide)) } : moved.draft;
+    const facts = [...[...moved.emptiedTitles, ...questions].sort((a, b) => a - b).map(slideIndex => ({ kind: 'missing_title', slideIndex, field: 'title' })), ...factsOf(result)];
     const materialGaps = [...(Array.isArray(plan.gaps) ? plan.gaps : []), ...moved.gaps];
     return { result, plan, planningDiagnostics, writingDiagnostics, reviewDiagnostics, reviewStatus: facts.length ? 'needs_attention' : reviewStatus, ...extra,
       ...((facts.length || extra.violations?.length) ? { violations: [...(extra.violations || []), ...facts] } : {}),

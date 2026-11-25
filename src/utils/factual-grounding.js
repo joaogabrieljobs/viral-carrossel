@@ -530,7 +530,12 @@ const GAP_NOTE_PT = /\b(?:nenhum[a]?|sem|n[ãa]o\s+h[áa])\s+[^.!?;:,]{0,60}\b(?
 // ressalva de abertura sai e a afirmação fica.
 const GAP_HEDGE = /^\s*(?:(?:based\s+on|from|given|according\s+to)\s+(?:the\s+)?(?:available|provided|supplied)\s+(?:evidence|information|data|material|details|documentation)|(?:based\s+on|from|given|according\s+to)\s+(?:the\s+)?(?:evidence|information|data|material|details|documentation)\s+(?:available|provided|supplied|shared)|(?:com\s+base\s+n[oa]s?|a\s+partir\s+d[oa]s?|segundo|conforme|pel[oa]s?)\s+(?:(?:[oa]s?)\s+)?(?:evid[êe]ncias?|informa[çc](?:[ãa]o|[õo]es)|dados|materia(?:l|is)|documenta[çc][ãa]o)\s+(?:dispon[ií]ve(?:l|is)|fornecid[oa]s?|enviad[oa]s?|recebid[oa]s?))\s*[,:]\s*(?=\S)/iu;
 
-const noteSentence = text => BRIEFING_NOTE.test(text) || BRIEFING_NOTE_MORE.test(text) || BRIEFING_NOTE_EN.test(text) || GAP_NOTE_EN.test(text) || GAP_NOTE_PT.test(text);
+// Reteste real 24/11 (RT24 3): Relatório, slide 8, "Maintenance, hosting, and
+// recurring costs after delivery are not described in the offer." "Hosting is
+// not included in the $797" é fato do cliente e fica.
+const GAP_NOTE_DESCRIBED = /\b(?:is|are|was|were)\s+not\s+(?:described|outlined|explained)\b|\bn[ãa]o\s+(?:[ée]|s[ãa]o|foi|foram|est[áa]|est[ãa]o)\s+(?:descrit|explicad|detalhad)[oa]s?\b/iu;
+
+const noteSentence = text => BRIEFING_NOTE.test(text) || BRIEFING_NOTE_MORE.test(text) || BRIEFING_NOTE_EN.test(text) || GAP_NOTE_EN.test(text) || GAP_NOTE_PT.test(text) || GAP_NOTE_DESCRIBED.test(text);
 
 export function isBriefingNote(sentence) {
   const text = String(sentence || '');
