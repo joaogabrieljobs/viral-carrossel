@@ -4,9 +4,13 @@ import { expandLibraryFromLocalCopy } from './local-library-compact.js';
 // ─── ANALYTICS ────────────────────────────────────────────────────────────────
 // Plausible (carregado via index.html). Helper que é no-op se ad blocker bloquear
 // ou se window.plausible não estiver disponível (dev local, etc.).
+// O GA4 recebe só estes, sem propriedades, e só depois do consentimento.
+const EVENTOS_GA4 = new Set(['landing_complete', 'paywall_open', 'sign_up', 'begin_checkout']);
+
 function trackEvent(name, props) {
   try {
     if (typeof window === 'undefined') return;
+    if (EVENTOS_GA4.has(name)) window.moontGA4?.evento(name);
     if (typeof window.plausible !== 'function') return;
     window.plausible(name, props ? { props } : undefined);
   } catch { /* never break app por causa de analytics */ }

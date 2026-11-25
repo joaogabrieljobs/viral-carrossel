@@ -1,6 +1,8 @@
 /**
  * Client helpers — assinatura Stripe / acesso ao studio.
  */
+import { trackEvent } from '../utils/telemetry.js';
+
 const PENDING_CHECKOUT_KEY = 'vc_pending_checkout';
 export const ACCESS_SESSION_TIMEOUT_MS = 10_000;
 
@@ -88,6 +90,7 @@ export async function startCheckout(email, { tier = 'creator' } = {}) {
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || 'Não foi possível iniciar o checkout');
+  trackEvent('begin_checkout');
   // sessionStorage pertence à aba: o retorno do Stripe não expõe o id na URL
   // e outro checkout aberto ao lado não troca a sessão desta compra.
   if (data.url && data.sessionId) {
@@ -204,5 +207,6 @@ export async function registerWithPassword(email, password) {
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || 'Não foi possível criar a conta');
+  trackEvent('sign_up');
   return data;
 }
