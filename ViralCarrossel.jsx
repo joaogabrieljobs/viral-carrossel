@@ -457,6 +457,7 @@ import {
   disableCanvasLayoutSlides,
   removeCanvasLayoutSlides,
 } from './src/utils/canvas-zones.js';
+import { canvasLayoutEnabledToast } from './src/utils/canvas-layout-copy.js';
 import {
   CARD_VISUAL_STYLE_IDS,
   BG_PATTERN_IDS,
@@ -5168,7 +5169,11 @@ export default function App() {
     // Reutiliza zonas guardadas — antes repunha os defaults e perdia a foto ajustada (bug 2026-09-15).
     history.set(d => transformFormatVisuals(d, viewed => enableCanvasLayoutSlides(viewed, d.creativePreset)));
     setCanvasEditMode(true);
-    toast('Composição ativada em todos os cards. Ligue «Mostrar zonas» para mover e redimensionar.', 'success');
+    // QA 24/11: o aviso leva o Desfazer, que usa o histórico e sai da edição.
+    toast(...canvasLayoutEnabledToast(() => {
+      history.undo();
+      setCanvasEditMode(false);
+    }));
   }, [history, toast]);
 
   const disableCanvasLayout = useCallback(() => {
