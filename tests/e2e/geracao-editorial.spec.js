@@ -76,6 +76,54 @@ for (const fails of [false, true]) {
   });
 }
 
+// QA 24/11 (texto 3): a pessoa pede 6 cards, dois dizem o mesmo com outras
+// palavras e o reparo por IA não corrige. O card repetido sai, e a tela diz
+// que o projeto ficou com menos cards, sem precisar abrir "O que conferir".
+test('card repetido que o reparo não corrige sai do projeto e a tela avisa', async ({ page }) => {
+  test.setTimeout(60_000);
+  const cards = [
+    ['Reunião sem pauta custa tempo', 'A conversa termina e ninguém sabe o que foi decidido.', ''],
+    ['Comece pela pergunta', 'Escreva o que precisa ser decidido antes de convidar alguém.', ''],
+    ['Convide quem decide', 'Chame as pessoas que respondem pelo tema.', 'Menos gente na sala deixa a conversa objetiva.'],
+    ['Registre o combinado', 'Anote a decisão na frente da equipe.', 'O registro evita a mesma conversa na semana seguinte.'],
+    ['Defina o dono da tarefa', 'Cada tarefa sai da reunião com um responsável.', 'O responsável confirma o prazo antes de sair.'],
+    ['O dono da tarefa', 'Cada tarefa sai da reunião com um responsável definido.', 'O responsável confirma o prazo antes de sair da reunião.'],
+  ];
+  const prompts = [];
+  await mockApi(page, { session, extra: {
+    '/api/ai/compatible': route => {
+      const prompt = route.request().postDataJSON().payload.messages.find(m => m.role === 'user').content;
+      prompts.push(prompt);
+      // Revisão e reparo respondem sem mudar nada: o card 6 continua repetindo o 5.
+      if (prompt.startsWith('REVISÃO EDITORIAL')) return route.fulfill({ json: completion({ edits: [] }) });
+      return route.fulfill({ json: completion({
+        slides: cards.map(([title, subtitle, bodyAfterImage]) => ({ title, subtitle, bodyAfterImage, imageQuery: '' })),
+        caption: 'Uma decisão concreta. #gestão #equipes #reuniões #trabalho #liderança',
+      }) });
+    },
+  } });
+  await page.goto('/?app=1');
+  await enterEditorFromHome(page);
+  await useProfessionalControls(page);
+  await page.getByRole('button', { name: 'Gerar carrossel com IA', exact: true }).first().click();
+  const modal = page.locator('.modal-panel');
+  await modal.getByPlaceholder(/como freelancers/i).fill('Reuniões sem pauta');
+  for (let i = 0; i < 2; i++) await modal.getByRole('button', { name: /continuar/i }).click();
+  await modal.getByRole('radio', { name:'Só texto', exact:true }).check();
+  await modal.getByRole('button', { name:/continuar/i }).click();
+  await modal.getByRole('button', { name: 'Gerar só texto', exact: true }).click();
+  await expect(modal).toHaveCount(0, { timeout: 25_000 });
+  await expect.poll(async () => (await persistedDoc(page))?.editorialReviewStatus).toBe('needs_attention');
+  const doc = await persistedDoc(page);
+  expect(doc.slides.map(slide => slide.title)).toEqual(cards.slice(0, 5).map(([title]) => title));
+  expect(doc.editorialReviewIssues).toContainEqual(expect.objectContaining({ code: 'repeated_cards_removed' }));
+  await expect(page.getByText('Um card repetia outro e foi removido. O projeto ficou com menos cards do que o pedido.', { exact: true })).toBeVisible();
+  // Rascunho, revisão e um único reparo dirigido.
+  expect(prompts).toHaveLength(3);
+  expect(prompts[2]).toContain('REPARO DIRECIONADO');
+  expect(prompts[2]).toContain('slideIndex 5 repete o slideIndex 4');
+});
+
 test('pesquisa com fonte datada leva evidência ao material da ideia', async ({ page }) => {
   test.setTimeout(60_000);
   await page.addInitScript(() => {
