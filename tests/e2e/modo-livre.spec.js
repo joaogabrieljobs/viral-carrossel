@@ -139,6 +139,12 @@ test('Livre no assistente: roteiro v3, páginas variadas, salva e reabre igual',
     return getComputedStyle(ground || n).backgroundColor;
   }));
   expect(new Set(fundos).size).toBeGreaterThanOrEqual(3);
+  // QA livre-f2 ("cida de", "9/1 0"): o texto do slide não herda as variantes
+  // de glifo da interface (cv11, ss01). O html2canvas desenha o glifo padrão na
+  // posição medida com a variante e abria um vão depois de cada "a".
+  const variantes = await page.locator('main [data-vc-card-surface]').evaluateAll(nodes => [...new Set(nodes.flatMap(n => [...n.querySelectorAll('h1, p, span, div')]
+    .filter(e => [...e.childNodes].some(c => c.nodeType === 3 && c.textContent.trim())).map(e => getComputedStyle(e).fontFeatureSettings)))]);
+  expect(variantes).toEqual(['normal']);
 
   // Reabre: nada é recomposto.
   await page.reload();

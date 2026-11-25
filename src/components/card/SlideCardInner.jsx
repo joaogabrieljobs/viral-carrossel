@@ -4079,6 +4079,13 @@ const SlideCardInner = React.forwardRef(({
       position:'relative', overflow:'hidden',
       borderRadius: scale < 0.9 ? 10 : 0,
       flexShrink:0, background: outerBg,
+      // QA livre-f2 ("cida de", "9/1 0"): o body da interface liga as variantes
+      // cv11 e ss01 da Inter, e o texto do slide as herdava. Space Grotesk, Inter
+      // e IBM Plex trocam o "a" e o "1" por glifos de outra largura; o
+      // html2canvas mede a letra com a variante e desenha o glifo padrão, o que
+      // abria um vão depois de cada "a" no arquivo. O slide usa os glifos padrão,
+      // os mesmos na tela e no arquivo.
+      fontFeatureSettings: 'normal',
     }}>
       <div style={previewUsesZoom ? {
         zoom: scale,
