@@ -302,12 +302,12 @@ describe('fase 3, defeitos da fase 2: cartão do Modular com texto curto (kit, p
   const { freeTextLines } = await import('../../src/utils/free-design.js');
   const KIT_ESCURO = { contextMd: 'Fundo: #0D1B2A\nDestaque: #E0A458\nTítulo: #F4F1DE' };
   const MODULAR = { family: 'modular', ground: 'bg', photo: 'half', block: 'none', emphasis: [], icons: [] };
-  const pagina = (subtitle, body = '') => {
+  const pagina = (subtitle, body = '', role = 'content') => {
     const slides = Array.from({ length: 6 }, (_, i) => ({
       id: `m${i}`, title: i === 3 ? 'Festa cidade ritmo encontro noite cultura' : `Título da página ${i + 1}`,
       subtitle: i === 3 ? subtitle : 'Apoio da página com algumas palavras.', bodyAfterImage: i === 3 ? body : '',
       bgImage: 'data:image/png;base64,iVBORw0KGgo=', imageQuery: 'editorial photo',
-      presentationPlan: { schemaVersion: 3, visualRole: i === 0 ? 'cover' : i === 5 ? 'closing' : 'content', purpose: 'context', ...(i === 3 ? { design: MODULAR } : {}) },
+      presentationPlan: { schemaVersion: 3, visualRole: i === 0 ? 'cover' : i === 5 ? 'closing' : i === 3 ? role : 'content', purpose: 'context', ...(i === 3 ? { design: MODULAR } : {}) },
     }));
     const doc = applyPresentationVisualPresetToDoc({ presentationPath: 'auto', brand: {}, slides, styleKit: KIT_ESCURO }, FREE_PRESENTATION_PRESET_ID);
     return doc.slides[3];
@@ -330,6 +330,18 @@ describe('fase 3, defeitos da fase 2: cartão do Modular com texto curto (kit, p
     const margemCima = sub.y - card.y;
     expect(vazioEmbaixo).toBeLessThanOrEqual(margemCima + 4);
     expect(card.h).toBeLessThan(40);
+  });
+
+  it('título e apoio no mesmo cartão (demonstração, v3 página 5): o conteúdo fica no meio do cartão', () => {
+    const s = pagina(palavrasLongas(150), '', 'demo');
+    expect(s.presentationComposition).toBe('demo');
+    const { title, subtitle } = s.canvas.zones;
+    const card = s.presentationChrome.chrome.find(d => d.t === 'block' && d.y <= title.y && d.y + d.h >= subtitle.y + subtitle.h);
+    expect(card).toBeTruthy();
+    const acima = title.y - card.y;
+    const abaixo = (card.y + card.h) - (subtitle.y + textoPct(s));
+    expect(Math.abs(acima - abaixo), `acima ${acima} abaixo ${abaixo}`).toBeLessThanOrEqual(4);
+    expect(textoPct(s)).toBeLessThanOrEqual(subtitle.h + 0.5);
   });
 
   it('texto mais longo: o cartão cresce com o texto, sem passar do fim da coluna', () => {

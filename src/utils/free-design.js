@@ -876,15 +876,18 @@ function compactReading({ zones, chrome, slide, titleSize, subSize, display, tex
  * página 7): o cartão da família ocupa até o pé da coluna e o texto curto
  * deixava a metade de baixo vazia. O corpo cresce até 32 px enquanto couber;
  * o cartão sobe para logo abaixo do título (largura medida da fonte do deck) e
- * abraça o texto, com as mesmas margens internas. Nunca passa do cartão da
- * família nem diminui o texto.
+ * abraça o texto, com as mesmas margens internas. Com título e apoio no mesmo
+ * cartão, o cartão fica e o conteúdo vai para o meio dele. Nunca passa do
+ * cartão da família nem diminui o texto.
  */
 function panelReading({ zones, chrome, slide, titleSize, subSize, display, text, kind, leading, titleLeading }) {
   const t = zones.title;
   const sub = zones.subtitle;
   if (!t || !sub || !['content', 'demo'].includes(kind)) return null;
   const panel = textPanel({ chrome }, sub);
-  if (!panel || textPanel({ chrome }, t) || !(sub.y >= t.y + 1)) return null;
+  if (!panel || !(sub.y >= t.y + 1)) return null;
+  const shared = textPanel({ chrome }, t) === panel;
+  if (!shared && textPanel({ chrome }, t)) return null;
   const index = chrome.indexOf(panel);
   const padTop = sub.y - panel.y;
   const padBottom = panel.y + panel.h - (sub.y + sub.h);
@@ -907,6 +910,24 @@ function panelReading({ zones, chrome, slide, titleSize, subSize, display, text,
   const breathing = Math.max(20, titlePx * 0.44 + 1080 * 0.012);
   const needed = Math.round(((titleLines * titlePx * titleLeading + breathing) / 1080) * 10000) / 100 + 0.5;
   const titleZone = needed < t.h - 1 ? { ...t, h: needed } : t;
+  const grownSize = px === startPx ? subSize : rendererSubtitleSizePercent(px);
+  if (shared) {
+    // Título e apoio no mesmo cartão (demonstração do Modular): o cartão fica
+    // do tamanho da família, ao lado da foto, e o conteúdo vai para o meio dele.
+    const top = t.y - panel.y;
+    const inner = panel.h - top - padBottom;
+    const total = titleZone.h + STACK_GAP + subH;
+    const free = inner - total;
+    if (free < 4 && px === startPx) return null;
+    const y = Math.round((t.y + Math.max(0, free) / 2) * 100) / 100;
+    const subY = Math.round((y + titleZone.h + STACK_GAP) * 100) / 100;
+    return {
+      zone: { ...sub, y: subY, h: Math.round(Math.min(subH, panel.y + panel.h - padBottom - subY) * 100) / 100 },
+      titleZone: { ...titleZone, y },
+      subSize: grownSize,
+      chrome: chrome.map(d => (d.follow === 'subtitle' ? { ...d, y: Math.round((d.y + subY - sub.y) * 100) / 100 } : d)),
+    };
+  }
   const cardY = Math.round(Math.min(panel.y, titleZone.y + titleZone.h + STACK_GAP) * 100) / 100;
   const delta = panel.y - cardY;
   if (sub.h - subH < 3 && delta < 1 && px === startPx) return null;
@@ -914,7 +935,7 @@ function panelReading({ zones, chrome, slide, titleSize, subSize, display, text,
   return {
     zone: { ...sub, y: Math.round((sub.y - delta) * 100) / 100, h: subH },
     titleZone: delta >= 1 ? titleZone : t,
-    subSize: px === startPx ? subSize : rendererSubtitleSizePercent(px),
+    subSize: grownSize,
     chrome: chrome.map((d, i) => (i === index ? card : d.follow === 'subtitle' ? { ...d, y: Math.round((d.y - delta) * 100) / 100 } : d)),
   };
 }
