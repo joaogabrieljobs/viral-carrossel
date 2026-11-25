@@ -90,7 +90,11 @@ export function resolvePresentationCompositionKind({ slide = {}, stage = {}, ind
  * Vale só ao compor (geração e "aplicar estilo"): projeto salvo guarda a
  * composição no slide e não é recomposto ao abrir.
  */
-const RHYTHM_ALTERNATIVES = ['demo', 'divider'];
+// Cobertura (25/11): sequência de demonstrações (roteiro com demo no miolo,
+// ou deck sem roteiro cujas etapas são "evidência") não tinha para onde ir,
+// porque a única alternativa era ela mesma ou a página de frase sem foto. A
+// página de conteúdo da família entra por último.
+const RHYTHM_ALTERNATIVES = ['demo', 'divider', 'content'];
 
 function rhythmKind(kind, slide, family, previous) {
   const [before, last] = previous.slice(-2);
