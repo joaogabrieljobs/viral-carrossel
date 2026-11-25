@@ -305,6 +305,49 @@ function blockSupported(block, slide, icons) {
   return true;
 }
 
+/**
+ * Uma linha por família para o diretor de arte da IA (roteiro v3): o que a
+ * página parece e onde a foto costuma ficar. Vem das geometrias que as
+ * famílias desenham hoje (presentation-art-direction.js).
+ */
+export const FREE_FAMILY_GUIDE = Object.freeze({
+  editorial: 'revista contemporânea: título serifado grande, fios finos, foto em coluna à direita ou à esquerda na demonstração.',
+  executive: 'sóbrio e arejado: muito espaço em branco, foto em painel à direita, divisor escuro com foto estreita à esquerda.',
+  swiss: 'grade suíça: módulos rígidos e alinhamento à esquerda, foto em módulo à direita ou à esquerda na demonstração, divisor em cor de destaque.',
+  cinematic: 'cinema: foto em tela cheia com título sobre véu escuro na capa e na demonstração, faixa de foto larga no conteúdo.',
+  luxury: 'luxo discreto: margens largas, foto estreita e alta, divisor escuro, poucas palavras por página.',
+  typographic: 'tipográfico expressivo: título enorme ocupa a página, foto pequena como pontuação, divisor e fecho sem foto.',
+  cultural: 'cultural e artístico: colagem com recortes e cor sobreposta, foto em coluna à direita ou à esquerda.',
+  technical: 'técnico: grade de blueprint, rótulos em mono, foto à direita, à esquerda na demonstração ou pequena no divisor.',
+  photo: 'fotográfico e humano: foto inteira na capa, foto grande ao lado do texto e meia página no fecho.',
+  modular: 'modular: texto em cartões arredondados ao lado de um cartão de foto, divisor escuro com foto pequena.',
+});
+
+/** Fontes de título que não servem para texto corrido (o `text` do deck). */
+export const FREE_DISPLAY_ONLY_FONTS = Object.freeze(FREE_FONT_FAMILIES.filter(name => !FONT_SPECS[name].text));
+
+const clipPhrase = value => String(value ?? '').replace(/\*\*/g, '').replace(/\s+/g, ' ').trim().slice(0, 60).trim();
+
+/**
+ * Design proposto pela IA no roteiro v3, só com os enums corrigidos. Ainda
+ * não há texto escrito: se o bloco tem dado e se os trechos de negrito estão
+ * no texto é conferido na composição (normalizeSlideDesign com o slide).
+ * Sem objeto, null: o diretor determinístico decide a página.
+ */
+export function normalizeProposedDesign(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const block = enumValue(raw.block, FREE_BLOCKS, BLOCK_ALIASES, 'none');
+  const icons = [...new Set((Array.isArray(raw.icons) ? raw.icons : []).map(i => String(i || '').trim().toLowerCase()).filter(i => FREE_ICONS.includes(i)))].slice(0, 4);
+  return {
+    family: normalizeFreeFamily(raw.family),
+    ground: enumValue(raw.ground, FREE_GROUNDS, GROUND_ALIASES, 'bg'),
+    photo: enumValue(raw.photo, FREE_PHOTO_SIZES, PHOTO_ALIASES, 'none'),
+    block,
+    emphasis: [...new Set((Array.isArray(raw.emphasis) ? raw.emphasis : []).map(clipPhrase).filter(Boolean))].slice(0, 3),
+    icons: block === 'icons' ? icons : [],
+  };
+}
+
 /** Corrige o design de um slide para os enums fechados da spec. */
 export function normalizeSlideDesign(raw, slide = {}) {
   const d = raw && typeof raw === 'object' ? raw : {};

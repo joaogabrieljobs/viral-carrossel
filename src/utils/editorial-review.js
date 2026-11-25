@@ -1285,7 +1285,7 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
   };
   const { plan, diagnostics: planningDiagnostics } = await generatePresentationPlan({
     brief: planning.brief || '', userInstructions: config.userInstructions || '', sources, count: config.count, presentationPath: config.presentationPath,
-    aiOptions: textOptions, onStage, onPlan,
+    freeDesign: config.freeDesign === true, aiOptions: textOptions, onStage, onPlan,
   }, callAI);
   let writingDiagnostics = [];
   // Reteste 0b1cb62 (D06): a revisão não rodou e não ficou registrado por quê.
