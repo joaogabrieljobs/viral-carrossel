@@ -271,12 +271,15 @@ export function contentAwarePresentationOverrides(base, slide = {}, kind = 'cont
   const typography = previousTypography[kind] || {};
   const displaySize = fields.titleSize;
   const titleSize = fittedTitleSize(structured ? Math.min(46, displaySize) : displaySize, slide.title, zones.title, fields.typography.title.fontFamily);
-  const subSize = fields.subSize;
+  const support = kind === 'content' && visual && !pitch ? grownSupport(layout, slide, base) : null;
+  if (support) zones.subtitle = support.zone;
+  const subSize = support ? rendererSubtitleSizePercent(support.px) : fields.subSize;
   const titleLeading = fields.titleLeading;
   const bodyLeading = fields.bodyLeading;
   const imagePosition = !layout.photo ? 'none' : layout.photo.x + layout.photo.w / 2 < 50 ? 'left-evidence' : 'right-evidence';
   const rawLimits = pitch ? (base.presentationTextLimits || {}) : plannedPresentationTextLimits(kind, slide, deliveryMode);
-  const narrow = zones.subtitle.w < 45 && zones.subtitle.h < 50;
+  // Limites pedidos ao modelo seguem a caixa da família, não a que cresceu.
+  const narrow = layout.subtitle.w < 45 && layout.subtitle.h < 50;
   const narrowed = narrow ? {
     ...rawLimits,
     subtitle: { ...rawLimits.subtitle, maxChars: Math.min(rawLimits.subtitle?.maxChars || 180, 180), maxLines: 6 },
@@ -336,6 +339,40 @@ export function contentAwarePresentationOverrides(base, slide = {}, kind = 'cont
     },
     canvas: { ...base.canvas, preserveZones: true, zones },
   };
+}
+
+/**
+ * Apoio da página de conteúdo com foto ao lado (spec 1.1, entrega 4). A QA
+ * mediu o apoio do Cinemático em 28 px numa coluna de 30% que deixa vazia a
+ * metade de baixo do lado esquerdo. A zona desce até o fim da área de leitura
+ * (90%, acima de fólio, fio de rodapé e paginação, sem passar do pé da foto) e
+ * o corpo cresce em passos de 2 px enquanto o texto estimado couber, até 32 px,
+ * o maior corpo de leitura que a biblioteca já usa no 16:9. Nunca diminui;
+ * sem texto (limites pedidos antes da redação) a página fica como era.
+ */
+const SUPPORT_READING_BOTTOM = 90;
+const SUPPORT_MAX_PX = 32;
+
+function grownSupport(layout, slide, base) {
+  const sub = layout.subtitle;
+  const photo = layout.photo;
+  const copy = String(slide.subtitle || '').replace(/\*\*/g, '').trim();
+  if (!copy || !sub || !photo || layout.longReading || layout.scrim || layout.format !== '16:9') return null;
+  // Só com a foto ao lado da coluna de texto, nunca acima ou abaixo dela.
+  if (Math.min(sub.x + sub.w, photo.x + photo.w) - Math.max(sub.x, photo.x) > 0) return null;
+  const bottom = Math.max(sub.y + sub.h, Math.min(SUPPORT_READING_BOTTOM, photo.y + photo.h));
+  const zone = { ...sub, h: Math.round((bottom - sub.y) * 100) / 100 };
+  const leading = familySpec(layout.family).type.bodyLeading || 1.5;
+  const widthPx = 1920 * zone.w / 100 - 24;
+  const heightPx = 1080 * zone.h / 100 - 14;
+  // 0,55 em por caractere: estimativa folgada para as fontes de texto da biblioteca.
+  const lines = (value, px) => value.split('\n').reduce((n, part) => n + Math.max(1, Math.ceil([...part].length * 0.55 * px / widthPx)), 0);
+  const tail = String(slide.bodyAfterImage || '').trim();
+  const tailPx = 1920 * 0.018 * presentationSupportTextSize(base) * PRESENTATION_VIEW_FACTOR / 100;
+  const height = px => lines(copy, px) * px * leading + (tail ? 0.8 * px + lines(tail, tailPx) * tailPx * leading : 0);
+  let px = layout.bodyPx;
+  for (let next = layout.bodyPx + 2; next <= SUPPORT_MAX_PX && height(next) <= heightPx; next += 2) px = next;
+  return { zone, px };
 }
 
 const SURFACE_INK_FIELDS = [['titleColor', 'ink'], ['subtitleColor', 'ink'], ['textColor', 'muted']];

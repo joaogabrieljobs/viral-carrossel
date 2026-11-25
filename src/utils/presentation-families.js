@@ -955,6 +955,43 @@ export function familyPhotoFilter(key) {
   return familySpec(key).photo.filter || '';
 }
 
+/**
+ * Descrição das colunas de evidência (spec 1.1, entrega 4). A QA mediu no
+ * Cinemático, a 1920 px, a linha de descrição das métricas com ~21 px e
+ * contraste ~4,0 para 1: o menor texto do deck e o único abaixo de 4,5.
+ *
+ * Piso de tamanho: 25 px, o menor corpo de leitura que alguma família já usa
+ * no 16:9 (apoio do Suíço na página de dados). Nenhuma família passa a ter
+ * texto corrido menor que o que a biblioteca já desenha.
+ */
+export const EVIDENCE_DETAIL_MIN_PX = 25;
+export const EVIDENCE_DETAIL_MIN_CONTRAST = 4.5;
+
+const hexRgb = (value) => {
+  const m = /^#?([0-9a-f]{6}|[0-9a-f]{3})$/i.exec(String(value || '').trim());
+  if (!m) return null;
+  const h = m[1].length === 3 ? m[1].split('').map((c) => c + c).join('') : m[1];
+  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+};
+
+/**
+ * Tinta da descrição: a da coluna, atenuada pela opacidade da família só até
+ * onde ainda lê (>= 4,5 sobre a superfície). Devolve cor sólida, sem
+ * opacidade, para a prévia e o arquivo medirem a mesma coisa. Cor fora de hex
+ * (gradiente, rgba) não é medida: fica a atenuação de antes.
+ */
+export function evidenceDetailInk(ink, surface, opacity = 1) {
+  const fg = hexRgb(ink);
+  const bg = hexRgb(surface);
+  if (!fg || !bg) return { color: ink, opacity };
+  const mix = (t) => '#' + fg.map((c, i) => Math.round(c * t + bg[i] * (1 - t)).toString(16).padStart(2, '0')).join('');
+  for (let t = Math.min(1, Math.max(0, Number(opacity) || 0)); t < 1; t = Math.round((t + 0.01) * 100) / 100) {
+    if (wcagContrast(mix(t), surface) >= EVIDENCE_DETAIL_MIN_CONTRAST) return { color: mix(t), opacity: 1 };
+  }
+  if (wcagContrast(mix(1), surface) >= EVIDENCE_DETAIL_MIN_CONTRAST) return { color: mix(1), opacity: 1 };
+  return { color: readableOn(surface, [ink]), opacity: 1 };
+}
+
 /** Tratamento de evidência (tabela, métricas e etapas) por família. */
 export function familyEvidenceStyle(key) {
   const family = normalizeFamilyKey(key);
@@ -964,6 +1001,9 @@ export function familyEvidenceStyle(key) {
     panel: false, panelColor: p.surface, radius: 0, metricRule: 2, metricRuleColor: p.accent,
     numberRole: 'numeric', headerCase: 'normal', headerTracking: 0, headerRole: 'text', stepMarker: 'number',
     accent: p.accent, ink: p.ink, muted: p.muted,
+    // Descrição sob o rótulo da métrica e explicação da etapa: atenuadas para
+    // hierarquia, nunca abaixo do piso de tamanho nem de 4,5 para 1.
+    detailPx: EVIDENCE_DETAIL_MIN_PX, detailOpacity: 0.75, stepBodyOpacity: 0.82,
   };
   return {
     editorial: { ...base, zebra: 'transparent', headerRule: 1, metricRuleColor: p.ink, stepMarker: 'roman' },

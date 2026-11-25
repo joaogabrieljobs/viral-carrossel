@@ -57,7 +57,11 @@ describe('ritmo de layout do deck (spec 1.1, entrega 2)', () => {
     slides.forEach((slide, i) => {
       expect(PAGE_KINDS).toContain(slide.presentationComposition);
       if (i === 8) return;
-      expect(slide.canvas.zones).toEqual(contentAwarePresentationZones(slide.presentationComposition, deck()[i], family));
+      // A altura do apoio pode crescer até o fim da área de leitura (entrega 4); o resto é a zona da família.
+      const { subtitle: { h, ...apoio }, ...zonas } = slide.canvas.zones;
+      const { subtitle: { h: hFamilia, ...apoioFamilia }, ...zonasFamilia } = contentAwarePresentationZones(slide.presentationComposition, deck()[i], family);
+      expect({ ...zonas, apoio }).toEqual({ ...zonasFamilia, apoio: apoioFamilia });
+      expect(h).toBeGreaterThanOrEqual(hFamilia);
     });
   });
 

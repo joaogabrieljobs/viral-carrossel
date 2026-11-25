@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import LegacyPresentationBlocks from './LegacyPresentationBlocks.jsx';
 import { normalizePresentationBlocks } from '../utils/presentation-quality.js';
-import { familyEvidenceStyle, familyFont, normalizeFamilyKey } from '../utils/presentation-families.js';
+import { evidenceDetailInk, familyEvidenceStyle, familyFont, normalizeFamilyKey } from '../utils/presentation-families.js';
 import { readTypedText } from '../utils/inline-edit-text.js';
 import { accentInkOnSurface } from '../utils/brand-visuals.js';
 import { wcagContrast } from '../utils/wcag.js';
@@ -175,6 +175,10 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, back
   const headerFont = familyFont(key, st.headerRole === 'display' ? 'display' : st.headerRole === 'label' ? 'label' : 'text');
   const numberFont = numericTypography?.fontFamily || familyFont(key, 'numeric').css || fontFamily;
   const panelInk = panel ? st.ink : ink;
+  // Spec 1.1 (entrega 4): descrição das colunas com piso de 25 px e 4,5:1.
+  const detailSurface = panel ? st.panelColor : background;
+  const metricDetail = evidenceDetailInk(panelInk, detailSurface, st.detailOpacity);
+  const stepBody = evidenceDetailInk(panelInk, detailSurface, st.stepBodyOpacity);
   const roman = ['I', 'II', 'III', 'IV', 'V'];
   // Valor da métrica cabe numa linha da coluna (mesmo cálculo da galeria).
   const metricColumnPx = (count) => {
@@ -228,7 +232,7 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, back
           return cell(item.value, ['items', index, 'value'], `valor ${index + 1}`, { display: 'block', whiteSpace: fit.wrap ? 'normal' : 'nowrap', overflowWrap: 'normal', fontFamily: numberFont, fontVariantNumeric: 'tabular-nums', fontSize: fit.fontSize, letterSpacing: '-0.02em', lineHeight: fit.wrap ? 1.1 : 1.18, fontWeight: weight, fontSynthesisWeight: 'none' });
         })()}
         {cell(item.label, ['items', index, 'label'], `indicador ${index + 1}`, { display: 'block', fontSize: 26 * unit, marginTop: 18 * unit, fontWeight: 600 })}
-        {item.detail && cell(item.detail, ['items', index, 'detail'], `condição ${index + 1}`, { display: 'block', fontSize: 23 * unit, marginTop: 8 * unit, opacity: 0.75 })}
+        {item.detail && cell(item.detail, ['items', index, 'detail'], `condição ${index + 1}`, { display: 'block', fontSize: st.detailPx * unit, marginTop: 8 * unit, color: metricDetail.color, opacity: metricDetail.opacity })}
       </div>)}
     </div> : <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gridTemplateColumns: `repeat(${stepColumns}, minmax(0, 1fr))`, gap: 24 * unit }}>
       {block.items.map((item, index) => <li key={index} style={{ minWidth: 0, borderTop: st.metricRule ? `${Math.max(1, (st.metricRule > 4 ? 6 : 2) * unit)}px solid ${ruleColor}` : 'none', padding: panel ? `${22 * unit}px` : `${16 * unit}px 0 0`, borderRadius: st.radius * unit, backgroundColor: panel ? st.panelColor : 'transparent', color: panelInk }}>
@@ -236,7 +240,7 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, back
           fontStyle: st.stepMarker === 'roman' ? 'italic' : 'normal',
           ...(st.stepMarker === 'pill' ? { backgroundColor: st.accent, color: st.pillInk, borderRadius: 40 * unit, padding: `${8 * unit}px ${16 * unit}px` } : {}) }}>{marker(index)}</span>}
         {cell(item.title, ['items', index, 'title'], `etapa ${index + 1}`, { display: 'block', fontWeight: 600, fontSize: 28 * unit, lineHeight: 1.2 })}
-        {item.body && cell(item.body, ['items', index, 'body'], `explicação da etapa ${index + 1}`, { display: 'block', marginTop: 8 * unit, opacity: 0.82 })}
+        {item.body && cell(item.body, ['items', index, 'body'], `explicação da etapa ${index + 1}`, { display: 'block', fontSize: Math.max(26, st.detailPx) * unit, marginTop: 8 * unit, color: stepBody.color, opacity: stepBody.opacity })}
       </li>)}
     </ol>}
   </div>;
