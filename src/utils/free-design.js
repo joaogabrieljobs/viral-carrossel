@@ -787,10 +787,10 @@ function compactReading({ zones, chrome, slide, titleSize, subSize, display, kin
   if (!t || !sub || !['content', 'demo'].includes(kind)) return null;
   if (!(sub.y >= t.y + 1) || Math.min(t.x + t.w, sub.x + sub.w) - Math.max(t.x, sub.x) <= Math.min(t.w, sub.w) * 0.4) return null;
   // Mesma conta do aperto da pilha das famílias (tightenStack), com a fonte do
-  // deck e folga de 6% na largura: a zona do título encolhe para o que o
+  // deck (a largura média da biblioteca já é folgada): a zona do título encolhe para o que o
   // título ocupa, e o apoio começa logo abaixo, sem sobrepor.
   const titlePx = titlePxOf(titleSize);
-  const lines = estimateTitleLines(String(slide.title || '').replace(/\*\*/g, ''), 1920 * t.w / 100 - 24, titlePx, (display.widthFactor || 0.55) * 1.06, display.case === 'upper');
+  const lines = estimateTitleLines(String(slide.title || '').replace(/\*\*/g, ''), 1920 * t.w / 100 - 24, titlePx, display.widthFactor || 0.55, display.case === 'upper');
   const breathing = Math.max(20, titlePx * 0.44 + 1080 * 0.012);
   const needed = Math.round(((lines * titlePx * titleLeading + breathing) / 1080) * 10000) / 100 + 0.5;
   const titleZone = needed < t.h - 1 ? { ...t, h: needed } : t;
