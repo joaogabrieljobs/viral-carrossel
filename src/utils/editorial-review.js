@@ -781,9 +781,54 @@ function repeatedContentRule(slides, unit = 'CARD') {
 
 const slideHasText = slide => ['title', 'subtitle', 'bodyAfterImage'].some(field => String(slide?.[field] || '').trim());
 
-function repeatedFactRule(slides, plan) {
-  const signatures = deckSignatures(slides, plan);
-  const repeated = [...repeatedFactSlides(slides), ...repeatedPhraseSlides(slides, { signatures }).map(item => ({ fact: item.phrase, slideIndexes: item.slideIndexes }))];
+/**
+ * Assinaturas do deck para o pedido à IA: as medidas nos slides atuais mais as
+ * que o chamador mediu no rascunho (config.deckSignatures). Teste 4 (25/11): a
+ * régua da contagem é a do rascunho; se o texto mudou depois (a capa deixou de
+ * citar a frase), o pedido não pode voltar a tratá-la como fato repetido.
+ */
+function promptSignatures(slides, plan, measured) {
+  const found = deckSignatures(slides, plan);
+  for (const item of Array.isArray(measured) ? measured : []) {
+    if (typeof item === 'string' && tokensOf(item).length && !found.some(known => tokensOf(known).join(' ') === tokensOf(item).join(' '))) found.push(item);
+  }
+  return found;
+}
+
+/** Fato com número que está dentro de uma assinatura não é repetição (Teste 4). */
+/**
+ * Desfechos do reparo de repetição em reviewDiagnostics (entrada com stage
+ * 'repetition', sizeBefore e sizeAfter = tamanho da repetição antes e no deck
+ * que segue; targets = slides pedidos):
+ * - repetition_none: não havia repetição; o reparo não foi chamado. Deck sem
+ *   nenhuma entrada 'repetition' foi gerado antes deste registro (25/11).
+ * - repetition_repaired: reparo aceito (menos repetição, sem fato novo nem
+ *   limite pior).
+ * - repetition_request_failed: a chamada falhou (status e message).
+ * - repetition_invalid_response: resposta sem edits ou com edição que não
+ *   passa no contrato (message).
+ * - repetition_out_of_scope: editou slide fora da lista (outOfScope).
+ * - repetition_not_improved: não reduziu a repetição; unchanged quando o
+ *   texto voltou igual; sizeProposed.
+ * - repetition_rejected_facts_or_limits: reduziu, mas criou fato sem fonte
+ *   ou passou do limite (rejectedBy) e nenhuma edição isolada se aproveitou.
+ * - repetition_partially_salvaged: mesmo caso, com parte das edições mantida
+ *   slide a slide (kept, dropped). Desfecho próprio porque o deck mudou; é a
+ *   convenção da revisão ('salvaged').
+ */
+export const REPETITION_REPAIR_OUTCOMES = Object.freeze([
+  'repetition_none', 'repetition_repaired', 'repetition_request_failed', 'repetition_invalid_response', 'repetition_out_of_scope',
+  'repetition_not_improved', 'repetition_rejected_facts_or_limits', 'repetition_partially_salvaged',
+]);
+
+export function factsOutsideSignatures(facts, signatures) {
+  const runs = (Array.isArray(signatures) ? signatures : []).map(tokensOf).filter(run => run.length);
+  return runs.length ? facts.filter(item => !runs.some(run => containsRun(run, tokensOf(item.fact)))) : facts;
+}
+
+function repeatedFactRule(slides, plan, measured) {
+  const signatures = promptSignatures(slides, plan, measured);
+  const repeated = [...factsOutsideSignatures(repeatedFactSlides(slides), signatures), ...repeatedPhraseSlides(slides, { signatures }).map(item => ({ fact: item.phrase, slideIndexes: item.slideIndexes }))];
   return repeated.length
     ? `\nFATO REPETIDO — ${repeated.map(item => `"${item.fact}" aparece nos slideIndex ${item.slideIndexes.join(', ')}`).join('; ')}. Mantenha cada fato no slide em que ele é o assunto (no máximo 2 slides); nos outros, troque por outra informação do material ou condense, sem inventar e sem mudar a quantidade de slides.`
     : '';
@@ -799,8 +844,8 @@ function repeatedTitleRule(slides) {
 // Reteste 22/11 (W02): título "segunda língua grátis" com apoio sobre os
 // modelos de taqueria. Não há regra segura por palavras; a revisão confere.
 // Teste 4 (25/11): a revisão não pode tirar a linha da campanha da capa.
-function signatureRule(slides, plan) {
-  const signatures = deckSignatures(slides, plan);
+function signatureRule(slides, plan, measured) {
+  const signatures = promptSignatures(slides, plan, measured);
   return signatures.length
     ? `\nASSINATURA DO DECK — ${signatures.map(item => `"${item}"`).join('; ')}: é a linha da campanha, não repetição. Mantenha-a na capa e no fecho onde já estiver; não a remova nem a reescreva por causa de repetição.`
     : '';
@@ -835,7 +880,7 @@ ${buildReviewFactCheckPrompt()}
 Verifique também: promessa da capa entregue; caminho escolhido respeitado; uma ideia por slide; progressão sem repetição; títulos legíveis a distância; argumentos e exemplos sustentados pelo material; síntese e próximo passo coerentes.${limitsBlock}
 Leia todos os campos do rascunho, inclusive blocos nativos, speakerNotes e caption. Verifique fatos, estágio e condições em cada campo, não apenas no texto principal. Decisão pendente permanece pendente; aceite não autoriza deduzir encerramento contratual. Base, período e condições essenciais de indicadores e escopo devem estar visíveis no slide correspondente, não somente nas notas.
 Corrija apenas problemas identificados. Preserve ordem, quantidade, assunto, arco, números e fatos sustentados.${lessonRepair} Remova ou qualifique alegações sem apoio; não acrescente fontes ou fatos. Não altere imageQuery nem configuração visual.
-Use slideIndex começando em zero. Não envie edições para slides que já estejam bons. Cada índice aparece no máximo uma vez. ${buildPresentationReviewRules(config.presentationPath)}${repeatedTitleRule(draft?.slides)}${repeatedContentRule(draft?.slides, 'SLIDE')}${repeatedFactRule(draft?.slides, config.presentationPlan)}${signatureRule(draft?.slides, config.presentationPlan)}${TITLE_SUPPORT_RULE}
+Use slideIndex começando em zero. Não envie edições para slides que já estejam bons. Cada índice aparece no máximo uma vez. ${buildPresentationReviewRules(config.presentationPath)}${repeatedTitleRule(draft?.slides)}${repeatedContentRule(draft?.slides, 'SLIDE')}${repeatedFactRule(draft?.slides, config.presentationPlan, config.deckSignatures)}${signatureRule(draft?.slides, config.presentationPlan, config.deckSignatures)}${TITLE_SUPPORT_RULE}
 Resposta: um único objeto JSON {"edits":[{"slideIndex":0,"reason":"problema concreto","title":"texto corrigido"}],"caption":"resumo geral corrigido apenas se necessário"}.
 Cada edição exige slideIndex e reason; inclua somente os campos que mudam: ${editableFields}. caption é opcional. Se estiver adequado, retorne {"edits":[]}. Sem texto fora do JSON ou campos adicionais.${plannedRules}`;
   }
@@ -1400,6 +1445,9 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
   }, callAI);
   let writingDiagnostics = [];
   // Reteste 0b1cb62 (D06): a revisão não rodou e não ficou registrado por quê.
+  // Vai para presentationQuality.reviewDiagnostics no projeto. Entradas com
+  // attempt são da revisão; entradas com stage 'repetition' são do reparo de
+  // repetição (REPETITION_REPAIR_OUTCOMES).
   const reviewDiagnostics = [];
   // Visible native blocks and speaker notes carry factual claims as well.
   // This conservative check flags calculations/paraphrases for review; it
@@ -1454,6 +1502,8 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
   // curta do material citada na capa) sai da conta de repetição. Medida uma
   // vez, no rascunho, para que antes e depois do reparo usem a mesma régua.
   const signatures = deckSignatures(draft.slides, plan);
+  // O pedido da revisão e dos reparos usa a mesma régua (promptSignatures).
+  plannedConfig.deckSignatures = signatures;
   if (written.incomplete) {
     return finish(draft, 'needs_attention', { incomplete: true, interruptionReason: written.interruptionReason,
       completedCount: written.completedCount, totalCount: written.totalCount,
@@ -1486,7 +1536,7 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
   // dirigido; se falhar ou não melhorar, o deck segue como estava (repetição
   // é qualidade, não fato sem fonte).
   const repetitionOf = slides => {
-    const facts = [...repeatedFactSlides(slides), ...repeatedPhraseSlides(slides, { signatures }).map(item => ({ fact: item.phrase, slideIndexes: item.slideIndexes }))];
+    const facts = [...factsOutsideSignatures(repeatedFactSlides(slides), signatures), ...repeatedPhraseSlides(slides, { signatures }).map(item => ({ fact: item.phrase, slideIndexes: item.slideIndexes }))];
     const titles = repeatedTitleIndexes(slides);
     // QA 24/11 (texto 3): corpo, paráfrase e bloco de passos também contam.
     const contents = repeatedContentSlides(slides);
@@ -1537,7 +1587,10 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
   };
   const settleRepetition = async (result, reviewStatus, extra) => {
     const repetition = repetitionOf(result.slides);
-    if (!repetition.size) return finish(result, reviewStatus, extra);
+    if (!repetition.size) {
+      reviewDiagnostics.push({ stage: 'repetition', outcome: 'repetition_none', sizeBefore: 0, sizeAfter: 0 });
+      return finish(result, reviewStatus, extra);
+    }
     const targets = [...new Set([...repetition.facts.flatMap(item => withoutClosing(item.slideIndexes)), ...repetition.titles,
       ...repetition.contents.map(item => item.slideIndex), ...repetition.steps.map(item => item.slideIndex), ...repetition.metrics.map(item => item.slideIndex),
       ...repetition.sentences.flatMap(item => withoutClosing(item.slideIndexes)), ...repetition.echoes])].sort((a, b) => a - b);
@@ -1547,22 +1600,69 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
     const signatureNote = signatures.length ? ` Assinatura do deck, que não é repetição e fica onde está: ${signatures.map(item => `"${item}"`).join('; ')}.` : '';
     let current = result;
     let status = reviewStatus;
+    // Teste 4 (revisão de 25/11): o desfecho do reparo fica registrado; antes,
+    // falha, edição fora da lista, texto igual e descarte por fato ou limite
+    // sumiam no mesmo catch.
+    const diagnostic = { stage: 'repetition', outcome: '', sizeBefore: repetition.size, sizeAfter: repetition.size, targets };
+    const failure = (outcome, error) => Object.assign(diagnostic, { outcome,
+      ...(Number.isInteger(error?.status) ? { status: error.status } : {}), message: String(error?.message || '').slice(0, 160) });
+    let repair;
     onStage?.('repairing');
     try {
-      const repair = await callAI(`${buildEditorialReviewPrompt(briefing, result, plannedConfig)}
+      repair = await callAI(`${buildEditorialReviewPrompt(briefing, result, plannedConfig)}
 REPARO DE REPETIÇÃO: edite somente os slides com slideIndex ${targets.join(', ')}.${repetition.facts.length ? ` Fatos que se repetem: ${repetition.facts.map(item => `"${item.fact}" nos slideIndex ${item.slideIndexes.join(', ')}`).join('; ')}. Mantenha cada fato só nos slides em que ele é o assunto; nos outros, troque por outra informação do material ou condense.` : ''}${repetition.titles.length ? ` Títulos que repetem um anterior: slideIndex ${repetition.titles.join(', ')}; reescreva com a ideia própria do slide.` : ''}${repetition.contents.length ? ` Slides que repetem outro com outras palavras: ${repetition.contents.map(item => `slideIndex ${item.slideIndex} (repete o ${item.duplicateOf})`).join('; ')}; reescreva com a contribuição própria da posição no roteiro.` : ''}${repetition.steps.map(item => ` Mesmo bloco de passos nos slideIndex ${item.duplicateOf} e ${item.slideIndex}: mantenha o bloco só no primeiro; no slideIndex ${item.slideIndex}, devolva presentationBlocks [] ou um bloco com outra informação do material.`).join('')}${repetition.metrics.map(item => ` Mesmo bloco de métricas nos slideIndex ${item.duplicateOf} e ${item.slideIndex}: mantenha o bloco só no primeiro; no slideIndex ${item.slideIndex}, devolva presentationBlocks [] ou um bloco com outra informação do material.`).join('')}${repetition.sentences.length ? ` Frase repetida em dois slides: ${repetition.sentences.map(item => `"${item.phrase}" nos slideIndex ${item.slideIndexes.join(' e ')}`).join('; ')}; mantenha a frase só no slide em que ela é o assunto e, no outro, escreva outra informação do material.` : ''}${repetition.echoes.length ? ` Apoio que termina repetindo o título do próprio slide: slideIndex ${repetition.echoes.join(', ')}; tire essa linha ou troque por uma informação nova do material.` : ''} ${closingNote}${signatureNote} Inclua presentationBlocks quando a repetição estiver no bloco. Não acrescente fatos, não mude quantidade nem ordem.`, reviewOptions);
       throwIfGenerationCancelled(aiOptions?.signal);
-      if (!Array.isArray(repair?.edits) || repair.edits.some(edit => !targets.includes(edit?.slideIndex))) throw new Error('Reparo fora do escopo');
-      const repaired = keepSignatureFields(result, applyEditorialReview(result, repair, plannedConfig, { deferQualityChecks: true }));
-      // Item 2 do Teste 4: melhora parcial (menos ocorrências) é aceita.
-      if (repetitionOf(repaired.slides).size < repetition.size && factsOf(repaired).length <= factsOf(result).length
-        && overLimits(repaired.slides).length <= overLimits(result.slides).length) {
-        current = repaired;
-        status = 'repaired';
-      }
     } catch (error) {
       if (isGenerationCancelled(error) || aiOptions?.signal?.aborted) throw error;
+      failure('repetition_request_failed', error);
     }
+    const outOfScope = Array.isArray(repair?.edits) ? [...new Set(repair.edits.map(edit => edit?.slideIndex).filter(index => !targets.includes(index)))] : [];
+    if (diagnostic.outcome) {
+      // A chamada falhou: o deck segue como estava.
+    } else if (!Array.isArray(repair?.edits)) {
+      failure('repetition_invalid_response', new Error('Resposta sem a lista edits'));
+    } else if (outOfScope.length) {
+      Object.assign(diagnostic, { outcome: 'repetition_out_of_scope', outOfScope });
+    } else {
+      let applyError = null;
+      let repaired = null;
+      try { repaired = keepSignatureFields(result, applyEditorialReview(result, repair, plannedConfig, { deferQualityChecks: true })); } catch (error) { applyError = error; }
+      if (!repaired) {
+        failure('repetition_invalid_response', applyError);
+      } else {
+        const proposed = repetitionOf(repaired.slides).size;
+        const rejectedBy = [...(factsOf(repaired).length > factsOf(result).length ? ['facts'] : []),
+          ...(overLimits(repaired.slides).length > overLimits(result.slides).length ? ['limits'] : [])];
+        // Item 2 do Teste 4: melhora parcial (menos ocorrências) é aceita. A
+        // regra de aceite não mudou: menos repetição, sem fato novo, sem limite pior.
+        if (proposed < repetition.size && !rejectedBy.length) {
+          current = repaired;
+          status = 'repaired';
+          diagnostic.outcome = 'repetition_repaired';
+        } else if (proposed >= repetition.size) {
+          Object.assign(diagnostic, { outcome: 'repetition_not_improved', sizeProposed: proposed,
+            unchanged: JSON.stringify(repaired.slides) === JSON.stringify(result.slides) });
+        } else {
+          // Reduziu a repetição, mas criou fato sem fonte ou passou do limite.
+          // Cada edição entra sozinha sobre as já mantidas e fica só se reduz
+          // a repetição sem piorar fatos nem limites (mesmos validadores).
+          let kept = result;
+          const keptSlides = [];
+          const droppedSlides = [];
+          for (const edit of repair.edits) {
+            const candidate = leniently(() => keepSignatureFields(result, applyEditorialReview(kept, { edits: [edit] }, plannedConfig, { deferQualityChecks: true })), null);
+            const helps = candidate && repetitionOf(candidate.slides).size < repetitionOf(kept.slides).size
+              && factsOf(candidate).length <= factsOf(kept).length && overLimits(candidate.slides).length <= overLimits(kept.slides).length;
+            if (helps) { kept = candidate; keptSlides.push(edit.slideIndex); } else droppedSlides.push(edit?.slideIndex ?? null);
+          }
+          if (keptSlides.length) { current = kept; status = 'repaired'; }
+          Object.assign(diagnostic, { outcome: keptSlides.length ? 'repetition_partially_salvaged' : 'repetition_rejected_facts_or_limits',
+            rejectedBy, sizeProposed: proposed, kept: keptSlides, dropped: droppedSlides });
+        }
+      }
+    }
+    diagnostic.sizeAfter = current === result ? repetition.size : repetitionOf(current.slides).size;
+    reviewDiagnostics.push(diagnostic);
     const deduped = dedupeWithoutAI(current);
     // Teste 4, item 2: o que sobrou depois do reparo vai para o bloco de
     // revisão com os números dos slides, como o card removido.

@@ -151,7 +151,7 @@ describe('apresentação planejada e revisada', () => {
     expect(output.result.slides[0].title).toBe(draft().slides[0].title);
     expect(output.result.slides[0].imageQuery).toBe(draft().slides[0].imageQuery);
     expect(ai).toHaveBeenCalledTimes(4);
-    expect(output.reviewDiagnostics.map(item => item.outcome)).toEqual(['invalid_response', 'invalid_response']);
+    expect(output.reviewDiagnostics.map(item => item.outcome)).toEqual(['invalid_response', 'invalid_response', 'repetition_none']);
   });
 
   it('cancelamento entre plano e redação impede a próxima chamada', async () => {
@@ -557,7 +557,7 @@ describe('revisão da apresentação planejada que falha', () => {
     const output = await generateReviewedCarousel({ prompt: 'Material.', config: config() }, ai);
     expect(ai).toHaveBeenCalledTimes(4);
     expect(output.reviewStatus).toBe('unchanged');
-    expect(output.reviewDiagnostics).toEqual([expect.objectContaining({ attempt: 1, outcome: 'invalid_response' }), expect.objectContaining({ attempt: 2, outcome: 'applied' })]);
+    expect(output.reviewDiagnostics).toEqual([expect.objectContaining({ attempt: 1, outcome: 'invalid_response' }), expect.objectContaining({ attempt: 2, outcome: 'applied' }), { stage: 'repetition', outcome: 'repetition_none', sizeBefore: 0, sizeAfter: 0 }]);
   });
 
   it('queda do serviço não repete e fica registrada', async () => {
@@ -565,7 +565,7 @@ describe('revisão da apresentação planejada que falha', () => {
     const output = await generateReviewedCarousel({ prompt: 'Material.', config: config() }, ai);
     expect(ai).toHaveBeenCalledTimes(3);
     expect(output.reviewStatus).toBe('unavailable');
-    expect(output.reviewDiagnostics).toEqual([expect.objectContaining({ attempt: 1, outcome: 'request_failed', status: 503 })]);
+    expect(output.reviewDiagnostics).toEqual([expect.objectContaining({ attempt: 1, outcome: 'request_failed', status: 503 }), { stage: 'repetition', outcome: 'repetition_none', sizeBefore: 0, sizeAfter: 0 }]);
   });
 });
 
@@ -583,6 +583,6 @@ describe('revisão da apresentação com uma edição inválida', () => {
     expect(output.result.slides[0].subtitle).toBe('Software pronto para organizar informações.');
     expect(output.result.slides[1].presentationBlocks).toEqual(draft().slides[1].presentationBlocks);
     expect(output.reviewStatus).toBe('revised');
-    expect(output.reviewDiagnostics).toEqual([expect.objectContaining({ attempt: 1, outcome: 'salvaged', dropped: 1 })]);
+    expect(output.reviewDiagnostics).toEqual([expect.objectContaining({ attempt: 1, outcome: 'salvaged', dropped: 1 }), { stage: 'repetition', outcome: 'repetition_none', sizeBefore: 0, sizeAfter: 0 }]);
   });
 });
