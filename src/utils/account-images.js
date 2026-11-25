@@ -5,9 +5,9 @@
  * outro aparelho os projetos chegam da conta com `bgImageAssetId` e sem os
  * bytes, e a galeria ficava vazia. Aqui a lista sai dos cards de todos os
  * projetos da biblioteca e os bytes vêm sob demanda: primeiro deste navegador,
- * depois da conta, pelo mesmo caminho que a abertura do projeto usa.
+ * depois da conta.
  */
-import { imageGet, origemParaBlob } from './image-store.js';
+import { dataUrlParaBlob, imageGet, imagePut } from './image-store.js';
 
 /** Imagens de IA ligadas aos cards, com ou sem os bytes neste navegador. */
 export function accountAiImageRefs(library) {
@@ -38,17 +38,26 @@ export function accountAiImageRefs(library) {
   return refs.sort((a, b) => b.atualizado - a.atualizado);
 }
 
-/** Baixa uma imagem da conta com a hidratação que a abertura do projeto usa. */
+/**
+ * Baixa uma imagem da conta e devolve os bytes que a conta entregou.
+ *
+ * RT24 (conta 5): antes passava pela hidratação do projeto, que grava no
+ * navegador e devolve um endereço `blob:`; a miniatura lia esse endereço com
+ * fetch, que a política de segurança do site no ar recusa (connect-src não tem
+ * blob:). Nenhuma imagem da conta aparecia, com o armazenamento cheio ou não.
+ * Agora os bytes saem direto da resposta. Guardar neste navegador continua
+ * sendo tentado, sem esperar: se falhar ou demorar, a imagem aparece igual.
+ */
 export async function fetchImageFromAccount(ref, { signal } = {}) {
-  const { hydrateProjectEntryFromCloud } = await import('./library-sync.js');
-  const { entry } = await hydrateProjectEntryFromCloud({
-    id: ref.docId,
-    doc: { slides: [{ id: ref.slideId || ref.key, bgImageAssetId: ref.assetId }] },
-  }, { signal });
-  const photo = entry?.doc?.slides?.[0]?.bgImage;
-  if (!photo) return null;
-  try { return await origemParaBlob(photo); }
-  finally { if (photo.startsWith('blob:')) URL.revokeObjectURL(photo); }
+  if (!ref?.assetId) return null;
+  const { fetchAssetDataUrl } = await import('./library-sync.js');
+  const dataUrl = await fetchAssetDataUrl(ref.assetId, signal);
+  if (!dataUrl) return null;
+  const blob = dataUrlParaBlob(dataUrl);
+  if (!blob) return null;
+  // Mesmo id que a hidratação do projeto usa: a próxima abertura acha a cópia.
+  void imagePut(ref.assetId, blob, { mime: blob.type }).catch(() => { /* sem espaço: fica só nesta tela */ });
+  return blob;
 }
 
 function loadError(code) {

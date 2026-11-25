@@ -683,7 +683,7 @@ export async function pushLibraryToCloud(opts = {}) {
 }
 
 /** Foto em falta NÃO pode derrubar o restore da lista de projetos. */
-async function fetchAssetDataUrl(assetId, signal) {
+export async function fetchAssetDataUrl(assetId, signal) {
   if (!assetId) return null;
   try {
     const data = await syncRequest(null, {
