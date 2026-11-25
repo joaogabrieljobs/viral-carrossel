@@ -14,6 +14,7 @@ import { MAX_REF_IMAGES, composeImgExtraPrompt, normalizeStyleKit } from './styl
 import { composeReferenceMap, normalizeSlideReferenceMention, slideReferenceDescriptors } from './slide-reference.js';
 import { composeSceneParts } from './visual-bible.js';
 import { isAestheticDirection } from '../../shared/image-prompt.js';
+import { presentationSceneQuery } from './presentation-plan.js';
 
 const SLIDE_DIRECTION_MAX = 1200;
 
@@ -31,36 +32,41 @@ export function presentationImageAvoid(slide) {
   return [...new Set(lines)].slice(0, 8);
 }
 
-const PRESENTATION_REFERENCE_ROLES = Object.freeze(['cover', 'closing']);
-const visualRoleOf = (slide) => String(slide?.presentationPlan?.visualRole || slide?.presentationVisualRole || slide?.visualRole || '');
+const OTHER_SCENES_MAX = 5;
+const OTHER_SCENE_CHARS = 120;
+
+const sceneSummary = (scene) => {
+  const texto = presentationSceneQuery(scene);
+  if (texto.length <= OTHER_SCENE_CHARS) return texto;
+  const corte = texto.slice(0, OTHER_SCENE_CHARS + 1).lastIndexOf(' ');
+  return texto.slice(0, corte > 0 ? corte : OTHER_SCENE_CHARS).replace(/[\s,;]+$/, '');
+};
 
 /**
- * Spec 1.1, referência (decisão do João, 25/11): na Apoteose a referência do
- * kit, sem papel declarado, ia como moodboard em todas as imagens, e a mesma
- * mulher de máscara saiu em 7 de 10 slides. Na apresentação ela vai só na capa
- * e no fecho (papel visual cover e closing). Deck sem esse papel (gerado sem
- * roteiro, cujas etapas usam outros nomes) usa a primeira e a última posição
- * no lugar do que falta. Referência com @rótulo no kit tem papel declarado e
- * continua em toda imagem.
+ * Spec 1.1, referência (pedido do dono, 25/11): a referência do kit vai em
+ * todas as imagens da apresentação, e cada slide precisa propor uma cena nova.
+ * Devolve as cenas planejadas (roteiro v2, `presentationPlan.scene`) dos
+ * outros slides, resumidas: até 5, as mais próximas do slide, na ordem do
+ * deck. Fica de fora slide sem cena e cena igual à deste slide. Deck sem
+ * roteiro v2 não tem cena: lista vazia, pedido igual ao de antes.
  */
-export function presentationStyleReferenceAllowed(slides, index) {
+export function presentationOtherScenes(slides, index) {
   const list = Array.isArray(slides) ? slides : [];
-  const roles = list.map(visualRoleOf);
-  if (PRESENTATION_REFERENCE_ROLES.includes(roles[index])) return true;
-  if (index === 0 && !roles.includes('cover')) return true;
-  return index === list.length - 1 && list.length > 0 && !roles.includes('closing');
-}
-
-/**
- * Kit para a imagem de um slide de apresentação: fora da capa e do fecho,
- * sem as referências sem papel. O estilo escrito fica; ele e a família passam
- * a guiar a imagem, e o assunto vem da cena do slide. Carrossel e referência
- * do próprio slide não passam por aqui.
- */
-export function presentationStyleKitForSlide(styleKit, slides, index) {
-  const kit = normalizeStyleKit(styleKit);
-  if (presentationStyleReferenceAllowed(slides, index)) return kit;
-  return { ...kit, refImages: kit.refImages.filter((ref) => String(ref.mention || '').trim()) };
+  if (!Number.isInteger(index) || index < 0 || index >= list.length) return [];
+  const sceneOf = (slide) => {
+    const scene = slide?.presentationPlan?.scene;
+    return scene && typeof scene === 'object' ? sceneSummary(scene) : '';
+  };
+  const own = sceneOf(list[index]).toLowerCase();
+  const candidates = list.map((slide, position) => ({ position, text: position === index ? '' : sceneOf(slide) }))
+    .filter((item) => item.text && item.text.toLowerCase() !== own);
+  const seen = new Set();
+  return candidates
+    .sort((a, b) => Math.abs(a.position - index) - Math.abs(b.position - index) || a.position - b.position)
+    .filter((item) => { const key = item.text.toLowerCase(); if (seen.has(key)) return false; seen.add(key); return true; })
+    .slice(0, OTHER_SCENES_MAX)
+    .sort((a, b) => a.position - b.position)
+    .map((item) => item.text);
 }
 
 /**
@@ -98,10 +104,13 @@ function sentReferences({ kit, slide, anchorPlan, baseReferenceCount }) {
  * @param {number} [input.baseReferenceCount] anexos do projeto/card realmente enviados
  * @param {boolean} [input.presentationPanel] imagem de painel de apresentação planejado
  * @param {string} [input.presentationFamily] família do deck; '' quando não há família ativa
+ * @param {object[]} [input.deckSlides] slides do deck (apresentação): cenas dos outros slides
+ * @param {number} [input.slideIndex] posição deste slide em `deckSlides`
  */
 export function composeImageDirection({
   styleKit = null, slide = null, fmt = 'carrossel', visualBible = null, slideDirection,
   anchorPlan = null, baseReferenceCount, presentationPanel = false, presentationFamily,
+  deckSlides = null, slideIndex = -1,
 } = {}) {
   const card = slide || {};
   const kit = normalizeStyleKit(styleKit);
@@ -114,12 +123,17 @@ export function composeImageDirection({
   const cena = composeSceneParts({
     visualBible, slide: card, fmt, excludeEntityIds: anchorPlan?.excludeEntityIds || [], presentationFamily,
   });
-  const avoid = fmt === 'apresentacao' ? presentationImageAvoid(card) : [];
+  const apresentacao = fmt === 'apresentacao';
+  const avoid = apresentacao ? presentationImageAvoid(card) : [];
+  const otherScenes = apresentacao ? presentationOtherScenes(deckSlides, slideIndex) : [];
   return {
     format: fmt === 'apresentacao' ? 'presentation' : 'carousel',
     framing: cena.framing,
     referenceCount: references.length,
     styleMoodboard: references.some((ref) => ref.role === 'moodboard'),
+    // Spec 1.1: na apresentação, da referência de estilo do kit (sem @rótulo)
+    // sai só o visual, com ou sem estilo escrito. @rótulo continua como está.
+    styleReferenceLook: apresentacao && references.some((ref) => ref.role === 'moodboard' && !ref.label),
     referenceMap,
     identityAnchor: comAncora ? anchorPlan.direction : '',
     presentationPanel: presentationPanel === true,
@@ -130,5 +144,6 @@ export function composeImageDirection({
     styleBody: [composeImgExtraPrompt(kit, ''), estetica ? composeImgExtraPrompt(null, direcao) : ''].filter(Boolean),
     familyEnglish: cena.familyEnglish,
     ...(avoid.length ? { avoid } : {}),
+    ...(otherScenes.length ? { otherScenes } : {}),
   };
 }

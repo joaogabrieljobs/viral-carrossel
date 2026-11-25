@@ -72,6 +72,17 @@ export const IMAGE_PROMPT_TEXT = Object.freeze({
   hardRules: 'HARD RULES: No lettering, captions, logos or watermarks anywhere in the image. Keep factual claims, charts and interface content in editable layers. Deliver the image only. Keep the subject’s identifying geometry and materials consistent with the scene. In photographs, retain natural anatomy, skin texture and coherent lighting. Do not add people the scene does not call for.',
   // I17 — só com anexos efetivamente enviados.
   referenceRoles: 'REFERENCE ROLES: Use moodboard images for medium, palette, lighting and composition. Follow a named product or subject reference only for its assigned role. A separate identity anchor governs identity only. Create the scene in this request. Exclude lettering, logos and watermarks from every role.',
+  // Spec 1.1, referência (25/11): na apresentação, a referência de estilo do
+  // kit vai em todas as imagens e serve só para o visual. O texto acima (I17)
+  // pedia ao moodboard também a composição; com estilo escrito o I18 não
+  // entrava, e a Apoteose repetiu a pessoa da referência em 7 de 10 slides.
+  referenceRolesPresentation: 'REFERENCE ROLES: Use moodboard images only for the look (medium, palette, lighting, contrast, texture), never for people, objects, framing or composition. Follow a named product or subject reference only for its assigned role. A separate identity anchor governs identity only. Create the scene in this request. Exclude lettering, logos and watermarks from every role.',
+  styleReferenceLook: 'STYLE REFERENCE (moodboard): take only the visual look from the attached style reference images: medium, palette (including black and white or a limited palette), lighting, contrast, texture, colour grading and mood. Never copy their people, faces, clothing, objects, framing, composition or scene. The subject and the scene come from this slide\'s SCENE.',
+  // Só sem estilo escrito, como no I18: o visual da referência manda sobre cor e luz citadas no resto.
+  styleReferenceOverride: 'This look overrides any colour, light or mood mentioned elsewhere in this request.',
+  styleReferenceLabeled: 'References named in the REFERENCE MAP keep their assigned role.',
+  // Cenas planejadas dos outros slides do deck (roteiro v2).
+  otherScenesHeader: 'OTHER SLIDES IN THIS DECK already show these scenes. Do not repeat their subject, setting or framing; propose a different scene that fits this slide, with the same look:',
   // I18 — moodboard de estilo sem direção estética escrita.
   // Reteste de 22/11: a frase curta do catálogo perdia para a luz quente da família e para as cores da ficha.
   moodboardOnly: 'STYLE REFERENCE (moodboard): the attached reference images define the look of this image. Match their medium, palette (including black and white or a limited palette), contrast, lighting and texture. This look overrides any colour, light or mood mentioned elsewhere in this request. Take only the look from the references, not their subject: create the new scene described above.',
@@ -186,7 +197,7 @@ function shrinkBody(head, body, tail, max) {
   return corpo ? `${head}${corpo}${tail}` : '';
 }
 
-const OPTIONAL_DROP_ORDER = Object.freeze(['defaultArtDirection', 'medium', 'treatment']);
+const OPTIONAL_DROP_ORDER = Object.freeze(['defaultArtDirection', 'otherScenes', 'medium', 'treatment']);
 const OPTIONAL_DROP_ORDER_CAROUSEL = Object.freeze(['medium', 'defaultArtDirection', 'treatment']);
 // O bloco AVOID é o último texto do usuário a ceder: só depois de estilo,
 // ficha e direção do slide, e sai inteiro só depois deles.
@@ -194,6 +205,12 @@ const REQUIRED_SHRINK_ORDER = Object.freeze(['style', 'subjects', 'slideAction',
 const REQUIRED_DROP_ORDER = Object.freeze([
   'slideAction', 'style', 'moodboardOnly', 'subjects', 'avoid', 'framing', 'presentationPanel', 'referenceMap', 'identityAnchor', 'referenceRoles',
 ]);
+
+/** Cenas dos outros slides: cabeçalho fixo e uma linha por cena; '' sem cenas. */
+export function composeOtherScenesBlock(scenes) {
+  const itens = (Array.isArray(scenes) ? scenes : []).filter(presente).map((texto) => texto.replace(/\s+/g, ' ').trim());
+  return itens.length ? `${IMAGE_PROMPT_TEXT.otherScenesHeader}\n${[...new Set(itens)].map((texto) => `- ${texto}`).join('\n')}` : '';
+}
 
 /** Bloco AVOID: cabeçalho fixo e uma linha por item; '' sem itens. */
 export function composeAvoidBlock(avoid) {
@@ -210,7 +227,9 @@ const tamanhoTotal = (blocos) => blocos.reduce((soma, bloco) => soma + bloco.tex
  *   scene, axisTags, format ('carousel' | 'presentation'), framing,
  *   referenceCount, styleMoodboard, referenceMap, identityAnchor,
  *   presentationPanel, slideAction, subjects, styleBody, familyEnglish, avoid
- *   (string ou lista: o que a imagem não pode mostrar).
+ *   (string ou lista: o que a imagem não pode mostrar), styleReferenceLook
+ *   (apresentação com referência de estilo do kit: dela sai só o visual) e
+ *   otherScenes (lista: cenas dos outros slides do deck, para não repetir).
  * `styleBody` aceita uma string ou segmentos `[estilo do projeto, direção do
  * slide]`; se precisar reduzir, o primeiro segmento cede antes dos demais.
  *
@@ -230,6 +249,14 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
   const styleSegments = (Array.isArray(parts.styleBody) ? parts.styleBody : [parts.styleBody]).filter(presente).map((texto) => texto.trim());
   const styleBody = styleSegments.join('\n\n');
   const styleMoodboard = referenceCount > 0 && parts.styleMoodboard === true;
+  // Apresentação com referência de estilo: o bloco "só o visual" é fixo, com
+  // ou sem estilo escrito, e reservado como as regras.
+  const lookOnly = styleMoodboard && presentation && parts.styleReferenceLook === true;
+  const styleReference = lookOnly ? [
+    T.styleReferenceLook,
+    styleBody ? '' : T.styleReferenceOverride,
+    presente(parts.referenceMap) ? T.styleReferenceLabeled : '',
+  ].filter(Boolean).join(' ') : '';
   const dropped = [];
   const trimmed = [];
 
@@ -239,7 +266,7 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
   // Reserva: a cena é o único texto fixo de tamanho livre. Ela só é encurtada
   // quando sozinha, com as regras fixas, já não cabe na rota.
   const reservado = Math.min(teto, agente ? (caps.reservedLimit || teto) : teto);
-  const fixosSemCena = regras.length + 2 + (!agente && framing ? framing.length + 2 : 0);
+  const fixosSemCena = regras.length + 2 + (!agente && framing ? framing.length + 2 : 0) + (styleReference ? styleReference.length + 2 : 0);
   const cenaMax = Math.max(0, reservado - fixosSemCena - 'SCENE: '.length - (axis ? axis.length + 1 : 0));
   let scene = String(parts.scene || '').trim();
   if (scene.length > cenaMax) {
@@ -253,13 +280,14 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
   add('rules', regras, 'fixed');
   add('framing', framing, agente ? 'required' : 'fixed');
   if (referenceCount > 0) {
-    add('referenceRoles', T.referenceRoles, 'required');
+    add('referenceRoles', lookOnly ? T.referenceRolesPresentation : T.referenceRoles, 'required');
     add('referenceMap', parts.referenceMap, 'required');
     add('identityAnchor', parts.identityAnchor, 'required');
   }
   // No agente, I31 já proíbe captura, gráfico e depoimento.
   if (parts.presentationPanel && !agente) add('presentationPanel', T.presentationPanel, 'required');
   add('avoid', composeAvoidBlock(parts.avoid), 'required', keepWholeLines);
+  if (presentation) add('otherScenes', composeOtherScenesBlock(parts.otherScenes), 'optional', keepWholeLines);
   add('slideAction', parts.slideAction, 'required', (texto, max) => {
     const [cabecalho, ...resto] = texto.split('\n');
     return shrinkBody(`${cabecalho}\n`, resto.join('\n'), '', max);
@@ -280,11 +308,12 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
       return shrinkBody(head, styleBody, tail, max);
     });
   } else if (styleMoodboard) {
-    add('moodboardOnly', T.moodboardOnly, 'required');
+    if (!lookOnly) add('moodboardOnly', T.moodboardOnly, 'required');
     add('medium', canvas, 'optional');
   } else if (!agente) {
     add('medium', presentation ? T.mediumPresentation : T.mediumCarousel, 'optional');
   }
+  add('styleReference', styleReference, 'fixed');
   // Com moodboard de estilo, a luz da família disputaria com a referência.
   if (!styleMoodboard) add('treatment', composeFamilyTreatment(parts.familyEnglish), 'optional');
   if (!agente && !styleBody && !styleMoodboard) add('defaultArtDirection', T.defaultArtDirection, 'optional');
@@ -297,9 +326,15 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
   // 1) Blocos opcionais saem inteiros. No carrossel a frase de mídia repete o
   //    que a direção de arte já diz e sai antes dela; na apresentação ela
   //    carrega a regra de tela e fica.
+  //    Bloco com redução própria (cenas dos outros slides) perde linhas
+  //    inteiras antes de sair.
   for (const key of (presentation ? OPTIONAL_DROP_ORDER : OPTIONAL_DROP_ORDER_CAROUSEL)) {
-    if (tamanhoTotal(ativos) <= teto) break;
-    if (ativos.some((bloco) => bloco.key === key && bloco.tier === 'optional')) remover(key);
+    const excesso = tamanhoTotal(ativos) - teto;
+    if (excesso <= 0) break;
+    const bloco = ativos.find((item) => item.key === key && item.tier === 'optional');
+    if (!bloco) continue;
+    const menor = bloco.shrink ? bloco.shrink(bloco.text, bloco.text.length - excesso) : '';
+    if (menor) { bloco.text = menor; trimmed.push(key); } else remover(key);
   }
   // 2) Texto exigido pelo usuário: reduz em fim de frase ou de linha.
   for (const key of REQUIRED_SHRINK_ORDER) {

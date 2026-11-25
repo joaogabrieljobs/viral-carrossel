@@ -342,10 +342,10 @@
     "imageId": "img_ref"
    }
   ],
-  "nota": "No projeto real, uma imagem de referência sem papel declarado (vai como moodboard em todas as imagens). Bytes fora do repositório."
+  "nota": "No projeto real, uma imagem de referência sem papel declarado (vai como moodboard em todas as imagens da apresentação). Bytes fora do repositório."
  },
  "imagePromptsV1": {
-  "nota": "sha256 (16 primeiros) dos pedidos de imagem com o roteiro v1 salvo. Família presentation_cinematic, rota sjinn, kit com 1 referência sem papel. shaAntesDaReferencia: calculado antes do roteiro v2 (c46f91a), referência em todas as imagens. sha: desde a regra da referência (spec 1.1), que muda de propósito os slides 2 a 9: a referência vai só na capa e no fecho, que ficam iguais.",
+  "nota": "sha256 (16 primeiros) dos pedidos de imagem com o roteiro v1 salvo. Família presentation_cinematic, rota sjinn, kit com 1 referência sem papel. shaAntesDaReferencia: antes do roteiro v2 (c46f91a), referência em todas as imagens. shaSoCapaEFecho: regra de 5999378 (referência só na capa e no fecho), desfeita em 25/11. sha: desde 25/11, referência de novo em todas as imagens, com REFERENCE ROLES sem composition para o moodboard e o bloco STYLE REFERENCE (só o visual); sem esses dois blocos, o pedido volta a shaAntesDaReferencia.",
   "shaAntesDaReferencia": [
    "b22112cb31cd76b0",
    "b8f32f1cc4ee7e67",
@@ -358,7 +358,7 @@
    "1fc43d7f116c52a4",
    "9cdd4a7ac8cf4e8f"
   ],
-  "sha": [
+  "shaSoCapaEFecho": [
    "b22112cb31cd76b0",
    "51d68542a3a88893",
    "f628b30629687f49",
@@ -369,6 +369,18 @@
    "c553de93d61d2e3c",
    "4ef07121741692a4",
    "9cdd4a7ac8cf4e8f"
+  ],
+  "sha": [
+   "b890ce0294cd4676",
+   "dfb918262d33478f",
+   "73d47f36a65587e9",
+   "1f7dbfac9bf19014",
+   "14c0fecfc7e3aa41",
+   "e9c7e660122ddbbc",
+   "d7a9cab6b22a88cf",
+   "8ceacd7c8abb7ca4",
+   "d1e06a9a4acfc9f3",
+   "63596db9daa175d3"
   ]
  }
 }

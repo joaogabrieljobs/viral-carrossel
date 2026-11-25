@@ -7,8 +7,8 @@ import {
   coercePresentationPlanShape, negatedPlanElements, presentationPlanEntryImageQuery, presentationPlanSchema, validatePresentationPlan,
 } from '../../src/utils/presentation-plan.js';
 import { generatePresentationPlan } from '../../src/utils/presentation-planning.js';
-import { composeImageDirection, presentationStyleKitForSlide } from '../../src/utils/image-direction.js';
-import { buildImagePrompt } from '../../shared/image-prompt.js';
+import { composeImageDirection } from '../../src/utils/image-direction.js';
+import { buildImagePrompt, IMAGE_PROMPT_TEXT } from '../../shared/image-prompt.js';
 import { imagePromptCutMessage } from '../../src/utils/image-prompt-budget.js';
 import { repairRenderedPresentation } from '../../src/utils/presentation-render-review.js';
 
@@ -99,26 +99,30 @@ describe('Spec 1.1 entrega 1: plano v1 salvo continua abrindo e gerando igual', 
     expect(buildPresentationPlanBlock(result.plan)).toContain('Atribua a imagem apenas quando imageBrief contribuir; imagem não substitui informação. Não insira o plano no JSON final.');
   });
 
-  // Spec 1.1 (referência): este teste mudou de propósito. A referência do kit
-  // sem papel passou a ir só na capa e no fecho; os pedidos 1 e 10 continuam
-  // iguais aos de antes do roteiro v2, os 2 a 9 mudam (sem anexo, com o estilo
-  // escrito e a família).
-  it('os 10 pedidos de imagem do v1 real: capa e fecho iguais aos de antes, 2 a 9 sem a referência', () => {
+  // Spec 1.1 (referência, 25/11): este teste mudou de propósito duas vezes.
+  // A regra "só capa e fecho" saiu: a referência do kit volta a todos os 10
+  // pedidos. Em relação aos pedidos de antes do roteiro v2, só mudam o texto
+  // de REFERENCE ROLES (sem "composition" para o moodboard) e o bloco
+  // obrigatório STYLE REFERENCE (só o visual). O v1 não tem cena: nenhum
+  // pedido ganha as cenas dos outros slides.
+  it('os 10 pedidos de imagem do v1 real: referência em todos; só os blocos da referência mudam', () => {
     const draft = attachPresentationPlan({ slides: apoteose.slides.map(({ presentationComposition, ...slide }) => slide) }, planV1());
     // O slide 9 tem bloco de métricas: a redação tira a imagem depois; aqui vale o imageBrief.
     expect(draft.slides.map(slide => slide.imageQuery)).toEqual(apoteose.slides.map((slide, index) => slide.imageQuery || apoteose.presentationPlan.slides[index].imageBrief));
     expect(draft.slides[3].presentationPlan).toMatchObject({ imageBrief: apoteose.presentationPlan.slides[3].imageBrief });
     expect(draft.slides[3].presentationPlan).not.toHaveProperty('scene');
-    const prompts = draft.slides.map((slide) => {
-      const styleKit = presentationStyleKitForSlide(apoteose.styleKit, draft.slides, draft.slides.indexOf(slide));
-      const direction = composeImageDirection({ styleKit, slide, fmt: 'apresentacao', baseReferenceCount: styleKit.refImages.length, presentationPanel: true, presentationFamily: 'presentation_cinematic' });
+    const prompts = draft.slides.map((slide, index) => {
+      const direction = composeImageDirection({ styleKit: apoteose.styleKit, slide, fmt: 'apresentacao', baseReferenceCount: 1, presentationPanel: true, presentationFamily: 'presentation_cinematic', deckSlides: draft.slides, slideIndex: index });
       expect(direction).not.toHaveProperty('avoid');
+      expect(direction).not.toHaveProperty('otherScenes');
       return buildImagePrompt({ scene: slide.imageQuery, ...direction }, { route: 'sjinn' }).prompt;
     });
-    expect(prompts.some(prompt => prompt.includes('AVOID'))).toBe(false);
+    expect(prompts.some(prompt => prompt.includes('AVOID') || prompt.includes('OTHER SLIDES'))).toBe(false);
     expect(prompts.map(sha)).toEqual(apoteose.imagePromptsV1.sha);
-    const before = apoteose.imagePromptsV1.shaAntesDaReferencia;
-    expect(prompts.map(sha).map((value, index) => value === before[index])).toEqual([true, false, false, false, false, false, false, false, false, true]);
+    const semOsBlocosNovos = prompts.map(prompt => prompt
+      .replace(IMAGE_PROMPT_TEXT.referenceRolesPresentation, IMAGE_PROMPT_TEXT.referenceRoles)
+      .replace(`\n\n${IMAGE_PROMPT_TEXT.styleReferenceLook}`, ''));
+    expect(semOsBlocosNovos.map(sha)).toEqual(apoteose.imagePromptsV1.shaAntesDaReferencia);
   });
 
   it('a imagem planejada da posição v1 continua vindo do imageBrief', () => {

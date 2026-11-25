@@ -7,7 +7,8 @@
 //   2. ritmo de layout (nunca a mesma geometria três vezes seguidas);
 //   3. frase repetida em 2 slides e eco do título vão ao reparo;
 //   4. leitura (descrição das colunas >= 25 px e 4,5:1; apoio cresce);
-//   5. referência do kit sem papel só na capa e no fecho.
+//   5. referência do kit em todas as imagens, só para o visual, com as cenas
+//      dos outros slides no pedido (desfez "só capa e fecho" em 25/11).
 // O que ainda não vale e depende de decisão fica em `it.fails`: o teste passa
 // enquanto a regra NÃO vale e acusa quando alguém a fizer valer.
 import React from 'react';
@@ -29,8 +30,8 @@ import { docAfterReadyTemplate } from '../../src/utils/ready-template.js';
 import {
   PRESENTATION_PLAN_PROMPT_VERSION, PRESENTATION_PLAN_SCHEMA_VERSION, presentationPlanEntryImageQuery,
 } from '../../src/utils/presentation-plan.js';
-import { composeImageDirection, presentationStyleKitForSlide, presentationStyleReferenceAllowed } from '../../src/utils/image-direction.js';
-import { buildImagePrompt } from '../../shared/image-prompt.js';
+import { composeImageDirection } from '../../src/utils/image-direction.js';
+import { buildImagePrompt, IMAGE_PROMPT_TEXT } from '../../shared/image-prompt.js';
 import { generateReviewedCarousel } from '../../src/utils/editorial-review.js';
 import { wcagContrast } from '../../src/utils/wcag.js';
 
@@ -270,23 +271,36 @@ describe('mudança 4, leitura: apoio da página de conteúdo com foto, todo pres
   });
 });
 
-describe('mudança 5, referência: só capa e fecho em todo caminho', () => {
-  const ultimoEPrimeiro = slides => slides.map((_, i) => presentationStyleReferenceAllowed(slides, i));
-  const esperado = n => Array.from({ length: n }, (_, i) => i === 0 || i === n - 1);
+describe('mudança 5, referência: em todas as imagens, em todo caminho', () => {
+  const kit = { stylePrompt: 'Cores e luz da referência anexada.', refImages: [{ id: 'img_ref', name: 'referencia.jpeg', dataUrl: FOTO }] };
+  const comCena = slides => slides.map((slide, i) => (slide.imageQuery
+    ? { ...slide, presentationPlan: { ...(slide.presentationPlan || {}), scene: { subject: `subject ${i + 1}`, action: 'a', setting: 's', shot: 'wide' } } }
+    : slide));
+  const pedidos = slides => slides.map((slide, i) => composeImageDirection({ styleKit: kit, slide, fmt: 'apresentacao', baseReferenceCount: 1, presentationPanel: true, deckSlides: slides, slideIndex: i }));
+  const todos = (slides, test) => slides.map(test).every(Boolean);
 
   it.each(PRESETS.flatMap(preset => CAMINHOS.map(path => [preset, path])))('%s · %s: deck com roteiro e deck sem roteiro', (preset, path) => {
-    expect(ultimoEPrimeiro(gerar(preset, path, deck()))).toEqual(esperado(10));
-    expect(ultimoEPrimeiro(applyPresentationVisualPresetToSlides(deck({ roteiro: 'nenhum' }), preset, path))).toEqual(esperado(10));
+    const comRoteiro = comCena(gerar(preset, path, deck()));
+    const semRoteiro = applyPresentationVisualPresetToSlides(deck({ roteiro: 'nenhum' }), preset, path);
+    for (const slides of [comRoteiro, semRoteiro]) {
+      expect(todos(pedidos(slides), d => d.referenceCount === 1 && d.styleReferenceLook === true)).toBe(true);
+      const prompt = buildImagePrompt({ scene: 'party', ...pedidos(slides)[3] }, { route: 'sjinn' }).prompt;
+      expect(prompt).toContain(IMAGE_PROMPT_TEXT.styleReferenceLook);
+    }
+    // Cenas dos outros só no deck com roteiro v2 (cena no plano).
+    expect(pedidos(comRoteiro)[3].otherScenes).toHaveLength(5);
+    expect(todos(pedidos(semRoteiro), d => !d.otherScenes)).toBe(true);
   });
 
   it('preset personalizado e modelo da galeria seguem a mesma regra', () => {
     const custom = { ...createCustomVisualPreset({ label: 'Meu deck', brand: {}, slide: {}, productKind: 'apresentacao' }), id: 'custom_teste' };
-    expect(ultimoEPrimeiro(applyPresentationVisualPresetToSlides(deck(), custom.id, 'pitch', [custom]))).toEqual(esperado(10));
+    expect(todos(pedidos(applyPresentationVisualPresetToSlides(deck(), custom.id, 'pitch', [custom])), d => d.styleReferenceLook)).toBe(true);
     const origem = applyPresentationVisualPresetToSlides(deck().slice(0, 3), 'presentation_cinematic', 'auto');
     const doc = applyTemplateToDoc({ fmt: 'apresentacao', slides: gerar('presentation_swiss_grid', 'auto', deck()) }, buildTemplateContent({ fmt: 'apresentacao', brand: {}, slides: origem }));
-    expect(ultimoEPrimeiro(doc.slides)).toEqual(esperado(10));
-    // A geração do deck aplica a regra por formato, não por preset.
-    expect(monolito).toContain('const imageKit = isPresentationGeneration ? presentationStyleKitForSlide(styleKit, newSlides, i) : styleKit;');
+    expect(todos(pedidos(doc.slides), d => d.styleReferenceLook)).toBe(true);
+    // A geração do deck manda o kit inteiro e o deck, por formato, não por preset.
+    expect(monolito).toContain('deckSlides: isPresentationGeneration ? newSlides : null,');
+    expect(monolito).not.toContain('presentationStyleKitForSlide');
   });
 });
 
@@ -343,7 +357,7 @@ describe('mudanças 1 e 3: roteiro v2 e repetição, todo caminho, preset oficia
     const slides = output.result.slides;
     expect(slides[3].imageQuery).toBe('street musicians, talking, rooftop at dusk, wide');
     expect(slides[3].presentationPlan).toMatchObject({ avoid: 'carnival costumes', imageRules: ['fantasias, plumas e confetes literais'] });
-    const direction = composeImageDirection({ styleKit: presentationStyleKitForSlide(apoteose.styleKit, slides, 3), slide: slides[3], fmt: 'apresentacao', presentationPanel: true, presentationFamily: preset || '' });
+    const direction = composeImageDirection({ styleKit: apoteose.styleKit, slide: slides[3], fmt: 'apresentacao', presentationPanel: true, presentationFamily: preset || '' });
     expect(buildImagePrompt({ scene: slides[3].imageQuery, ...direction }, { route: 'sjinn' }).prompt).toContain('AVOID (from the brief and this slide plan');
     // 3: frase repetida em dois slides e eco do título vão ao reparo de repetição.
     const reparo = prompts.find(prompt => prompt.includes('REPARO DE REPETIÇÃO')) || '';

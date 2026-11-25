@@ -567,6 +567,8 @@ function imagePromptParts(q, imgParams, direction, { aspectRatio = '4:5', withRe
     styleBody: d.styleBody || '',
     familyEnglish: d.familyEnglish || '',
     avoid: d.avoid || '',
+    styleReferenceLook: d.styleReferenceLook === true,
+    otherScenes: Array.isArray(d.otherScenes) ? d.otherScenes : [],
   };
 }
 
