@@ -294,11 +294,90 @@ function vcPreferFileShareForDownloads() {
   return false;
 }
 
+/** Texto do aviso que pede o toque para salvar, pelo tipo do arquivo. */
+function saveFileTapLabels(filename) {
+  const ext = String(filename || '').split('.').pop().toLowerCase();
+  if (ext === 'pdf') return { message: 'PDF pronto.', action: 'Salvar PDF' };
+  if (ext === 'zip') return { message: 'ZIP pronto.', action: 'Salvar ZIP' };
+  if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) return { message: 'Imagem pronta.', action: 'Salvar imagem' };
+  if (['mp4', 'webm', 'mov', 'quicktime'].includes(ext)) return { message: 'Vídeo pronto.', action: 'Salvar vídeo' };
+  return { message: 'Arquivo pronto.', action: 'Salvar arquivo' };
+}
+
+/** Sem a API userActivation não dá para saber: tenta o share e trata a recusa. */
+function vcHasTransientActivation() {
+  const ua = typeof navigator !== 'undefined' ? navigator.userActivation : null;
+  return ua ? ua.isActive !== false : true;
+}
+
 /**
- * Descarga um Blob; em mobile tenta primeiro partilhar ficheiro, depois `<a download>`.
- * @returns {Promise<boolean>} false quando a pessoa fecha a folha de compartilhar (MOO-27).
+ * Aviso com botão para salvar: o toque nele é uma ativação nova, e o share é
+ * chamado dentro do próprio clique. Usa as classes do ToastStack para ter a
+ * mesma cara dos outros avisos. Devolve true (salvo), false (fechado/cancelado)
+ * ou rejeita quando o share falha de outro jeito.
  */
-async function downloadBlob(blob, filename) {
+function vcAskTapToSave({ labels, share }) {
+  return new Promise((resolve, reject) => {
+    const stack = document.createElement('div');
+    stack.className = 'toast-stack';
+    stack.setAttribute('data-vc-save-file', '');
+    stack.style.zIndex = '2147483000';
+    const item = document.createElement('div');
+    item.className = 'toast-item toast-success';
+    item.setAttribute('role', 'dialog');
+    item.setAttribute('aria-label', labels.message);
+    const text = document.createElement('span');
+    text.style.flex = '1';
+    text.style.alignSelf = 'center';
+    text.textContent = labels.message;
+    const save = document.createElement('button');
+    save.type = 'button';
+    save.className = 'toast-action';
+    save.textContent = labels.action;
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.setAttribute('aria-label', 'Fechar sem salvar');
+    close.textContent = '×';
+    close.style.fontSize = '20px';
+    close.style.lineHeight = '1';
+    item.append(text, save, close);
+    stack.append(item);
+    let done = false;
+    const finish = (fn, value) => { if (done) return; done = true; stack.remove(); fn(value); };
+    close.addEventListener('click', () => finish(resolve, false));
+    save.addEventListener('click', () => {
+      // Nada de await antes do share: ele precisa da ativação deste toque.
+      let pending;
+      try { pending = share(); } catch (e) { pending = Promise.reject(e); }
+      stack.remove();
+      Promise.resolve(pending).then((value) => finish(resolve, value), (e) => finish(reject, e));
+    });
+    document.body.appendChild(stack);
+    try { save.focus({ preventScroll: true }); } catch { /* foco é só conveniência */ }
+  });
+}
+
+/** Share do toque novo: fechar a folha é cancelamento; outro erro vira mensagem. */
+async function vcShareFile(data) {
+  try {
+    await navigator.share(data);
+    return true;
+  } catch (e) {
+    if (e?.name === 'AbortError') return false;
+    throw Object.assign(new Error('Não deu para abrir a opção de salvar. Tente de novo.'), { code: 'export_share_failed', cause: e });
+  }
+}
+
+/**
+ * Descarga um Blob. No computador usa `<a download>`. No celular entrega o
+ * arquivo pela folha de compartilhar ("Salvar em Arquivos"), só com o arquivo,
+ * sem title: no iPhone, quando o arquivo fica pronto depois que a ativação do
+ * toque expirou (~5 s, comum no PDF), o share é recusado e a âncora blob:
+ * tirava a pessoa do app mostrando só o PDF. Nesse caso pede um toque novo.
+ * @param {{ askForTap?: (o: { filename: string, labels: { message: string, action: string }, share: () => Promise<boolean> }) => Promise<boolean> }} [options]
+ * @returns {Promise<boolean>} false quando a pessoa fecha a folha ou o aviso (MOO-27).
+ */
+async function downloadBlob(blob, filename, { askForTap = vcAskTapToSave } = {}) {
   const mime = blob.type || 'application/octet-stream';
   const tryShare =
     vcPreferFileShareForDownloads() &&
@@ -307,15 +386,21 @@ async function downloadBlob(blob, filename) {
     typeof navigator.canShare === 'function';
 
   if (tryShare) {
-    try {
-      const file = new File([blob], filename, { type: mime });
-      if (navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: filename });
-        return true;
+    const file = new File([blob], filename, { type: mime });
+    const data = { files: [file] };
+    let canShare = false;
+    try { canShare = navigator.canShare(data); } catch { canShare = false; }
+    if (canShare) {
+      if (vcHasTransientActivation()) {
+        try {
+          await navigator.share(data);
+          return true;
+        } catch (e) {
+          if (e?.name === 'AbortError') return false;
+          /* ativação recusada (NotAllowedError) ou outra falha: pede um toque novo */
+        }
       }
-    } catch (e) {
-      if (e?.name === 'AbortError') return false;
-      /* continua para âncora */
+      return askForTap({ filename, labels: saveFileTapLabels(filename), share: () => vcShareFile(data) });
     }
   }
 
@@ -340,6 +425,7 @@ export {
   vcFixHtml2CanvasTextClip,
   vcPrepareHtml2CanvasClone,
   vcPreferFileShareForDownloads,
+  saveFileTapLabels,
   downloadBlob,
 };
 

@@ -341,6 +341,12 @@ export function useExport({
   const isPresentation = productKind === 'apresentacao' || fmt === 'apresentacao';
   const itemLabel = isPresentation ? 'slide' : 'card';
   const fileStem = exportFileStem(projectName, isPresentation);
+  // Arquivo pronto: o "Exportando n/n" sai antes da entrega. No celular ela pode
+  // esperar o toque em "Salvar PDF", e o Cancelar do progresso já não valeria.
+  const deliverFile = (blob, name) => {
+    setExportProgress({ current: 0, total: 0 });
+    return downloadBlob(blob, name);
+  };
   const waitForRender = async (slideIndexes = null) => {
     const scope = exportRenderScope(slides, slideRefs.current, slideIndexes);
     await waitForExportReadiness(scope);
@@ -505,7 +511,7 @@ export function useExport({
       // PNG e vídeo já são comprimidos: STORE poupa CPU e memória (MOO-09).
       const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
       throwIfExportCancelled();
-      assertDelivered(await downloadBlob(zipBlob, `${fileStem}.zip`));
+      assertDelivered(await deliverFile(zipBlob, `${fileStem}.zip`));
       const videoNote = videoSlides.length > 0 ? ` (${videoSlides.length} c/ vídeo — veja LEIA-ME.md)` : '';
       if (missingVideos > 0) {
         // Vídeo que não pôde ser lido não some em silêncio (MOO-08).
@@ -559,7 +565,7 @@ export function useExport({
       // Fotos e vídeos já são comprimidos: STORE poupa CPU e memória (MOO-09).
       const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
       throwIfExportCancelled();
-      assertDelivered(await downloadBlob(zipBlob, `${fileStem}-fotos.zip`));
+      assertDelivered(await deliverFile(zipBlob, `${fileStem}-fotos.zip`));
       toast(
         outcome.level === 'success' && aiCount > 0
           ? `${outcome.message} (${aiCount} geradas por IA, guarde para reuso)`
@@ -603,7 +609,7 @@ export function useExport({
         canvas.height = 1;
       }
       throwIfExportCancelled();
-      assertDelivered(await downloadBlob(pdf.output('blob'), `${fileStem}.pdf`));
+      assertDelivered(await deliverFile(pdf.output('blob'), `${fileStem}.pdf`));
       toast(`PDF com ${slides.length} ${itemLabel}s gerado`, 'success');
       return true;
     } catch(e) {

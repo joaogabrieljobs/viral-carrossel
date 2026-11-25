@@ -70,8 +70,8 @@ function ExportMoreFormats({
         }}
       >
         <Download size={13}/>
-        {exporting && exportProgress
-          ? `${exportProgress.current}/${exportProgress.total}…`
+        {exporting && exportProgress?.total > 0
+          ?`${exportProgress.current}/${exportProgress.total}…`
           : 'Exportar'}
         <ChevronDown size={12} style={{ transform: open ? 'rotate(180deg)' : 'none', transition:'transform 0.15s' }}/>
       </button>
