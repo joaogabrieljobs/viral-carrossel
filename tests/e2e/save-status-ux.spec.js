@@ -86,3 +86,43 @@ test('no celular o aviso de gravação pendente e seu botão cabem na tela', asy
   expect(status.linhas, 'texto do aviso em no máximo duas linhas').toBeLessThanOrEqual(2);
   expect(status.largura, 'sem rolagem horizontal').toBeLessThanOrEqual(390);
 });
+
+// Reteste 24/11 (conta 7): com o armazenamento do navegador cheio, o aviso
+// vermelho voltava em toda aba nova e ao recarregar.
+test('aviso de armazenamento cheio aparece uma vez no dia, não em cada aba nem ao recarregar', async ({ page }) => {
+  test.setTimeout(90_000);
+  const NOTICE = /Não foi possível salvar a cópia local porque o armazenamento deste navegador está cheio/;
+  const prepare = async (target) => {
+    await (await import('./helpers/api-mock.js')).mockEditorApi(target, { session: SESSAO_ATIVA });
+    // A lista de projetos não cabe mais: toda gravação dela é recusada por cota.
+    await target.addInitScript(() => {
+      const setItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = function quotaFull(key, value) {
+        if (this === window.localStorage && key === 'vc_library' && window.__libraryIsFull) {
+          throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+        }
+        return setItem.call(this, key, value);
+      };
+      window.__libraryIsFull = true;
+    });
+  };
+  const studioReady = (target) => expect(target.getByRole('button', { name: /^Imagens$/ }).first()).toBeVisible({ timeout: 20_000 });
+
+  await prepare(page);
+  await page.goto('/?app=1');
+  await expect(page.getByText(NOTICE)).toBeVisible({ timeout: 20_000 });
+
+  const second = await page.context().newPage();
+  await prepare(second);
+  await second.goto('/?app=1');
+  await studioReady(second);
+  // A gravação continua falhando nesta aba; o aviso do dia já foi dado na outra.
+  await second.waitForTimeout(3_000);
+  await expect(second.getByText(NOTICE)).toHaveCount(0);
+
+  await page.reload();
+  await studioReady(page);
+  await page.waitForTimeout(3_000);
+  await expect(page.getByText(NOTICE)).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem('vc_quota_notice_day'))).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+});

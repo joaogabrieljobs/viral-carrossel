@@ -61,19 +61,49 @@ const quotaFailedKeys = new Set();
 
 /**
  * QA-2411: o aviso vermelho de armazenamento cheio aparecia a cada abertura.
- * Com assinatura os projetos ficam na conta, então o aviso aparece uma vez por
- * sessão da aba (recarregar não repete); volta a valer quando a gravação se
- * recupera e falha de novo. No plano grátis a cópia deste aparelho é a única:
- * o aviso nunca é omitido.
+ * RT24 (conta 7): a marca ficava em sessionStorage, que é de cada aba, e era
+ * apagada quando uma gravação passava; o aviso voltava em toda aba nova e ao
+ * recarregar. Com assinatura os projetos ficam na conta, então o aviso vale
+ * uma vez por dia neste navegador (marca em localStorage, com a data).
+ *
+ * O armazenamento está cheio justamente neste caso: se a marca do dia não
+ * couber, a aba lembra sozinha (sessionStorage e memória) e a aba seguinte
+ * tenta gravar de novo. Na página que avisou, o aviso fechado por uma gravação
+ * que passou volta se a falha voltar. No plano grátis a cópia deste aparelho é
+ * a única: o aviso nunca é omitido e não gasta a marca do dia.
  */
-const QUOTA_NOTICE_KEY = 'vc_quota_notice_shown';
+const QUOTA_NOTICE_KEY = 'vc_quota_notice_day';
+let quotaNoticeOwnedDay = null;
+let quotaNoticeClosedByRecovery = false;
 
-export function shouldShowQuotaNotice({ free = false } = {}) {
+function quotaNoticeDay(now) {
+  const date = new Date(now);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function readQuotaNoticeDay(store) {
+  try { return store.getItem(QUOTA_NOTICE_KEY); } catch { return null; }
+}
+
+function writeQuotaNoticeDay(store, day) {
+  try { store.setItem(QUOTA_NOTICE_KEY, day); return true; } catch { return false; }
+}
+
+export function shouldShowQuotaNotice({ free = false, now = Date.now() } = {}) {
   if (free) return true;
-  try {
-    if (sessionStorage.getItem(QUOTA_NOTICE_KEY)) return false;
-    sessionStorage.setItem(QUOTA_NOTICE_KEY, '1');
-  } catch { /* sem sessão para lembrar: melhor avisar */ }
+  const day = quotaNoticeDay(now);
+  if (quotaNoticeOwnedDay === day) {
+    if (!quotaNoticeClosedByRecovery) return false;
+    quotaNoticeClosedByRecovery = false;
+    return true;
+  }
+  const local = typeof localStorage === 'undefined' ? null : localStorage;
+  const session = typeof sessionStorage === 'undefined' ? null : sessionStorage;
+  if ((local && readQuotaNoticeDay(local) === day) || (session && readQuotaNoticeDay(session) === day)) return false;
+  quotaNoticeOwnedDay = day;
+  quotaNoticeClosedByRecovery = false;
+  if (local) writeQuotaNoticeDay(local, day);
+  if (session) writeQuotaNoticeDay(session, day);
   return true;
 }
 
@@ -87,7 +117,7 @@ function confirmQuotaRecovery(key) {
   if (!quotaFailedKeys.delete(key) || quotaFailedKeys.size) return;
   VC_QUOTA_SLIM_ALREADY_NOTIFIED = false;
   VC_QUOTA_HARD_ALREADY_NOTIFIED = false;
-  try { sessionStorage.removeItem(QUOTA_NOTICE_KEY); } catch { /* sessão indisponível */ }
+  if (quotaNoticeOwnedDay) quotaNoticeClosedByRecovery = true;
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('vc:quota-recovered'));
   }
