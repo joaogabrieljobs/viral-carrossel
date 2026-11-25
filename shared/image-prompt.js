@@ -82,7 +82,7 @@ export const IMAGE_PROMPT_TEXT = Object.freeze({
   styleReferenceOverride: 'This look overrides any colour, light or mood mentioned elsewhere in this request.',
   styleReferenceLabeled: 'References named in the REFERENCE MAP keep their assigned role.',
   // Cenas planejadas dos outros slides do deck (roteiro v2).
-  otherScenesHeader: 'OTHER SLIDES IN THIS DECK already show these scenes. Do not repeat their subject, setting or framing; propose a different scene that fits this slide, with the same look:',
+  otherScenesHeader: 'OTHER SLIDES IN THIS DECK show these scenes. Do not repeat them: make this slide\'s SCENE a different image (other subject, moment and framing) within the same context and the same look:',
   // I18 — moodboard de estilo sem direção estética escrita.
   // Reteste de 22/11: a frase curta do catálogo perdia para a luz quente da família e para as cores da ficha.
   moodboardOnly: 'STYLE REFERENCE (moodboard): the attached reference images define the look of this image. Match their medium, palette (including black and white or a limited palette), contrast, lighting and texture. This look overrides any colour, light or mood mentioned elsewhere in this request. Take only the look from the references, not their subject: create the new scene described above.',
