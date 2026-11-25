@@ -161,10 +161,13 @@ function persistOperation(ownerId, projectId, kind, entry, baseVersion, projectN
         // DB-03: já a recusa do servidor (4xx) vale para o conteúdo recusado.
         // Uma edição nova é um envio novo; se for recusada de novo, volta à
         // revisão sem parar a fila. O mesmo conteúdo não é reenviado (acima).
-        const effectiveKind = previous?.kind === 'review_put_deleted' && kind === 'put'
-          ? 'review_put_deleted' : kind;
+        // QA-2411: o mesmo vale para a edição retida por conflito de versão.
+        // Salvar de novo atualiza o texto retido; só a escolha a libera.
+        const effectiveKind = (previous?.kind === 'review_put_deleted' || previous?.kind === 'review_put_conflict')
+          && kind === 'put' ? previous.kind : kind;
         const keepsEntry = effectiveKind === 'put'
           || effectiveKind === 'review_put_deleted'
+          || effectiveKind === 'review_put_conflict'
           || effectiveKind === 'review_put_billing'
           || effectiveKind === 'review_put_failed';
         const op = {
@@ -178,8 +181,9 @@ function persistOperation(ownerId, projectId, kind, entry, baseVersion, projectN
           projectName: kind === 'delete'
             ? String(projectName || previous?.projectName || '').slice(0, 160)
             : effectiveKind === 'review_put_deleted' || effectiveKind === 'review_put_failed'
+              || effectiveKind === 'review_put_conflict'
               ? String(entry?.name || previous?.projectName || '').slice(0, 160) : '',
-          ...(effectiveKind === 'review_put_deleted'
+          ...(effectiveKind === 'review_put_deleted' || effectiveKind === 'review_put_conflict'
             ? { reviewVersion: previous.reviewVersion } : {}),
           opId: operationId(),
           ...(entryFingerprint ? { entryFingerprint } : {}),
@@ -368,6 +372,35 @@ function markPutForReview(ownerId, sentOp, cloudVersion) {
   });
 }
 
+/**
+ * QA-2411: a conta tem uma versão mais nova do que a que esta aba editou.
+ * A edição fica retida, com a versão da conta que a pessoa vai comparar,
+ * até ela escolher: manter a minha, usar a da conta ou salvar como cópia.
+ */
+function markPutForConflict(ownerId, sentOp, cloudVersion) {
+  assertActiveOwner(ownerId);
+  return transaction('readwrite', (store, setResult, fail) => {
+    const read = store.get(operationKey(ownerId, sentOp.projectId));
+    read.onsuccess = () => {
+      try {
+        assertActiveOwner(ownerId);
+        const current = read.result;
+        if (!current || (current.kind !== 'put' && current.kind !== 'review_put_conflict')) {
+          setResult(false);
+          return;
+        }
+        store.put({
+          ...current, kind: 'review_put_conflict',
+          reviewVersion: Number.isSafeInteger(cloudVersion) ? cloudVersion : null,
+          projectName: String(current.entry?.name || current.projectName || '').slice(0, 160),
+          updatedAt: Date.now(),
+        });
+        setResult(true);
+      } catch (error) { fail(error); }
+    };
+  });
+}
+
 /** Assinatura recusada não é exclusão. O próximo envio tenta de novo. */
 function markPutForBilling(ownerId, sentOp) {
   assertActiveOwner(ownerId);
@@ -518,6 +551,7 @@ function pendingPredecessors(previous) {
 }
 
 const CONFLICT_COPY_SUFFIX = ' (cópia de conflito)';
+export const PROJECT_CONFLICT_REVIEW_MESSAGE = 'Este projeto mudou em outro lugar. Sua edição continua guardada neste navegador: escolha qual versão fica.';
 
 /** Uma cópia por projeto. Novas gravações atualizam essa cópia em vez de abrir outra. */
 export function conflictCopyId(projectId) {
@@ -607,7 +641,7 @@ export async function verifyProjectOutboxOwner(ownerId, { signal } = {}) {
   return expectedOwnerId;
 }
 
-async function sendOperation(ownerId, op, { signal, expectedOwnerId }) {
+async function sendOperation(ownerId, op, { signal, expectedOwnerId, reviewConflicts = false }) {
   assertActiveOwner(ownerId);
   const isPut = op.kind === 'put' || op.kind === 'review_put_billing' || isRetryableReview(op);
   if (isPut && op.assets?.length) {
@@ -657,9 +691,14 @@ async function sendOperation(ownerId, op, { signal, expectedOwnerId }) {
         // A confirmou na conta; B chegou à fila antes do recibo de A. Só
         // rebaseia B sobre A comprovado, nunca sobre texto de outra aba.
         return sendOperation(ownerId, { ...op, baseVersion: remote.version, predecessors: [] }, {
-          signal, expectedOwnerId,
+          signal, expectedOwnerId, reviewConflicts,
         });
       }
+    }
+    // QA-2411: com a pessoa no editor, o conflito vira uma escolha dela em
+    // vez de uma cópia criada sozinha.
+    if (isPut && reviewConflicts && Number.isSafeInteger(remote?.version)) {
+      return { id: op.projectId, needsReviewConflict: true, cloudVersion: remote.version };
     }
     if (isPut) {
       const recoveredCopy = await recoverPutAsCopy(op, { signal, expectedOwnerId });
@@ -677,7 +716,7 @@ async function sendOperation(ownerId, op, { signal, expectedOwnerId }) {
  * A fila fica intacta se rede, sessão ou versão falharem. Uma edição recebida
  * durante o envio é mantida e herda a versão confirmada da operação anterior.
  */
-async function flushProjectOutboxSerial(ownerId, { signal, maxOperations = 100, onConfirmed } = {}) {
+async function flushProjectOutboxSerial(ownerId, { signal, maxOperations = 100, onConfirmed, reviewConflicts = false } = {}) {
   assertActiveOwner(ownerId);
   if (!Number.isSafeInteger(maxOperations) || maxOperations < 1) {
     throw outboxError('Limite de sincronização inválido.', 'project_bad_limit');
@@ -685,7 +724,7 @@ async function flushProjectOutboxSerial(ownerId, { signal, maxOperations = 100, 
   const expectedOwnerId = await verifyProjectOutboxOwner(ownerId, { signal });
   let sent = 0;
   const recoveries = [];
-  const heldForReview = new Set(['review_delete', 'review_put_deleted', 'review_put_failed', 'review_delete_failed']);
+  const heldForReview = new Set(['review_delete', 'review_put_deleted', 'review_put_conflict', 'review_put_failed', 'review_delete_failed']);
   const held = (op) => heldForReview.has(op.kind) && !isRetryableReview(op) && !isRetryableDeleteReview(op);
   let queue = (await listPendingProjectOps(ownerId))
     .filter((op) => !held(op));
@@ -700,7 +739,7 @@ async function flushProjectOutboxSerial(ownerId, { signal, maxOperations = 100, 
       if (held(op)) continue;
       let result;
       try {
-        result = await sendOperation(ownerId, op, { signal, expectedOwnerId });
+        result = await sendOperation(ownerId, op, { signal, expectedOwnerId, reviewConflicts });
       } catch (error) {
         if (!isPermanentOperationFailure(error)) {
           // Sem resposta do servidor (rede, timeout, conta) a fila para, como antes.
@@ -731,6 +770,10 @@ async function flushProjectOutboxSerial(ownerId, { signal, maxOperations = 100, 
         await markPutForReview(ownerId, op, result.cloudVersion);
         continue;
       }
+      if (result.needsReviewConflict) {
+        await markPutForConflict(ownerId, op, result.cloudVersion);
+        continue;
+      }
       if (!Number.isSafeInteger(result?.version) || result.version < 0) {
         throw outboxError('A nuvem não confirmou a versão do projeto.', 'project_bad_response');
       }
@@ -742,12 +785,14 @@ async function flushProjectOutboxSerial(ownerId, { signal, maxOperations = 100, 
   const remaining = await listPendingProjectOps(ownerId);
   const needsReview = remaining.filter((op) => op.kind === 'review_delete'
     || op.kind === 'review_put_deleted'
+    || op.kind === 'review_put_conflict'
     || op.kind === 'review_put_billing'
     || op.kind === 'review_put_failed'
     || op.kind === 'review_delete_failed').map((op) => ({
     projectId: op.projectId, projectName: op.projectName || '',
     ...(op.reviewVersion != null ? { reviewVersion: op.reviewVersion } : {}),
     ...(op.kind === 'review_put_deleted' ? { kind: 'put_deleted' } : {}),
+    ...(op.kind === 'review_put_conflict' ? { kind: 'put_conflict' } : {}),
     ...(op.kind === 'review_put_billing' ? { kind: 'put_billing' } : {}),
     ...(['review_put_failed', 'review_delete_failed'].includes(op.kind) ? {
       kind: 'sync_failed', operation: op.kind === 'review_put_failed' ? 'put' : 'delete',
@@ -792,7 +837,12 @@ export function flushProjectOutbox(ownerId, options = {}) {
  */
 export async function listRetainedProjectEdits(ownerId) {
   const operations = await listPendingProjectOps(ownerId);
-  return operations.filter((op) => op.kind === 'review_put_failed' && op.entry).map((op) => ({
+  // QA-2411: a edição retida por conflito também segue na lista até a escolha.
+  return operations.filter((op) => (op.kind === 'review_put_failed' || op.kind === 'review_put_conflict')
+    && op.entry).map((op) => (op.kind === 'review_put_conflict' ? {
+    projectId: op.projectId, entry: op.entry, baseVersion: op.baseVersion,
+    code: 'project_conflict', status: 409, message: PROJECT_CONFLICT_REVIEW_MESSAGE,
+  } : {
     projectId: op.projectId, entry: op.entry, baseVersion: op.baseVersion,
     code: op.reviewCode || 'project_sync_failed',
     status: Number.isInteger(op.reviewStatus) ? op.reviewStatus : null,
@@ -897,5 +947,81 @@ export async function resolveDeletedProjectEdit(ownerId, projectId, action, { si
     assertActiveOwner(ownerId);
     const copyEntry = conflictCopyEntry(op);
     return { resolved: await removeIfSame(op), recoveredCopy, copyEntry };
+  });
+}
+
+/**
+ * QA-2411: tudo o que espera uma escolha da pessoa, para a mesma tela: edição
+ * de projeto excluído em outro dispositivo e edição feita sobre uma versão
+ * antiga (outra aba ou outro aparelho salvou antes). Sem o conteúdo.
+ */
+export async function listProjectEditReviews(ownerId) {
+  const operations = await listPendingProjectOps(ownerId);
+  return operations.filter((op) => (op.kind === 'review_put_deleted' || op.kind === 'review_put_conflict')
+    && op.entry).map((op) => ({
+    kind: op.kind === 'review_put_conflict' ? 'conflict' : 'deleted',
+    projectId: op.projectId,
+    projectName: String(op.projectName || op.entry?.name || '').slice(0, 160),
+    copyName: conflictCopyEntry(op).name,
+    updatedAt: op.updatedAt || op.createdAt || 0,
+  }));
+}
+
+/**
+ * Escolha explícita sobre uma edição retida por conflito de versão:
+ *  - `mine`: a edição volta à fila sobre a versão da conta que a pessoa viu; o
+ *    salvamento seguinte a envia (se a conta mudar de novo, a escolha volta);
+ *  - `copy`: grava a edição na conta como projeto novo e só então libera a fila;
+ *  - `account`: apaga a edição retida e fica a versão da conta (a tela confirma antes).
+ */
+export async function resolveProjectConflictEdit(ownerId, projectId, action, { signal } = {}) {
+  assertActiveOwner(ownerId);
+  assertId(projectId);
+  if (action !== 'mine' && action !== 'copy' && action !== 'account') {
+    throw outboxError('Escolha manter a sua edição, usar a versão da conta ou salvar como cópia.', 'project_bad_review_action');
+  }
+  const key = operationKey(ownerId, projectId);
+  // Uma edição mais nova que chegou durante a escolha continua retida.
+  const settleIfSame = (op, next) => transaction('readwrite', (store, setResult, fail) => {
+    const read = store.get(key);
+    read.onsuccess = () => {
+      try {
+        assertActiveOwner(ownerId);
+        if (read.result?.opId !== op.opId || read.result.kind !== 'review_put_conflict') {
+          setResult(false);
+          return;
+        }
+        if (next) store.put(next(read.result));
+        else store.delete(key);
+        setResult(true);
+      } catch (error) { fail(error); }
+    };
+  });
+  return runOutboxExclusive(ownerId, signal, async () => {
+    const op = await getPendingProjectOp(ownerId, projectId);
+    if (!op || op.kind !== 'review_put_conflict' || !op.entry) return { resolved: false };
+    if (action === 'account') {
+      return (await settleIfSame(op)) ? { resolved: true, discarded: true } : { resolved: false };
+    }
+    if (action === 'mine') {
+      if (!Number.isSafeInteger(op.reviewVersion)) return { resolved: false };
+      const released = await settleIfSame(op, ({ reviewVersion: _reviewVersion, ...current }) => ({
+        ...current, kind: 'put', baseVersion: op.reviewVersion, projectName: '', predecessors: [], updatedAt: Date.now(),
+      }));
+      return released ? { resolved: true, baseVersion: op.reviewVersion } : { resolved: false };
+    }
+    const expectedOwnerId = await verifyProjectOutboxOwner(ownerId, { signal });
+    if (op.assets?.length) {
+      const uploaded = await uploadAssetsBestEffort(new Map(op.assets), {
+        owner: ownerId, signal, assertCurrent: () => assertActiveOwner(ownerId),
+      });
+      if (uploaded.failed) {
+        throw outboxError('As imagens da edição ainda não foram enviadas. Tente novamente em instantes.', 'project_asset_upload_failed');
+      }
+      assertActiveOwner(ownerId);
+    }
+    const recoveredCopy = await recoverPutAsCopy(op, { signal, expectedOwnerId });
+    assertActiveOwner(ownerId);
+    return { resolved: await settleIfSame(op), recoveredCopy, copyEntry: conflictCopyEntry(op) };
   });
 }

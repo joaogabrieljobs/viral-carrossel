@@ -7,8 +7,8 @@ import {
 } from '../../src/utils/unsent-project-marker.js';
 import {
   acknowledgeProjectOp, conflictCopyEntry, conflictCopyId, flushProjectOutbox, getPendingProjectOp,
-  listDeletedProjectEdits, listPendingProjectOps, listRetainedProjectEdits, overlayRetainedProjectEdits,
-  queueProjectDelete, queueProjectPut, resolveDeletedProjectEdit, retainedProjectMessage,
+  listDeletedProjectEdits, listPendingProjectOps, listProjectEditReviews, listRetainedProjectEdits, overlayRetainedProjectEdits,
+  queueProjectDelete, queueProjectPut, resolveDeletedProjectEdit, resolveProjectConflictEdit, retainedProjectMessage,
   wipeProjectOutboxForOwners,
 } from '../../src/utils/projects-outbox.js';
 import { clearAccountLocalData, OUTBOX_WIPE_OWNERS_KEY } from '../../src/utils/clear-account-data.js';
@@ -610,6 +610,163 @@ describe('outbox durável por projeto', () => {
       await expect(resolveDeletedProjectEdit(ALICE, 'janine', 'discard')).rejects.toBeTruthy();
       setOwner(ALICE);
       expect(await listDeletedProjectEdits(ALICE)).toHaveLength(1);
+    });
+  });
+
+  // QA 24/11 (conta 2): a segunda aba, com a versão antiga, salvava e a edição
+  // ia sozinha para uma cópia; o projeto ficava "pendente na conta" sem
+  // explicação. Com `reviewConflicts`, a fila retém a edição até a pessoa
+  // escolher: manter a minha, usar a da conta ou salvar como cópia.
+  describe('QA-2411 conta 2: salvar com versão desatualizada pede uma escolha', () => {
+    const mine = { id: 'janine', name: 'Clínica', doc: { title: 'Edição da segunda aba' } };
+    const theirs = { id: 'janine', entry: { id: 'janine', name: 'Clínica', doc: { title: 'Edição da primeira aba' } }, version: 3 };
+    async function holdConflict(entry = mine) {
+      await queueProjectPut(ALICE, entry, { baseVersion: 2 });
+      fetch.mockResolvedValueOnce(session())
+        .mockResolvedValueOnce(json({ error: 'Conflito', code: 'project_conflict', cloudVersion: 3 }, 409))
+        .mockResolvedValueOnce(json({ ok: true, project: theirs }));
+      return flushProjectOutbox(ALICE, { reviewConflicts: true });
+    }
+
+    it('não cria cópia nem descarta: a edição fica retida com a versão da conta que causou o conflito', async () => {
+      const receipt = await holdConflict();
+      expect(receipt).toEqual({ sent: 0, pending: 1, needsReview: [{
+        kind: 'put_conflict', projectId: 'janine', projectName: 'Clínica', reviewVersion: 3,
+      }] });
+      expect(fetch).toHaveBeenCalledTimes(3); // sessão, PUT recusado, GET; nenhum PUT de conflict-*
+      expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({
+        kind: 'review_put_conflict', entry: mine, baseVersion: 2, reviewVersion: 3,
+      });
+    });
+
+    it('aparece na lista de escolhas com as três saídas e sem expor o conteúdo', async () => {
+      await holdConflict();
+      const reviews = await listProjectEditReviews(ALICE);
+      expect(reviews).toEqual([{
+        kind: 'conflict', projectId: 'janine', projectName: 'Clínica',
+        copyName: 'Clínica (cópia de conflito)', updatedAt: expect.any(Number),
+      }]);
+      // A lista antiga, só de projetos excluídos, não muda.
+      expect(await listDeletedProjectEdits(ALICE)).toEqual([]);
+    });
+
+    it('novo envio não reenvia nem troca de fila: continua aguardando a escolha, já com o texto mais recente', async () => {
+      await holdConflict();
+      await queueProjectPut(ALICE, { ...mine, doc: { title: 'Mais um trecho' } }, { baseVersion: 2 });
+      fetch.mockResolvedValueOnce(session());
+      const calls = fetch.mock.calls.length;
+      expect(await flushProjectOutbox(ALICE, { reviewConflicts: true })).toMatchObject({
+        sent: 0, pending: 1, needsReview: [{ kind: 'put_conflict', reviewVersion: 3 }],
+      });
+      expect(fetch).toHaveBeenCalledTimes(calls + 1); // só a conferência da sessão
+      expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({
+        kind: 'review_put_conflict', entry: { doc: { title: 'Mais um trecho' } }, reviewVersion: 3,
+      });
+      // O envio sem a opção (abertura da conta) também não mexe na edição retida.
+      fetch.mockResolvedValueOnce(session());
+      expect(await flushProjectOutbox(ALICE)).toMatchObject({ sent: 0, pending: 1 });
+      expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({ kind: 'review_put_conflict' });
+    });
+
+    it('a edição retida continua na lista de projetos depois de recarregar', async () => {
+      await holdConflict();
+      const retained = await listRetainedProjectEdits(ALICE);
+      expect(retained).toMatchObject([{ projectId: 'janine', entry: mine, code: 'project_conflict' }]);
+      expect(retained[0].message).toMatch(/mudou em outro lugar/);
+      const { library, unsent } = overlayRetainedProjectEdits([theirs.entry], retained);
+      expect(library).toEqual([mine]);
+      expect(unsent.janine).toMatchObject({ onlyHere: false });
+    });
+
+    it('manter a minha: a edição volta à fila sobre a versão que a pessoa viu e é enviada', async () => {
+      await holdConflict();
+      const calls = fetch.mock.calls.length;
+      expect(await resolveProjectConflictEdit(ALICE, 'janine', 'mine')).toEqual({ resolved: true, baseVersion: 3 });
+      expect(fetch).toHaveBeenCalledTimes(calls); // a escolha só libera; quem envia é o salvamento
+      expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({ kind: 'put', baseVersion: 3, entry: mine });
+      fetch.mockResolvedValueOnce(session())
+        .mockResolvedValueOnce(json({ ok: true, project: { id: 'janine', version: 4 } }));
+      expect(await flushProjectOutbox(ALICE, { reviewConflicts: true })).toEqual({ sent: 1, pending: 0 });
+      expect(JSON.parse(fetch.mock.calls.at(-1)[1].body)).toMatchObject({ baseVersion: 3, entry: mine });
+    });
+
+    it('manter a minha não passa por cima de uma terceira versão: pede a escolha de novo', async () => {
+      await holdConflict();
+      await resolveProjectConflictEdit(ALICE, 'janine', 'mine');
+      fetch.mockResolvedValueOnce(session())
+        .mockResolvedValueOnce(json({ error: 'Conflito', code: 'project_conflict', cloudVersion: 4 }, 409))
+        .mockResolvedValueOnce(json({ ok: true, project: { ...theirs, version: 4, entry: { ...theirs.entry, doc: { title: 'Terceira versão' } } } }));
+      expect(await flushProjectOutbox(ALICE, { reviewConflicts: true })).toMatchObject({
+        sent: 0, pending: 1, needsReview: [{ kind: 'put_conflict', reviewVersion: 4 }],
+      });
+      expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({ kind: 'review_put_conflict', entry: mine });
+    });
+
+    it('salvar como cópia: grava a edição como projeto novo e o original da conta fica como está', async () => {
+      await holdConflict();
+      fetch.mockResolvedValueOnce(session())
+        .mockResolvedValueOnce(json({ ok: true, project: { id: 'conflict-janine', version: 1 } }));
+      const result = await resolveProjectConflictEdit(ALICE, 'janine', 'copy');
+      expect(result).toMatchObject({ resolved: true, recoveredCopy: {
+        sourceProjectId: 'janine', copyProjectId: 'conflict-janine', copyName: 'Clínica (cópia de conflito)',
+      } });
+      expect(JSON.parse(fetch.mock.calls.at(-1)[1].body)).toMatchObject({
+        baseVersion: 0, entry: { id: 'conflict-janine', conflictSourceId: 'janine', doc: mine.doc },
+      });
+      expect(await listPendingProjectOps(ALICE)).toEqual([]);
+    });
+
+    it('se a conta falhar ao gravar a cópia, a edição continua retida', async () => {
+      await holdConflict();
+      fetch.mockResolvedValueOnce(session()).mockResolvedValueOnce(json({ error: 'Indisponível' }, 503));
+      await expect(resolveProjectConflictEdit(ALICE, 'janine', 'copy')).rejects.toBeTruthy();
+      expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({ kind: 'review_put_conflict', entry: mine });
+    });
+
+    it('usar a da conta: só então a edição local sai da fila, sem falar com a nuvem', async () => {
+      await holdConflict();
+      const calls = fetch.mock.calls.length;
+      expect(await resolveProjectConflictEdit(ALICE, 'janine', 'account')).toEqual({ resolved: true, discarded: true });
+      expect(fetch).toHaveBeenCalledTimes(calls);
+      expect(await listPendingProjectOps(ALICE)).toEqual([]);
+    });
+
+    it('edição mais nova que chegou durante a escolha não é descartada', async () => {
+      await holdConflict();
+      const seen = await getPendingProjectOp(ALICE, 'janine');
+      // A pessoa escolhe "usar a da conta" e, no mesmo instante, mais um trecho é salvo.
+      const chosen = resolveProjectConflictEdit(ALICE, 'janine', 'account');
+      await queueProjectPut(ALICE, { ...mine, doc: { title: 'Escrito depois' } }, { baseVersion: 2 });
+      const result = await chosen;
+      const after = await getPendingProjectOp(ALICE, 'janine');
+      // Ou a escolha chegou antes (e o trecho novo entrou como envio comum), ou
+      // chegou depois e foi recusada. Em nenhum caso o texto novo some.
+      expect(after).toMatchObject({ entry: { doc: { title: 'Escrito depois' } } });
+      expect(result.resolved === false || after.opId !== seen.opId).toBe(true);
+    });
+
+    it('não toca em operação comum, em edição de projeto excluído, nem aceita ação desconhecida', async () => {
+      await queueProjectPut(ALICE, { id: 'normal', doc: {} });
+      expect(await resolveProjectConflictEdit(ALICE, 'normal', 'account')).toEqual({ resolved: false });
+      expect(await getPendingProjectOp(ALICE, 'normal')).toMatchObject({ kind: 'put' });
+      await expect(resolveProjectConflictEdit(ALICE, 'normal', 'apagar-tudo')).rejects.toMatchObject({ code: 'project_bad_review_action' });
+      expect(await resolveProjectConflictEdit(ALICE, 'inexistente', 'mine')).toEqual({ resolved: false });
+    });
+
+    it('sem a opção, o envio conserva a cópia automática (abertura da conta e marcador DB-05)', async () => {
+      await queueProjectPut(ALICE, mine, { baseVersion: 2 });
+      fetch.mockResolvedValueOnce(session())
+        .mockResolvedValueOnce(json({ error: 'Conflito', code: 'project_conflict', cloudVersion: 3 }, 409))
+        .mockResolvedValueOnce(json({ ok: true, project: theirs }))
+        .mockResolvedValueOnce(json({ ok: true, project: { id: 'conflict-janine', version: 1 } }));
+      expect(await flushProjectOutbox(ALICE)).toMatchObject({ sent: 1, pending: 0, recoveries: [{ sourceProjectId: 'janine' }] });
+    });
+
+    it('a abertura da conta não fica presa por uma escolha pendente', async () => {
+      await holdConflict();
+      fetch.mockResolvedValueOnce(session());
+      const boot = await flushProjectOutboxForBoot(ALICE, flushProjectOutbox);
+      expect(boot).toMatchObject({ unavailable: false, receipt: { pending: 1, needsReview: [{ kind: 'put_conflict' }] } });
     });
   });
 

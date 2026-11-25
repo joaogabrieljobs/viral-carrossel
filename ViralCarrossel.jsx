@@ -1582,7 +1582,7 @@ export default function App() {
         baseVersion: v2VersionsRef.current.get(docId) ?? 0, projectName,
       });
       try {
-        await flushProjectOutbox(owner);
+        await flushProjectOutbox(owner, { reviewConflicts: true });
         const pending = await getPendingProjectOp(owner, docId);
         if (pending?.kind === 'review_delete') {
           toast('Este projeto mudou em outro dispositivo. A exclusão não foi feita. Revise a versão atual e exclua novamente se desejar.', 'warning', 7000);
@@ -2247,6 +2247,11 @@ export default function App() {
         v2OutboxUnavailableRef.current = true;
       }
     }
+    // QA-2411: a edição retida por conflito espera a escolha da pessoa. A
+    // versão da conta que esta aba acabou de receber não entra no lugar dela.
+    if (existing?.kind === 'review_put_conflict' && v2BaselinesRef.current.get(entry.id) === fingerprint) {
+      throw Object.assign(new Error(outbox.PROJECT_CONFLICT_REVIEW_MESSAGE), { code: 'project_conflict_review' });
+    }
     if (v2BaselinesRef.current.get(entry.id) === fingerprint && !existing) {
       return { skipped: true, recoveredCopy: v2RecoveredProjectsRef.current.get(entry.id) };
     }
@@ -2304,8 +2309,11 @@ export default function App() {
       try {
         await outbox.queueProjectPut(owner, prepared.entry, { baseVersion, assets: prepared.assets });
         // Com IndexedDB funcional, a fila protege a edição se a rede cair.
-        flushed = await outbox.flushProjectOutbox(owner, { onConfirmed });
+        flushed = await outbox.flushProjectOutbox(owner, { onConfirmed, reviewConflicts: true });
         const stillPending = await outbox.getPendingProjectOp(owner, entry.id);
+        if (stillPending?.kind === 'review_put_conflict') {
+          throw Object.assign(new Error(outbox.PROJECT_CONFLICT_REVIEW_MESSAGE), { code: 'project_conflict_review' });
+        }
         if (stillPending?.kind === 'review_put_deleted') {
           throw Object.assign(
             new Error('Este projeto foi excluído em outro dispositivo. Sua edição continua guardada neste navegador: escolha entre manter como projeto novo ou descartar.'),
@@ -2427,7 +2435,7 @@ export default function App() {
     const owner = readDataOwner();
     if (!owner) return [];
     try {
-      const reviews = await projectOutbox.listDeletedProjectEdits(owner);
+      const reviews = await projectOutbox.listProjectEditReviews(owner);
       if (readDataOwner() !== owner) return [];
       setDeletedEditReviews(reviews);
       // Abre sozinha uma vez por edição; depois, só quando a pessoa pede
@@ -2554,7 +2562,8 @@ export default function App() {
         }
         // Um projeto excluído em outro lugar fica retido para a escolha da
         // pessoa; ele não pode impedir o envio dos demais projetos.
-        const sendFailures = persisted.failures.filter(({ error }) => error?.code !== 'project_deleted_elsewhere');
+        const sendFailures = persisted.failures.filter(({ error }) => error?.code !== 'project_deleted_elsewhere'
+          && error?.code !== 'project_conflict_review');
         if (sendFailures.length < persisted.failures.length) deletedElsewhere = true;
         const sendFailure = combinedProjectSyncError(sendFailures, { activeId: selectedId });
         if (sendFailure) throw sendFailure;
@@ -2564,7 +2573,7 @@ export default function App() {
         if (!verifyWithoutOutbox) {
           try {
             const { flushProjectOutbox } = projectOutbox;
-            outbox = await flushProjectOutbox(owner);
+            outbox = await flushProjectOutbox(owner, { reviewConflicts: true });
             for (const recovery of outbox.recoveries || []) {
               if (recovery?.copyName) recoveredCopies.add(recovery.copyName);
             }
@@ -2594,13 +2603,15 @@ export default function App() {
         if (outbox.pending > reviewCount) {
           throw new Error('Há projetos ainda aguardando envio. Sincronize novamente antes de sair da conta.');
         }
-        if (deletedElsewhere || outbox.needsReview?.some((item) => item.kind === 'put_deleted')) {
+        if (deletedElsewhere || outbox.needsReview?.some((item) => item.kind === 'put_deleted' || item.kind === 'put_conflict')) {
           // Sync e salvamento automático seguem; a edição retida vira uma
           // escolha na tela. Só a saída da conta espera a decisão, porque
           // sair apagaria a única cópia.
           void refreshDeletedEditReviews({ open: source !== 'auto' });
           if (source === 'logout') {
-            throw new Error('Há uma edição de projeto excluído em outro dispositivo. Escolha entre manter como projeto novo ou descartar antes de sair da conta.');
+            throw new Error(outbox.needsReview?.some((item) => item.kind === 'put_deleted') || !outbox.needsReview?.length
+              ? 'Há uma edição de projeto excluído em outro dispositivo. Escolha entre manter como projeto novo ou descartar antes de sair da conta.'
+              : 'Há uma edição esperando a sua escolha. Decida qual versão do projeto fica antes de sair da conta.');
           }
         }
         const continuation = cloudSaveContinuation({
@@ -2727,7 +2738,9 @@ export default function App() {
           ...(newerChanges ? { pendingChanges: true } : {}) };
       } catch (error) {
         setCloudUnsaved(true);
-        if (error?.code === 'project_deleted_elsewhere') void refreshDeletedEditReviews({ open: true });
+        if (error?.code === 'project_deleted_elsewhere' || error?.code === 'project_conflict_review') {
+          void refreshDeletedEditReviews({ open: true });
+        }
         if (source !== 'logout') {
           toast(
             cloudSyncFailureMessage(error, { localSaved, cloudSaved }),
@@ -2852,6 +2865,59 @@ export default function App() {
     }
   }, [deleteDocLocal, refreshDeletedEditReviews, toast]);
 
+
+  // QA-2411: escolha da pessoa para a edição feita sobre uma versão antiga.
+  const resolveConflictEditReview = useCallback(async (projectId, action) => {
+    const owner = readDataOwner();
+    if (!owner || !accountLibraryReadyRef.current || areAccountDataWritesLocked() || cloudSyncInFlightRef.current) {
+      toast('Aguarde a sincronização terminar e tente de novo.', 'warning', 5000);
+      return false;
+    }
+    setDeletedEditBusyId(projectId);
+    try {
+      const result = await projectOutbox.resolveProjectConflictEdit(owner, projectId, action);
+      if (readDataOwner() !== owner) return false;
+      if (!result?.resolved && !result?.recoveredCopy) {
+        toast('Essa edição mudou enquanto você decidia. Confira a lista de novo.', 'warning', 6000);
+        await refreshDeletedEditReviews({ open: true });
+        return false;
+      }
+      // Um conflito novo neste projeto volta a abrir a tela sozinho.
+      deletedEditPromptedRef.current.delete(projectId);
+      if (action === 'mine') {
+        // A edição segue pelo salvamento de sempre, agora sobre a versão vista.
+        v2VersionsRef.current.set(projectId, result.baseVersion);
+        await refreshDeletedEditReviews();
+        await syncProjectLibraryRef.current?.('auto');
+        await refreshDeletedEditReviews({ open: true });
+        // Só anuncia quando a fila confirma que o envio saiu.
+        const still = await projectOutbox.getPendingProjectOp(owner, projectId).catch(() => undefined);
+        if (still === null) toast('Sua edição foi salva na conta.', 'success', 5000);
+        return true;
+      }
+      // A versão da conta passa a valer para este projeto: a edição local não
+      // é reenviada e a lista é atualizada em seguida.
+      const editor = editorSyncStateRef.current;
+      const local = (libraryPersistRef.current || []).find((entry) => entry?.id === projectId);
+      if (local) {
+        v2BaselinesRef.current.set(projectId, projectCacheFingerprint(
+          local.id === editor.activeDocId ? { ...local, doc: editor.doc } : local,
+        ));
+      }
+      await refreshDeletedEditReviews();
+      toast(action === 'copy'
+        ? `Edição guardada na sua conta como “${result.recoveredCopy?.copyName || 'cópia'}”. Este projeto volta a mostrar a versão da conta.`
+        : 'Edição descartada. Este projeto volta a mostrar a versão da conta.', action === 'copy' ? 'success' : 'info', 6000);
+      setRemoteProjectNotice(null);
+      await syncProjectLibraryRef.current?.('sync');
+      return true;
+    } catch (error) {
+      toast(`${error?.message || 'Não foi possível concluir.'} A edição continua guardada neste navegador.`, 'warning', 7000);
+      return false;
+    } finally {
+      setDeletedEditBusyId(null);
+    }
+  }, [refreshDeletedEditReviews, toast]);
 
   const salvarProjeto = useCallback(() => syncProjectLibrary('salvar'), [syncProjectLibrary]);
 
@@ -9826,6 +9892,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
             busyId={deletedEditBusyId}
             onKeep={(projectId) => resolveDeletedEditReview(projectId, 'copy')}
             onDiscard={(projectId) => resolveDeletedEditReview(projectId, 'discard')}
+            onResolveConflict={resolveConflictEditReview}
             onClose={() => setDeletedEditReviewOpen(false)}
           />
         </Suspense>

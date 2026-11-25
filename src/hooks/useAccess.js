@@ -726,8 +726,14 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
             const failedProjectEdits = outboxReceipt?.needsReview?.filter(
               (review) => review.kind === 'sync_failed',
             ) || [];
+            // QA-2411: edição retida por conflito de versão abre a tela de escolha
+            // sozinha; não é exclusão em revisão.
+            const conflictProjectEdits = outboxReceipt?.needsReview?.filter(
+              (review) => review.kind === 'put_conflict',
+            ) || [];
             const deleteReviews = (outboxReceipt?.needsReview?.length || 0)
-              - deletedProjectEdits.length - billingProjectEdits.length - failedProjectEdits.length;
+              - deletedProjectEdits.length - billingProjectEdits.length - failedProjectEdits.length
+              - conflictProjectEdits.length;
             if (deleteReviews) {
               toast?.(`${deleteReviews} exclusão(ões) precisam de revisão: o projeto mudou em outro dispositivo e continua na sua conta.`, 'warning', 7500);
             }

@@ -282,11 +282,16 @@ test('conflito 409 preserva ambas as versões como projetos separados', async ({
   await createTextProject(page, { name:'Projeto em edição' });
   cloud.forceConflictOnce = true;
   await page.getByRole('button', { name: 'Salvar projeto agora' }).click();
-  await expect(page.getByText(/Sua edição ficou na cópia/)).toBeVisible();
-  expect(cloud.puts).toHaveLength(1);
+  // QA 24/11 (conta 2): a cópia não é mais criada sozinha; a pessoa escolhe.
+  const dialog = page.getByRole('dialog', { name: 'Este projeto tem duas versões' });
+  await expect(dialog).toBeVisible();
+  expect(cloud.puts).toHaveLength(0);
+  await dialog.getByRole('button', { name: 'Salvar como cópia', exact: true }).click();
+  await expect.poll(() => cloud.puts.length).toBe(1);
+  await expect(dialog).toHaveCount(0);
   const conflicted = [...cloud.rows.values()].find((row) => row.entry.name === 'Versão de outro dispositivo');
   expect(conflicted?.version).toBe(1);
-  await expect(page.getByText('Projeto em edição', { exact: true }).first()).toBeVisible();
+  expect([...cloud.rows.values()].some((row) => row.entry.name === 'Projeto em edição (cópia de conflito)')).toBe(true);
   await page.reload();
   await home(page);
   await expect(page.getByRole('button', { name:'Abrir Versão de outro dispositivo', exact:true }).first()).toBeVisible();
@@ -537,4 +542,109 @@ test('edição de projeto excluído em outro dispositivo: reaparece ao recarrega
   await page.getByRole('button', { name: 'Salvar projeto agora' }).click();
   await expect.poll(() => cloud.puts.length).toBeGreaterThan(before);
   await expect(page.getByRole('dialog', { name: 'Edição de um projeto excluído' })).toHaveCount(0);
+});
+
+// QA 24/11 (conta 2): duas abas na mesma conta. A segunda aba, com a versão
+// antiga, salvava e ficava "pendente" sem dizer por quê.
+async function openProjectAInTwoTabs(page, cloud) {
+  await mockV2(page, cloud);
+  await page.goto('/?app=1');
+  await openProjectLibrary(page);
+  await page.getByRole('button', { name:'Abrir Projeto A', exact:true }).first().click();
+  const second = await page.context().newPage();
+  await mockV2(second, cloud);
+  await second.goto('/?app=1');
+  await openProjectLibrary(second);
+  await second.getByRole('button', { name:'Abrir Projeto A', exact:true }).first().click();
+  return second;
+}
+
+async function editTitle(page, text) {
+  const title = page.locator('main h1[data-vc-inline-editable="true"]').first();
+  await expect(title).toBeVisible();
+  // O duplo clique abre o campo do título no painel (o foco depende de a aba estar na frente).
+  await title.dblclick();
+  const field = page.locator('textarea').first();
+  await expect(field).toBeVisible();
+  await field.fill(text);
+  await expect(title).toHaveText(text);
+}
+
+async function saveStaleEditInSecondTab(page, cloud) {
+  const second = await openProjectAInTwoTabs(page, cloud);
+  await page.bringToFront();
+  await editTitle(page, 'Edição da primeira aba');
+  await page.getByRole('button', { name: 'Salvar projeto agora' }).click();
+  await expect.poll(() => cloud.rows.get('p-a').version).toBe(2);
+  await second.bringToFront();
+  await editTitle(second, 'Edição da segunda aba');
+  const dialog = second.getByRole('dialog', { name: 'Este projeto tem duas versões' });
+  const save = second.getByRole('button', { name: 'Salvar projeto agora' });
+  await expect(async () => {
+    // O salvamento automático pode chegar antes do clique e abrir a escolha sozinho.
+    if (!await dialog.isVisible()) await save.click({ timeout: 1_000 });
+    await expect(dialog).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
+  // Nada foi decidido pela pessoa: a conta segue com a versão da primeira aba,
+  // nenhuma cópia foi criada e a edição da segunda aba continua no editor.
+  expect(cloud.rows.get('p-a')).toMatchObject({ version: 2 });
+  expect(cloud.rows.get('p-a').entry.doc.slides[0].title).toBe('Edição da primeira aba');
+  expect(cloud.rows.has('conflict-p-a')).toBe(false);
+  await expect(dialog.getByText('Projeto A', { exact: true })).toBeVisible();
+  for (const name of ['Manter a minha', 'Usar a da conta', 'Salvar como cópia']) {
+    await expect(dialog.getByRole('button', { name, exact: true })).toBeVisible();
+  }
+  return { second, dialog };
+}
+const editorTitle = (page) => page.locator('main h1[data-vc-inline-editable="true"]').first();
+
+test('duas abas: salvar com versão antiga pede a escolha e "Manter a minha" grava sobre a versão vista', async ({ page }, testInfo) => {
+  const cloud = accountSeed();
+  const { second, dialog } = await saveStaleEditInSecondTab(page, cloud);
+  await second.screenshot({ path: testInfo.outputPath('conflito-duas-abas-1280.png') });
+  await dialog.getByRole('button', { name: 'Manter a minha', exact: true }).click();
+  await expect.poll(() => cloud.rows.get('p-a').version).toBe(3);
+  expect(cloud.rows.get('p-a').entry.doc.slides[0].title).toBe('Edição da segunda aba');
+  expect(cloud.puts.at(-1)).toMatchObject({ id: 'p-a', baseVersion: 2 });
+  expect(cloud.rows.has('conflict-p-a')).toBe(false);
+  await expect(dialog).toHaveCount(0);
+  await expect(editorTitle(second)).toHaveText('Edição da segunda aba');
+  await expect(second.getByText(/^Salvo na conta às/)).toBeVisible({ timeout: 15_000 });
+});
+
+test('duas abas: "Usar a da conta" só descarta a edição depois de confirmar e mostra a versão da conta', async ({ page }) => {
+  const cloud = accountSeed();
+  const { second, dialog } = await saveStaleEditInSecondTab(page, cloud);
+  const putsBefore = cloud.puts.length;
+  await dialog.getByRole('button', { name: 'Usar a da conta', exact: true }).click();
+  await expect(dialog.getByText(/A sua edição deste projeto será descartada/)).toBeVisible();
+  // Até aqui a edição continua no editor e nada foi apagado.
+  await expect(editorTitle(second)).toHaveText('Edição da segunda aba');
+  await dialog.getByRole('button', { name: 'Descartar a minha e usar a da conta', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(editorTitle(second)).toHaveText('Edição da primeira aba', { timeout: 20_000 });
+  expect(cloud.rows.get('p-a')).toMatchObject({ version: 2 });
+  expect(cloud.rows.has('conflict-p-a')).toBe(false);
+  expect(cloud.puts.length).toBe(putsBefore);
+});
+
+test('duas abas: "Decidir depois" guarda a edição ao recarregar e "Salvar como cópia" preserva as duas versões', async ({ page }) => {
+  const cloud = accountSeed();
+  const { second, dialog } = await saveStaleEditInSecondTab(page, cloud);
+  await dialog.getByRole('button', { name: 'Decidir depois', exact: true }).last().click();
+  await expect(dialog).toHaveCount(0);
+  await second.reload();
+  // A escolha volta sozinha e a edição não some atrás da versão da conta.
+  const again = second.getByRole('dialog', { name: 'Este projeto tem duas versões' });
+  await expect(again).toBeVisible({ timeout: 20_000 });
+  expect(cloud.rows.get('p-a').entry.doc.slides[0].title).toBe('Edição da primeira aba');
+  await again.getByRole('button', { name: 'Salvar como cópia', exact: true }).click();
+  await expect.poll(() => cloud.rows.has('conflict-p-a')).toBe(true);
+  expect(cloud.rows.get('conflict-p-a').entry.doc.slides[0].title).toBe('Edição da segunda aba');
+  expect(cloud.rows.get('p-a')).toMatchObject({ version: 2 });
+  expect(cloud.rows.get('p-a').entry.doc.slides[0].title).toBe('Edição da primeira aba');
+  await expect(again).toHaveCount(0);
+  await home(second);
+  await expect(second.getByRole('button', { name:'Abrir Projeto A (cópia de conflito)', exact:true }).first()).toBeVisible({ timeout: 20_000 });
+  await expect(second.getByRole('button', { name:'Abrir Projeto A', exact:true }).first()).toBeVisible();
 });
