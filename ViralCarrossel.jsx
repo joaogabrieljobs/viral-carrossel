@@ -261,7 +261,8 @@ import {
 import { buildProjectDesignInstructions, explicitBrandColorsFromKit, projectDesignBrandPatch, PROJECT_DESIGN_SCHEMA } from './src/utils/style-kit-design.js';
 import { buildExplicitCardScriptPrompt, canAutoApplyExplicitCardScript, parseExplicitCardScript } from './src/utils/structured-card-script.js';
 import { resolveImageReferences, migrateProjectReferences } from './src/utils/style-kit-storage.js';
-import { imageGenerationAccess, importedPhotoRegenerationPrompt, slideImageGenerationState, slidesPendingImageGeneration } from './src/utils/image-generation-readiness.js';
+import { imageAuditRegenerationPrompt, imageGenerationAccess, importedPhotoRegenerationPrompt, slideImageGenerationState, slidesPendingImageGeneration } from './src/utils/image-generation-readiness.js';
+import { runImageAudit } from './src/utils/image-audit.js';
 import { createImagePromptCutGate } from './src/utils/image-prompt-budget.js';
 import { GLOBAL_STYLE } from './src/styles/global-style.js';
 import { useExport, waitForExportReadiness } from './src/hooks/useExport.js';
@@ -5525,6 +5526,23 @@ export default function App() {
     }
   }, [slides, fmt, imageGenerationAvailability, openaiKey, imgParams, styleKit, setSlides, setSlidesPhotoSwap, toast, activeEntry?.name, doc.visualBible, access, useOwnImageKey]);
 
+  // Spec 1.1 entrega 5: a auditoria só aponta. Gerar outra imagem do slide
+  // apontado é escolha da pessoa: pergunta antes com o custo e usa o caminho
+  // normal de crédito de imagem (generateSlideImageAt).
+  const regenerateAuditImage = useCallback(async (finding) => {
+    const liveSlides = slidesLiveRef.current || slides;
+    const idx = liveSlides.findIndex(slide => slide.id === finding?.slideId);
+    if (idx < 0) return;
+    const question = imageAuditRegenerationPrompt({
+      slideNumber: idx + 1, useOwnImageKey, billingDisabled: !!access?.billingDisabled, imageQuota: access?.imageQuota, planTier: access?.tier,
+    });
+    if (!window.confirm(question)) return;
+    const result = await generateSlideImageAt(idx, null, { slideId: finding.slideId });
+    if (result?.ok) {
+      history.set(current => ({ ...current, imageAuditFindings: (current.imageAuditFindings || []).filter(item => item.slideId !== finding.slideId) }));
+    }
+  }, [slides, useOwnImageKey, access, generateSlideImageAt, history]);
+
   useEffect(() => {
     const onQuota = (ev) => {
       const q = ev?.detail;
@@ -6510,6 +6528,8 @@ ${jsonShapeLine}`;
         ? (effectiveVisualPresetDef?.sourceVersion || null)
         : undefined,
       slideTextDensity: td, contentObjective: objective, editorialReviewStatus: reviewStatus,
+      // Spec 1.1 entrega 5: achados da auditoria de imagem valem só para a geração que os produziu.
+      imageAuditFindings: [],
       // MF-11 / reteste 22/11: aviso de modo sem base no material, fixo no projeto.
       // QA 24/11 (texto 1): a lacuna do briefing fica aqui, fora do slide.
       // RT24 (texto 1): o slide que ainda repete outro é avisado no mesmo lugar.
@@ -6598,6 +6618,8 @@ ${jsonShapeLine}`;
         const totalImgs = slidesWithImage.length;
         let doneImgs = 0;
         const attemptedImageSlideIds = new Set();
+        // Spec 1.1 entrega 5: imagens deste laço, em memória, para o mosaico da auditoria.
+        const auditImages = [];
         // MF-03: a primeira imagem gerada com a pessoa da ficha vira referência
         // de identidade para os cards seguintes em que ela aparece.
         const personAnchor = { url: null };
@@ -6680,6 +6702,7 @@ ${jsonShapeLine}`;
               setCreationPreviewSlides(prev => applySlidePatchIfImageCurrent(prev, {
                 id:slideId, expectedImageIdentity, patch:imagePatch,
               }));
+              auditImages.push({ slideId, dataUrl: url });
             }
           } catch(e) {
             if (isGenerationCancelled(e) || job.signal.aborted) throw e;
@@ -6725,6 +6748,28 @@ ${jsonShapeLine}`;
             }), prev));
           }
         }
+        // Spec 1.1 entrega 5: auditoria de imagem, atrás da flag da conta. Uma
+        // chamada com o mosaico, os títulos e as rules de imagem do roteiro. Só
+        // aponta (slide, regra, evidência) no aviso de revisão; nunca gera
+        // imagem. Falha ou modelo não configurado não bloqueiam nada.
+        if (isPresentationGeneration && generationPlan && auditImages.length && !abort.cancelled
+          && accessSessionRef.current?.imageAudit === true && activeProjectRef.current === generationProjectId) {
+          setGenProgress({ phase: 'images', current: doneImgs, total: totalImgs, label: 'Conferindo as imagens…' });
+          const auditResult = await runImageAudit({
+            enabled: accessSessionRef.current?.imageAudit === true,
+            plan: generationPlan,
+            slides: newSlides,
+            images: auditImages,
+            signal: job.signal,
+          });
+          checkActive();
+          if (auditResult.status !== 'done' && auditResult.status !== 'disabled') console.warn('[auditoria de imagem]', auditResult.status, auditResult.reason || '');
+          const imageAuditFindings = auditResult.findings.map(({ slideId, ruleId, level, rule, evidence }) => ({ slideId, ruleId, level, rule, evidence }));
+          if (imageAuditFindings.length && !abort.cancelled && activeProjectRef.current === generationProjectId) {
+            history.set(current => ({ ...current, imageAuditFindings }));
+          }
+        }
+        // Spec 1.1 entrega 5: fim da auditoria de imagem
       }
 
       if (!abort.cancelled && imgFailCount > 0 && !imgQuotaStop) {
@@ -8713,7 +8758,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
               materialNotice={doc.materialNotice || doc.presentationMaterialNotice || ''}
               onDismissMaterialNotice={() => history.set(current => ({ ...current, materialNotice: '', presentationMaterialNotice: '' }))}
               presentationQuality={doc.presentationQuality} slides={slides}
-              onDismissMovedToNotes={() => history.set(current => ({ ...current, presentationQuality: { ...current.presentationQuality, movedToNotesReviewed: true } }))}/>
+              onDismissMovedToNotes={() => history.set(current => ({ ...current, presentationQuality: { ...current.presentationQuality, movedToNotesReviewed: true } }))}
+              imageAuditFindings={doc.imageAuditFindings} onRegenerateAuditImage={regenerateAuditImage}
+              onDismissImageAudit={() => history.set(current => ({ ...current, imageAuditFindings: [] }))}/>
             {empty ? (
               // Empty state
               <div className="empty-grid" style={{

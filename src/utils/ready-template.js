@@ -17,6 +17,7 @@ export function docAfterReadyTemplate(doc, { slides, brand, creativePreset } = {
     // descrevem o conteúdo que acabou de sair: não valem para o do template.
     editorialReviewStatus: undefined,
     editorialReviewIssues: [],
+    imageAuditFindings: [],
     materialNotice: '',
     presentationMaterialNotice: undefined,
     visualBible: null,
