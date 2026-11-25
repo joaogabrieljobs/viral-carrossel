@@ -1,5 +1,7 @@
 /** Native evidence is data, never HTML or an image of a table. Invalid input is
  * rejected as a whole instead of losing rows, digits or words silently. */
+import { PRESENTATION_ICON_NAMES, isPresentationIcon } from './presentation-icons.js';
+
 const stringValue = (value, max, optional = false) => {
   if (optional && (value == null || value === '')) return '';
   if (typeof value !== 'string') return null;
@@ -33,16 +35,67 @@ export function normalizePresentationBlocks(raw) {
     const items = block.items.map((item) => ({ title: stringValue(item?.title, 100), body: stringValue(item?.body, 260, true) }));
     return items.some((item) => Object.values(item).includes(null)) ? [] : [{ type: 'steps', items }];
   }
+  // Modo livre, fase 3: citação, número grande e ícones.
+  if (block.type === 'quote') {
+    // Só as aspas de fora saem: a citação é desenhada com o próprio sinal.
+    const text = stringValue(typeof block.text === 'string' ? block.text.trim().replace(/^["“”«»']+|["“”«»']+$/gu, '') : block.text, QUOTE_MAX);
+    const author = stringValue(block.author, 80, true);
+    return text === null || author === null ? [] : [{ type: 'quote', text, author }];
+  }
+  if (block.type === 'bignumber') {
+    const value = stringValue(block.value, 16);
+    const item = { type: 'bignumber', value: value && /\d/.test(value) ? value : null, label: stringValue(block.label, 90), detail: stringValue(block.detail, 160, true) };
+    return Object.values(item).includes(null) ? [] : [item];
+  }
+  if (block.type === 'icons') {
+    if (!Array.isArray(block.items) || block.items.length < 2 || block.items.length > 4) return [];
+    const items = block.items.map((item) => ({
+      icon: isPresentationIcon(item?.icon) ? item.icon : null, title: stringValue(item?.title, 60), body: stringValue(item?.body, 140, true),
+    }));
+    return items.some((item) => Object.values(item).includes(null)) ? [] : [{ type: 'icons', items }];
+  }
   return [];
 }
 
-export function buildPresentationBlocksPrompt() {
-  return `BLOCOS NATIVOS EDITÁVEIS — em cada slide inclua presentationBlocks: []. Use no máximo um bloco apenas quando os dados fornecidos sustentarem sua função no roteiro. Formatos permitidos:
+const QUOTE_MAX = 240;
+
+/** Textos visíveis de um bloco (sem tipo nem nome de ícone), na ordem de leitura. */
+export function presentationBlockStrings(block) {
+  if (!block || typeof block !== 'object') return [];
+  if (block.type === 'comparison') return [...(block.headers || []), ...(block.rows || []).flat()];
+  if (block.type === 'quote') return [block.text, block.author].filter(value => typeof value === 'string' && value);
+  if (block.type === 'bignumber') return [block.value, block.label, block.detail].filter(value => typeof value === 'string' && value);
+  return (Array.isArray(block.items) ? block.items : []).flatMap(item => (block.type === 'metrics' ? [item?.value, item?.label, item?.detail]
+    : [item?.title, item?.body]).filter(value => typeof value === 'string' && value));
+}
+
+/** O mesmo bloco com `fn` aplicada a cada texto visível; tipo e ícone ficam. */
+export function mapPresentationBlockStrings(block, fn) {
+  const map = value => (typeof value === 'string' ? fn(value) : value);
+  if (!block || typeof block !== 'object') return block;
+  if (block.type === 'comparison') return { ...block, headers: block.headers.map(map), rows: block.rows.map(row => row.map(map)) };
+  if (block.type === 'quote') return { ...block, text: map(block.text), author: map(block.author) };
+  if (block.type === 'bignumber') return { ...block, value: map(block.value), label: map(block.label), detail: map(block.detail) };
+  if (!Array.isArray(block.items)) return block;
+  return { ...block, items: block.items.map(item => Object.fromEntries(Object.entries(item).map(([key, value]) => [key, key === 'icon' ? value : map(value)]))) };
+}
+
+export function buildPresentationBlocksPrompt({ free = false } = {}) {
+  const base = `BLOCOS NATIVOS EDITÁVEIS — em cada slide inclua presentationBlocks: []. Use no máximo um bloco apenas quando os dados fornecidos sustentarem sua função no roteiro. Formatos permitidos:
 - comparação: [{"type":"comparison","headers":["Critério","Opção A","Opção B"],"rows":[["Critério real","Condição real A","Condição real B"]]}]. 2–4 colunas, 1–5 linhas; cada célula até 240 caracteres e cabeçalho até 80.
 - métricas: [{"type":"metrics","items":[{"label":"Indicador real","value":"Valor com unidade","detail":"Período, condição ou ressalva"}]}]. 1–4 itens; label até 100, value até 48, detail até 180 caracteres.
 - sequência: [{"type":"steps","items":[{"title":"Etapa real","body":"Explicação concreta"},{"title":"Próxima etapa","body":"Responsável ou critério informado"}]}]. 2–5 itens; título até 100, corpo até 260 caracteres.
 Os limites são máximos de segurança, não uma meta de preenchimento: prefira 2–3 colunas, até 4 linhas, células de até 80 caracteres, detalhes de métricas até 90 e corpos de etapas até 110. Divida argumentos extensos entre slides ou notas; nunca corte palavras para caber.
 Não transforme informação ausente em zero ou comparação inventada. Números devem manter unidade, período e condição. Texto simples; sem HTML nem CSS. O bloco contém a evidência e o subtitle explica sua implicação, sem repetir cada célula. Use [] quando não houver dados suficientes. Não peça à imagem que desenhe tabela, gráfico, números, rótulos ou qualquer prova. Essas informações serão renderizadas de forma nativa.`;
+  if (!free) return base;
+  // Modo livre (fase 3): blocos de citação, número grande e ícones. Só o
+  // preset presentation_free pede; os outros continuam com o pedido de antes.
+  return `${base}
+BLOCOS DO MODO LIVRE — além dos três acima, quando design.block da posição for quote, bignumber ou icons, presentationBlocks traz esse bloco, e só quando o material o sustentar:
+- citação: [{"type":"quote","text":"frase copiada literalmente do material","author":"autoria exatamente como está no material"}]. text até ${QUOTE_MAX} caracteres (prefira até 140), sem aspas; author opcional até 80, "" quando o material não diz quem falou. Nunca parafraseie nem atribua a frase a alguém que o material não nomeia: citação ou autoria sem fonte literal faz o bloco cair.
+- número grande: [{"type":"bignumber","value":"40 mil","label":"pessoas por edição","detail":"período ou condição"}]. value até 16 caracteres, com o número como está no material; label até 90; detail opcional até 160. Número que não está no material faz o bloco cair.
+- ícones: [{"type":"icons","items":[{"icon":"users","title":"Título curto","body":"Uma linha concreta"}]}]. 2–4 itens; icon só desta lista: ${PRESENTATION_ICON_NAMES.join(', ')}; title até 60 (prefira até 28); body opcional até 140 (prefira uma linha, até 60).
+Sem material para o bloco pedido, use [] e escreva a ideia no texto.`;
 }
 
 const isPresentation = (slide, fmt) => fmt === 'apresentacao' || !!slide?.presentationCompositionId || !!slide?.presentationPresetId;

@@ -1,12 +1,25 @@
 import React, { useEffect, useRef, useState } from 'react';
+import {
+  ArrowRight, BarChart, BookOpen, Briefcase, Calendar, Camera, Check, Clock, DollarSign, Globe, Heart, Leaf,
+  Lightbulb, MapPin, MessageCircle, Music, Rocket, Shield, Sparkles, Star, Target, TrendingDown, TrendingUp, User, Users, Zap,
+} from 'lucide-react';
 import LegacyPresentationBlocks from './LegacyPresentationBlocks.jsx';
 import { normalizePresentationBlocks } from '../utils/presentation-quality.js';
 import { evidenceDetailInk, familyEvidenceStyle, familyFont, normalizeFamilyKey } from '../utils/presentation-families.js';
 import { readTypedText } from '../utils/inline-edit-text.js';
 import { accentInkOnSurface } from '../utils/brand-visuals.js';
 import { wcagContrast } from '../utils/wcag.js';
+import { PRESENTATION_ICON_NAMES } from '../utils/presentation-icons.js';
 
-function EditableCell({ as: Tag = 'span', value, label, onCommit, style = {} }) {
+/** Bloco de ícones (fase 3): a lista fechada de 26 nomes, desenhados como SVG inline. */
+const ICON_COMPONENTS = Object.freeze({
+  check: Check, 'arrow-right': ArrowRight, 'trending-up': TrendingUp, 'trending-down': TrendingDown, users: Users, user: User,
+  calendar: Calendar, clock: Clock, 'map-pin': MapPin, star: Star, heart: Heart, lightbulb: Lightbulb, target: Target,
+  shield: Shield, zap: Zap, globe: Globe, music: Music, camera: Camera, 'book-open': BookOpen, briefcase: Briefcase,
+  'bar-chart': BarChart, 'dollar-sign': DollarSign, leaf: Leaf, sparkles: Sparkles, 'message-circle': MessageCircle, rocket: Rocket,
+});
+
+function EditableCell({ as: Tag = 'span', value, label, onCommit, style = {}, attrs = {} }) {
   const [editing, setEditing] = useState(false);
   const [invalid, setInvalid] = useState(false);
   const ref = useRef(null);
@@ -20,6 +33,7 @@ function EditableCell({ as: Tag = 'span', value, label, onCommit, style = {} }) 
     setEditing(false);
   };
   return <Tag
+    {...attrs}
     ref={ref}
     data-vc-evidence-cell="true"
     data-vc-inline-editable={onCommit ? 'true' : undefined}
@@ -140,7 +154,40 @@ export function evidenceStyleForBrand(familyStyle, brandAccent, background) {
 
 /** A small, allowlisted set of editable primitives shared by preview and export.
  * React escapes every value; generated content never controls markup or CSS. */
-export default function PresentationBlocks({ blocks: raw, rect, frame, ink, background, fontFamily, family = 'executive', accent, numericTypography, onChange, forExport = false, artDirectionVersion = 2, paletteOverrides = {} }) {
+/** Linhas de um texto quebrado por palavras numa coluna (largura medida por px de fonte). */
+function wrappedLines(text, widthPx, sizePx, fontFamily, weight) {
+  const space = measureMetricText(' ', fontFamily, weight);
+  let lines = 1; let used = 0;
+  for (const word of String(text || '').split(/\s+/).filter(Boolean)) {
+    const w = measureMetricText(word, fontFamily, weight) * sizePx;
+    if (used && used + space * sizePx + w > widthPx) { lines += 1; used = w; } else used += (used ? space * sizePx : 0) + w;
+  }
+  return lines;
+}
+
+/**
+ * Tamanho da citação (fase 3): o maior, em passos de 4 px, cuja frase, o sinal
+ * de citação e a autoria cabem na zona. Nunca abaixo de 40 px.
+ */
+export function quoteTextFit({ text, author, widthPx, heightPx, unit, fontFamily, weight }) {
+  const markPx = 96 * unit;
+  for (let size = 72; size >= 40; size -= 4) {
+    const px = size * unit;
+    const lines = wrappedLines(text, widthPx, px, fontFamily, weight);
+    const total = markPx * 0.62 + lines * px * 1.18 + (author ? 26 * unit * 1.4 + 22 * unit : 0);
+    if (total <= heightPx) return { fontSize: px, lines };
+  }
+  return { fontSize: 40 * unit, lines: wrappedLines(text, widthPx, 40 * unit, fontFamily, weight) };
+}
+
+/** Número grande (fase 3): enche a largura da zona numa linha, entre 96 e 260 px. */
+export function bigNumberFit({ value, widthPx, heightPx, unit, fontFamily, weight }) {
+  const perPx = measureMetricText(value, fontFamily, weight);
+  const byWidth = perPx > 0 ? (widthPx * 0.95) / perPx : 260 * unit;
+  return Math.max(Math.min(96 * unit, byWidth), Math.min(260 * unit, heightPx * 0.5, byWidth));
+}
+
+export default function PresentationBlocks({ blocks: raw, rect, frame, ink, strongInk, background, fontFamily, family = 'executive', accent, numericTypography, onChange, forExport = false, artDirectionVersion = 2, paletteOverrides = {} }) {
   // Mede de novo quando as fontes terminam de carregar (a exportação espera
   // por elas; a primeira medida pode usar a fonte de reserva).
   const [, setFontsReady] = useState(0);
@@ -188,20 +235,32 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, back
   const marker = (index) => st.stepMarker === 'roman' ? roman[index] : st.stepMarker === 'code' ? `0${index + 1}/` : String(index + 1).padStart(2, '0');
   const stepColumns = frame.h === frame.w ? Math.min(block.items?.length || 1, 2)
     : frame.h > frame.w ? ((block.items?.length || 0) > 3 ? 2 : 1) : Math.min(block.items?.length || 1, 4);
-  const cell = (value, path, label, style) => <EditableCell
+  const editable = !forExport && !!onChange;
+  const commitBlock = (path, value) => {
+    const next = JSON.parse(JSON.stringify(blocks));
+    let parent = next[0];
+    path.slice(0, -1).forEach((key) => { parent = parent[key]; });
+    parent[path[path.length - 1]] = value;
+    if (!normalizePresentationBlocks(next).length) return false;
+    onChange(next);
+    return true;
+  };
+  // Blocos da fase 3: tinta forte (título do slide no modo livre) e destaque
+  // medidos contra a superfície onde o bloco fica, como os outros blocos.
+  const strong = evidenceDetailInk(strongInk || panelInk, detailSurface, 1).color;
+  const accentInk = accentInkOnSurface(st.accent, detailSurface, 3);
+  const displayFont = numericTypography?.fontFamily || familyFont(key, 'display').css || fontFamily;
+  const displayWeight = numericTypography?.weight || familyFont(key, 'display').weight || 600;
+  const zonePx = { w: (rect.w / 100) * frame.w, h: (rect.h / 100) * frame.h };
+  const panelBox = panel ? { backgroundColor: st.panelColor, borderRadius: st.radius * unit, padding: `${36 * unit}px ${40 * unit}px`, boxSizing: 'border-box' } : {};
+  const inner = { w: zonePx.w - (panel ? 80 * unit : 0), h: zonePx.h - (panel ? 72 * unit : 0) };
+  const cell = (value, path, label, style, attrs) => <EditableCell
     key={path.join('.')}
     value={value}
     label={label}
     style={style}
-    onCommit={!forExport && onChange ? (text) => {
-      const next = JSON.parse(JSON.stringify(blocks));
-      let parent = next[0];
-      path.slice(0, -1).forEach((key) => { parent = parent[key]; });
-      parent[path[path.length - 1]] = text;
-      if (!normalizePresentationBlocks(next).length) return false;
-      onChange(next);
-      return true;
-    } : undefined}
+    attrs={attrs}
+    onCommit={editable ? (text) => commitBlock(path, text) : undefined}
   />;
   return <div
     data-vc-quality-zone="evidence"
@@ -234,7 +293,46 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, back
         {cell(item.label, ['items', index, 'label'], `indicador ${index + 1}`, { display: 'block', fontSize: 26 * unit, marginTop: 18 * unit, fontWeight: 600 })}
         {item.detail && cell(item.detail, ['items', index, 'detail'], `condição ${index + 1}`, { display: 'block', fontSize: st.detailPx * unit, marginTop: 8 * unit, color: metricDetail.color, opacity: metricDetail.opacity })}
       </div>)}
-    </div> : <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gridTemplateColumns: `repeat(${stepColumns}, minmax(0, 1fr))`, gap: 24 * unit }}>
+    </div> : block.type === 'quote' ? (() => {
+      const fit = quoteTextFit({ text: block.text, author: block.author, widthPx: inner.w - 8 * unit, heightPx: inner.h, unit, fontFamily: displayFont, weight: displayWeight });
+      return <figure style={{ margin: 0, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', color: strong, ...panelBox }}>
+        <span aria-hidden style={{ display: 'block', fontFamily: displayFont, fontWeight: displayWeight, fontSize: 96 * unit, lineHeight: 0.62, height: 96 * unit * 0.62, color: accentInk }}>“</span>
+        <blockquote style={{ margin: 0 }}>
+          {cell(block.text, ['text'], 'citação', { display: 'block', fontFamily: displayFont, fontWeight: displayWeight, fontSynthesisWeight: 'none', fontSize: fit.fontSize, lineHeight: 1.18, letterSpacing: '-0.01em', color: strong }, { 'data-vc-quote-text': 'true' })}
+        </blockquote>
+        {block.author && <figcaption style={{ display: 'flex', gap: 10 * unit, marginTop: 22 * unit, fontSize: 26 * unit, fontWeight: 600, color: metricDetail.color }}>
+          <span aria-hidden>—</span>
+          {cell(block.author, ['author'], 'autoria', { display: 'block', fontSize: 26 * unit, fontWeight: 600, color: metricDetail.color, opacity: metricDetail.opacity }, { 'data-vc-quote-author': 'true' })}
+        </figcaption>}
+      </figure>;
+    })() : block.type === 'bignumber' ? (() => {
+      const size = bigNumberFit({ value: block.value, widthPx: inner.w, heightPx: inner.h, unit, fontFamily: displayFont, weight: displayWeight });
+      return <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', color: strong, ...panelBox }}>
+        {cell(block.value, ['value'], 'número', { display: 'block', whiteSpace: 'nowrap', overflowWrap: 'normal', fontFamily: displayFont, fontWeight: displayWeight, fontSynthesisWeight: 'none', fontSize: size, lineHeight: 1.02, letterSpacing: '-0.03em', color: accentInk }, { 'data-vc-bignumber-value': 'true' })}
+        {cell(block.label, ['label'], 'rótulo do número', { display: 'block', marginTop: 18 * unit, fontSize: 36 * unit, lineHeight: 1.2, fontWeight: 600, color: strong }, { 'data-vc-bignumber-label': 'true' })}
+        {block.detail && cell(block.detail, ['detail'], 'apoio do número', { display: 'block', marginTop: 10 * unit, fontSize: Math.max(26, st.detailPx) * unit, lineHeight: 1.35, color: metricDetail.color, opacity: metricDetail.opacity }, { 'data-vc-bignumber-detail': 'true' })}
+      </div>;
+    })() : block.type === 'icons' ? <ul style={{ margin: 0, padding: 0, listStyle: 'none', height: '100%', alignContent: 'center', display: 'grid',
+      gridTemplateColumns: `repeat(${frame.h > frame.w ? Math.min(block.items.length, 2) : block.items.length}, minmax(0, 1fr))`, gap: 32 * unit }}>
+      {block.items.map((item, index) => {
+        const Icon = ICON_COMPONENTS[item.icon] || Check;
+        const next = PRESENTATION_ICON_NAMES[(PRESENTATION_ICON_NAMES.indexOf(item.icon) + 1) % PRESENTATION_ICON_NAMES.length];
+        return <li key={index} style={{ minWidth: 0, color: strong, ...(panel ? { backgroundColor: st.panelColor, borderRadius: st.radius * unit, padding: `${26 * unit}px` } : {}) }}>
+          <span
+            data-vc-icon={item.icon}
+            role={editable ? 'button' : undefined}
+            tabIndex={editable ? 0 : undefined}
+            aria-label={editable ? `Trocar ícone ${index + 1}` : undefined}
+            title={editable ? 'Clique para trocar o ícone' : undefined}
+            onClick={editable ? (event) => { event.stopPropagation(); commitBlock(['items', index, 'icon'], next); } : undefined}
+            onKeyDown={editable ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); commitBlock(['items', index, 'icon'], next); } } : undefined}
+            style={{ display: 'inline-flex', marginBottom: 18 * unit, cursor: editable ? 'pointer' : undefined }}
+          ><Icon aria-hidden="true" size={Math.round(60 * unit)} color={accentInk} strokeWidth={1.75} /></span>
+          {cell(item.title, ['items', index, 'title'], `título do item ${index + 1}`, { display: 'block', fontWeight: 600, fontSize: 30 * unit, lineHeight: 1.2, color: strong }, { 'data-vc-icons-title': 'true' })}
+          {item.body && cell(item.body, ['items', index, 'body'], `linha do item ${index + 1}`, { display: 'block', marginTop: 8 * unit, fontSize: Math.max(26, st.detailPx) * unit, lineHeight: 1.35, color: stepBody.color, opacity: stepBody.opacity }, { 'data-vc-icons-body': 'true' })}
+        </li>;
+      })}
+    </ul> : <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gridTemplateColumns: `repeat(${stepColumns}, minmax(0, 1fr))`, gap: 24 * unit }}>
       {block.items.map((item, index) => <li key={index} style={{ minWidth: 0, borderTop: st.metricRule ? `${Math.max(1, (st.metricRule > 4 ? 6 : 2) * unit)}px solid ${ruleColor}` : 'none', padding: panel ? `${22 * unit}px` : `${16 * unit}px 0 0`, borderRadius: st.radius * unit, backgroundColor: panel ? st.panelColor : 'transparent', color: panelInk }}>
         {!/^[A-Z][.)]?$/.test(item.title) && <span aria-hidden style={{ display: st.stepMarker === 'pill' ? 'inline-block' : 'block', fontFamily: numberFont, fontSize: (st.stepMarker === 'pill' ? 20 : 40) * unit, lineHeight: 1, marginBottom: 14 * unit, fontVariantNumeric: 'tabular-nums', color: st.accent,
           fontStyle: st.stepMarker === 'roman' ? 'italic' : 'normal',

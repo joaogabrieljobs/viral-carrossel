@@ -169,7 +169,7 @@ const rect = (x, y, w, h) => ({ x, y, w, h });
 const inactivePhoto = () => rect(96, 94, 1, 1);
 export const hasVisual = slide => !!(slide.bgImage || slide.bgImageId || slide.bgImageAssetId || text(slide.imageQuery));
 export const hasBlocks = slide => Array.isArray(slide.presentationBlocks)
-  && slide.presentationBlocks.some(block => ['comparison', 'metrics', 'steps'].includes(block?.type));
+  && slide.presentationBlocks.some(block => ['comparison', 'metrics', 'steps', 'quote', 'bignumber', 'icons'].includes(block?.type));
 
 /**
  * Perfis fechados com faixa superior reservada à marca. Fotos usam cover e

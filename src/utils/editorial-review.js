@@ -5,9 +5,9 @@ import { isPitchPath, cleanPitchSlide, cleanPitchText } from './pitch-content.js
 import { presentationAIOptions, buildPresentationReviewRules, getPresentationPath } from './presentation.js';
 import { buildPresentationPlanBlock, attachPresentationPlan } from './presentation-plan.js';
 import { generatePresentationPlan, parsePresentationPlanResponse, presentationResponseMetadata } from './presentation-planning.js';
-import { buildPresentationBlocksPrompt, normalizePresentationBlocks } from './presentation-quality.js';
+import { buildPresentationBlocksPrompt, mapPresentationBlockStrings, normalizePresentationBlocks } from './presentation-quality.js';
 import { requiresSocialTitles, recoverSocialTitle, recoverSocialTitleForEditing, missingSocialTitleIndexes, auditSocialTextDensity, buildSocialTextLimitsPrompt } from './social-generation.js';
-import { auditDraftFactuality, auditUnsupportedCommercialClaims, buildFactualGroundingPrompt, buildReviewFactCheckPrompt, replaceEmDashes, splitBriefingNotes } from './factual-grounding.js';
+import { auditDraftFactuality, auditUnsupportedCommercialClaims, buildFactualGroundingPrompt, buildReviewFactCheckPrompt, groundPresentationBlocks, replaceEmDashes, splitBriefingNotes } from './factual-grounding.js';
 export { auditUnsupportedCommercialClaims } from './factual-grounding.js';
 
 const isObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -22,12 +22,16 @@ function plannedReviewStructure(plan) {
 ${JSON.stringify({ slides: (plan.slides || []).map(({ index, purpose, visualRole, question }) => ({ index, purpose, visualRole, question })) })}`;
 }
 
-function presentationReviewBlockContract(nativeBlocks) {
+function presentationReviewBlockContract(nativeBlocks, free = false) {
   if (nativeBlocks === false) return 'Neste padrão personalizado presentationBlocks permanece [].';
+  const freeTypes = free ? `
+- quote: type, text (até 240, frase literal do material, sem aspas) e author ("" ou autoria como está no material).
+- bignumber: type, value (até 16, com o número do material), label até 90 e detail opcional até 160.
+- icons: type, items (2–4 objetos com icon da lista fechada, title até 60 e body opcional até 140).` : '';
   return `CONTRATO DE PATCH PARA BLOCOS: só inclua presentationBlocks na edição se esse campo precisar mudar. O valor substitui o array existente: [] ou exatamente um bloco de um destes tipos:
 - comparison: type, headers (2–4 strings até 80 caracteres), rows (1–5 linhas com o mesmo número de células dos cabeçalhos; cada célula até 240).
 - metrics: type, items (1–4 objetos com label até 100, value até 48 e detail opcional até 180 caracteres).
-- steps: type, items (2–5 objetos com title até 100 e body opcional até 260 caracteres).
+- steps: type, items (2–5 objetos com title até 100 e body opcional até 260 caracteres).${freeTypes}
 Preserve o tipo e a ordem do bloco. Os valores devem vir das fontes originais; não preencha ausências com zero, nomes, datas, exemplos ou comparações inventadas. Não gere um objeto de slide ou configurações visuais dentro do patch.`;
 }
 
@@ -251,10 +255,7 @@ export function normalizeCarouselDraftInput(rawDraft, { count, presetId, density
 }
 
 function mapBlockText(blocks, fn) {
-  const map = value => (typeof value === 'string' ? fn(value) : value);
-  return blocks.map(block => block.type === 'comparison'
-    ? { ...block, headers: block.headers.map(map), rows: block.rows.map(row => row.map(map)) }
-    : { ...block, items: block.items.map(item => Object.fromEntries(Object.entries(item).map(([key, value]) => [key, map(value)]))) });
+  return blocks.map(block => mapPresentationBlockStrings(block, fn));
 }
 
 /**
@@ -281,6 +282,14 @@ function blocksWithoutGapNotes(blocks, gaps) {
       });
       return rows.length ? [{ ...block, rows }] : [];
     }
+    if (block?.type === 'quote' || block?.type === 'bignumber') {
+      const keys = block.type === 'quote' ? ['text', 'author'] : ['value', 'label', 'detail'];
+      const essential = block.type === 'quote' ? ['text'] : ['value', 'label'];
+      const cells = Object.fromEntries(keys.map(key => [key, clean(block[key])]));
+      if (essential.some(key => cells[key]?.emptied)) { gaps.push(essential.map(key => block[key]).filter(Boolean).join(': ')); return []; }
+      keys.forEach(key => Array.isArray(cells[key]?.notes) && gaps.push(...cells[key].notes));
+      return [{ ...block, ...Object.fromEntries(keys.map(key => [key, typeof block[key] === 'string' ? cells[key].text : block[key]])) }];
+    }
     if (!Array.isArray(block?.items)) return [block];
     const main = block.type === 'metrics' ? ['label', 'value'] : ['title'];
     const items = block.items.flatMap((item) => {
@@ -289,7 +298,7 @@ function blocksWithoutGapNotes(blocks, gaps) {
       Object.values(cells).forEach(cell => Array.isArray(cell?.notes) && gaps.push(...cell.notes));
       return [Object.fromEntries(Object.entries(cells).map(([key, cell]) => [key, typeof item[key] === 'string' ? cell.text : item[key]]))];
     });
-    return items.length >= (block.type === 'steps' ? 2 : 1) ? [{ ...block, items }] : [];
+    return items.length >= (['steps', 'icons'].includes(block.type) ? 2 : 1) ? [{ ...block, items }] : [];
   });
 }
 
@@ -704,7 +713,7 @@ export function buildEditorialReviewPrompt(prompt, draft, config = {}) {
       ? ' Em Aula, o arco a preservar é o aprendizado: corrija uma etapa de prática/correção omitida e não mantenha um desvio comercial só porque ele foi planejado, sem alterar quantidade ou ordem física.'
       : '';
     const plannedRules = config.presentationPlan
-      ? `\nCompare também o roteiro validado com a redação: cada pergunta precisa ser respondida, mas fatos e estágio (fato, proposta ou desconhecido) devem ser conferidos nas fontes originais. Validar a estrutura do roteiro não comprova suas afirmações. Não use o roteiro nem o rascunho como fonte de si mesmos. Não acrescente tração, preço, equipe ou promessa ausentes. Notas complementam a página, sem esconder ali a conclusão essencial.\n${plannedReviewStructure(config.presentationPlan)}\nPreserve o tipo do bloco e a integridade dos valores/unidades/condições; não duplique tabela em parágrafos. ${presentationReviewBlockContract(config.nativeBlocks)}`
+      ? `\nCompare também o roteiro validado com a redação: cada pergunta precisa ser respondida, mas fatos e estágio (fato, proposta ou desconhecido) devem ser conferidos nas fontes originais. Validar a estrutura do roteiro não comprova suas afirmações. Não use o roteiro nem o rascunho como fonte de si mesmos. Não acrescente tração, preço, equipe ou promessa ausentes. Notas complementam a página, sem esconder ali a conclusão essencial.\n${plannedReviewStructure(config.presentationPlan)}\nPreserve o tipo do bloco e a integridade dos valores/unidades/condições; não duplique tabela em parágrafos. ${presentationReviewBlockContract(config.nativeBlocks, config.freeDesign === true)}`
       : '';
     const reviewDraft = config.presentationPlan ? {
       // Auditoria 23/11 (B7): o índice explícito evita a edição contada a partir
@@ -1303,7 +1312,11 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
   // RT24 3: a pergunta-título cujo assunto é uma lacuna do plano segue o mesmo caminho.
   const gapTitlesOf = result => [...new Set([...moveGapNotesOutOfSlides(result).emptiedTitles, ...gapQuestionSlides(result.slides, plan)])].sort((a, b) => a - b)
     .map(slideIndex => ({ slideIndex, field: 'title', category: 'lacuna do material', claim: String(result.slides[slideIndex].title).trim(), kind: 'factual' }));
-  const finish = (reviewed, reviewStatus, extra = {}) => {
+  const finish = (rawReviewed, reviewStatus, extra = {}) => {
+    // Modo livre, fase 3: citação e número grande sem fonte literal no
+    // material caem antes das conferências (a página fica sem o bloco).
+    const grounded = config.freeDesign === true ? groundPresentationBlocks(rawReviewed.slides, factualConfig) : null;
+    const reviewed = grounded && grounded.slides !== rawReviewed.slides ? { ...rawReviewed, slides: grounded.slides } : rawReviewed;
     // A lacuna sai do texto visível e vai, com as do plano, para o aviso de
     // material. Título que ficou vazio é marcado para revisão.
     const moved = moveGapNotesOutOfSlides(reviewed);
@@ -1319,12 +1332,12 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
       ...(materialGaps.length ? { materialGaps } : {}), ...(repetitionNotice ? { repetitionNotice } : {}) };
   };
   const plannedConfig = {
-    ...factualConfig, presentationPlan: plan,
+    ...factualConfig, presentationPlan: plan, freeDesign: config.freeDesign === true,
     presentationTextLimits: typeof config.presentationLimitsForPlan === 'function'
       ? config.presentationLimitsForPlan(plan)
       : config.presentationTextLimits,
   };
-  const blockRules = config.nativeBlocks === false ? 'Neste padrão personalizado presentationBlocks deve ser []. Preserve a composição livre do usuário.' : buildPresentationBlocksPrompt();
+  const blockRules = config.nativeBlocks === false ? 'Neste padrão personalizado presentationBlocks deve ser []. Preserve a composição livre do usuário.' : buildPresentationBlocksPrompt({ free: config.freeDesign === true });
   const generationPrompt = `${prompt}\nINSTRUÇÕES ATUAIS DO USUÁRIO — restrições também válidas para cada lote de redação:\n${config.userInstructions || ''}\n${buildPresentationPlanBlock(plan)}\n${blockRules}\nCONTRATO COMPLEMENTAR: em cada slide inclua presentationBlocks (ou [] quando não houver bloco) e speakerNotes (complemento opcional no idioma definido, até 600 caracteres, ou ""). O texto visível deve ser autossuficiente. Não coloque nomes de arquivos, rótulos de extração nem instruções ao designer no texto final. Dados, exemplos e condições permanecem fiéis às evidências. Em slides com bloco, subtitle contextualiza sem repetir suas células; bodyAfterImage fica vazio e apenas aprofundamento vai para speakerNotes.${buildPresentationLimitsBlock(plannedConfig, config.count)}`;
   const written = await writePresentationBatches({ prompt: generationPrompt, plan, config: plannedConfig, textOptions, onStage, onDraft }, callAI);
   writingDiagnostics = written.diagnostics;

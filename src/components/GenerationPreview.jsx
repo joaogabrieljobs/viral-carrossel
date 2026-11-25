@@ -14,7 +14,11 @@ function PreviewEvidence({ blocks }) {
       <tbody>{block.rows.map((row, index) => <tr key={index}>{row.map((cell, column) => <td key={column}>{cell}</td>)}</tr>)}</tbody>
     </table></div> : block.type === 'metrics' ? <dl aria-label="Indicadores do slide">
       {block.items.map((item, index) => <div key={index}><dt>{item.label}</dt><dd><strong>{item.value}</strong>{item.detail && <span>{item.detail}</span>}</dd></div>)}
-    </dl> : <ol aria-label="Etapas do slide">
+    </dl> : block.type === 'quote' ? <blockquote aria-label="Citação do slide">
+      <p>“{block.text}”</p>{block.author && <footer>— {block.author}</footer>}
+    </blockquote> : block.type === 'bignumber' ? <dl aria-label="Número do slide">
+      <div><dt>{block.label}</dt><dd><strong>{block.value}</strong>{block.detail && <span>{block.detail}</span>}</dd></div>
+    </dl> : <ol aria-label={block.type === 'icons' ? 'Itens do slide' : 'Etapas do slide'}>
       {block.items.map((item, index) => <li key={index}><strong>{item.title}</strong>{item.body && <p>{item.body}</p>}</li>)}
     </ol>}
   </div>;

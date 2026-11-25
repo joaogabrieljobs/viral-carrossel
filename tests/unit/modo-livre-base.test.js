@@ -152,8 +152,11 @@ describe('modo livre, fase 1: modelo e normalizador (sem IA)', () => {
     expect(d.emphasis).toEqual(['12 noites', 'cidade', 'Ritmo']);
     expect(normalizeSlideDesign({ family: '???', ground: 7, photo: null, block: 'bignumber' }, { title: 'Sem número' }))
       .toMatchObject({ family: 'executive', ground: 'bg', photo: 'none', block: 'none' });
-    expect(normalizeSlideDesign({ block: 'bignumber' }, { title: 'Público de 40 mil' }).block).toBe('bignumber');
-    expect(normalizeSlideDesign({ block: 'icons', icons: ['star', 'foguete', 'users', 'heart', 'globe', 'zap'] }, {}).icons).toEqual(['star', 'users', 'heart', 'globe']);
+    // Fase 3: o bloco é desenhado a partir de presentationBlocks; sem o bloco escrito, none.
+    expect(normalizeSlideDesign({ block: 'bignumber' }, { title: 'Público de 40 mil' }).block).toBe('none');
+    expect(normalizeSlideDesign({ block: 'bignumber' }, { title: 'Público', presentationBlocks: [{ type: 'bignumber', value: '40 mil', label: 'pessoas' }] }).block).toBe('bignumber');
+    const icones = { type: 'icons', items: [{ icon: 'star', title: 'A' }, { icon: 'users', title: 'B' }] };
+    expect(normalizeSlideDesign({ block: 'icons', icons: ['star', 'foguete', 'users', 'heart', 'globe', 'zap'] }, { presentationBlocks: [icones] }).icons).toEqual(['star', 'users']);
     expect(normalizeSlideDesign({ block: 'metrics' }, deck()[8]).block).toBe('metrics');
     expect(FREE_GROUNDS).toEqual(['bg', 'surface', 'inverse', 'accent', 'photo']);
     expect(FREE_PHOTO_SIZES).toEqual(['none', 'small', 'half', 'full']);

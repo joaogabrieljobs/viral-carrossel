@@ -52,7 +52,9 @@ function EditableCell({ as: Tag = 'span', value, label, onCommit, style = {} }) 
  * React escapes every value; generated content never controls markup or CSS. */
 export default function LegacyPresentationBlocks({ blocks: raw, rect, frame, ink, background, fontFamily, family = 'executive', accent, numericTypography, onChange, forExport = false }) {
   const blocks = normalizePresentationBlocks(raw);
-  if (!blocks.length || !rect) return null;
+  // Citação, número grande e ícones (modo livre, fase 3) só existem na direção
+  // de arte 2; o desenho antigo não os conhece e não inventa um.
+  if (!blocks.length || !rect || !['comparison', 'metrics', 'steps'].includes(blocks[0].type)) return null;
   const block = blocks[0];
   const unit = frame.w / (frame.h >= frame.w ? 1080 : 1920);
   const fontSize = 25 * unit;

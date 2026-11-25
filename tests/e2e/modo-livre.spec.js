@@ -25,7 +25,7 @@ const DESIGN = [
   { family: 'swiss', ground: 'bg', photo: 'small', block: 'none', emphasis: ['12 noites'], icons: [] },
   { family: 'executive', ground: 'accent', photo: 'half', block: 'none', emphasis: [], icons: [] },
 ];
-const plano = () => ({
+const plano = (designs = DESIGN) => ({
   schemaVersion: 3, promptVersion: PRESENTATION_PLAN_FREE_PROMPT_VERSION,
   objective: 'Apresentar o festival aos patrocinadores.', audience: 'Patrocinadores locais.', thesis: 'O festival move a cidade.',
   rules: [], evidence: [], gaps: [],
@@ -34,7 +34,7 @@ const plano = () => ({
     fonts: { display: 'Space Grotesk', text: 'IBM Plex Sans' },
     mood: 'Warm dusk light over crowded streets, magenta accents, documentary framing.',
   },
-  slides: DESIGN.map((design, i) => ({
+  slides: designs.map((design, i) => ({
     index: i + 1, visualRole: i === 0 ? 'cover' : i === COUNT - 1 ? 'closing' : 'content',
     purpose: i === 0 ? 'introduction' : i === COUNT - 1 ? 'decision' : 'context',
     question: `Pergunta ${i + 1}?`, keyMessage: `Mensagem ${i + 1}.`, evidenceIds: [],
@@ -50,9 +50,9 @@ const TEXTO = [
   ['São 12 noites de programação', 'Palcos abertos, feira de produtores e oficinas para crianças.'],
   ['Patrocine a próxima edição', 'Escolha a cota que combina com a sua marca até o fim do mês.'],
 ];
-const redacao = () => ({
+const redacao = (blocks = []) => ({
   slides: TEXTO.map(([title, subtitle], i) => ({
-    title, subtitle, bodyAfterImage: '', imageQuery: '', presentationBlocks: [], speakerNotes: '', _i: i,
+    title, subtitle, bodyAfterImage: '', imageQuery: '', presentationBlocks: blocks[i] ? [blocks[i]] : [], speakerNotes: '', _i: i,
   })).map(({ _i, ...slide }) => slide),
   caption: 'Festival de verão.',
 });
@@ -154,4 +154,92 @@ test('Livre no assistente: roteiro v3, páginas variadas, salva e reabre igual',
   const reaberto = (await library(page)).find(p => p.name === NOME).doc;
   expect(reaberto.visualPreset).toBe('presentation_free');
   expect(reaberto.slides.map(resumo)).toEqual(salvo.slides.map(resumo));
+});
+
+// Fase 3: citação, número grande e ícones. A citação e o número existem no
+// material (tema); a segunda citação foi inventada pela IA simulada e cai.
+const TEMA_F3 = `${TEMA} "A praça cheia é o melhor palco da cidade", diz Ana Souza, curadora do festival.`;
+const DESIGN_F3 = DESIGN.map((d, i) => (i === 1 ? { ...d, photo: 'none', block: 'quote', emphasis: [] }
+  : i === 2 ? { ...d, ground: 'surface', block: 'bignumber' }
+    : i === 3 ? { ...d, photo: 'none', block: 'icons', icons: ['music', 'leaf', 'users'] }
+      : i === 4 ? { ...d, photo: 'none', block: 'quote', emphasis: [] } : d));
+const BLOCOS_F3 = [null,
+  { type: 'quote', text: 'A praça cheia é o melhor palco da cidade', author: 'Ana Souza, curadora do festival' },
+  { type: 'bignumber', value: '40 mil', label: 'pessoas por edição', detail: 'Em 12 noites de programação' },
+  { type: 'icons', items: [
+    { icon: 'music', title: 'Palcos abertos', body: 'Música em cada praça do centro.' },
+    { icon: 'leaf', title: 'Feira de produtores', body: 'Comida da região.' },
+    { icon: 'users', title: 'Oficinas', body: 'Atividades para crianças.' },
+  ] },
+  { type: 'quote', text: 'O festival mudou a minha vida', author: 'Visitante' },
+  null];
+
+test('Livre, fase 3: citação, número grande e ícones do material; citação inventada cai', async ({ page }) => {
+  test.setTimeout(90_000);
+  const prompts = [];
+  await mockApi(page, { session, extra: {
+    '/api/ai/compatible': route => {
+      const prompt = route.request().postDataJSON().payload.messages.find(m => m.role === 'user').content;
+      prompts.push(prompt);
+      const value = prompt.startsWith('PLANEJAMENTO ESTRUTURADO') ? plano(DESIGN_F3)
+        : prompt.startsWith('REVISÃO DE APRESENTAÇÃO') ? { edits: [] }
+          : { ...redacao(BLOCOS_F3), slides: presentationBatch(prompt, redacao(BLOCOS_F3).slides) };
+      return route.fulfill({ json: completion(value) });
+    },
+  } });
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('modo-livre-f3')) return;
+    sessionStorage.setItem('modo-livre-f3', '1');
+    localStorage.setItem('vc_library', '[]');
+    localStorage.setItem('vc_shell_view', JSON.stringify('project'));
+  });
+  await page.goto('/?app=1');
+  await page.getByRole('button', { name: 'Criar um projeto', exact: true }).click();
+  const wizard = page.getByRole('region', { name: 'Criar novo projeto', exact: true });
+  const continuar = () => wizard.getByRole('button', { name: 'Continuar', exact: true }).click();
+  await wizard.getByRole('radio', { name: /^Apresentação/ }).click();
+  await wizard.getByLabel(/^Nome do projeto/).fill(`${NOME} f3`);
+  await continuar();
+  await continuar();
+  await wizard.getByLabel(/^Sobre o que vamos criar/).fill(TEMA_F3);
+  await continuar();
+  await wizard.getByRole('radio', { name: /^Deixar o Moont organizar/ }).click();
+  await continuar();
+  await wizard.getByRole('spinbutton', { name: 'Quantidade de slides', exact: true }).fill(String(COUNT));
+  await continuar();
+  await wizard.getByRole('group', { name: 'Estilos para começar' }).getByRole('button').first().click();
+  await wizard.getByRole('radio', { name: /^Criar o texto primeiro/ }).click();
+  await continuar();
+  await wizard.getByRole('button', { name: `Criar e gerar ${COUNT} slides`, exact: true }).click();
+  await expect(wizard).toHaveCount(0, { timeout: 45_000 });
+  await expect.poll(async () => (await library(page)).find(p => p.name === `${NOME} f3`)?.doc?.presentationQuality?.renderCheckStatus, { timeout: 30_000 }).toBe('passed');
+
+  // Só o modo livre pede os blocos novos, com a lista de ícones.
+  const redacoes = prompts.filter(p => p.includes('PLANO EDITORIAL VALIDADO'));
+  expect(redacoes.length).toBeGreaterThan(0);
+  for (const p of redacoes) expect(p).toContain('"type":"bignumber"');
+
+  const salvo = (await library(page)).find(p => p.name === `${NOME} f3`).doc;
+  const blocos = salvo.slides.map(s => s.presentationBlocks?.[0]?.type || 'none');
+  expect(blocos).toEqual(['none', 'quote', 'bignumber', 'icons', 'none', 'none']);
+  expect(salvo.slides.map(s => s.presentationFreeDesign.block)).toEqual(blocos);
+  expect(salvo.slides[1].presentationBlocks[0].author).toBe('Ana Souza, curadora do festival');
+  expect(freeDeckViolations(salvo.slides)).toEqual([]);
+
+  // No editor: citação, número e ícones desenhados como SVG inline, editáveis.
+  const cards = page.locator('main [data-vc-card-surface]');
+  await expect(cards.nth(1).locator('[data-vc-presentation-block="quote"] blockquote')).toContainText('A praça cheia é o melhor palco da cidade');
+  await expect(cards.nth(2).locator('[data-vc-bignumber-value]')).toHaveText('40 mil');
+  await expect(cards.nth(3).locator('[data-vc-presentation-block="icons"] svg')).toHaveCount(3);
+  const stroke = await cards.nth(3).locator('[data-vc-presentation-block="icons"] svg').first().getAttribute('stroke');
+  expect(stroke).toMatch(/^#[0-9a-f]{6}$/i);
+  // Trocar o ícone e editar o título do item ficam gravados no projeto.
+  await cards.nth(3).getByRole('button', { name: 'Trocar ícone 1', exact: true }).click();
+  await expect.poll(async () => (await library(page)).find(p => p.name === `${NOME} f3`).doc.slides[3].presentationBlocks[0].items[0].icon).toBe('camera');
+  const titulo = cards.nth(3).getByLabel('Editar título do item 2', { exact: true });
+  await titulo.dblclick();
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+  await page.keyboard.type('Feira local');
+  await page.locator('main').click({ position: { x: 5, y: 5 } });
+  await expect.poll(async () => (await library(page)).find(p => p.name === `${NOME} f3`).doc.slides[3].presentationBlocks[0].items[1].title).toBe('Feira local');
 });

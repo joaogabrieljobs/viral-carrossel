@@ -28,6 +28,7 @@ import { resolveChromeColor } from './presentation-chrome.js';
 import { titleTrackingBase } from './title-tracking.js';
 import { wcagContrast } from './wcag.js';
 import { markdownBoldAccentIntervalsUtf16 } from './text-spans.js';
+import { PRESENTATION_ICON_NAMES } from './presentation-icons.js';
 
 export { FREE_PRESENTATION_PRESET_ID };
 
@@ -35,11 +36,7 @@ export const FREE_GROUNDS = Object.freeze(['bg', 'surface', 'inverse', 'accent',
 export const FREE_PHOTO_SIZES = Object.freeze(['none', 'small', 'half', 'full']);
 export const FREE_BLOCKS = Object.freeze(['none', 'comparison', 'metrics', 'steps', 'quote', 'bignumber', 'icons']);
 /** Lista fechada de ícones lucide (nomes kebab-case) para o bloco de ícones. */
-export const FREE_ICONS = Object.freeze([
-  'check', 'arrow-right', 'trending-up', 'trending-down', 'users', 'user', 'calendar', 'clock',
-  'map-pin', 'star', 'heart', 'lightbulb', 'target', 'shield', 'zap', 'globe', 'music', 'camera',
-  'book-open', 'briefcase', 'bar-chart', 'dollar-sign', 'leaf', 'sparkles', 'message-circle', 'rocket',
-]);
+export const FREE_ICONS = PRESENTATION_ICON_NAMES;
 export const FREE_PALETTE_KEYS = Object.freeze(['bg', 'surface', 'ink', 'muted', 'accent', 'accent2', 'inverse', 'inverseInk']);
 
 /* ------------------------------------------------------------------------ */
@@ -310,13 +307,14 @@ const slideText = slide => [slide?.title, slide?.subtitle, slide?.bodyAfterImage
 const slideBlockTypes = slide => (Array.isArray(slide?.presentationBlocks) ? slide.presentationBlocks : []).map(b => b?.type);
 
 /** O roteiro sustenta o bloco? Sem dado, o bloco cai para `none` (spec, regra 4). */
-function blockSupported(block, slide, icons) {
-  if (['comparison', 'metrics', 'steps'].includes(block)) return slideBlockTypes(slide).includes(block);
-  if (block === 'bignumber') return /\d/.test(slideText(slide));
-  if (block === 'quote') return /["“”«»]|^\s*[—–-]\s/m.test(slideText(slide)) || slideBlockTypes(slide).includes('quote');
-  if (block === 'icons') return icons.length > 0;
-  return true;
+function blockSupported(block, slide) {
+  // Fase 3: o bloco é desenhado a partir de presentationBlocks. Proposta sem o
+  // bloco escrito (ou que a guarda de fatos derrubou) não desenha nada: none.
+  return block === 'none' || slideBlockTypes(slide).includes(block);
 }
+/** Ícones do bloco escrito (fase 3) ou, sem ele, os propostos. */
+const writtenIcons = slide => (Array.isArray(slide?.presentationBlocks) ? slide.presentationBlocks : [])
+  .find(b => b?.type === 'icons' && Array.isArray(b.items))?.items.map(item => item?.icon) || [];
 
 /**
  * Uma linha por família para o diretor de arte da IA (roteiro v3): o que a
@@ -364,10 +362,11 @@ export function normalizeProposedDesign(raw) {
 /** Corrige o design de um slide para os enums fechados da spec. */
 export function normalizeSlideDesign(raw, slide = {}) {
   const d = raw && typeof raw === 'object' ? raw : {};
-  const iconsIn = Array.isArray(d.icons) ? d.icons : [];
+  const written = writtenIcons(slide);
+  const iconsIn = written.length ? written : Array.isArray(d.icons) ? d.icons : [];
   const icons = [...new Set(iconsIn.map(i => String(i || '').trim().toLowerCase()).filter(i => FREE_ICONS.includes(i)))].slice(0, 4);
   let block = enumValue(d.block, FREE_BLOCKS, BLOCK_ALIASES, 'none');
-  if (!blockSupported(block, slide, icons)) block = 'none';
+  if (!blockSupported(block, slide)) block = 'none';
   const text = slideText(slide);
   // Trecho que está no texto, sem diferença de caixa; guarda a grafia do texto.
   const lower = text.toLowerCase();
@@ -664,11 +663,12 @@ function directFreeSlide({ slide = {}, stage = {}, index = 0, count = 1, previou
     if (score < bestScore) { best = c; bestScore = score; }
   }
   const chosen = best || { family: 'executive', ground: 'bg', photo: hasVisual(slide) ? 'half' : 'none' };
-  // Bloco nativo do roteiro manda; sem ele, o bloco proposto (citação, número
-  // grande ou ícones) fica se o texto o sustentar. Negrito e ícones propostos
+  // O bloco da página é o que está escrito em presentationBlocks (fase 3:
+  // citação, número grande e ícones também). Proposta sem bloco escrito, ou
+  // derrubada pela guarda de fatos, fica none. Negrito e ícones propostos
   // passam pelo mesmo normalizador.
-  const native = slideBlockTypes(slide).find(type => ['comparison', 'metrics', 'steps'].includes(type));
-  const block = native || (proposal && !['comparison', 'metrics', 'steps'].includes(proposal.block) ? proposal.block : 'none');
+  const native = slideBlockTypes(slide).find(type => FREE_BLOCKS.includes(type) && type !== 'none');
+  const block = native || 'none';
   const design = normalizeSlideDesign({
     family: chosen.family, ground: chosen.ground, photo: chosen.photo, block,
     emphasis: proposal?.emphasis || [], icons: proposal?.icons || [],

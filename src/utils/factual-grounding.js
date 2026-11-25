@@ -616,3 +616,61 @@ export function replaceEmDashes(text) {
     .join('\n');
 }
 
+
+/*
+ * Modo livre, fase 3 (docs/product/modo-livre-apresentacao.md, regra 4): a
+ * citação e o número grande só existem com fonte no material. Diferente da
+ * auditoria acima, que marca para revisão, aqui o bloco sem fonte cai: o slide
+ * fica sem o bloco (design.block = none), com o texto da página intacto.
+ */
+const foldWords = text => ` ${normalize(text).replace(/[^a-z0-9]+/g, ' ').trim()} `;
+
+function quoteGrounded(block, sourceWords) {
+  const text = foldWords(block.text);
+  if (text.trim().length < 3 || !sourceWords.includes(text)) return { block: null, reason: 'citação sem fonte no material' };
+  const author = String(block.author || '').trim();
+  // Autoria que o material não traz sai; a frase literal fica.
+  if (author && !sourceWords.includes(foldWords(author))) return { block: { ...block, author: '' } };
+  return { block };
+}
+
+function bigNumberGrounded(block, evidence, sourceNumbers) {
+  const value = String(block.value || '');
+  const counted = numbersIn(value);
+  const digits = [...value.matchAll(/\d+(?:[.,]\d+)*/g)].map(match => match[0]);
+  if (!digits.length) return { block: null, reason: 'número sem fonte no material' };
+  // Algarismo sozinho ("7") não entra em numbersIn: confere o algarismo no material.
+  const ok = counted.length
+    ? counted.every(number => sourceNumbers.has(number.value))
+    : digits.every(raw => new RegExp(`(?:^|[^\\d.,])${raw.replace(/[.,]/g, '[.,]')}(?![\\d]|[.,]\\d)`).test(evidence));
+  return ok ? { block } : { block: null, reason: 'número sem fonte no material' };
+}
+
+/**
+ * Confere citação e número grande dos slides contra o material. Sem material
+ * (deck já existente, troca de estilo), nada muda e a mesma lista volta.
+ */
+export function groundPresentationBlocks(slides, config = {}) {
+  const source = config.factualSource ?? config.commercialClaimSource;
+  const list = Array.isArray(slides) ? slides : [];
+  if (typeof source !== 'string' || !source.trim()) return { slides, dropped: [] };
+  const evidence = factualEvidenceText([source, config.userInstructions].filter(Boolean).join('\n'));
+  const sourceWords = foldWords(evidence);
+  const sourceNumbers = evidenceNumbers(evidence);
+  const dropped = [];
+  let changed = false;
+  const out = list.map((slide, slideIndex) => {
+    const blocks = Array.isArray(slide?.presentationBlocks) ? slide.presentationBlocks : [];
+    if (!blocks.some(block => block?.type === 'quote' || block?.type === 'bignumber')) return slide;
+    const next = blocks.flatMap((block) => {
+      const result = block?.type === 'quote' ? quoteGrounded(block, sourceWords)
+        : block?.type === 'bignumber' ? bigNumberGrounded(block, evidence, sourceNumbers) : { block };
+      if (!result.block) dropped.push({ slideIndex, type: block.type, reason: result.reason });
+      return result.block ? [result.block] : [];
+    });
+    if (next.length === blocks.length && next.every((block, i) => block === blocks[i])) return slide;
+    changed = true;
+    return { ...slide, presentationBlocks: next };
+  });
+  return { slides: changed ? out : slides, dropped };
+}

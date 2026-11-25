@@ -1268,6 +1268,8 @@ const ClassicCanvasInner = React.forwardRef(({
         rect={zcv.evidence}
         frame={f}
         ink={bodyInk}
+        // Modo livre: números, citação e títulos dos blocos na tinta do título.
+        strongInk={slide.presentationFreeDesign ? titleInk : undefined}
         background={bg}
         fontFamily={bodyAfterFF}
         family={slide.presentationDesignFamily}

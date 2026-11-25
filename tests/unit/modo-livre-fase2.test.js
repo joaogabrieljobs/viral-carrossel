@@ -113,11 +113,13 @@ describe('modo livre, fase 2: o diretor corrige a proposta da IA', () => {
     expect(previous.map(s => s.presentationFreeDesign)).toEqual(livre(source).map(s => s.presentationFreeDesign));
   });
 
-  it('bloco proposto fica só quando o texto sustenta; bloco nativo manda', () => {
+  it('bloco proposto fica só quando o bloco está escrito; bloco nativo manda', () => {
     const slides = deck(i => (i === 2 ? { ...PROPOSTA[i], block: 'bignumber' } : i === 3 ? { ...PROPOSTA[i], block: 'quote' } : i === 8 ? { ...PROPOSTA[i], block: 'steps' } : PROPOSTA[i]));
-    slides[2] = { ...slides[2], title: 'A cidade recebe 40 mil pessoas' };
+    // Fase 3: número no texto não basta; o número grande precisa do bloco escrito.
+    slides[2] = { ...slides[2], title: 'A cidade recebe 40 mil pessoas', presentationBlocks: [{ type: 'bignumber', value: '40 mil', label: 'pessoas por edição' }] };
     const out = livre(slides);
     expect(out[2].presentationFreeDesign.block).toBe('bignumber');
+    expect(livre(deck(i => (i === 2 ? { ...PROPOSTA[i], block: 'bignumber' } : PROPOSTA[i])))[2].presentationFreeDesign.block).toBe('none');
     expect(out[3].presentationFreeDesign.block).toBe('none');
     expect(out[8].presentationFreeDesign.block).toBe('metrics');
   });

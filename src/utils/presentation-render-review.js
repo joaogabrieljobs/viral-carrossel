@@ -24,7 +24,10 @@ const qualifiers = [
 ];
 const blockStrings = blocks => (blocks || []).flatMap(block => block.type === 'comparison'
   ? [...block.headers, ...block.rows.flat()]
-  : block.items.flatMap(item => block.type === 'metrics' ? [item.value, item.label, item.detail || ''] : [item.title, item.body || '']));
+  // Modo livre, fase 3: citação e número grande não têm itens.
+  : block.type === 'quote' ? [block.text, block.author || '']
+    : block.type === 'bignumber' ? [block.value, block.label, block.detail || '']
+      : block.items.flatMap(item => block.type === 'metrics' ? [item.value, item.label, item.detail || ''] : [item.title, item.body || '']));
 const visibleText = slide => [slide.title, slide.subtitle, slide.bodyAfterImage, ...blockStrings(slide.presentationBlocks)].filter(Boolean).join('\n');
 const snapshot = slide => ({
   ...Object.fromEntries(TEXT_FIELDS.map(field => [field, typeof slide[field] === 'string' ? slide[field] : ''])),
@@ -51,6 +54,9 @@ function sameBlockShape(before, after) {
   const left = before[0]; const right = after[0];
   if (left.type !== right.type) return false;
   if (left.type === 'comparison') return left.headers.length === right.headers.length && left.rows.length === right.rows.length;
+  // Citação é literal e o número grande é o dado: nenhum dos dois muda no reparo visual.
+  if (left.type === 'quote') return left.text === right.text && (left.author || '') === (right.author || '');
+  if (left.type === 'bignumber') return left.value === right.value;
   if (left.items.length !== right.items.length) return false;
   // A metric's displayed value is immutable during visual text repair.
   return left.type !== 'metrics' || left.items.every((item, index) => item.value === right.items[index].value);
