@@ -318,3 +318,34 @@ describe('modo livre, fase 1: foto importada numa página sem foto', () => {
     expect(depois.presentationChrome.ground).toBe(depois.presentationGround);
   });
 });
+
+describe('modo livre, fase 1: pontos de montagem do deck (ViralCarrossel.jsx)', () => {
+  const source = readFileSync(new URL('../../ViralCarrossel.jsx', import.meta.url), 'utf8');
+  const trecho = (inicio, tamanho = 3000) => {
+    const at = source.indexOf(inicio);
+    expect(at, inicio).toBeGreaterThan(-1);
+    return source.slice(at, at + tamanho);
+  };
+
+  it('geração: o deck do modo livre nasce do kit e vai para a composição, a marca e o projeto', () => {
+    expect(source).toMatch(/const freeDeckDesign = effectiveVisualPresetDef\?\.isFree\s*\?\s*deckDesignFromBrand\(/);
+    const montagem = trecho('const compositionOverrides = isPresentationGeneration && !effectiveVisualPresetDef?.isCustom', 900);
+    expect(montagem).toMatch(/deckDesign: freeDeckDesign/);
+    const gravacao = trecho('history.set(d => ({\n      ...d, brand: generationBrand, slides: newSlides', 900);
+    expect(gravacao).toMatch(/presentationDeckDesign: freeDeckDesign/);
+  });
+
+  it('geração: página com photo none não pede imagem', () => {
+    const imagens = trecho('const slidesWithImage = newSlides.map(', 600);
+    expect(imagens).toMatch(/!slideSkipsImageGeneration\(x\.sl\)/);
+  });
+
+  it('recuperação do rascunho e novo slide usam o deck gravado', () => {
+    const recuperacao = trecho('const recovered = snapshot.draft.slides.map(', 1200);
+    expect(recuperacao).toMatch(/deckDesign: recoveredDeckDesign/);
+    expect(source).toMatch(/presentationDeckDesign: recoveredDeckDesign/);
+    const novo = trecho('const newSlide = applyPresentationVisualPresetToSlide(', 600);
+    expect(novo).toMatch(/previous: slides/);
+    expect(novo).toMatch(/deckDesign: doc\.presentationDeckDesign/);
+  });
+});

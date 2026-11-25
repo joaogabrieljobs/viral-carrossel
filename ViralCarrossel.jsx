@@ -251,6 +251,7 @@ import {
   applyPresentationVisualPresetToSlides,
   presentationStageAt,
 } from './src/utils/presentation-state.js';
+import { deckDesignFromBrand, freeBrandPatch, slideSkipsImageGeneration } from './src/utils/free-design.js';
 import {
   normalizeStyleKit,
   buildProjectContextBlock,
@@ -5716,7 +5717,8 @@ export default function App() {
         visualPreset || DEFAULT_PRESENTATION_VISUAL_PRESET_ID,
         presentationPath,
         visualPresets,
-        { index: slides.length, count: slides.length + 1 },
+        // Modo livre: o diretor conhece as páginas anteriores e o deck gravado.
+        { index: slides.length, count: slides.length + 1, previous: slides, deckDesign: doc.presentationDeckDesign },
       );
       setSlides([
         ...slides,
@@ -5733,6 +5735,7 @@ export default function App() {
     slides,
     brand,
     doc.cardVisualStyle,
+    doc.presentationDeckDesign,
     setSlides,
     visualPreset,
     presentationPath,
@@ -6278,6 +6281,13 @@ ${jsonShapeLine}`;
       // descritas em um briefing antigo, sem alterar o preset de origem.
       ...sanitizeCustomVisualPresetBrand(brandVisualOverrides),
     };
+    // Modo livre (docs/product/modo-livre-apresentacao.md): paleta e fontes do
+    // deck. Cores do kit e escolhas do assistente substituem as do padrão; o
+    // código completa o resto. A marca do projeto segue o deck.
+    const freeDeckDesign = effectiveVisualPresetDef?.isFree
+      ? deckDesignFromBrand({ ...explicitBrandColorsFromKit(styleKit), ...sanitizeCustomVisualPresetBrand(brandVisualOverrides) })
+      : null;
+    if (freeDeckDesign) generationBrand = { ...generationBrand, ...freeBrandPatch(freeDeckDesign) };
     if (generationBrand.logoImageId) {
       try {
         const hydratedLogo = await resolveLogoDataUrl(generationBrand, {});
@@ -6343,6 +6353,7 @@ ${jsonShapeLine}`;
             count: nSlides,
             previous: generationRhythm,
             next: i + 1 < nSlides ? { slide: result.slides[i + 1], stage: generationStageAt(i + 1, result.slides[i + 1]) } : null,
+            deckDesign: freeDeckDesign,
           })
         : {};
       generationRhythm.push(compositionOverrides);
@@ -6530,6 +6541,7 @@ ${jsonShapeLine}`;
             productKind: 'carrossel',
           }),
       visualPreset: generationPresetId || null,
+      ...(freeDeckDesign ? { presentationDeckDesign: freeDeckDesign } : {}),
       presentationDesignSystemId: isPresentationGeneration
         ? (effectiveVisualPresetDef?.sourceId || null)
         : undefined,
@@ -6623,7 +6635,8 @@ ${jsonShapeLine}`;
           sl, slideId:sl.id, i, q:result.slides[i]?.imageQuery || sl.imageQuery,
           expectedImageIdentity:slideImageIdentity(sl),
         }))
-          .filter(x => !concurrentMediaSlideIds.has(x.slideId) && !!(x.q && String(x.q).trim()));
+          // Modo livre: página que o diretor deixou sem foto não pede imagem.
+          .filter(x => !concurrentMediaSlideIds.has(x.slideId) && !slideSkipsImageGeneration(x.sl) && !!(x.q && String(x.q).trim()));
         const totalImgs = slidesWithImage.length;
         let doneImgs = 0;
         const attemptedImageSlideIds = new Set();
@@ -6970,11 +6983,15 @@ ${jsonShapeLine}`;
         const incomplete = completedCount < totalCount;
         const reviewStatus = incomplete ? 'needs_attention' : 'unavailable';
         const preset = resolvePresentationVisualPresetDefinition(snapshot.visualPreset, visualPresets);
+        const recoveredDeckDesign = preset?.isFree
+          ? deckDesignFromBrand({ ...explicitBrandColorsFromKit(current.styleKit), ...sanitizeCustomVisualPresetBrand(snapshot.brandVisualOverrides) })
+          : null;
         const identity = {
           ...(snapshot.visualPreset && !snapshot.preserveBrandIdentity
             ? applyVisualPreset(current.brand, snapshot.visualPreset, visualPresets) : current.brand),
           ...explicitBrandColorsFromKit(current.styleKit),
           ...sanitizeCustomVisualPresetBrand(snapshot.brandVisualOverrides),
+          ...(recoveredDeckDesign ? freeBrandPatch(recoveredDeckDesign) : {}),
           subtitleVisible: true,
         };
         const presetOverrides = getSlideOverridesForPreset(snapshot.visualPreset, visualPresets);
@@ -6991,6 +7008,7 @@ ${jsonShapeLine}`;
           const composition = preset?.isCustom ? {} : getPresentationCompositionOverrides(snapshot.visualPreset, {
             slide, stage, index, count: totalCount, previous: recoveredRhythm,
             next: index + 1 < snapshot.draft.slides.length ? recoveredInput(snapshot.draft.slides[index + 1], index + 1) : null,
+            deckDesign: recoveredDeckDesign,
           });
           recoveredRhythm.push(composition);
           return {
@@ -7007,6 +7025,7 @@ ${jsonShapeLine}`;
           ...current, brand: identity, fmt: 'apresentacao', productKind: 'apresentacao', creativePreset: 'apresentacao',
           slides: applyFinalizeCanvasMarginsToSlides(recovered, 'apresentacao'), caption: snapshot.draft.caption || '',
           quickCardCount: totalCount, presentationPath: snapshot.presentationPath, visualPreset: snapshot.visualPreset,
+          ...(recoveredDeckDesign ? { presentationDeckDesign: recoveredDeckDesign } : {}),
           presentationPlan: snapshot.plan, editorialReviewStatus: reviewStatus,
           editorialReviewIssues: incomplete ? [{ code: 'presentation_incomplete', kind: 'incomplete', slideIndex: null, completedCount, totalCount }] : [],
           presentationQuality: { version: 1, reviewStatus, incomplete, completedCount, totalCount, renderCheckStatus: 'pending' },
