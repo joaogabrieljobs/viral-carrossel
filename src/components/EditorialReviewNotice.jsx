@@ -27,6 +27,7 @@ function issueDescription(issue) {
   if (issue.kind === 'factual') return `informação sem apoio suficiente no briefing${issue.claim ? `: “${issue.claim}”` : '.'}`;
   if (issue.kind === 'repeated_title') return 'o título repete o de outro card ou slide; reescreva com a ideia própria deste.';
   if (issue.kind === 'repeated_content') return 'o texto repete o de outro card com outras palavras; reescreva com a ideia própria deste ou remova o card.';
+  if (issue.code === 'repetition_remaining') return 'ainda repete texto de outro depois do reparo automático; reescreva o trecho repetido.';
   if (issue.code === 'repeated_cards_removed') return 'um card repetia outro e foi removido. O projeto ficou com menos cards do que o pedido.';
   if (issue.kind === 'density') return 'texto acima do espaço previsto; reduza mantendo a ideia e as condições.';
   if (issue.code === 'missing_slides_padded') return 'a IA devolveu menos cards do que o pedido. Confira os espaços que ainda precisam de conteúdo.';
@@ -91,8 +92,11 @@ export default function EditorialReviewNotice({ materialNotice = '', onDismissMa
 }
 
 function ReviewNotice({ status, issues = [], isPresentation = false, onReviewed }) {
-  if (!['needs_attention', 'unavailable'].includes(status)) return null;
   const items = Array.isArray(issues) ? issues : [];
+  // Teste 4 (25/11): repetição que sobrou depois do reparo aparece aqui sem
+  // transformar o deck em rascunho (o status da revisão não muda).
+  const onlyRepetition = !['needs_attention', 'unavailable'].includes(status);
+  if (onlyRepetition && (status === 'reviewed_by_user' || !items.some(issue => issue.code === 'repetition_remaining'))) return null;
   const incomplete = items.find(issue => issue.code === 'presentation_incomplete');
   const completed = Number(incomplete?.completedCount);
   const total = Number(incomplete?.totalCount);
@@ -101,6 +105,10 @@ function ReviewNotice({ status, issues = [], isPresentation = false, onReviewed 
   // QA 24/11 (texto 3): a pessoa pediu N cards e recebeu menos. Isso não pode
   // ficar só dentro de "O que conferir", que nasce fechado.
   const cardsRemoved = items.some(issue => issue.code === 'repeated_cards_removed');
+  // Teste 4 (25/11): repetição que o reparo não resolveu, com os números.
+  const repeatedLeft = [...new Set(items.filter(issue => issue.code === 'repetition_remaining' && Number.isInteger(issue.slideIndex) && issue.slideIndex >= 0)
+    .map(issue => issue.slideIndex + 1))].sort((a, b) => a - b);
+  const repeatedList = repeatedLeft.length > 1 ? `${repeatedLeft.slice(0, -1).join(', ')} e ${repeatedLeft.at(-1)}` : String(repeatedLeft[0] ?? '');
   const pages = [...new Set(items.filter(issue => Number.isInteger(issue.slideIndex) && issue.slideIndex >= 0)
     .map(issue => issue.slideIndex + 1))].sort((a, b) => a - b);
   const locations = [
@@ -108,17 +116,18 @@ function ReviewNotice({ status, issues = [], isPresentation = false, onReviewed 
     items.some(issue => issue.field === 'caption' || issue.slideIndex === -1) ? 'Legenda' : '',
   ].filter(Boolean).join(' · ');
   return <section className="vc-editor-review-notice" aria-label="Revisão pendente do conteúdo">
-    <strong>{incomplete ? 'Apresentação incompleta — revise antes de exportar' : 'Rascunho preservado — revise antes de exportar'}</strong>
+    <strong>{incomplete ? 'Apresentação incompleta — revise antes de exportar' : onlyRepetition ? 'Repetição para conferir — revise antes de exportar' : 'Rascunho preservado — revise antes de exportar'}</strong>
     {incomplete && <p>{hasIncompleteCount
       ? `${completed} de ${total} slides preservados. A geração parou antes de escrever os ${total - completed} restantes.`
       : 'Os slides concluídos foram preservados, mas a geração parou antes de completar a apresentação.'} Complete a sequência antes de exportar.</p>}
     {interruptionMessage && <p>{interruptionMessage}</p>}
     {cardsRemoved && <p>Um card repetia outro e foi removido. O projeto ficou com menos cards do que o pedido.</p>}
-    <p>{incomplete
+    {repeatedLeft.length > 0 && <p>Sobrou repetição depois do reparo automático {repeatedLeft.length > 1 ? `nos ${isPresentation ? 'slides' : 'cards'}` : `no ${isPresentation ? 'slide' : 'card'}`} {repeatedList}. Reescreva o trecho repetido antes de exportar.</p>}
+    {!onlyRepetition && <p>{incomplete
       ? 'Confira as informações, os títulos e o tamanho dos textos dos slides disponíveis. A sequência ainda precisa ser completada.'
       : status === 'unavailable'
       ? 'Este texto ainda não passou pela revisão automática. Confira as informações e o tamanho dos textos.'
-      : 'A revisão encontrou pontos que precisam de conferência. Verifique as informações, os títulos e o tamanho dos textos.'}</p>
+      : 'A revisão encontrou pontos que precisam de conferência. Verifique as informações, os títulos e o tamanho dos textos.'}</p>}
     {locations && <p>{locations}</p>}
     {items.length > 0 && <details>
       <summary>O que conferir</summary>

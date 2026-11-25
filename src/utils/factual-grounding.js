@@ -674,3 +674,37 @@ export function groundPresentationBlocks(slides, config = {}) {
   });
   return { slides: changed ? out : slides, dropped };
 }
+
+/**
+ * Teste 4 da Apoteose (25/11): título "O mais badalado de São Paulo" com o
+ * apoio "A Apoteose pretende se consolidar como o esquenta de Carnaval mais
+ * badalado da cidade". O material diz intenção; o título dá o resultado como
+ * fato. Vale quando uma frase do apoio (subtitle ou bodyAfterImage) traz
+ * pretende, quer, busca ou meta, o título não traz nenhuma dessas marcas e
+ * metade ou mais das palavras longas do título (5 letras ou mais, comparadas
+ * pelas 6 primeiras) estão nessa frase. Número que só o título tem é outro
+ * dado ("Entrega em 24 horas" com a meta de 12 horas). Devolve os índices; o
+ * título vai ao reparo de fatos.
+ */
+const INTENT_MARK = /\b(?:pretend(?:e|em|emos|ia|iam)|quer|querem|queremos|busca|buscam|buscamos|metas?)\b/;
+const LONG_STOP = new Set('entre sobre quando porque ainda desde todos todas outro outra outros outras muito muita depois antes nosso nossa estao essas esses aquele aquela'.split(' '));
+const longStems = text => new Set((normalize(text).match(/[a-z0-9]+/g) || [])
+  .filter(word => word.length >= 5 && !LONG_STOP.has(word)).map(word => word.slice(0, 6)));
+const digitsOf = text => new Set(normalize(text).match(/\d+/g) || []);
+
+export function goalTitleAsFactSlides(slides) {
+  return (Array.isArray(slides) ? slides : []).flatMap((slide, index) => {
+    const title = String(slide?.title || '');
+    if (!title.trim() || INTENT_MARK.test(normalize(title))) return [];
+    const stems = longStems(title);
+    if (!stems.size) return [];
+    const sentences = [slide?.subtitle, slide?.bodyAfterImage].map(value => String(value || ''))
+      .join('\n').split(/[.!?;\n]+/).filter(sentence => INTENT_MARK.test(normalize(sentence)));
+    const hit = sentences.some((sentence) => {
+      const shared = [...stems].filter(stem => longStems(sentence).has(stem)).length;
+      const sentenceDigits = digitsOf(sentence);
+      return shared && shared / stems.size >= 0.5 && [...digitsOf(title)].every(digit => sentenceDigits.has(digit));
+    });
+    return hit ? [index] : [];
+  });
+}

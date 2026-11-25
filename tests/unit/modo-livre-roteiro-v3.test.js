@@ -51,9 +51,11 @@ export const planoV3 = (n = 6, designOf = () => null, extra = {}) => ({
 });
 
 describe('modo livre, fase 2: roteiro v2 inalterado para os outros presets', () => {
-  it('o pedido v2 é byte a byte o mesmo de antes (hash medido em 6d40332)', () => {
-    expect(h(buildPresentationPlanPrompt({ brief: 'Festival', sources: SRC, count: 10, presentationPath: 'auto' }))).toBe('35b81b983596f508');
-    expect(h(buildPresentationPlanPrompt({ brief: 'Festival', sources: SRC, count: 8, presentationPath: 'pitch', compactRepair: true }))).toBe('135aebd49994edb4');
+  // Teste 4 (25/11): o pedido ganhou a linha e o campo signature (assinatura
+  // do deck); hashes antes: 35b81b983596f508 e 135aebd49994edb4.
+  it('o pedido v2 é byte a byte o esperado (hash medido depois do campo signature)', () => {
+    expect(h(buildPresentationPlanPrompt({ brief: 'Festival', sources: SRC, count: 10, presentationPath: 'auto' }))).toBe('75c0191a0f0ec608');
+    expect(h(buildPresentationPlanPrompt({ brief: 'Festival', sources: SRC, count: 8, presentationPath: 'pitch', compactRepair: true }))).toBe('dd161a18a566df9b');
   });
 
   it('o pedido v2 não fala em direção de arte, deckDesign ou design', () => {
