@@ -1,3 +1,5 @@
+import { storageErrorMessage } from './storage-error-message.js';
+
 /** A stale lazy module must never trigger an editor reload before data is safe. */
 export function isModuleLoadError(error) {
   const message = String(error?.message || error || '');
@@ -10,12 +12,14 @@ export function cloudSyncFailureMessage(error, { localSaved = false, cloudSaved 
       ? 'A Moont foi atualizada. A edição foi preservada neste navegador. Recarregue a página e clique em Salvar para retomar a sincronização com a conta.'
       : 'A Moont foi atualizada. Sua edição continua aberta, mas a cópia local não foi confirmada. Baixe um backup do projeto antes de recarregar; depois, clique em Salvar.';
   }
+  // O erro do navegador (armazenamento cheio, falha ao gravar) vem em inglês.
+  const reason = storageErrorMessage(error) || error?.message;
   if (legacy) {
-    return `${localSaved ? 'Projeto salvo neste navegador. ' : ''}Sincronização incompleta: ${error?.message || 'tente novamente.'}`;
+    return `${localSaved ? 'Projeto salvo neste navegador. ' : ''}Sincronização incompleta: ${reason || 'tente novamente.'}`;
   }
   // DB-04: o conflito é só dos dados da conta; os projetos já foram confirmados.
   if (error?.code === 'account_meta_conflict' && error?.message) return error.message;
-  return `${cloudSaved ? 'O projeto foi salvo, mas a lista não foi atualizada. ' : localSaved ? 'A edição continua neste editor, mas ainda não foi confirmada na conta. ' : ''}${error?.message || 'Não foi possível sincronizar.'}`;
+  return `${cloudSaved ? 'O projeto foi salvo, mas a lista não foi atualizada. ' : localSaved ? 'A edição continua neste editor, mas ainda não foi confirmada na conta. ' : ''}${reason || 'Não foi possível sincronizar.'}`;
 }
 
 /**

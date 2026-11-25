@@ -30,6 +30,7 @@ import {
 } from '../utils/custom-visual-presets.js';
 import { normalizeHookLibrary } from '../utils/hooks-library.js';
 import { isProjectOutboxUnavailable, selectRestoredProjectId } from '../utils/project-sync-control.js';
+import { readableErrorMessage } from '../utils/storage-error-message.js';
 import {
   isFreeSession, markFreePlanUse, stashFreePlanDrafts, clearFreePlanDrafts,
 } from '../utils/free-plan.js';
@@ -742,8 +743,8 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
           } catch (error) {
             if (!cancelled && (sessionStillOwnsData()
               || (bootExpired && sessionOwners.has(readDataOwner())))) {
-              libraryCallbacksRef.current.onLibraryBlocked?.(error?.message
-                || 'Não foi possível restaurar seus projetos. Verifique a conexão e tente novamente.');
+              libraryCallbacksRef.current.onLibraryBlocked?.(readableErrorMessage(error,
+                'Não foi possível restaurar seus projetos. Verifique a conexão e tente novamente.'));
             }
             return;
           }
@@ -847,8 +848,8 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
         setLoginOpen(true);
       }
     })().catch((error) => {
-      if (!cancelled) libraryCallbacksRef.current.onLibraryBlocked?.(error?.message
-        || 'Não foi possível restaurar seus projetos. Confira a conexão e tente novamente.');
+      if (!cancelled) libraryCallbacksRef.current.onLibraryBlocked?.(readableErrorMessage(error,
+        'Não foi possível restaurar seus projetos. Confira a conexão e tente novamente.'));
     }).finally(() => {
       if (bootDeadlineTimer) clearTimeout(bootDeadlineTimer);
     });
