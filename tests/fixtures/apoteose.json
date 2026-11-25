@@ -1,0 +1,336 @@
+{
+ "origem": "Apoteose, projeto 28ului7 (família Cinemático), lido do banco em modo somente leitura em 25/11/2026. Só os textos dos slides e o plano v1 salvo; o briefing completo fica fora do repositório. As citações das evidências do plano são a única parte do briefing aqui, porque a leitura do plano confere cada citação na fonte.",
+ "slides": [
+  {
+   "title": "Apoteose, o esquenta de Carnaval que São Paulo esperava",
+   "subtitle": "Como se o Carnaval não fosse suficiente.",
+   "bodyAfterImage": "",
+   "imageQuery": "vibrant Brazilian urban party scene, contemporary aesthetic, bold colors, no text",
+   "presentationBlocks": [],
+   "presentationComposition": "cover"
+  },
+  {
+   "title": "O brasileiro não espera o Carnaval começar",
+   "subtitle": "Mal termina o Réveillon, já começa a expectativa pelo Carnaval. E, como se não bastasse, ainda existe o **esquenta**. O brasileiro antecipa, prolonga, inventa e reinventa a festa.",
+   "bodyAfterImage": "É nesse território comportamental que a Apoteose constrói sua identidade.",
+   "imageQuery": "urban Brazilian celebration atmosphere, people anticipating carnival energy, editorial style, no text",
+   "presentationBlocks": [],
+   "presentationComposition": "content"
+  },
+  {
+   "title": "Apoteose é ápice, celebração, intensidade e liberdade",
+   "subtitle": "O nome remete ao ponto mais alto da celebração. A festa existe nesse intervalo entre a promessa de se comportar e a **absoluta falta de intenção** de cumpri-la.",
+   "bodyAfterImage": "O Carnaval aparece como estado de espírito, não como representação literal.",
+   "imageQuery": "abstract representation peak celebration freedom, vibrant gradient colors, no text",
+   "presentationBlocks": [],
+   "presentationComposition": "content"
+  },
+  {
+   "title": "Carnaval como comportamento, não como fantasia",
+   "subtitle": "A Apoteose propõe uma **interpretação contemporânea** da cultura carnavalesca brasileira, sem reproduzir necessariamente sua estética tradicional. O Carnaval aparece como estado de espírito, não como representação literal de fantasias, plumas e confetes.",
+   "bodyAfterImage": "Espontaneidade do Carnaval encontra o comportamento urbano.",
+   "imageQuery": "Contemporary Brazilian urban carnival mood, fashion editorial style, no costumes, no text",
+   "presentationBlocks": [],
+   "presentationComposition": "content"
+  },
+  {
+   "title": "Curadoria brasileira sem fronteiras rígidas",
+   "subtitle": "A programação combina **brasilidades, hip-hop, funk, eletrônica, remixes e releituras de clássicos** nacionais, conduzida por DJs que transitam entre universos musicais distintos.",
+   "bodyAfterImage": "",
+   "imageQuery": "DJ booth vibrant lighting, urban Brazilian music scene, contemporary atmosphere, no text",
+   "presentationBlocks": [],
+   "presentationComposition": "content"
+  },
+  {
+   "title": "Para quem faz a festa acontecer",
+   "subtitle": "Público socialmente ativo, **formador de opinião**, conectado a tendências de comportamento, moda, entretenimento e cultura.",
+   "bodyAfterImage": "",
+   "imageQuery": "Stylish diverse crowd at exclusive party, editorial fashion photography, no text",
+   "presentationBlocks": [],
+   "presentationComposition": "content"
+  },
+  {
+   "title": "A exclusividade se percebe, não se anuncia",
+   "subtitle": "Comunicação inteligente, provocativa, irreverente e bem-humorada. O humor nasce da observação do comportamento e dos exageros das festas brasileiras.",
+   "bodyAfterImage": "",
+   "imageQuery": "bold graphic composition provocative contemporary Brazilian visual language no text",
+   "presentationBlocks": [],
+   "presentationComposition": "content"
+  },
+  {
+   "title": "Cultura brasileira de forma autoral, sem clichês",
+   "subtitle": "A identidade evita fantasias, plumas e confetes literais.",
+   "bodyAfterImage": "",
+   "imageQuery": "authorial Brazilian visual culture collage tropical urban editorial mix no text",
+   "presentationBlocks": [],
+   "presentationComposition": "content"
+  },
+  {
+   "title": "O que torna a Apoteose diferente",
+   "subtitle": "Encontro exclusivo para convidados, curadoria musical brasileira plural e identidade autoral. Posicionamento como **o esquenta mais badalado de São Paulo**.",
+   "bodyAfterImage": "",
+   "imageQuery": "",
+   "presentationBlocks": [
+    {
+     "type": "metrics",
+     "items": [
+      {
+       "label": "Acesso",
+       "value": "Exclusivo para convidados",
+       "detail": "Curadoria de público fortalece o caráter social da festa"
+      },
+      {
+       "label": "Música",
+       "value": "Brasileira e plural",
+       "detail": "Hip-hop, funk, eletrônica e remixes sem fronteiras rígidas"
+      },
+      {
+       "label": "Posicionamento",
+       "value": "Esquenta de Carnaval de SP",
+       "detail": "Festa com identidade própria que gera desejo e expectativa"
+      }
+     ]
+    }
+   ],
+   "presentationComposition": "data"
+  },
+  {
+   "title": "Apoteose, o esquenta de Carnaval de São Paulo",
+   "subtitle": "Apoteose existe nesse intervalo entre a promessa de se comportar e a absoluta falta de intenção de cumpri-la. O esquenta que São Paulo esperava.",
+   "bodyAfterImage": "Apoteose, o esquenta de Carnaval de São Paulo.",
+   "imageQuery": "Celebratory full-screen scene, vibrant colors, party energy fading into anticipation, no text",
+   "presentationBlocks": [],
+   "presentationComposition": "closing"
+  }
+ ],
+ "presentationPlan": {
+  "gaps": [
+   "Data, local e line-up da festa não foram informados",
+   "Preço de convites, lotes e condições de acesso não foram informados",
+   "Parceiros, patrocinadores e realizadores não foram informados"
+  ],
+  "slides": [
+   {
+    "index": 1,
+    "purpose": "introduction",
+    "question": "O que é Apoteose?",
+    "imageBrief": "Full-screen vibrant party scene, contemporary Brazilian urban aesthetic, bold colors, no text",
+    "keyMessage": "Capa: Apoteose — o esquenta de Carnaval que São Paulo esperava. Como se o Carnaval não fosse suficiente.",
+    "visualRole": "cover",
+    "evidenceIds": [
+     "e12",
+     "e13"
+    ]
+   },
+   {
+    "index": 2,
+    "purpose": "context",
+    "question": "Por que existe a Apoteose?",
+    "imageBrief": "Urban Brazilian celebration atmosphere, people anticipating carnival energy, editorial style, no text",
+    "keyMessage": "Contexto: O brasileiro não espera o Carnaval chegar para começar o Carnaval. Ele antecipa, prolonga, inventa e reinventa a festa.",
+    "visualRole": "content",
+    "evidenceIds": [
+     "e4"
+    ]
+   },
+   {
+    "index": 3,
+    "purpose": "vision",
+    "question": "O que o nome Apoteose significa?",
+    "imageBrief": "Abstract representation of peak celebration and freedom, vibrant gradient colors, no text",
+    "keyMessage": "Conceito: O nome remete ao ápice, à celebração, à intensidade e à liberdade. A festa existe entre a promessa de se comportar e a falta de intenção de cumpri-la.",
+    "visualRole": "content",
+    "evidenceIds": [
+     "e3",
+     "e14"
+    ]
+   },
+   {
+    "index": 4,
+    "purpose": "solution",
+    "question": "Como a Apoteose interpreta o Carnaval?",
+    "imageBrief": "Contemporary carnival reinterpretation, urban fashion editorial, no traditional costumes, no text",
+    "keyMessage": "Corpo: Proposta de interpretação contemporânea da cultura carnavalesca brasileira, sem reproduzir necessariamente a estética tradicional.",
+    "visualRole": "content",
+    "evidenceIds": [
+     "e10"
+    ]
+   },
+   {
+    "index": 5,
+    "purpose": "solution",
+    "question": "Qual é a identidade musical da festa?",
+    "imageBrief": "DJ booth with vibrant lighting, contemporary urban music scene, Brazilian atmosphere, no text",
+    "keyMessage": "Corpo: Curadoria essencialmente brasileira sem fronteiras rígidas — hip-hop, funk, eletrônica, remixes e releituras de clássicos nacionais.",
+    "visualRole": "content",
+    "evidenceIds": [
+     "e5",
+     "e6"
+    ]
+   },
+   {
+    "index": 6,
+    "purpose": "context",
+    "question": "Para quem é a Apoteose?",
+    "imageBrief": "Stylish diverse crowd at exclusive party, editorial fashion photography style, no text",
+    "keyMessage": "Corpo: Público socialmente ativo, formador de opinião, conectado a tendências de comportamento, moda, entretenimento e cultura.",
+    "visualRole": "content",
+    "evidenceIds": [
+     "e7",
+     "e8"
+    ]
+   },
+   {
+    "index": 7,
+    "purpose": "solution",
+    "question": "Como a marca se comunica?",
+    "imageBrief": "Bold graphic design composition, provocative contemporary Brazilian visual language, no text",
+    "keyMessage": "Corpo: Comunicação inteligente, provocativa, irreverente e bem-humorada. A exclusividade é percebida, não anunciada.",
+    "visualRole": "content",
+    "evidenceIds": [
+     "e11"
+    ]
+   },
+   {
+    "index": 8,
+    "purpose": "vision",
+    "question": "Qual é o universo visual da Apoteose?",
+    "imageBrief": "Authorial Brazilian visual culture collage, tropical urban editorial mix, no text",
+    "keyMessage": "Corpo: Identidade explora cultura brasileira de maneira autoral, evitando clichês visuais do Carnaval. Direção transita entre tropical, urbano e editorial.",
+    "visualRole": "content",
+    "evidenceIds": [
+     "e9"
+    ]
+   },
+   {
+    "index": 9,
+    "purpose": "summary",
+    "question": "O que torna a Apoteose diferente?",
+    "imageBrief": "Energetic party crowd silhouette against vibrant lights, premium atmosphere, no text",
+    "keyMessage": "Síntese: Exclusiva para convidados, curadoria musical brasileira plural, identidade autoral e posicionamento como o esquenta mais badalado de SP.",
+    "visualRole": "content",
+    "evidenceIds": [
+     "e2",
+     "e12"
+    ]
+   },
+   {
+    "index": 10,
+    "purpose": "decision",
+    "question": "Qual é o convite?",
+    "imageBrief": "Celebratory full-screen scene, vibrant colors, party energy fading into anticipation, no text",
+    "keyMessage": "Fecho: Como se o Carnaval não fosse suficiente. Apoteose — o esquenta que São Paulo esperava.",
+    "visualRole": "closing",
+    "evidenceIds": [
+     "e13",
+     "e12"
+    ]
+   }
+  ],
+  "thesis": "Apoteose é uma festa pré-Carnaval que transforma o comportamento brasileiro de celebrar em uma experiência contemporânea, exclusiva e desejada.",
+  "audience": "Público socialmente ativo, formador de opinião, conectado a tendências de comportamento, moda, entretenimento e cultura.",
+  "evidence": [
+   {
+    "id": "e1",
+    "claim": "Apoteose é uma festa pré-Carnaval em São Paulo.",
+    "quote": "A Apoteose é uma festa que nasce com a proposta de ocupar um espaço relevante no calendário pré-Carnaval de São Paulo.",
+    "status": "fact",
+    "sourceId": "source-base"
+   },
+   {
+    "id": "e2",
+    "claim": "Festa exclusiva para convidados conectados a cultura e vida noturna.",
+    "quote": "Um encontro exclusivo para convidados, que reúne pessoas conectadas à música, à moda, à arte, à cultura contemporânea e à vida noturna.",
+    "status": "fact",
+    "sourceId": "source-base"
+   },
+   {
+    "id": "e3",
+    "claim": "O nome remete a ápice, celebração, intensidade e liberdade.",
+    "quote": "O nome Apoteose remete ao ápice, à celebração, à intensidade e à liberdade.",
+    "status": "fact",
+    "sourceId": "source-base"
+   },
+   {
+    "id": "e4",
+    "claim": "Brasileiro antecipa e reinventa o Carnaval antes dele chegar.",
+    "quote": "O brasileiro não espera o Carnaval chegar para começar o Carnaval. Ele antecipa, prolonga, inventa e reinventa a festa.",
+    "status": "fact",
+    "sourceId": "source-base"
+   },
+   {
+    "id": "e5",
+    "claim": "Curadoria musical brasileira sem fronteiras rígidas entre gêneros.",
+    "quote": "A curadoria musical é essencialmente brasileira, mas sem fronteiras rígidas entre gêneros. Brasilidades, hip-hop, funk, música eletrônica, remixes e releituras de clássicos nacionais",
+    "status": "fact",
+    "sourceId": "source-base"
+   },
+   {
+    "id": "e6",
+    "claim": "Música reflete Brasil contemporâneo, urbano, plural e sofisticado.",
+    "quote": "A música deve refletir um Brasil contemporâneo, urbano, plural e culturalmente sofisticado, sem perder sua essência popular.",
+    "status": "fact",
+    "sourceId": "source-base"
+   },
+   {
+    "id": "e7",
+    "claim": "Público formador de opinião conectado a tendências e cultura.",
+    "quote": "A Apoteose é direcionada a um público socialmente ativo, formador de opinião, conectado às tendências de comportamento, moda, entretenimento e cultura.",
+    "status": "fact",
+    "sourceId": "source-base"
+   },
+   {
+    "id": "e8",
+    "claim": "Acesso exclusivo para convidados fortalece curadoria e caráter social.",
+    "quote": "O acesso exclusivo para convidados faz parte do posicionamento da festa, privilegiando a curadoria de público e fortalecendo seu caráter social.",
+    "status": "fact",
+    "sourceId": "source-base"
+   },
+   {
+    "id": "e9",
+    "claim": "Identidade visual explora cultura brasileira de forma autoral, sem clichês.",
+    "quote": "A identidade da Apoteose deve explorar a cultura brasileira de maneira autoral, evitando os clichês visuais do Carnaval.",
+    "status": "fact",
+    "sourceId": "source-base"
+   },
+   {
+    "id": "e10",
+    "claim": "Carnaval como comportamento e estado de espírito, não representação literal.",
+    "quote": "O Carnaval aparece mais como comportamento e estado de espírito do que como uma representação literal de fantasias, plumas e confetes.",
+    "status": "fact",
+    "sourceId": "source-base"
+   },
+   {
+    "id": "e11",
+    "claim": "Comunicação inteligente, provocativa, irreverente e bem-humorada.",
+    "quote": "A comunicação da Apoteose deve ser inteligente, provocativa, irreverente e bem-humorada.",
+    "status": "fact",
+    "sourceId": "source-base"
+   },
+   {
+    "id": "e12",
+    "claim": "Pretende se consolidar como esquenta de Carnaval mais badalado de SP.",
+    "quote": "A Apoteose pretende se consolidar como o esquenta de Carnaval mais badalado de São Paulo.",
+    "status": "fact",
+    "sourceId": "source-base"
+   },
+   {
+    "id": "e13",
+    "claim": "Conceito central de campanha da festa.",
+    "quote": "Como se o Carnaval não fosse suficiente.",
+    "status": "fact",
+    "sourceId": "source-base"
+   },
+   {
+    "id": "e14",
+    "claim": "Festa existe entre a promessa de se comportar e a falta de intenção de cumpri-la.",
+    "quote": "A Apoteose existe justamente nesse intervalo entre a promessa de se comportar e a absoluta falta de intenção de cumpri-la.",
+    "status": "fact",
+    "sourceId": "source-base"
+   }
+  ],
+  "objective": "Apresentar a festa Apoteose como o esquenta de Carnaval mais badalado de São Paulo, comunicando conceito, identidade e posicionamento.",
+  "promptVersion": "presentation-plan-v1",
+  "schemaVersion": 1
+ }
+}
