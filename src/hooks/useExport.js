@@ -28,6 +28,37 @@ export function exportFileStem(projectName, isPresentation = false) {
   return name ? `${kind}-${name}` : kind;
 }
 
+/**
+ * Formato de cada página do PDF (spec 1.1, PDF). A Apoteose saía com 44 MB:
+ * toda página ia como PNG de 5318 px, e foto em PNG não comprime. Página com
+ * foto visível vai em JPEG de alta qualidade; página só de texto (mesmo com
+ * logo) continua PNG, sem artefato em letra e logo sobre cor chapada. "Com
+ * foto" é o que o card desenha: imagem de fundo presente, sem falha e sem a
+ * composição ter suprimido a zona de foto. O PNG e o ZIP por card não mudam.
+ *
+ * Qualidade medida, não escolhida (25/11): o mesmo card com foto, logo
+ * branca e dois CTAs sobre a foto foi codificado pelo Chrome em PNG e em JPEG
+ * 0,92/0,95/0,97, a 5318 px (PDF no computador) e a 3840 px (no celular).
+ * Nos recortes 1:1 de título, texto pequeno, logo e CTA nenhuma das três
+ * borra; 0,92 é a menor. O aviso antigo ("0,92 esborratava logo branca e
+ * CTAs") não se reproduziu nessas escalas.
+ */
+export const PDF_PHOTO_JPEG_QUALITY = 0.92;
+
+export function pdfPageImageFormat(slide = {}) {
+  const photo = !!(slide?.bgImage || slide?.bgImageId || slide?.bgImageAssetId)
+    && slide.bgImageFailed !== true && slide.presentationSuppressPhoto !== true;
+  return photo
+    ? { mime: 'image/jpeg', format: 'JPEG', quality: PDF_PHOTO_JPEG_QUALITY }
+    : { mime: 'image/png', format: 'PNG' };
+}
+
+/** Codifica a página já renderizada no formato que ela pede. */
+export function pdfPageImage(canvas, slide) {
+  const kind = pdfPageImageFormat(slide);
+  return { dataUrl: canvas.toDataURL(kind.mime, kind.quality), format: kind.format };
+}
+
 /** PDFs longos precisam de uma escala menor em aparelhos com pouca memória. */
 export function pdfCanvasScale({
   viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1280,
@@ -351,7 +382,7 @@ export function useExport({
     toast('Cancelando após o arquivo atual…', 'info');
   }, [toast]);
 
-  const renderSlideToCanvas = async (slideObj, { scale = 3 } = {}) => {
+  const renderSlideToCanvas = async (slideObj, { scale = 3, backgroundColor = null } = {}) => {
     const el = slideRefs.current[slideObj.id];
     if (!el) throw new Error('Elemento de export não encontrado');
     const f = FORMATS[fmt] || FORMATS.carrossel;
@@ -362,7 +393,7 @@ export function useExport({
       useCORS: true,
       allowTaint: true,
       logging: false,
-      backgroundColor: null,
+      backgroundColor,
       width: w,
       height: h,
       windowWidth: w,
@@ -560,12 +591,14 @@ export function useExport({
       for (let i=0; i<slides.length; i++) {
         throwIfExportCancelled();
         setExportProgress({current:i+1,total:slides.length});
-        const canvas = await renderSlideToCanvas(slides[i], { scale });
-        // PNG no PDF: JPEG a 0.92 esborratava logo branca e CTAs.
-        let dataUrl = canvas.toDataURL('image/png');
+        // JPEG não tem transparência: a página com foto é desenhada sobre
+        // branco, a mesma cor que a página do PDF mostrava sob o PNG.
+        const photoPage = pdfPageImageFormat(slides[i]).format === 'JPEG';
+        const canvas = await renderSlideToCanvas(slides[i], { scale, backgroundColor: photoPage ? '#ffffff' : null });
+        let page = pdfPageImage(canvas, slides[i]);
         if (i > 0) pdf.addPage([f.w, f.h], f.h > f.w ? 'portrait' : 'landscape');
-        pdf.addImage(dataUrl, 'PNG', 0, 0, f.w, f.h);
-        dataUrl = null;
+        pdf.addImage(page.dataUrl, page.format, 0, 0, f.w, f.h);
+        page = null;
         canvas.width = 1;
         canvas.height = 1;
       }
