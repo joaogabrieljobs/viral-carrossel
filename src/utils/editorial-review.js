@@ -1236,11 +1236,22 @@ async function reviewSocialDraft({ prompt, draft, config, textOptions, onStage }
       if (!responded) break;
     }
   }
+  // Etapa 2 do plano do carrossel (26/11): linha de apoio que é pedaço do
+  // parágrafo do mesmo card fica vazia, sem IA (mesma regra do caminho
+  // planejado da apresentação, withoutEchoedSupportLines).
+  candidate = withoutEchoedSocialSupport(candidate);
   let violations = auditSocialDraft(candidate, config);
   if (!violations.length) {
-    const status = reviewApplied
+    let status = reviewApplied
       ? JSON.stringify(candidate) === JSON.stringify(draft) ? 'unchanged' : 'revised'
       : 'unavailable';
+    // Título que dá como fato o que o apoio do mesmo card chama de intenção:
+    // um reparo dirigido, como no caminho planejado. Falha deixa o card como
+    // estava, sem marcar o carrossel.
+    if (reviewResponded && goalTitleAsFactSlides(candidate.slides).length) {
+      const repaired = await repairSocialGoalTitles({ prompt, candidate, config, textOptions, onStage }, callAI);
+      if (repaired) { candidate = repaired; status = 'repaired'; }
+    }
     // Reteste 22/11 (WebExpresso): a mesma frase ou fato em 3+ cards depois
     // da revisão ganha um reparo dirigido; falha não vira rascunho.
     const repeated = [...repeatedFactSlides(candidate.slides), ...repeatedPhraseSlides(candidate.slides).map(item => ({ fact: item.phrase, slideIndexes: item.slideIndexes }))];
@@ -1320,10 +1331,40 @@ Reescreva frases completas para respeitar o limite. Preserve números, condiçõ
   return finishSocialReview(candidate, 'needs_attention', [...violations, ...removed]);
 }
 
+/** Card a card, a linha de apoio-eco sai (withoutEchoedSupportLines); mesmo objeto quando nada muda. */
+function withoutEchoedSocialSupport(result) {
+  const slides = withoutEchoedSupportLines(result.slides);
+  return slides.some((slide, index) => slide !== result.slides[index]) ? { ...result, slides } : result;
+}
+
+/**
+ * Reparo de "intenção como fato" no carrossel (Teste 4, item 4, no caminho
+ * social): edita só os cards marcados e só é aceito se reduz os títulos
+ * marcados sem criar outro problema da auditoria do carrossel.
+ */
+async function repairSocialGoalTitles({ prompt, candidate, config, textOptions, onStage }, callAI) {
+  const indexes = goalTitleAsFactSlides(candidate.slides);
+  const claims = indexes.map(slideIndex => `slideIndex ${slideIndex}, "${String(candidate.slides[slideIndex].title).replace(/[*_]/g, '').trim()}"`);
+  onStage?.('repairing');
+  try {
+    const repair = unwrapEditorialReview(await callAI(`${buildEditorialReviewPrompt(prompt, candidate, config)}
+REPARO DE FATOS — última passagem, sem gerar outro carrossel. Edite somente slideIndex ${indexes.join(', ')}. Título que afirma como fato o que o apoio do mesmo card trata como intenção (pretende, quer, busca, meta): ${claims.join('; ')}. Reescreva esse title no estágio do apoio (intenção ou meta), sem dar o resultado como alcançado. Não acrescente fatos nem mude a quantidade de cards. Preserve caption.`, textOptions));
+    throwIfGenerationCancelled(textOptions.signal);
+    if (!Array.isArray(repair?.edits) || repair.edits.some(edit => !indexes.includes(edit?.slideIndex)) || hasOwn(repair, 'caption')) return null;
+    const repaired = withoutEchoedSocialSupport(retainGroundedFields(applyEditorialReview(candidate, repair, config, { deferQualityChecks: true }), candidate, config).result);
+    return goalTitleAsFactSlides(repaired.slides).length < indexes.length && !auditSocialDraft(repaired, config).length ? repaired : null;
+  } catch (error) {
+    if (isGenerationCancelled(error) || textOptions.signal?.aborted) throw error;
+    return null;
+  }
+}
+
 // Normalization is reversible editorial recovery, never silent proof that the
 // provider followed the requested shape. Retain the legacy issue codes while
 // exposing the same notices to the progressive-review UI.
-function finishSocialReview(result, reviewStatus, violations = []) {
+function finishSocialReview(rawResult, reviewStatus, violations = []) {
+  // O reparo pode devolver a linha de apoio-eco: ela sai de novo, sem IA.
+  const result = withoutEchoedSocialSupport(rawResult);
   const normalization = (Array.isArray(result.normalizationIssues) ? result.normalizationIssues : []).map(code => ({ kind:'normalization', slideIndex:null, code }));
   const all = [...violations, ...normalization];
   // QA 24/11 (texto 1): a lacuna que sobrou no card vai para o aviso de
