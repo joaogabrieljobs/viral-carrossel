@@ -2,6 +2,8 @@
 import { normalizePresentationBlocks } from './presentation-quality.js';
 
 export const SOCIAL_FREE_STATE_FIELDS = Object.freeze([
+  // O Livre grava estas tintas no card; ao sair, o novo estilo as define.
+  'titleColor', 'subtitleColor', 'textColor',
   'socialFreeDesign', 'socialFreeDesignOverride', 'socialFreeTextSurfaces', 'socialFreeChromeGeometry',
   'socialDeckDesign', 'socialPlan', 'socialPresetId', 'socialVisualPresetId', 'socialSuppressPhoto',
   'socialComposition', 'socialCompositionVersion', 'socialArt', 'socialFunction', 'socialFamily', 'socialZoneAnchors',

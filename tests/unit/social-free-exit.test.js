@@ -11,6 +11,7 @@ import { slideForFormatDisplay } from '../../src/utils/format-view.js';
 import { clearSocialFreeDocumentState } from '../../src/utils/social-free-state.js';
 import { VISUAL_PRESETS, getSlideOverridesForPreset, applyVisualPreset } from '../../src/styles/visual-presets.jsx';
 import { PRESENTATION_VISUAL_PRESETS } from '../../src/styles/presentation-presets.jsx';
+import { contrastRatio } from '../../src/utils/social-chrome.js';
 
 const preset = VISUAL_PRESETS.find(item => item.socialFamily === 'revista');
 const blocks = [
@@ -59,6 +60,33 @@ describe('Saída explícita do Livre social', () => {
       expect(socialFormatPatch(slide, 'stories').socialComposition).not.toMatch(/^free:/);
     });
     expect(doc).toEqual(before);
+  });
+
+  it.each(['all', 'view'])('a saída %s troca as tintas claras do Livre pelas do estilo fixo abaixo da foto enviada', scope => {
+    const doc = make();
+    doc.slides[1] = { ...doc.slides[1], title: 'Apoteose é o **ápice**', subtitle: 'Celebração, intensidade e liberdade.', presentationBlocks: [],
+      bgImageId: 'uploaded-original', bgImage: 'data:image/png;base64,Yg==', imageQuery: '',
+      customBg: '#2B2158', titleColor: '#F8F8F8', subtitleColor: '#F8F8F8', textColor: '#F8F8F8',
+      socialFreeDesign: { ...doc.slides[1].socialFreeDesign, ground: 'bg', photo: 'half', block: 'none' },
+      socialArt: { ...doc.slides[1].socialArt, textOnPhoto: false, photoInks: { title: '#F8F8F8', body: '#F8F8F8', accent: '#F8701E' } },
+    };
+    const original = structuredClone(doc);
+    const brand = applyVisualPreset(doc.brand, preset.id);
+    let shown;
+    if (scope === 'view') {
+      doc.fmt = 'quadrado';
+      const updated = JSON.parse(JSON.stringify(applyVisualPresetToCard(doc, 1, preset, VISUAL_PRESETS)));
+      shown = slideForFormatDisplay(updated.slides[1], doc.fmt, updated.formatViews);
+      expect(updated.slides).toEqual(JSON.parse(JSON.stringify(original.slides)));
+    } else shown = switched(doc)[1];
+    expect(shown.socialArt.textOnPhoto).not.toBe(true);
+    for (const key of ['titleColor', 'subtitleColor', 'textColor']) {
+      expect(shown[key] || brand[key], key).toBe(brand[key]);
+      expect(contrastRatio(shown[key] || brand[key], shown.customBg || brand.bg), key).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(shown.socialArt.photoInks.title).not.toBe('#F8F8F8');
+    expect(shown.socialArt.photoInks.body).not.toBe('#F8F8F8');
+    for (const key of ['title', 'subtitle', 'bodyAfterImage', 'eyebrow', 'bgImageId', 'bgImage', 'imageQuery']) expect(shown[key], key).toBe(original.slides[1][key]);
   });
 
   it.each(blocks.map((block, index) => [block.type, block, blockNeedle[index]]))('o bloco %s continua visível depois de trocar para estilo fixo', (_type, block, needle) => {
