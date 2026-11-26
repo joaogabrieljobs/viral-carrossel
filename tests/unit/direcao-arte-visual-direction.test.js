@@ -193,8 +193,8 @@ describe('bloco VISUAL DIRECTION do pedido de imagem', () => {
   });
 
   it('paleta proposta pela IA com referência de estilo anexada: a referência manda na cor', () => {
-    expect(composeVisualDirectionBlock(APOTEOSE_VISUAL_DIRECTION, { referenceLook: true })).toContain('If the attached style reference shows different colours, follow the reference');
-    expect(composeVisualDirectionBlock({ ...APOTEOSE_VISUAL_DIRECTION, paletteSource: 'kit' }, { referenceLook: true })).not.toContain('follow the reference');
+    expect(composeVisualDirectionBlock(APOTEOSE_VISUAL_DIRECTION, { referenceLook: true })).toContain('If the attached style reference has other colours, its colours win; keep these roles.');
+    expect(composeVisualDirectionBlock({ ...APOTEOSE_VISUAL_DIRECTION, paletteSource: 'kit' }, { referenceLook: true })).not.toContain('its colours win');
   });
 
   it('slide sem visualDirection: a direção do pedido não ganha nada e o pedido fica igual ao de antes', () => {

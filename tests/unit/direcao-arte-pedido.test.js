@@ -111,7 +111,7 @@ describe('pedido de imagem da Apoteose com direção de arte', () => {
     const results = withImage.map(index => apoteosePrompt(deck, index));
     const cuts = results.flatMap(result => [...result.trimmed, ...result.dropped]);
     expect(cuts.filter(key => !['otherScenes'].includes(key))).toEqual([]);
-    expect(results.every(result => result.prompt.includes(IMAGE_PROMPT_TEXT.otherScenesHeader))).toBe(true);
+    expect(results.every(result => result.prompt.includes(IMAGE_PROMPT_TEXT.otherScenesHeader.replace("this slide's SCENE", "this slide's SUBJECT AND CASTING")))).toBe(true);
   });
 
   it('roteiro sem visualDirection: o pedido não ganha os blocos novos de direção (só COMPOSITION, porque o slide está composto)', () => {

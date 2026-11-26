@@ -207,7 +207,7 @@ export function composeVisualDirectionBlock(visualDirection, { referenceLook = f
     'VISUAL DIRECTION (shared by every image of this deck):',
     `Palette: ${palette}.`,
     // A IA não vê a referência: se ela anexada mostrar outra cor, vale a dela.
-    referenceLook && !['kit'].includes(visualDirection.paletteSource) ? 'If the attached style reference shows different colours, follow the reference\'s colours and keep these roles.' : '',
+    referenceLook && !['kit'].includes(visualDirection.paletteSource) ? 'If the attached style reference has other colours, its colours win; keep these roles.' : '',
     visualDirection.finish ? `Finish: ${sentence(visualDirection.finish)}` : '',
     visualDirection.atmosphere ? `Atmosphere: ${sentence(visualDirection.atmosphere)}` : '',
     graphics ? `Graphics: ${graphics}` : '',

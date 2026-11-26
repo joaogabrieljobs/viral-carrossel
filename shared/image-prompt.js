@@ -341,7 +341,10 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
   // No agente, I31 já proíbe captura, gráfico e depoimento.
   if (parts.presentationPanel && !agente) add('presentationPanel', visualDirection && composition ? T.presentationPanelVisual : T.presentationPanel, 'required');
   add('avoid', composeAvoidBlock(parts.avoid), 'required', keepWholeLines);
-  if (presentation) add('otherScenes', composeOtherScenesBlock(parts.otherScenes), 'optional', keepWholeLines);
+  // Com a cena como briefing não há bloco SCENE: as referências a ele apontam
+  // para o assunto do slide.
+  const paraBriefing = (texto) => (brief ? texto.replace("this slide's SCENE", "this slide's SUBJECT AND CASTING") : texto);
+  if (presentation) add('otherScenes', paraBriefing(composeOtherScenesBlock(parts.otherScenes)), 'optional', keepWholeLines);
   add('slideAction', parts.slideAction, 'required', (texto, max) => {
     const [cabecalho, ...resto] = texto.split('\n');
     return shrinkBody(`${cabecalho}\n`, resto.join('\n'), '', max);
@@ -368,7 +371,7 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
   } else if (!agente) {
     add('medium', presentation ? (withComposition ? T.mediumPresentation.replace(`${CANVAS_PRESENTATION} `, '') : T.mediumPresentation) : T.mediumCarousel, 'optional');
   }
-  add('styleReference', styleReference, 'fixed');
+  add('styleReference', paraBriefing(styleReference), 'fixed');
   // Com moodboard de estilo, a luz da família disputaria com a referência.
   // Com direção visual do deck, a paleta, a luz e o acabamento vêm dela: nem
   // a luz da família nem a direção de arte padrão (dessaturada) entram.
