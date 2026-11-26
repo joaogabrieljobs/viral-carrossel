@@ -6,7 +6,7 @@
  */
 import { FREE_ART_MAX_SLIDES, FREE_PRESENTATION_PRESET_ID, freePresentationCompositionOverrides } from './free-design.js';
 import { manuallyPositioned } from './presentation-composition.js';
-import { isFreeSocialSlide, socialFreePhotoPatch } from './social-free-design.js';
+import { isFreeSocialSlide, socialFreePhotoPatch, socialFreeSlideLocked } from './social-free-design.js';
 
 const GENERIC_LAYOUT_FIELDS = new Set([
   'canvas', 'layout', 'align', 'photoRegion', 'overlay', 'overlayMode', 'overlaySide', 'overlayReach', 'overlayColor',
@@ -138,5 +138,26 @@ export function reconcileFreeImageFallback(previous = [], slides = [], { failedS
 export function reconcileFreeImageDocument(previous, next) {
   if (!next || !Array.isArray(next.slides)) return next;
   const slides = reconcileFreeImageFallback(previous?.slides, next.slides);
-  return slides === next.slides ? next : { ...next, slides };
+  let formatViews = next.formatViews;
+  const fmt = next.fmt;
+  const bucket = formatViews?.[fmt];
+  if (bucket?.slides && ['carrossel', 'quadrado', 'stories'].includes(fmt)) {
+    const before = new Map((previous?.slides || []).map(slide => [slide.id, slide]));
+    let entries = bucket.slides;
+    for (const incoming of next.slides) {
+      const old = before.get(incoming.id), entry = bucket.slides[incoming.id];
+      if (!old || !entry || incoming.bgImageFailed || !mediaKey(incoming) || mediaKey(old) === mediaKey(incoming)) continue;
+      const view = { ...old, ...entry };
+      // A vista fixa tem socialFreeDesign:null. A vista Livre manual conserva
+      // suas caixas e offsets; somente a inserção de mídia pode revelar foto.
+      if (!isFreeSocialSlide(view) || view.socialFreeDesign.photo !== 'none' || !socialFreeSlideLocked(view)) continue;
+      const patch = socialFreePhotoPatch({ ...incoming, ...entry,
+        socialFreeDesign: view.socialFreeDesign,
+        socialArt: { ...view.socialArt, formato: fmt },
+      });
+      if (Object.keys(patch).length) entries = { ...entries, [incoming.id]: { ...entry, ...patch } };
+    }
+    if (entries !== bucket.slides) formatViews = { ...formatViews, [fmt]: { ...bucket, slides: entries } };
+  }
+  return slides === next.slides && formatViews === next.formatViews ? next : { ...next, slides, ...(formatViews ? { formatViews } : {}) };
 }
