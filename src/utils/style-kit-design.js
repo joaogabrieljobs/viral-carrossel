@@ -1,5 +1,7 @@
 import { TITLE_FONTS } from './design-data.js';
 import { BODY_FONTS } from './brand-visuals.js';
+import { nearestPaletteHex, normalizeReferencePalette, rgbToLab } from './reference-palette.js';
+import { wcagContrast } from './wcag.js';
 
 // A IA escolhe apenas valores que o editor sabe representar, nunca CSS arbitrário.
 export const PROJECT_DESIGN_SCHEMA = {
@@ -66,4 +68,48 @@ export function needsLightPhotoText(slide) {
   const photo = slide?.canvas?.zones?.photo;
   const canvasFullPhoto = !photo || (photo.w >= 90 && photo.h >= 90);
   return !!slide?.bgImage && fullPhoto && canvasFullPhoto && !(slide?.useCultureLayout && String(slide.bodyAfterImage || '').trim()) && (slide.overlay ?? 0) >= 38;
+}
+
+/* Paleta da referência no desenho do projeto (carrossel, 26/11/2026) ------- */
+
+const DESIGN_COLOR_KEYS = ['bg', 'titleColor', 'subtitleColor', 'textColor', 'accent'];
+const HEX6_DESIGN = /^#[0-9a-f]{6}$/i;
+const chroma = (hex) => {
+  const [, a, b] = rgbToLab([1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)));
+  return Math.hypot(a, b);
+};
+const readableOn = (bg, pool, min) => pool.find((c) => c !== bg && wcagContrast(c, bg) >= min) || null;
+const plainInk = (bg) => (wcagContrast('#111111', bg) >= wcagContrast('#FFFFFF', bg) ? '#111111' : '#FFFFFF');
+
+/**
+ * Desenho do projeto do carrossel com as cores da imagem de referência do kit
+ * (extraídas no navegador, reference-palette.js). Mesma regra da apresentação
+ * (snapPlanColorsToReference): cor que a IA do texto escreveu vai para a mais
+ * próxima entre as escritas no kit e as da referência; cor que ela deixou
+ * vazia sai da referência por papel (fundo = a mais pesada; título, apoio e
+ * corpo = a primeira que lê 4,5:1 no fundo, senão preto ou branco; acento = a
+ * mais saturada que lê 3:1). As cores escritas no kit continuam acima (o app
+ * as aplica depois). Sem referência, devolve o desenho como veio.
+ */
+export function projectDesignWithReferencePalette(raw, referenceColors = [], { kitColors = [] } = {}) {
+  const reference = normalizeReferencePalette(referenceColors).map((c) => c.hex);
+  if (!reference.length) return raw;
+  const base = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const kit = (Array.isArray(kitColors) ? kitColors : []).map((c) => String(c || '').toUpperCase()).filter((c) => HEX6_DESIGN.test(c));
+  const allowed = [...new Set([...kit, ...reference])];
+  const given = (key) => (typeof base[key] === 'string' && HEX6_DESIGN.test(base[key]) ? nearestPaletteHex(base[key], allowed) : '');
+  const bg = given('bg') || reference[0];
+  const others = reference.filter((c) => c !== bg);
+  const ink = (key, fallback) => {
+    const own = given(key);
+    return own && wcagContrast(own, bg) >= 4.5 ? own : fallback;
+  };
+  const titleColor = ink('titleColor', readableOn(bg, others, 4.5) || plainInk(bg));
+  const subtitleColor = ink('subtitleColor', titleColor);
+  const textColor = ink('textColor', readableOn(bg, others.filter((c) => c !== titleColor), 4.5) || titleColor);
+  const vivid = [...others].sort((a, b) => chroma(b) - chroma(a));
+  const accent = given('accent') || readableOn(bg, vivid, 3) || titleColor;
+  const out = { ...base, bg, titleColor, subtitleColor, textColor, accent };
+  for (const key of DESIGN_COLOR_KEYS) if (!HEX6_DESIGN.test(out[key])) delete out[key];
+  return out;
 }

@@ -263,7 +263,7 @@ import {
   resolveQuickGenerationRequest,
   buildGenerationTaskBlock,
 } from './src/utils/style-kit.js';
-import { buildProjectDesignInstructions, explicitBrandColorsFromKit, projectDesignBrandPatch, PROJECT_DESIGN_SCHEMA } from './src/utils/style-kit-design.js';
+import { buildProjectDesignInstructions, explicitBrandColorsFromKit, projectDesignBrandPatch, projectDesignWithReferencePalette, PROJECT_DESIGN_SCHEMA } from './src/utils/style-kit-design.js';
 import { buildExplicitCardScriptPrompt, canAutoApplyExplicitCardScript, parseExplicitCardScript } from './src/utils/structured-card-script.js';
 import { resolveImageReferences, migrateProjectReferences } from './src/utils/style-kit-storage.js';
 import { imageAuditRegenerationPrompt, imageGenerationAccess, importedPhotoRegenerationPrompt, slideImageGenerationState, slidesPendingImageGeneration } from './src/utils/image-generation-readiness.js';
@@ -6194,6 +6194,21 @@ ${jsonShapeLine}`;
         } catch { referenceColors = []; }
       }
     }
+    // Carrossel (etapa 2 do plano do carrossel, 26/11): a mesma extração, só
+    // para o desenho do projeto (projectDesign). Não entra em pedido de texto
+    // nem de imagem; vale onde o desenho do projeto vale (sem padrão escolhido
+    // e com a identidade livre) e fica guardada no kit como na apresentação.
+    let carouselReferenceColors = [];
+    if (!isPresentationGeneration && !remix && (styleKit?.refImages?.length || 0) > 0
+      && !effectiveVisualPreset && !brand.visualIdentityLocked && !preserveBrandIdentity) {
+      carouselReferenceColors = kitReferencePalette(styleKit);
+      if (!carouselReferenceColors.length) {
+        try {
+          carouselReferenceColors = await extractReferencePaletteFromSources(await resolveImageReferences(styleKit, null, null, null));
+          referencePaletteField = referencePaletteKitField(styleKit, carouselReferenceColors);
+        } catch { carouselReferenceColors = []; }
+      }
+    }
     const planningBrief = [
       buildGenerationTaskBlock(topic, announcement),
       n ? `Área ou contexto: ${n}` : '',
@@ -6369,8 +6384,12 @@ ${jsonShapeLine}`;
       : brand;
     let generationBrand = {
       ...presetBrand,
-      ...((projectDesignInstructions && !effectiveVisualPreset && !brand.visualIdentityLocked && !preserveBrandIdentity)
-        ? projectDesignBrandPatch(result.projectDesign)
+      ...(((projectDesignInstructions || carouselReferenceColors.length) && !effectiveVisualPreset && !brand.visualIdentityLocked && !preserveBrandIdentity)
+        // Carrossel com referência no kit: cores da imagem por papel; as
+        // escritas no kit vêm logo abaixo e continuam vencendo.
+        ? projectDesignBrandPatch(carouselReferenceColors.length
+          ? projectDesignWithReferencePalette(result.projectDesign, carouselReferenceColors, { kitColors: Object.values(explicitBrandColorsFromKit(styleKit)) })
+          : result.projectDesign)
         : {}),
       ...explicitBrandColorsFromKit(styleKit),
       // Escolhas feitas nos controles do assistente prevalecem sobre cores
