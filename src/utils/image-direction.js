@@ -153,7 +153,14 @@ export function composeImageDirection({
   anchorPlan = null, baseReferenceCount, presentationPanel = false, presentationFamily,
   deckSlides = null, slideIndex = -1, socialFree = false, formatViews = null,
 } = {}) {
-  const card = slide || {};
+  const apresentacao = fmt === 'apresentacao';
+  const source = slide || {};
+  const entry = formatViews?.[fmt]?.slides?.[source.id];
+  const exitedFreeHere = Object.hasOwn(entry || {}, 'socialFreeDesign') && entry.socialFreeDesign === null;
+  // A composição e a decisão de usar o plano pertencem à mesma vista.
+  // Um estilo fixo nesta proporção não reativa a direção Livre da base.
+  const card = !apresentacao && (socialFree === true || isSocialFreeSlide(source))
+    ? socialFreeImageSlide(source, { fmt, formatViews }) : source;
   const kit = normalizeStyleKit(styleKit);
   const direcao = String(slideDirection ?? card.imgExtraPrompt ?? '').trim().slice(0, SLIDE_DIRECTION_MAX);
   const estetica = isAestheticDirection(direcao);
@@ -161,8 +168,7 @@ export function composeImageDirection({
   // Instrução de ação cita os @rótulos: fica junto do mapa. Sem mapa, vira
   // bloco próprio. Em nenhum dos casos conta como estilo.
   const referenceMap = composeReferenceMap(references, estetica ? '' : direcao);
-  const apresentacao = fmt === 'apresentacao';
-  const livreSocial = !apresentacao && (socialFree === true || isSocialFreeSlide(card));
+  const livreSocial = !apresentacao && !exitedFreeHere && (socialFree === true || isSocialFreeSlide(card));
   // Direção de arte (partes 1 a 3): direção visual do deck (roteiro, modo
   // livre e kit), cena como briefing e o espaço do texto no quadro.
   const visual = apresentacao ? resolveSlideVisualDirection({ slide: card, styleKit })
@@ -173,7 +179,7 @@ export function composeImageDirection({
     : livreSocial ? composeSocialFreeComposition(card, { fmt, formatViews, visualDirection: visual, shot: clean(plannedScene?.shot) }) : '';
   const sceneBrief = visual ? presentationSceneBrief(plannedScene, { shotInComposition: !!composition }) : null;
   const cena = composeSceneParts({
-    visualBible, slide: livreSocial ? socialFreeImageSlide(card, { fmt, formatViews }) : card, fmt,
+    visualBible, slide: card, fmt,
     excludeEntityIds: anchorPlan?.excludeEntityIds || [], presentationFamily,
     compositionAware: !!composition,
   });

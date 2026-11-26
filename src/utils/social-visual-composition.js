@@ -696,7 +696,7 @@ export function socialFormatPatch(slide, formato = 'carrossel') {
     delete socialArt.heroNumber;
     delete socialArt.heroTitlePx;
   }
-  return {
+  const patch = {
     layout: L.align === 'center' ? 'tc' : 'tl',
     align: L.align,
     bgFit: L.photoFit === 'contain' ? 'contain' : 'cover',
@@ -715,6 +715,11 @@ export function socialFormatPatch(slide, formato = 'carrossel') {
     socialArt,
     canvas: { enabled: false, applied: true, variant: 'classic', source: 'social-preset', preserveZones: true, zones },
   };
+  // Cards vindos do Livre podem combinar uma foto com um bloco nativo.
+  // Cada proporção conserva ambos, usando a área de apoio do novo layout.
+  return slide.socialNativeBlocksFromFree
+    ? { ...patch, canvas: preserveSocialNativeBlockZone({ ...slide, ...patch }).canvas }
+    : patch;
 }
 
 /**

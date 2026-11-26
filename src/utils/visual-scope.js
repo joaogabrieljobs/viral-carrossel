@@ -46,7 +46,11 @@ export function applyVisualPresetToCard(doc, index, preset, presets) {
   if (!slide || !preset) return doc;
   let patch;
   let brand;
-  const exitFree = !isFreeSocialPreset(preset) && hasSocialFreeState(slide);
+  const entry = doc.formatViews?.[doc.fmt]?.slides?.[slide.id];
+  const exitedFreeView = hasSocialFreeState(doc.slides[index])
+    && Object.hasOwn(entry || {}, 'socialFreeDesign') && entry.socialFreeDesign === null;
+  // A saída continua restrita à vista nas próximas trocas de estilo também.
+  const exitFree = !isFreeSocialPreset(preset) && (hasSocialFreeState(slide) || exitedFreeView);
   if (preset.productKind === 'apresentacao') {
     const styled = applyPresentationVisualPresetToDoc({ ...doc, slides:[slide] }, preset.id, presets, { initialize:false });
     patch = { ...styled.slides[0] };

@@ -3,6 +3,7 @@ import { composeImageDirection } from '../../src/utils/image-direction.js';
 import { buildImagePrompt, IMAGE_PROMPT_TEXT } from '../../shared/image-prompt.js';
 import { presentationSceneQuery } from '../../src/utils/presentation-plan.js';
 import { PERSON_IDENTITY_DIRECTION } from '../../src/utils/visual-bible.js';
+import { socialFreeExitPatch } from '../../src/utils/social-free-state.js';
 
 const visualDirection = {
   palette: [{ role: 'base', hex: '#17364B' }, { role: 'subject_light', hex: '#E6BC65' }, { role: 'graphic', hex: '#75BED0' }],
@@ -59,6 +60,26 @@ describe('Imagem do Livre social: visual próprio e geometria real', () => {
     expect(parts.composition).toContain('covering 100% of the card width and 15% of its height');
     expect(parts.framing).toContain('wide, shallow band');
     expect(parts.framing).not.toContain('tall, narrow column');
+  });
+
+  it('uma vista que saiu do Livre usa o estilo efetivo sem reativar plano, cena ou direção da base', () => {
+    const slide = card();
+    const before = structuredClone(slide);
+    const entry = { ...socialFreeExitPatch(slide), socialVisualPresetId: 'social_revista', socialFamily: 'revista', canvas: { applied: true, userEdited: true, zones: {
+      photo: { x: 0, y: 65, w: 100, h: 15 }, title: { x: 8, y: 14, w: 84, h: 20 },
+    } } };
+    const formatViews = { stories: { slides: { a: entry } } };
+    const parts = composeImageDirection({ slide, fmt: 'stories', formatViews, styleKit, baseReferenceCount: 1, deckSlides: [slide, card('b')], slideIndex: 0 });
+    expect(parts.socialFree).toBeUndefined();
+    expect(parts.sceneBrief).toBeUndefined();
+    expect(parts.visualDirection).toBeUndefined();
+    expect(parts.avoid).toBeUndefined();
+    expect(parts.otherScenes).toBeUndefined();
+    expect(parts.composition).toBeUndefined();
+    expect(parts.framing).toContain('wide, shallow band');
+    expect(parts).toEqual(composeImageDirection({ slide: { ...slide, ...entry }, fmt: 'stories', styleKit, baseReferenceCount: 1 }));
+    expect(slide).toEqual(before);
+    expect(composeImageDirection({ slide, fmt: 'carrossel' }).socialFree).toBe(true);
   });
 
   it('preserva âncora e ficha visual sem pedir uma pessoa diferente da referência de identidade', () => {

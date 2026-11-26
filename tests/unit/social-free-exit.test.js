@@ -74,6 +74,24 @@ describe('Saída explícita do Livre social', () => {
     }
   });
 
+  it.each(blocks.map((block, index) => [block.type, block, blockNeedle[index]]))('o bloco %s com foto permanece ao adaptar o estilo fixo a outro formato', (_type, block, needle) => {
+    const doc = make(block);
+    doc.slides[1] = { ...doc.slides[1], imageQuery: 'Hands shaping clay in a workshop', bgImageId: 'block-photo', bgImage: 'data:image/png;base64,Yg==',
+      socialFreeDesign: { ...doc.slides[1].socialFreeDesign, photo: 'half' } };
+    const slides = switched(doc);
+    for (const fmt of ['carrossel', 'quadrado', 'stories']) {
+      const shown = slideForFormatDisplay(slides[1], fmt, {});
+      expect(shown.bgImageId).toBe('block-photo');
+      expect(shown.bgImage).toBe(doc.slides[1].bgImage);
+      expect(shown.canvas?.zones?.photo?.w).toBeGreaterThan(2);
+      expect(shown.canvas?.zones?.evidence?.h, fmt).toBeGreaterThan(0);
+      const html = render(shown, fmt, applyVisualPreset(doc.brand, preset.id));
+      expect(html).toContain(needle);
+      expect(html).toContain('Um contexto que continua visível.');
+      expect(shown.presentationBlocks).toEqual(doc.slides[1].presentationBlocks);
+    }
+  });
+
   it('o estilo individual no Feed muda só o card escolhido', () => {
     const doc = make();
     const result = applyVisualPresetToCard(doc, 1, preset, VISUAL_PRESETS);
@@ -97,6 +115,25 @@ describe('Saída explícita do Livre social', () => {
     expect(slideForFormatDisplay(result.slides[1], other, result.formatViews)).toEqual(JSON.parse(JSON.stringify(otherBefore)));
     expect(result.socialPlan).toEqual(JSON.parse(JSON.stringify(doc.socialPlan)));
     expect(result.formatViews.carrossel).toEqual(doc.formatViews.carrossel);
+  });
+
+  it.each(['stories', 'quadrado'])('a segunda troca de estilo em %s continua isolada na mesma vista', fmt => {
+    const doc = make();
+    doc.fmt = fmt;
+    const other = fmt === 'stories' ? 'quadrado' : 'stories';
+    const otherBefore = slideForFormatDisplay(doc.slides[1], other, doc.formatViews);
+    const first = JSON.parse(JSON.stringify(applyVisualPresetToCard(doc, 1, preset, VISUAL_PRESETS)));
+    const secondPreset = VISUAL_PRESETS.find(item => item.socialFamily === 'manchete');
+    const result = JSON.parse(JSON.stringify(applyVisualPresetToCard(first, 1, secondPreset, VISUAL_PRESETS)));
+    const shown = slideForFormatDisplay(result.slides[1], fmt, result.formatViews);
+    expectInactive(shown);
+    expect(shown.visualPresetId).toBe(secondPreset.id);
+    expect(shown.socialArt?.family).toBe('manchete');
+    expect(result.slides).toEqual(JSON.parse(JSON.stringify(doc.slides)));
+    expect(slideForFormatDisplay(result.slides[1], other, result.formatViews)).toEqual(JSON.parse(JSON.stringify(otherBefore)));
+    expect(result.socialPlan).toEqual(JSON.parse(JSON.stringify(doc.socialPlan)));
+    expect(result.formatViews[fmt].slides.c0).toBeUndefined();
+    expect(result.formatViews[fmt].slides.c2).toBeUndefined();
   });
 
   it('limpar o projeto inteiro desativa também os resíduos nas vistas, conservando conteúdo', () => {
