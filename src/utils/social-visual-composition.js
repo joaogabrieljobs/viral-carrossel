@@ -11,6 +11,7 @@ import { socialGround, luminance, socialChromeTokens, photoInkFor, minScrimAlpha
 import { normalizePresentationBlocks } from './presentation-quality.js';
 import { VIRAL_STYLES, PILL_ROLE_VISIBLE, pillRoleFor } from './social-viral-styles.js';
 import { applyFreeSocialDesign, isFreeSocialPreset, isFreeSocialSlide, socialFreeFormatPatch } from './social-free-design.js';
+import { hasSocialFreeState, preserveSocialNativeBlockZone, stripSocialFreeSlideFields } from './social-free-state.js';
 
 const box = (x, y, w, h) => ({ x, y, w, h });
 const PHOTO_ESSAY = new Set(['editorial_magazine', 'mood_sepia', 'reflexivo_cream', 'cinematic_hybrid']);
@@ -130,10 +131,12 @@ function supportChars(slide) {
  * vertical continua sendo da composição — capa embaixo, miolo em cima.
  */
 export function applySocialVisualComposition(slides, { preset, photoRegion = 'full', brand = null, formato = 'carrossel', narrative = 'editorial', deckDesign, plan } = {}) {
-  if (!preset || preset.productKind === 'apresentacao' || photoRegion !== 'full') return slides;
+  if (!preset || preset.productKind === 'apresentacao') return slides;
   if (isFreeSocialPreset(preset)) return applyFreeSocialDesign(slides, { preset, brand, formato, narrative, deckDesign, plan });
-  if (usesSocialLibrary(preset)) return composeSocialLibrary(slides, { preset, brand, formato, narrative });
-  return applySocialVisualCompositionV3(slides, { preset, photoRegion, brand, formato });
+  if (photoRegion !== 'full') return slides;
+  const source = Array.isArray(slides) && slides.some(hasSocialFreeState) ? slides.map(stripSocialFreeSlideFields) : slides;
+  if (usesSocialLibrary(preset)) return composeSocialLibrary(source, { preset, brand, formato, narrative });
+  return applySocialVisualCompositionV3(source, { preset, photoRegion, brand, formato });
 }
 
 /**
@@ -227,15 +230,15 @@ export function restyleSocialSlides(slides, { preset, brand = null, formato = 'c
   // estilo próprio, zonas manuais e offsets que precisam ser preservados.
   if (isFreeSocialPreset(preset)) return applyFreeSocialDesign(slides, { preset, brand, formato, narrative, deckDesign, plan });
   const eraComposto = slides.some((slide) => slide?.socialComposition);
-  const base = slides.map((slide) => ({ ...slide, ...overrides }));
+  const base = slides.map((slide) => ({ ...stripSocialFreeSlideFields(slide), ...overrides }));
   if (!eraComposto && !(preset?.socialFamily && usesSocialLibrary(preset))) return base;
   const recomposto = applySocialVisualComposition(base, { preset, brand, formato, narrative });
-  if (recomposto !== base) return recomposto;
-  return base.map((slide) => {
+  if (recomposto !== base) return recomposto.map((slide, index) => preserveSocialNativeBlockZone(slide, slides[index]));
+  return base.map((slide, index) => {
     const limpo = { ...slide };
     for (const campo of SOCIAL_COMPOSITION_FIELDS) delete limpo[campo];
     const temFoto = !!(slide.bgImage || slide.bgImageId || slide.bgImageAssetId);
-    return temFoto ? { ...limpo, overlay: Math.max(Number(slide.overlay) || 0, 60), textShadow: true } : limpo;
+    return preserveSocialNativeBlockZone(temFoto ? { ...limpo, overlay: Math.max(Number(slide.overlay) || 0, 60), textShadow: true } : limpo, slides[index]);
   });
 }
 
@@ -575,6 +578,9 @@ export function socialFormatPatch(slide, formato = 'carrossel') {
   const F = { ...formatFrame(formato) };
   const photo = hasPhoto(slide);
   let L = socialCardLayout(art.family, art.fn, { formato, photo, structured: art.structured, variant: art.variant, topReserve: logoTopReserve(art.logo, F) });
+  if (slide.socialNativeBlocksFromFree && art.structured && !photo && !L.evidence) {
+    L = socialCardLayout(art.family, 'comparison', { formato, photo: false, structured: true, variant: art.variant, topReserve: logoTopReserve(art.logo, F) });
+  }
   const typo = art.typo || {};
   // Margem mínima entre a logo e o texto: logo embaixo entra na conta do
   // rodapé (o bloco sobe); logo em cima encurta a caixa do título por cima, e

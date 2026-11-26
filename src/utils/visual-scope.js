@@ -4,6 +4,9 @@ import { sanitizeCustomVisualPresetBrand } from './custom-visual-presets.js';
 import { suggestCreativePresetForVisual } from './slide-design-system.js';
 import { applyFormatEdit, applyBrandEdit, brandForFormatDisplay, slideForFormatDisplay, transformFormatVisuals } from './format-view.js';
 import { dropKeysFromFormatViews } from './format-view-keys.js';
+import { isFreeSocialPreset } from './social-free-design.js';
+import { restyleSocialSlides } from './social-visual-composition.js';
+import { hasSocialFreeState, socialFreeExitPatch } from './social-free-state.js';
 
 const CONTENT_KEYS = ['id', 'title', 'subtitle', 'bodyAfterImage', 'eyebrow', 'eyebrowText', 'strikethroughText', 'afterTitleText', 'caption', 'bgImage', 'bgImageId', 'bgImageAssetId', 'imageQuery', 'overlays'];
 
@@ -43,6 +46,7 @@ export function applyVisualPresetToCard(doc, index, preset, presets) {
   if (!slide || !preset) return doc;
   let patch;
   let brand;
+  const exitFree = !isFreeSocialPreset(preset) && hasSocialFreeState(slide);
   if (preset.productKind === 'apresentacao') {
     const styled = applyPresentationVisualPresetToDoc({ ...doc, slides:[slide] }, preset.id, presets, { initialize:false });
     patch = { ...styled.slides[0] };
@@ -50,15 +54,31 @@ export function applyVisualPresetToCard(doc, index, preset, presets) {
   } else {
     patch = getSlideOverridesForPreset(preset.id, presets, { scope: 'card' });
     brand = applyVisualPreset(doc.brand, preset.id, presets);
+    if (exitFree) {
+      const shown = doc.slides.map(item => slideForFormatDisplay(item, doc.fmt, doc.formatViews, doc.creativePreset));
+      shown[index] = { ...slide, visualPresetId: preset.id };
+      patch = restyleSocialSlides(shown, { preset, brand, formato: doc.fmt, overrides: patch, narrative: doc.quickNarrativeMode || 'editorial' })[index];
+    }
   }
   // Keep the author's content and photos, including auxiliary copy and CTAs.
-  for (const key of CONTENT_KEYS) delete patch[key];
-  return applyFormatEdit(doc, index, {
+  for (const key of [...CONTENT_KEYS, ...(exitFree ? ['presentationBlocks', 'socialBlocks'] : [])]) delete patch[key];
+  const visualPatch = {
+    ...(exitFree ? socialFreeExitPatch(slide) : {}),
     ...patch,
     visualBrand: sanitizeCustomVisualPresetBrand(brand),
     visualPresetId: preset.id,
     visualCreativePreset: preset.socialFamily ? doc.creativePreset : (preset.creativePreset || suggestCreativePresetForVisual(preset.id) || doc.creativePreset),
-  });
+  };
+  if (exitFree && (doc.fmt !== 'carrossel' || doc.slides[index]?.socialArt?.formato && doc.slides[index].socialArt.formato !== 'carrossel')) {
+    // Os metadados de composição não são VIEW_KEYS legados. Guardar a saída
+    // inteira nesta vista impede que null apague o Livre dos outros formatos.
+    const entry = Object.fromEntries(Object.entries(visualPatch).filter(([key, value]) => value !== undefined && value !== slide[key]));
+    const bucket = doc.formatViews?.[doc.fmt] || {};
+    return { ...doc, formatViews: { ...doc.formatViews, [doc.fmt]: { ...bucket, slides: {
+      ...bucket.slides, [slide.id]: { ...bucket.slides?.[slide.id], ...entry },
+    } } } };
+  }
+  return applyFormatEdit(doc, index, visualPatch);
 }
 
 /**

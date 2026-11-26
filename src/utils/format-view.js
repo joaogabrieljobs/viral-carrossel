@@ -142,19 +142,21 @@ export function brandForFormatDisplay(brand, fmt, formatViews, creativePreset) {
 export function slideForFormatDisplay(slide, fmt, formatViews, creativePreset) {
   if (!slide || !fmt || !FORMATS[fmt]) return slide;
   const source = restorePresentationPhotoComposition(slide);
-  const adaptPresentation = fmt !== 'apresentacao' && hasPresentationDesign(slide, creativePreset);
   const entry = viewEntry(formatViews, fmt, slide.id) || {};
+  const exitedFreeHere = Object.hasOwn(entry, 'socialFreeDesign') && entry.socialFreeDesign === null;
+  const effective = exitedFreeHere ? { ...source, ...entry } : source;
+  const adaptPresentation = fmt !== 'apresentacao' && hasPresentationDesign(effective, creativePreset);
   // O Livre pode nascer em qualquer proporção. Só o Feed legado é sempre
   // a vista canônica; um Livre criado em Stories precisa da geometria 4:5.
-  const freeSocial = isFreeSocialSlide(slide);
-  const freeFeedDerived = freeSocial && slide.socialArt?.formato && slide.socialArt.formato !== 'carrossel';
-  if (fmt === 'carrossel' && !adaptPresentation && !freeFeedDerived && (!freeSocial || !Object.keys(entry).length)) return slide;
+  const freeSocial = isFreeSocialSlide(effective);
+  const freeFeedDerived = freeSocial && effective.socialArt?.formato && effective.socialArt.formato !== 'carrossel';
+  if (fmt === 'carrossel' && !adaptPresentation && !freeFeedDerived && !exitedFreeHere && (!freeSocial || !Object.keys(entry).length)) return slide;
   // Carrossel da biblioteca v4: Quadrado e Stories são recompostos (zonas,
   // escala e dispositivos do formato), não o Feed reduzido.
-  const socialLibrary = !adaptPresentation && fmt !== 'apresentacao' && slide.socialCompositionVersion >= 4 && !!slide.socialArt;
+  const socialLibrary = !adaptPresentation && fmt !== 'apresentacao' && effective.socialCompositionVersion >= 4 && !!effective.socialArt;
   const base = adaptPresentation
-    ? presentationForSocialFormat(slideForFormatDisplay(source, 'apresentacao', formatViews), fmt)
-    : socialLibrary ? { ...source, ...socialFormatPatch(source, fmt) } : source;
+    ? presentationForSocialFormat(slideForFormatDisplay(effective, 'apresentacao', formatViews), fmt)
+    : socialLibrary ? { ...effective, ...socialFormatPatch(effective, fmt) } : effective;
   const next = { ...base, ...entry };
   // Ajustes já gravados antes da opção automática também são escolhas manuais.
   if (adaptPresentation && !entry.photoFraming

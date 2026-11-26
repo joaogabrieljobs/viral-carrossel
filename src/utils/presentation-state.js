@@ -30,6 +30,7 @@ import {
 } from './free-design.js';
 import { explicitBrandColorsFromKit } from './style-kit-design.js';
 import { presentationRoadmap } from './presentation-roadmap.js';
+import { clearSocialFreeDocumentState, stripSocialFreeSlideFields } from './social-free-state.js';
 
 export const DEFAULT_CAROUSEL_VISUAL_PRESET_ID = 'minimal_clean';
 
@@ -56,7 +57,8 @@ export function presentationStageAt(pathId, index, count) {
 
 function applyResolvedPresentationPresetToSlide(sourceSlide, preset, normalizedPath, index, count, previous = null, nextSlide = null, deckDesign = null) {
   // Página que estava no modo livre volta ao neutro antes de outro preset.
-  const slide = preset?.isFree ? sourceSlide : stripFreeSlideFields(sourceSlide);
+  const socialCleared = stripSocialFreeSlideFields(sourceSlide);
+  const slide = preset?.isFree ? socialCleared : stripFreeSlideFields(socialCleared);
   const resolvedPresetId = preset?.id || DEFAULT_PRESENTATION_VISUAL_PRESET_ID;
   const stage = {
     ...presentationStageAt(normalizedPath, index, count),
@@ -226,7 +228,7 @@ export function applyPresentationVisualPresetToDoc(
   presets = PRESENTATION_VISUAL_PRESETS,
   { initialize = false } = {},
 ) {
-  const source = doc && typeof doc === 'object' ? doc : {};
+  const source = clearSocialFreeDocumentState(doc && typeof doc === 'object' ? doc : {});
   const preset = resolvePresentationPreset(presetId, presets);
   const resolvedPresetId = preset?.id || DEFAULT_PRESENTATION_VISUAL_PRESET_ID;
   const presentationPath = normalizePresentationPath(source.presentationPath);
