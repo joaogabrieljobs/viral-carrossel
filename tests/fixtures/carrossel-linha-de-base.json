@@ -1,0 +1,71 @@
+{
+  "origem": "Linha de base da composição do carrossel (26/11/2026), feita antes das melhorias da etapa 2 do plano docs/product/carrossel-melhorias-e-modo-livre.md. Deck fixo de 8 cards: capa, abertura, desenvolvimento ×2, foto, afirmação, lista e fecho com CTA. Texto de exemplo, só para teste.",
+  "marca": { "name": "Ateliê Forno", "handle": "" },
+  "narrativa": "editorial",
+  "cards": [
+    {
+      "id": "c1",
+      "papel": "capa",
+      "title": "A padaria que abriu a cozinha para a rua",
+      "subtitle": "Um ensaio sobre mostrar o processo antes do produto.",
+      "bodyAfterImage": "",
+      "imageQuery": "baker shaping dough behind a street-facing window"
+    },
+    {
+      "id": "c2",
+      "papel": "abertura",
+      "title": "Durante anos, o balcão escondia o trabalho",
+      "subtitle": "O pão chegava pronto à vitrine. Quem comprava via o resultado e nunca o tempo de fermentação.",
+      "bodyAfterImage": "",
+      "imageQuery": ""
+    },
+    {
+      "id": "c3",
+      "papel": "desenvolvimento",
+      "title": "A bancada saiu dos fundos",
+      "subtitle": "A mesa de modelar foi para perto da janela. A massa passou a descansar onde a calçada vê.",
+      "bodyAfterImage": "",
+      "imageQuery": ""
+    },
+    {
+      "id": "c4",
+      "papel": "desenvolvimento",
+      "title": "O forno virou parte da loja",
+      "subtitle": "O horário de cada fornada foi escrito na porta. Quem passa sabe quando o pão sai quente.",
+      "bodyAfterImage": "",
+      "imageQuery": ""
+    },
+    {
+      "id": "c5",
+      "papel": "foto",
+      "title": "A massa descansa à vista",
+      "subtitle": "A janela da cozinha virou a vitrine mais olhada da rua.",
+      "bodyAfterImage": "",
+      "imageQuery": "proofing dough in linen baskets near a bakery window"
+    },
+    {
+      "id": "c6",
+      "papel": "afirmação",
+      "title": "Ver o processo muda a conversa.",
+      "subtitle": "",
+      "bodyAfterImage": "",
+      "imageQuery": ""
+    },
+    {
+      "id": "c7",
+      "papel": "lista",
+      "title": "O que mudou na rotina",
+      "subtitle": "- A bancada saiu dos fundos\n- O horário ficou na porta\n- O balcão ganhou uma janela",
+      "bodyAfterImage": "",
+      "imageQuery": ""
+    },
+    {
+      "id": "c8",
+      "papel": "fecho",
+      "title": "Uma cozinha aberta também é vitrine",
+      "subtitle": "Salve este carrossel para quando repensar o seu espaço.",
+      "bodyAfterImage": "",
+      "imageQuery": "warm bakery storefront at dusk with the kitchen visible"
+    }
+  ]
+}

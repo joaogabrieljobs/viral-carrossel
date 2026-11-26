@@ -1,0 +1,887 @@
+{
+ "origem": "Gravado em 26/11/2026 sobre a main c11f948, antes da etapa 2. Chave: estilo|formato.",
+ "casos": {
+  "revista|carrossel": {
+   "hash": "dcb7d0bd3d7abd79",
+   "sequencia": "cover:coverFramed opener:opener development:devRule development:devColumn photo:photoStack statement:statementQuote list:list closing:closingFramed",
+   "cards": [
+    "1a23cab1cc3f24eb",
+    "8339b0ee8066e5fc",
+    "5caf2e1712e02b21",
+    "a1377456992d0ee7",
+    "fb3b2381f8d2efb4",
+    "4efb7c01a2ba8f22",
+    "a09296ca2765ee80",
+    "00246f9dbcf254e2"
+   ]
+  },
+  "revista|quadrado": {
+   "hash": "b243f336c0296f81",
+   "sequencia": "cover:wideStack opener:opener development:devRule development:devColumn photo:photoStack statement:statementQuote list:list closing:wideStack",
+   "cards": [
+    "dbf85be84a45dbb6",
+    "254330dd133f80be",
+    "d832d6694516ca4c",
+    "9b36e95cc54aee6e",
+    "7c3e2395b55464b4",
+    "4053a8ddd5834374",
+    "fa16d2071c712a5a",
+    "87478e4e5dcf5722"
+   ]
+  },
+  "revista|stories": {
+   "hash": "8282f50ad6345011",
+   "sequencia": "cover:coverFramed opener:opener development:devRule development:devColumn photo:photoStack statement:statementQuote list:list closing:closingFramed",
+   "cards": [
+    "a0893be0f768d6ea",
+    "2081749ac11c32e7",
+    "9c9e7e0a049e368f",
+    "7a62e5d9656baa4f",
+    "b3385dd25d20999a",
+    "3b4c6394f98553e6",
+    "c7568d6762ce128e",
+    "481fc94070983da0"
+   ]
+  },
+  "manchete|carrossel": {
+   "hash": "816636ee07c2ef40",
+   "sequencia": "cover:coverBleed opener:openerMega development:devMega development:devRule photo:photoInset statement:statementMega list:list closing:closingBleed",
+   "cards": [
+    "865a47a006079fe8",
+    "b68d377d196a9638",
+    "556cebfef89e64c5",
+    "219cfcad29be2527",
+    "7f80c8493cfb2221",
+    "1d03306ecf58e6c9",
+    "38445e23f789fe5e",
+    "2150476f0cfc6df4"
+   ]
+  },
+  "manchete|quadrado": {
+   "hash": "7f56b5491d722961",
+   "sequencia": "cover:coverBleed opener:openerMega development:devMega development:devRule photo:photoInset statement:statementMega list:list closing:closingBleed",
+   "cards": [
+    "5e1446f5618e7957",
+    "34e1cb943ec345d6",
+    "08531e16e739d908",
+    "d132a42fd4428727",
+    "b21ea12a337c111f",
+    "39fa5549ec3ac437",
+    "397fd09f04c61549",
+    "7fe84d0331af4072"
+   ]
+  },
+  "manchete|stories": {
+   "hash": "321bf5ae65d208fd",
+   "sequencia": "cover:coverBleed opener:openerMega development:devMega development:devRule photo:photoInset statement:statementMega list:list closing:closingBleed",
+   "cards": [
+    "217c4ca8af3bc407",
+    "1f603d05d611e76d",
+    "9f3e1e121e3ecec2",
+    "23452aca3c9455ed",
+    "311035d1f93872aa",
+    "d0c9aeac08c6166d",
+    "d9557781a58c1d59",
+    "c3a6987835676e07"
+   ]
+  },
+  "grade|carrossel": {
+   "hash": "94e1e1a8205581be",
+   "sequencia": "cover:coverGrid opener:openerIndex development:devIndex development:devIndex photo:photoGrid statement:statementBlock list:listIndex closing:closingGrid",
+   "cards": [
+    "ecd67acf26b98fe3",
+    "732a5a2fdfb284b2",
+    "eb81e74f6b17abc7",
+    "277b2047de75ed77",
+    "5ea05effbded8acc",
+    "2ec34178262a21fc",
+    "7ec0eede39143b21",
+    "a55ffb546e3c96f9"
+   ]
+  },
+  "grade|quadrado": {
+   "hash": "a00a79427c2cdde0",
+   "sequencia": "cover:coverGrid opener:openerIndex development:devIndex development:devIndex photo:photoGrid statement:statementBlock list:listIndex closing:closingGrid",
+   "cards": [
+    "ef3d9cccee477fbc",
+    "a0606d20d206f066",
+    "0258571f3434f50e",
+    "a82a782f426ae368",
+    "16a6ca9478735415",
+    "f0c11038618496e2",
+    "945d675c1e9b0c30",
+    "b9f28167f36d4d95"
+   ]
+  },
+  "grade|stories": {
+   "hash": "5b9f5108ed4bcc9a",
+   "sequencia": "cover:coverGrid opener:openerIndex development:devIndex development:devIndex photo:photoGrid statement:statementBlock list:listIndex closing:closingGrid",
+   "cards": [
+    "0dff87743addbf91",
+    "6b33ee3e9c9b7dfd",
+    "dcc5b8486ef092c4",
+    "a0b139cd49f747c4",
+    "5208b3f0704422d0",
+    "366f29eca1315091",
+    "dfbc5a6d692ae399",
+    "f513bf8472edf651"
+   ]
+  },
+  "documental|carrossel": {
+   "hash": "e29bbadd279202dc",
+   "sequencia": "cover:coverBleed opener:opener development:devRule development:devRule photo:photoFramed statement:statementQuote list:list closing:closingBleed",
+   "cards": [
+    "3a73b870446793e9",
+    "382d24e086c1f042",
+    "349144630d57baf4",
+    "6b3324954174d0f5",
+    "ee27984c7d7c8822",
+    "9ef4faf6f88929e5",
+    "5e15799e7faa65db",
+    "94645ea826fc57e0"
+   ]
+  },
+  "documental|quadrado": {
+   "hash": "a2a393e9450ad72f",
+   "sequencia": "cover:coverBleed opener:opener development:devRule development:devRule photo:photoFramed statement:statementQuote list:list closing:closingBleed",
+   "cards": [
+    "ba45c0521ebd2448",
+    "c2f753cd766e9a12",
+    "494e390ac1bf3004",
+    "8c09660e5447f2c7",
+    "f3c45e05b1a27551",
+    "7ba5a7b6ae3b411e",
+    "2553abc087269201",
+    "7e1f9b6ccf8bf086"
+   ]
+  },
+  "documental|stories": {
+   "hash": "8ce981e3dd02e853",
+   "sequencia": "cover:coverBleed opener:opener development:devRule development:devRule photo:photoFramed statement:statementQuote list:list closing:closingBleed",
+   "cards": [
+    "37403c05d7ab6a04",
+    "d8b5d20f27da9fb6",
+    "cd012e6e56f66bcd",
+    "2cfbf0dba3c1e2ce",
+    "7c0c88b924d1332b",
+    "d033286619a62341",
+    "dcf867bea37111e8",
+    "f444a53896154794"
+   ]
+  },
+  "produto|carrossel": {
+   "hash": "eb49859f5d30afc7",
+   "sequencia": "cover:coverProduct opener:openerCenter development:devCenter development:devCenter photo:photoProduct statement:statementCenter list:list closing:closingProduct",
+   "cards": [
+    "9015f3ce7cc63c1b",
+    "a7d10fd8e86771b6",
+    "04581394af4703b6",
+    "1e5a50437d7a458b",
+    "40edaac30d6586b8",
+    "e30eaa9fa9373305",
+    "8d805e847e64a239",
+    "f62e41490b86f5ba"
+   ]
+  },
+  "produto|quadrado": {
+   "hash": "0379724fca7524dd",
+   "sequencia": "cover:coverProduct opener:openerCenter development:devCenter development:devCenter photo:photoProduct statement:statementCenter list:list closing:closingProduct",
+   "cards": [
+    "4cf9153b5c7a8f35",
+    "e5c2b01c3765c1d1",
+    "97e1328bccfb26a8",
+    "1ad48c760f7b2098",
+    "48345ff2662b8c3f",
+    "c0c9ae7506b3dfc1",
+    "27ee5f5eeb4694e5",
+    "78919e7acf91ff1c"
+   ]
+  },
+  "produto|stories": {
+   "hash": "54b3ac38fcbee78d",
+   "sequencia": "cover:coverProduct opener:openerCenter development:devCenter development:devCenter photo:photoProduct statement:statementCenter list:list closing:closingProduct",
+   "cards": [
+    "ccd80ef49409f7c3",
+    "5627f5ae0dfba0b8",
+    "c96f9f6bb7d8f5eb",
+    "92a87284dc639dc0",
+    "bbaf99f819f689d3",
+    "ea4bf1c80af4468b",
+    "2a6fb52180f129eb",
+    "709b6918dbc72aaf"
+   ]
+  },
+  "ficha|carrossel": {
+   "hash": "91d0d0d51bbe43a5",
+   "sequencia": "cover:coverModule opener:openerModule development:devModule development:devModule photo:photoModule statement:statementModule list:listModule closing:closingModule",
+   "cards": [
+    "ba6c3628bd407e04",
+    "510223f7b0ced3de",
+    "fa559a19427629da",
+    "f1f00af1b176ee96",
+    "5eb87599cc1f3720",
+    "fa04d7225f66bba1",
+    "3830ef9d097d0d42",
+    "c25328a0558c8413"
+   ]
+  },
+  "ficha|quadrado": {
+   "hash": "6b3833ce66c572ac",
+   "sequencia": "cover:wideStack opener:openerModule development:devModule development:devModule photo:photoModule statement:statementModule list:listModule closing:wideStack",
+   "cards": [
+    "bfb0c033e576808b",
+    "95fb8823e872d56a",
+    "ff46dd2f89ab4c60",
+    "2a32bd3814ca7d26",
+    "74e77e564b0be9df",
+    "d1f1dd6a4a700c47",
+    "a8630ede1c60f21d",
+    "417429c1e68e5d84"
+   ]
+  },
+  "ficha|stories": {
+   "hash": "d8d60e2768051b3d",
+   "sequencia": "cover:coverModule opener:openerModule development:devModule development:devModule photo:photoModule statement:statementModule list:listModule closing:closingModule",
+   "cards": [
+    "290e7ea7aaf98fa1",
+    "5a2f0790a1c75391",
+    "13e73d5126cf181e",
+    "826b8481c67fad7c",
+    "2b7f1e404d1f77f2",
+    "3c7fb6f60bb826cf",
+    "8d03f6090f654b71",
+    "733a59c79731bf45"
+   ]
+  },
+  "minimal|carrossel": {
+   "hash": "b37ad9b2fc923a0e",
+   "sequencia": "cover:coverSplit opener:opener development:devRule development:devRule photo:photoStack statement:statementLeft list:list closing:coverSplit",
+   "cards": [
+    "4d6c4c42ead7bb23",
+    "1014a1f0434a4a6e",
+    "d99c18bb6f4ad22e",
+    "a974b8405ec7fc85",
+    "aa3e4dab2e2ffc45",
+    "10440a51b96942de",
+    "6d3350174b7dac51",
+    "76ca2c94bd4c22ec"
+   ]
+  },
+  "minimal|quadrado": {
+   "hash": "c5dd073f95718f1e",
+   "sequencia": "cover:wideStack opener:opener development:devRule development:devRule photo:photoStack statement:statementLeft list:list closing:wideStack",
+   "cards": [
+    "365cd059c0d88903",
+    "eb309e449bf6dc69",
+    "cf114647679aff72",
+    "c19478ce503ed249",
+    "b77f401c8c3c6ecb",
+    "f0cc6095bb00536f",
+    "672a20f673a607cf",
+    "d91d598cc8364173"
+   ]
+  },
+  "minimal|stories": {
+   "hash": "170e1d65921c8708",
+   "sequencia": "cover:coverSplit opener:opener development:devRule development:devRule photo:photoStack statement:statementLeft list:list closing:coverSplit",
+   "cards": [
+    "85e9af193b6bb3c4",
+    "d6000327e9344461",
+    "a369fb3449b60578",
+    "8b336c4508729c92",
+    "fe8c1c58160a1639",
+    "7e226e1f77734637",
+    "639aec42ae54341a",
+    "b8f705ab5950d56b"
+   ]
+  },
+  "poster|carrossel": {
+   "hash": "24870c4cc6d8f222",
+   "sequencia": "cover:coverPoster opener:opener development:devRule development:devRule photo:photoPoster statement:statementMega list:list closing:closingPoster",
+   "cards": [
+    "2b701d529084c056",
+    "39e98bff4836cbb9",
+    "ba06e8b24bc72406",
+    "ce267ea1401be10e",
+    "aac7bb1feb68d8e2",
+    "75fd9f15df337cf0",
+    "c8b119574ee3ec2b",
+    "7f3288706e43d613"
+   ]
+  },
+  "poster|quadrado": {
+   "hash": "fe9873167dc24666",
+   "sequencia": "cover:wideStack opener:opener development:devRule development:devRule photo:photoPoster statement:statementMega list:list closing:wideStack",
+   "cards": [
+    "41c2acff68d75d06",
+    "f73f53bc5abe16fa",
+    "82a4a075e388a845",
+    "a849b8210e570949",
+    "006614c119ea0dd3",
+    "f980aa096cd2fe2a",
+    "8d06bac7e19367b1",
+    "a52ed8c6f62548af"
+   ]
+  },
+  "poster|stories": {
+   "hash": "9422bc5c3f335371",
+   "sequencia": "cover:coverPoster opener:opener development:devRule development:devColumn photo:photoPoster statement:statementMega list:list closing:closingPoster",
+   "cards": [
+    "9955934a029f8e33",
+    "406050ab5e494ab3",
+    "83714de5557a8145",
+    "dd88d232c0c2ce7d",
+    "33c918bf79d67db1",
+    "ac9e1b6b0a477698",
+    "ed9644e33c528ff4",
+    "d12b5dc539c8904a"
+   ]
+  },
+  "cinema|carrossel": {
+   "hash": "3e3ea3850350357a",
+   "sequencia": "cover:coverBleed opener:openerCenter development:devRule development:devRule photo:photoBleed statement:statementCenter list:list closing:closingBleed",
+   "cards": [
+    "bd5751edb4f105e9",
+    "bfc797eae4f2b257",
+    "5259d8100fa41e4f",
+    "91cd511173df6d63",
+    "4bbc21d58b664bd8",
+    "6511f8c0bd85488c",
+    "98ab443eea3c9a59",
+    "bd3571c5608ca034"
+   ]
+  },
+  "cinema|quadrado": {
+   "hash": "d04429fe40e0e63a",
+   "sequencia": "cover:coverBleed opener:openerCenter development:devRule development:devRule photo:photoBleed statement:statementCenter list:list closing:closingBleed",
+   "cards": [
+    "64b31a4f6cde29f3",
+    "8bbb7eca4cd818ef",
+    "9238094d6bda174c",
+    "3f4308370b412f2e",
+    "faffc75c6ca2f051",
+    "dd13514dbaa34ccd",
+    "30933eeafeb8a990",
+    "a51abc4e7317d4d6"
+   ]
+  },
+  "cinema|stories": {
+   "hash": "fd0815305853567d",
+   "sequencia": "cover:coverBleed opener:openerCenter development:devRule development:devRule photo:photoBleed statement:statementCenter list:list closing:closingBleed",
+   "cards": [
+    "86ebcfcb8b568995",
+    "471fefbd8bcec254",
+    "4b38d25f66499267",
+    "476514f04abbcdbc",
+    "7975705732ec1575",
+    "21389212b999277d",
+    "5bf7224e4f5324f6",
+    "108d4d0dea754de4"
+   ]
+  },
+  "sports_editorial|carrossel": {
+   "hash": "29be1bd71e302f8d",
+   "sequencia": "cover:vCoverBleed opener:vDevNumeral development:vDevNumeral development:vDevBlock photo:vPhotoTop statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "b2b5510129392d6d",
+    "13ee3023c664abdb",
+    "8bc394c59c282d0e",
+    "70b7ec04034bbaae",
+    "6725c7eb4b7d42df",
+    "e826e6f20bd82d2c",
+    "d2c076981ac594f8",
+    "4c34dc19b71f6b71"
+   ]
+  },
+  "sports_editorial|quadrado": {
+   "hash": "333049fb3a804cd2",
+   "sequencia": "cover:vCoverBleed opener:vDevNumeral development:vDevNumeral development:vDevBlock photo:wideStack statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "3006596da6ccd2f5",
+    "77b47a5a7758f2b5",
+    "1de08d537a5ff374",
+    "acaeee0c1a69fe6f",
+    "36c8653536fbd66d",
+    "af9389fae2435905",
+    "af2d1b291f790813",
+    "9d15dcca7b5b1270"
+   ]
+  },
+  "sports_editorial|stories": {
+   "hash": "6732d5d70ae711a1",
+   "sequencia": "cover:vCoverBleed opener:vDevNumeral development:vDevNumeral development:vDevBlock photo:vPhotoTop statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "255838c79a4ee29e",
+    "04705e2239b28a8e",
+    "5fc18b9d23a9ef84",
+    "d8aede7092a8211a",
+    "4fd797084b528047",
+    "e8599775b4b75f65",
+    "508fc76010d18637",
+    "ba8d3c2cce857c8d"
+   ]
+  },
+  "case_study_neon|carrossel": {
+   "hash": "b455c0b5ee4f82d6",
+   "sequencia": "cover:vCoverBleed opener:vDevNumeral development:vDevNumeral development:vDevBlock photo:vPhotoTop statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "d27e00143ee67ab7",
+    "dc7eb0b085c933a6",
+    "5e85b3f2cae599c0",
+    "44a0e40e8b02da9e",
+    "b2a442d340305ea8",
+    "81afc18e4603e8b0",
+    "fea5fa6ef7bf6910",
+    "22736bb253ce9717"
+   ]
+  },
+  "case_study_neon|quadrado": {
+   "hash": "b0a53951ee06dec6",
+   "sequencia": "cover:vCoverBleed opener:vDevNumeral development:vDevNumeral development:vDevBlock photo:vPhotoTop statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "cae91c14d27b95e7",
+    "e1beb3f11fddf6e8",
+    "f84e4fe753ca7049",
+    "d37173a71f99cbd6",
+    "9709f812925aee76",
+    "7dff419b0d334221",
+    "e32c9da78e34ae7a",
+    "7794bc33647b01af"
+   ]
+  },
+  "case_study_neon|stories": {
+   "hash": "4e418f478e94cd72",
+   "sequencia": "cover:vCoverBleed opener:vDevNumeral development:vDevNumeral development:vDevBlock photo:vPhotoTop statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "cbfad53ad82714ed",
+    "79fb868568d15d55",
+    "214cabe131b11fc1",
+    "bc5452b8fbe5973a",
+    "93a7541cbfdcd2b7",
+    "4b9abaf066e7eb6b",
+    "fba0e9d6c3bf4e11",
+    "d69fb16cac1b159e"
+   ]
+  },
+  "mood_sepia|carrossel": {
+   "hash": "a812c513923fa18e",
+   "sequencia": "cover:vCoverBleed opener:vDevCenter development:vDevCenter development:vDevCenter photo:vPhotoColumn statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "00ea3027facb352e",
+    "60e9cc9dfd7614fb",
+    "8f4083081701e744",
+    "37290284f1076998",
+    "dec745dd970aa7b7",
+    "55d4908fd4845d93",
+    "2e5ea7baf01f5f6c",
+    "75606cd94ef4b295"
+   ]
+  },
+  "mood_sepia|quadrado": {
+   "hash": "9fe3d3d28ed6d68f",
+   "sequencia": "cover:vCoverBleed opener:vDevCenter development:vDevCenter development:vDevCenter photo:vPhotoColumn statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "7873d370d3b0b132",
+    "27cb2ab0611ba1e8",
+    "7fccb95dba58f532",
+    "50f0215c65ebfe0e",
+    "c4f33d803c7da10e",
+    "ec4dd67130b2aa0f",
+    "eb4ea729e2085aad",
+    "53b08cfdce316ac5"
+   ]
+  },
+  "mood_sepia|stories": {
+   "hash": "423d5644b31ed073",
+   "sequencia": "cover:vCoverBleed opener:vDevCenter development:vDevCenter development:vDevCenter photo:vPhotoColumn statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "a4c91f4aa097b87c",
+    "5a9a37086385bd28",
+    "3a80d663a3927a98",
+    "b8f61e8c54a4d5b9",
+    "2943878ead04b34f",
+    "0cc146894a314482",
+    "bf780e070624c0fb",
+    "6282c2affc541b8c"
+   ]
+  },
+  "bold_promo_rosa|carrossel": {
+   "hash": "eff3393a61c1a06f",
+   "sequencia": "cover:vCoverBleed opener:vDevNumeral development:vDevNumeral development:vDevBlock photo:vPhotoTop statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "b2b5510129392d6d",
+    "13ee3023c664abdb",
+    "8bc394c59c282d0e",
+    "70b7ec04034bbaae",
+    "6725c7eb4b7d42df",
+    "f1884bcbbf1b88e4",
+    "d2c076981ac594f8",
+    "4c34dc19b71f6b71"
+   ]
+  },
+  "bold_promo_rosa|quadrado": {
+   "hash": "693668b8ca62e5fa",
+   "sequencia": "cover:vCoverBleed opener:vDevNumeral development:vDevNumeral development:vDevBlock photo:wideStack statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "3006596da6ccd2f5",
+    "77b47a5a7758f2b5",
+    "1de08d537a5ff374",
+    "acaeee0c1a69fe6f",
+    "36c8653536fbd66d",
+    "d309a9c9b237e3c2",
+    "af2d1b291f790813",
+    "9d15dcca7b5b1270"
+   ]
+  },
+  "bold_promo_rosa|stories": {
+   "hash": "e8d937aa35255ef2",
+   "sequencia": "cover:vCoverBleed opener:vDevNumeral development:vDevNumeral development:vDevBlock photo:vPhotoTop statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "255838c79a4ee29e",
+    "04705e2239b28a8e",
+    "5fc18b9d23a9ef84",
+    "d8aede7092a8211a",
+    "4fd797084b528047",
+    "c47831cb15ba7a86",
+    "508fc76010d18637",
+    "ba8d3c2cce857c8d"
+   ]
+  },
+  "reflexivo_cream|carrossel": {
+   "hash": "535fd56abe8a5a23",
+   "sequencia": "cover:vCoverBleed opener:vDevCenter development:vDevCenter development:vDevCenter photo:vPhotoColumn statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "4d365c12bdd67165",
+    "aee64ac1d067b2d8",
+    "50db5deeb96a2d5b",
+    "fb7bf520a62facd9",
+    "472e743c5ff90ac4",
+    "542d799266a60a74",
+    "9d46fd20f8353c3e",
+    "1c75e84d540a56e2"
+   ]
+  },
+  "reflexivo_cream|quadrado": {
+   "hash": "4d7ac3500d8c4eaa",
+   "sequencia": "cover:vCoverBleed opener:vDevCenter development:vDevCenter development:vDevCenter photo:vPhotoColumn statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "d67fe7cecfb64af9",
+    "330fb5f2cb81414b",
+    "7c4f3d3e720d5140",
+    "d4fdd01ffccc4af1",
+    "bfbd781fe22e142b",
+    "de1c3acd9413cb8c",
+    "79ed5fb911c7301e",
+    "9573e24ab2c9ac1b"
+   ]
+  },
+  "reflexivo_cream|stories": {
+   "hash": "9c25928306986aac",
+   "sequencia": "cover:vCoverBleed opener:vDevCenter development:vDevCenter development:vDevCenter photo:vPhotoColumn statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "98074b404cfe3c39",
+    "c2a3df9b0ca29b4f",
+    "5363e517d34693ce",
+    "33a164f0a748a1fe",
+    "030fbb188ba18f7a",
+    "3d6516786b4c0d93",
+    "85ec4ae3aa49f8ca",
+    "e87f12819019b4d9"
+   ]
+  },
+  "tabloid_keywords|carrossel": {
+   "hash": "6a953b37e4963c5b",
+   "sequencia": "cover:vCoverBleed opener:vDevBlock development:vDevBlock development:vDevNumeral photo:vPhotoTop statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "d7c813f201656078",
+    "03f153f2c7eba63c",
+    "f5a33d733663daa6",
+    "ea029f159ec38147",
+    "11ce64bdf9a70d3d",
+    "723c1d824e7f4a7e",
+    "db7b8ab9fe4599ed",
+    "08aa9af277ca431b"
+   ]
+  },
+  "tabloid_keywords|quadrado": {
+   "hash": "330ec051e6e4a92a",
+   "sequencia": "cover:vCoverBleed opener:vDevBlock development:vDevBlock development:vDevNumeral photo:vPhotoTop statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "05c1b9674becf07d",
+    "3172431aaaee3496",
+    "a9acc07d9d2faf8c",
+    "f0b5c7d257bd90e6",
+    "feeeed3a213ce54e",
+    "ba1e8631bf33322b",
+    "491f56f77072a29f",
+    "3c05c88163e0cc46"
+   ]
+  },
+  "tabloid_keywords|stories": {
+   "hash": "8e77a38c53b215f3",
+   "sequencia": "cover:vCoverBleed opener:vDevBlock development:vDevBlock development:vDevNumeral photo:vPhotoTop statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "02a7d1d0a8fa8a2e",
+    "281594c94705c1e6",
+    "4dd37a1de5712af5",
+    "102e0dbe333538f5",
+    "2bfabee2ea9be95f",
+    "60bc5789ad170132",
+    "0e248c003e12cb6e",
+    "d664d84fe50eddd7"
+   ]
+  },
+  "editorial_magazine|carrossel": {
+   "hash": "632afecf204bef6b",
+   "sequencia": "cover:vCoverBleed opener:vDevCenter development:vDevCenter development:vDevCenter photo:vPhotoColumn statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "8a054731b6b319e1",
+    "50e723a1d0b26ed8",
+    "fd307fa7d5e812ef",
+    "39e43f98bc08afc6",
+    "b37addc4f9d5e42a",
+    "e45acee505121606",
+    "2f8a127eb051f19e",
+    "b829ab0676c64561"
+   ]
+  },
+  "editorial_magazine|quadrado": {
+   "hash": "ce1d23240d7a56dc",
+   "sequencia": "cover:vCoverBleed opener:vDevCenter development:vDevCenter development:vDevCenter photo:vPhotoColumn statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "16287bfe7a0a1115",
+    "dfc897a2070b5b29",
+    "a31b27842cd11584",
+    "66abe87e2e5cabe4",
+    "e62106faa026ec81",
+    "e3df4f73347f00e9",
+    "ecf028981a1c51f5",
+    "adea510ea6bbde29"
+   ]
+  },
+  "editorial_magazine|stories": {
+   "hash": "9b37cb09b1617b8c",
+   "sequencia": "cover:vCoverBleed opener:vDevCenter development:vDevCenter development:vDevCenter photo:vPhotoColumn statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "21a506b405be3ac0",
+    "576dff2910b43757",
+    "0f2bd4df837bf73c",
+    "494620fdba62598d",
+    "c0ea731619a27fff",
+    "960a3d6682d01252",
+    "796a8ec356a93fef",
+    "151c60f5b82b3f3b"
+   ]
+  },
+  "luxury_hybrid|carrossel": {
+   "hash": "29be1bd71e302f8d",
+   "sequencia": "cover:vCoverBleed opener:vDevNumeral development:vDevNumeral development:vDevBlock photo:vPhotoTop statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "b2b5510129392d6d",
+    "13ee3023c664abdb",
+    "8bc394c59c282d0e",
+    "70b7ec04034bbaae",
+    "6725c7eb4b7d42df",
+    "e826e6f20bd82d2c",
+    "d2c076981ac594f8",
+    "4c34dc19b71f6b71"
+   ]
+  },
+  "luxury_hybrid|quadrado": {
+   "hash": "333049fb3a804cd2",
+   "sequencia": "cover:vCoverBleed opener:vDevNumeral development:vDevNumeral development:vDevBlock photo:wideStack statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "3006596da6ccd2f5",
+    "77b47a5a7758f2b5",
+    "1de08d537a5ff374",
+    "acaeee0c1a69fe6f",
+    "36c8653536fbd66d",
+    "af9389fae2435905",
+    "af2d1b291f790813",
+    "9d15dcca7b5b1270"
+   ]
+  },
+  "luxury_hybrid|stories": {
+   "hash": "6732d5d70ae711a1",
+   "sequencia": "cover:vCoverBleed opener:vDevNumeral development:vDevNumeral development:vDevBlock photo:vPhotoTop statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "255838c79a4ee29e",
+    "04705e2239b28a8e",
+    "5fc18b9d23a9ef84",
+    "d8aede7092a8211a",
+    "4fd797084b528047",
+    "e8599775b4b75f65",
+    "508fc76010d18637",
+    "ba8d3c2cce857c8d"
+   ]
+  },
+  "viral_hype_dark|carrossel": {
+   "hash": "49ab9a2c7c615d44",
+   "sequencia": "cover:vCoverBleed opener:vDevNumeral development:vDevNumeral development:vDevBlock photo:vPhotoTop statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "9c96d20f0fb15cf3",
+    "fdce36547a8bbbab",
+    "7279f821f028f361",
+    "3f49ed07e1e73cfb",
+    "ac189f8cd7a9540e",
+    "1a366f21c28ce62d",
+    "9a190afac877e2ec",
+    "f426fcec1734086a"
+   ]
+  },
+  "viral_hype_dark|quadrado": {
+   "hash": "f7784fecdbb6c7fc",
+   "sequencia": "cover:vCoverBleed opener:vDevNumeral development:vDevNumeral development:vDevBlock photo:wideStack statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "fdbbcbdc570604ce",
+    "84e11b0caf576241",
+    "57eed829f7f007e1",
+    "eb1447ea23ea64f1",
+    "ff6b3c85ec8af5a8",
+    "ceeb91f37f1fb288",
+    "2365ec635150fd42",
+    "b0488bd9d89f7a78"
+   ]
+  },
+  "viral_hype_dark|stories": {
+   "hash": "de21029ff73a9469",
+   "sequencia": "cover:vCoverBleed opener:vDevNumeral development:vDevNumeral development:vDevBlock photo:vPhotoTop statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "d4700c5e7c249626",
+    "daab1e6d49248796",
+    "92861f6e40c4aae7",
+    "854c5e1553bd8dc9",
+    "1844dfc1565f6396",
+    "f0dae26e4e5c1e78",
+    "693bf799019204bd",
+    "ff8538d7d076b775"
+   ]
+  },
+  "cinematic_hybrid|carrossel": {
+   "hash": "b185717d361a4d34",
+   "sequencia": "cover:vCoverBleed opener:vDevBlock development:vDevBlock development:vDevBlock photo:vPhotoBleed statement:vStatementCenter list:vList closing:vClosingBleed",
+   "cards": [
+    "79d37cd525eb0f57",
+    "929d8e86ef0ac4c9",
+    "15bd99ccdcd6f06f",
+    "7d2fdf1d0a46a7b0",
+    "2e75deba190716bb",
+    "83d35521fbcf66d2",
+    "7414dca47b3fa194",
+    "ac1989cc947e4d99"
+   ]
+  },
+  "cinematic_hybrid|quadrado": {
+   "hash": "2d7bcd404bf4ae7a",
+   "sequencia": "cover:vCoverBleed opener:vDevBlock development:vDevBlock development:vDevBlock photo:vPhotoBleed statement:vStatementCenter list:vList closing:vClosingBleed",
+   "cards": [
+    "967872a6fb1a2a09",
+    "0cc4882dd2dd2008",
+    "2ef8b56ca1af5f6b",
+    "d9c979d8587782a5",
+    "644e62c577b9da20",
+    "0a3533a1b060d84e",
+    "3c2c03dd8f9f2a2c",
+    "50e4a291316a9ee1"
+   ]
+  },
+  "cinematic_hybrid|stories": {
+   "hash": "a68472242e03d9fc",
+   "sequencia": "cover:vCoverBleed opener:vDevBlock development:vDevBlock development:vDevBlock photo:vPhotoBleed statement:vStatementCenter list:vList closing:vClosingBleed",
+   "cards": [
+    "129e3111b68c6a0a",
+    "f2ad4e7cab68bfa8",
+    "f2a8c3032190bfcf",
+    "65eb152e572dce67",
+    "d3111eb8aa594360",
+    "cba0aa8567184195",
+    "34e0b99636ec787a",
+    "2222bc9d62dfb7cf"
+   ]
+  },
+  "authority_black|carrossel": {
+   "hash": "b01a1c6904643386",
+   "sequencia": "cover:vCoverBleed opener:vDevCenter development:vDevCenter development:vDevCenter photo:vPhotoTop statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "00ea3027facb352e",
+    "60e9cc9dfd7614fb",
+    "8f4083081701e744",
+    "37290284f1076998",
+    "49ddc60afdcfec35",
+    "55d4908fd4845d93",
+    "2e5ea7baf01f5f6c",
+    "75606cd94ef4b295"
+   ]
+  },
+  "authority_black|quadrado": {
+   "hash": "1fc1c209c6b31041",
+   "sequencia": "cover:vCoverBleed opener:vDevCenter development:vDevCenter development:vDevCenter photo:wideStack statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "7873d370d3b0b132",
+    "27cb2ab0611ba1e8",
+    "7fccb95dba58f532",
+    "50f0215c65ebfe0e",
+    "63ca74ec6ef08424",
+    "ec4dd67130b2aa0f",
+    "eb4ea729e2085aad",
+    "53b08cfdce316ac5"
+   ]
+  },
+  "authority_black|stories": {
+   "hash": "59181f882dcd204f",
+   "sequencia": "cover:vCoverBleed opener:vDevCenter development:vDevCenter development:vDevCenter photo:vPhotoTop statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "a4c91f4aa097b87c",
+    "5a9a37086385bd28",
+    "3a80d663a3927a98",
+    "b8f61e8c54a4d5b9",
+    "82583f2567cb25f3",
+    "0cc146894a314482",
+    "bf780e070624c0fb",
+    "6282c2affc541b8c"
+   ]
+  },
+  "minimal_clean|carrossel": {
+   "hash": "8712b0c6ea8cabe2",
+   "sequencia": "cover:vCoverBleed opener:vDevCenter development:vDevCenter development:vDevCenter photo:vPhotoTop statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "74e0c30961828161",
+    "c525d61571948db4",
+    "ef68870548610420",
+    "62faef9f4511eb7b",
+    "1d8a3e02f3852978",
+    "f5aec97fa5eb89f5",
+    "82054bed3aa06383",
+    "1cc652a94d4bf8f8"
+   ]
+  },
+  "minimal_clean|quadrado": {
+   "hash": "22fc13edc8d46e3f",
+   "sequencia": "cover:vCoverBleed opener:vDevCenter development:vDevCenter development:vDevCenter photo:vPhotoTop statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "3c2522e06fa47a80",
+    "35f3251d3687acfe",
+    "8d7b51a2205a3f7d",
+    "2757dd5b1ae88449",
+    "3f5263363828dacd",
+    "61d75cac810beda6",
+    "f6667e1d1ce05900",
+    "5cb6e876c8d94861"
+   ]
+  },
+  "minimal_clean|stories": {
+   "hash": "f367822d622b0aa5",
+   "sequencia": "cover:vCoverBleed opener:vDevCenter development:vDevCenter development:vDevCenter photo:vPhotoTop statement:vStatement list:vList closing:vClosingBleed",
+   "cards": [
+    "bdf2c2d36688b067",
+    "57beb7712a399835",
+    "2a41160e5d95a9a9",
+    "5438d203e8894dbc",
+    "7a1f664fa6915188",
+    "4fa139a9a6df459b",
+    "ff0e60cc83f9649f",
+    "2d2be2279ebc9b3a"
+   ]
+  }
+ }
+}
