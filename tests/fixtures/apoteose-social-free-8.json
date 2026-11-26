@@ -1,0 +1,391 @@
+{
+  "_origem": "Fixture editorial sintética de oito cards, adaptada do briefing textual autorizado da Apoteose/Teste7. Não é projeto salvo nem transcrição de um carrossel de produção. Sem código de composição ou geometria final.",
+  "_notas": [
+    "O retorno simulado de escrita contém texto e roteiro social juntos; não há chamada de planner separada.",
+    "Fotografias e arte são ativos locais de teste; nenhuma IA real é chamada.",
+    "A personagem fictícia existe somente para verificar ficha visual e âncora nos pedidos, sem atribuir fatos a pessoas reais.",
+    "A assinatura aparece apenas na capa e no fecho."
+  ],
+  "topic": "Apresente a Apoteose em oito cards: conceito, encontro, música, personalidade, público e ambição. Termine com o CTA: Salve a ideia e acompanhe a Apoteose.",
+  "narrative": "editorial",
+  "material": {
+    "content": "A Apoteose é uma festa que nasce com a proposta de ocupar um espaço relevante no calendário pré-Carnaval de São Paulo.\n\nUm encontro exclusivo para convidados, que reúne pessoas conectadas à música, à moda, à arte, à cultura contemporânea e à vida noturna.\n\nO nome Apoteose remete ao ápice, à celebração, à intensidade e à liberdade.\n\nO brasileiro não espera o Carnaval chegar para começar o Carnaval. Ele antecipa, prolonga, inventa e reinventa a festa.\n\nA curadoria musical é essencialmente brasileira, mas sem fronteiras rígidas entre gêneros. Brasilidades, hip-hop, funk, música eletrônica, remixes e releituras de clássicos nacionais\n\nA música deve refletir um Brasil contemporâneo, urbano, plural e culturalmente sofisticado, sem perder sua essência popular.\n\nA Apoteose é direcionada a um público socialmente ativo, formador de opinião, conectado às tendências de comportamento, moda, entretenimento e cultura.\n\nO acesso exclusivo para convidados faz parte do posicionamento da festa, privilegiando a curadoria de público e fortalecendo seu caráter social.\n\nA identidade da Apoteose deve explorar a cultura brasileira de maneira autoral, evitando os clichês visuais do Carnaval.\n\nA Apoteose pretende se consolidar como o esquenta de Carnaval mais badalado de São Paulo.\n\nComo se o Carnaval não fosse suficiente.\n\nA comunicação da Apoteose deve ser inteligente, provocativa, irreverente e bem-humorada.\n\nPara as imagens deste teste, use uma personagem de elenco explicitamente fictícia: a mesma mulher adulta, cabelos curtos escuros, camisa terracota e calça escura, sem marcas aparentes. Ela chega à festa, conversa com amigos e aproveita a música. Não use celebridades nem pessoas reais como referência de identidade.",
+    "sources": "Briefing da Apoteose fornecido ao projeto — adaptação editorial para o teste de oito cards.",
+    "context": "Use só fatos e intenções do material. A ambição da marca deve continuar marcada como intenção, sem números ou datas inventados. Para as imagens deste teste, use uma personagem de elenco explicitamente fictícia: a mesma mulher adulta, cabelos curtos escuros, camisa terracota e calça escura, sem marcas aparentes. Ela chega à festa, conversa com amigos e aproveita a música. Não use celebridades nem pessoas reais como referência de identidade."
+  },
+  "styleKit": {
+    "contextMd": "",
+    "stylePrompt": "# **crie uma apresentaçao sobre a festa apoteose. use essa imagem do flyer como referencia para criar as imagens. use esse estilo de paleta e visual",
+    "referencePalette": {
+      "colors": [
+        {
+          "hex": "#0E0E0F",
+          "weight": 0.48
+        },
+        {
+          "hex": "#2B2158",
+          "weight": 0.231
+        },
+        {
+          "hex": "#28B2D4",
+          "weight": 0.048
+        },
+        {
+          "hex": "#9D2559",
+          "weight": 0.044
+        },
+        {
+          "hex": "#C43B42",
+          "weight": 0.039
+        },
+        {
+          "hex": "#F8701E",
+          "weight": 0.023
+        }
+      ]
+    }
+  },
+  "response": {
+    "slides": [
+      {
+        "title": "O Carnaval começa antes",
+        "subtitle": "Apoteose: pré-Carnaval em São Paulo.",
+        "bodyAfterImage": "Como se o Carnaval não fosse suficiente.",
+        "eyebrow": "",
+        "imageQuery": "The recurring woman convidada arriving at an urban pre-Carnival party at night, medium portrait, quiet space for a headline.",
+        "scene": {
+          "subject": "The recurring fictional woman convidada in the project subject sheet",
+          "wardrobe": "Terracotta shirt and dark trousers",
+          "action": "Arriving at the party and looking toward the entrance",
+          "expression": "Natural and relaxed",
+          "setting": "An urban event entrance in São Paulo at night",
+          "light": "Warm orange subject light, deep indigo shadows, subtle cyan accents",
+          "graphics": "No graphics or text inside the photograph",
+          "shot": "Medium portrait, person to the right, quiet left and lower areas for type"
+        },
+        "avoid": [
+          "No confetti, feathers, costumes or carnival masks",
+          "No lettering, logos or watermarks"
+        ],
+        "design": {
+          "family": "cinema",
+          "ground": "photo",
+          "photo": "full",
+          "block": "none",
+          "emphasis": [
+            "Carnaval"
+          ],
+          "icons": []
+        },
+        "presentationBlocks": [],
+        "cultureTone": "br"
+      },
+      {
+        "title": "Apoteose é o **ápice**",
+        "subtitle": "Celebração, intensidade e liberdade. Um jeito de antecipar a festa com quem importa.",
+        "bodyAfterImage": "",
+        "eyebrow": "O CONCEITO",
+        "imageQuery": "",
+        "scene": null,
+        "avoid": [
+          "No photograph on this card"
+        ],
+        "design": {
+          "family": "editorial",
+          "ground": "art",
+          "photo": "none",
+          "block": "none",
+          "emphasis": [
+            "ápice"
+          ],
+          "icons": []
+        },
+        "presentationBlocks": [],
+        "cultureTone": "br"
+      },
+      {
+        "title": "A curadoria começa no encontro",
+        "subtitle": "Música, moda, arte e vida noturna se encontram em uma festa exclusiva para convidados.",
+        "bodyAfterImage": "",
+        "eyebrow": "O ENCONTRO",
+        "imageQuery": "The same recurring woman convidada greeting friends at the party, candid conversation, warm neon side light.",
+        "scene": {
+          "subject": "The recurring fictional woman convidada in the project subject sheet",
+          "wardrobe": "Terracotta shirt and dark trousers",
+          "action": "Greeting friends in a candid conversation",
+          "expression": "Natural and relaxed",
+          "setting": "A contemporary urban party lounge",
+          "light": "Warm orange subject light, deep indigo shadows, subtle cyan accents",
+          "graphics": "No graphics or text inside the photograph",
+          "shot": "Waist-up candid group, recurring woman visible, quiet adjacent area"
+        },
+        "avoid": [
+          "Do not copy the cover pose",
+          "No visible brands or costume clichés"
+        ],
+        "design": {
+          "family": "revista",
+          "ground": "bg",
+          "photo": "half",
+          "block": "none",
+          "emphasis": [
+            "curadoria"
+          ],
+          "icons": []
+        },
+        "presentationBlocks": [],
+        "cultureTone": "br"
+      },
+      {
+        "title": "Brasilidades **sem fronteiras**",
+        "subtitle": "Uma curadoria musical que aproxima universos.",
+        "bodyAfterImage": "",
+        "eyebrow": "A MÚSICA",
+        "imageQuery": "",
+        "scene": null,
+        "avoid": [
+          "No photograph or fictional performance statistics"
+        ],
+        "design": {
+          "family": "ficha",
+          "ground": "surface",
+          "photo": "none",
+          "block": "steps",
+          "emphasis": [
+            "sem fronteiras"
+          ],
+          "icons": []
+        },
+        "presentationBlocks": [
+          {
+            "type": "steps",
+            "items": [
+              {
+                "title": "Hip-hop e funk",
+                "body": ""
+              },
+              {
+                "title": "Eletrônica e remixes",
+                "body": ""
+              },
+              {
+                "title": "Clássicos nacionais",
+                "body": "Releituras para a pista."
+              }
+            ]
+          }
+        ],
+        "cultureTone": "br"
+      },
+      {
+        "title": "Personalidade feita de contrastes",
+        "subtitle": "",
+        "bodyAfterImage": "",
+        "eyebrow": "O TOM",
+        "imageQuery": "",
+        "scene": null,
+        "avoid": [
+          "Do not replace the comparison with a paragraph"
+        ],
+        "design": {
+          "family": "swiss",
+          "ground": "inverse",
+          "photo": "none",
+          "block": "comparison",
+          "emphasis": [
+            "contrastes"
+          ],
+          "icons": []
+        },
+        "presentationBlocks": [
+          {
+            "type": "comparison",
+            "headers": [
+              "A marca é",
+              "Sem ser"
+            ],
+            "rows": [
+              [
+                "Brasileira",
+                "Caricata"
+              ],
+              [
+                "Sofisticada",
+                "Pretensiosa"
+              ],
+              [
+                "Irreverente",
+                "Infantil"
+              ]
+            ]
+          }
+        ],
+        "cultureTone": "br"
+      },
+      {
+        "title": "Quem faz a noite acontecer",
+        "subtitle": "Uma curadoria de pessoas conectadas à cultura e dispostas a viver novos encontros.",
+        "bodyAfterImage": "",
+        "eyebrow": "O PÚBLICO",
+        "imageQuery": "The same recurring woman convidada enjoying the music with friends, candid movement, contemporary urban nightlife.",
+        "scene": {
+          "subject": "The recurring fictional woman convidada in the project subject sheet",
+          "wardrobe": "Terracotta shirt and dark trousers",
+          "action": "Enjoying the music with friends in a candid moment",
+          "expression": "Natural and relaxed",
+          "setting": "A contemporary dance floor with restrained warm and cyan light",
+          "light": "Warm orange subject light, deep indigo shadows, subtle cyan accents",
+          "graphics": "No graphics or text inside the photograph",
+          "shot": "Candid three-quarter portrait, face and hands clear, quiet upper area"
+        },
+        "avoid": [
+          "Do not repeat the arrival or greeting pose",
+          "No celebrity likeness or carnival costume"
+        ],
+        "design": {
+          "family": "documental",
+          "ground": "bg",
+          "photo": "half",
+          "block": "none",
+          "emphasis": [
+            "noite"
+          ],
+          "icons": []
+        },
+        "presentationBlocks": [],
+        "cultureTone": "br"
+      },
+      {
+        "title": "Um lugar no pré-Carnaval",
+        "subtitle": "A Apoteose **pretende** se consolidar como um dos encontros mais desejados de São Paulo.",
+        "bodyAfterImage": "",
+        "eyebrow": "A AMBIÇÃO",
+        "imageQuery": "",
+        "scene": null,
+        "avoid": [
+          "Do not present the ambition as a measured result"
+        ],
+        "design": {
+          "family": "poster",
+          "ground": "accent",
+          "photo": "none",
+          "block": "none",
+          "emphasis": [
+            "pretende"
+          ],
+          "icons": []
+        },
+        "presentationBlocks": [],
+        "cultureTone": "br"
+      },
+      {
+        "title": "A festa já começou",
+        "subtitle": "Salve a ideia e acompanhe a Apoteose.",
+        "bodyAfterImage": "Como se o Carnaval não fosse suficiente.",
+        "eyebrow": "O PRÓXIMO ENCONTRO",
+        "imageQuery": "",
+        "scene": null,
+        "avoid": [
+          "No date, price or ticket availability was provided"
+        ],
+        "design": {
+          "family": "editorial",
+          "ground": "art",
+          "photo": "none",
+          "block": "none",
+          "emphasis": [
+            "festa"
+          ],
+          "icons": []
+        },
+        "presentationBlocks": [],
+        "cultureTone": "br"
+      }
+    ],
+    "caption": "A Apoteose antecipa o Carnaval com curadoria de música e encontros. Salve a ideia e acompanhe a marca.",
+    "signature": "Como se o Carnaval não fosse suficiente.",
+    "deckDesign": {
+      "mood": "Nighttime editorial with warm neon glow on skin, deep purple shadows, cyan and magenta graphic overlays, cinematic grain, diverse casting in urban party settings.",
+      "fonts": {
+        "text": "Inter Tight",
+        "display": "Syne"
+      },
+      "palette": {
+        "bg": "#0E0E0F",
+        "ink": "#F8F8F8",
+        "muted": "#9A9A9A",
+        "accent": "#F8701E",
+        "accent2": "#28B2D4",
+        "inverse": "#F8F8F8",
+        "surface": "#2B2158",
+        "inverseInk": "#0E0E0F"
+      }
+    },
+    "visualDirection": {
+      "avoid": "No clichê Carnaval imagery: no feathers, sequins, confetti, samba costumes, masks or literal fantasy; no real celebrities, no visible logos or text, no stereotypes.",
+      "finish": "Grão fino de filme editorial noturno, textura sutil de impressão offset, realismo contemporâneo com pós-tratamento de campanha publicitária.",
+      "palette": [
+        {
+          "hex": "#0E0E0F",
+          "role": "base"
+        },
+        {
+          "hex": "#F8701E",
+          "role": "subject_light"
+        },
+        {
+          "hex": "#2B2158",
+          "role": "shadow"
+        },
+        {
+          "hex": "#28B2D4",
+          "role": "graphic"
+        },
+        {
+          "hex": "#C43B42",
+          "role": "accent"
+        }
+      ],
+      "graphics": "Blocos geométricos sobrepostos em magenta e ciano, recortes tipográficos, linhas finas de blueprint editorial, sobreposição de cor translúcida.",
+      "atmosphere": "Noite urbana brasileira intensa, calor tropical sob luz neon, energia de festa que ainda não começou mas já é inevitável.",
+      "paletteSource": "reference"
+    },
+    "visualBible": {
+      "entities": [
+        {
+          "id": "convidada",
+          "en": "A fictional adult woman with short dark hair, wearing a terracotta shirt and dark trousers, with no branded clothing.",
+          "never": "Celebrity resemblance, costume, branded clothing, hair or outfit changes."
+        }
+      ]
+    }
+  },
+  "expected": {
+    "photoCards": [
+      1,
+      3,
+      6
+    ],
+    "artCards": [
+      2,
+      8
+    ],
+    "safeZones": {
+      "carrossel": {
+        "top": 8.5,
+        "bottom": 8.5
+      },
+      "quadrado": {
+        "top": 9,
+        "bottom": 9
+      },
+      "stories": {
+        "top": 14,
+        "bottom": 18
+      }
+    },
+    "base": "#2B2158",
+    "minimumFontPx": 28,
+    "minimumContrast": 4.5
+  }
+}
