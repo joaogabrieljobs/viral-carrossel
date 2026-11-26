@@ -9,6 +9,7 @@ import { titleTrackingBase } from './title-tracking.js';
 import { wcagContrast } from './wcag.js';
 import { inkOver, sideScrim } from './image-composition.js';
 import { coerceVisualDirection, reservedAreaColour } from './visual-direction.js';
+import { freeNeutralChrome } from './presentation-chrome.js';
 const DATA_ROLES = new Set(['data', 'metric', 'result', 'matrix', 'comparison', 'priorities']);
 const DEMO_ROLES = new Set(['demo', 'example', 'evidence', 'story', 'people', 'application']);
 const DIVIDER_ROLES = new Set(['divider', 'agenda', 'question', 'reframe', 'contrast', 'statement', 'vision', 'objectives']);
@@ -470,6 +471,12 @@ function restoredSurfaceFields(slide, kind, family, layout) {
  * helper. Geometrias livres ou já reposicionadas continuam sob controle do autor.
  */
 export function restorePresentationPhotoComposition(slide) {
+  // Teste 7: havia fotos de IA persistidas em páginas que o diretor decidiu
+  // deixar sem foto. Hidratar esses assets não é uma nova escolha editorial.
+  // Importação, edição, origem desconhecida e geração individual explícita
+  // continuam restaurando a foto; os bytes/IDs originais nunca são apagados.
+  if (slide?.presentationPresetId === FREE_PRESENTATION_PRESET_ID && slide.presentationFreeDesign?.photo === 'none'
+    && slide.bgImageSource === 'ai' && !slide.presentationPhotoRequested && !slide.presentationImageFallback) return slide;
   if (!slide || ![2, 3].includes(slide.presentationCompositionVersion) || !slide.presentationSuppressPhoto
     || !(slide.bgImage || slide.bgImageId || slide.bgImageAssetId) || hasBlocks(slide)
     || slide.canvas?.source !== 'presentation-preset'
@@ -530,12 +537,32 @@ function restoredFreeFields(slide, layout) {
   const onPhoto = !!(layout.photo && (layout.scrim || layout.inkOnPhoto));
   const palette = slide.presentationPaletteOverrides || {};
   const lightInk = [palette.inverseInk, palette.bg, '#FFFFFF'].find(c => c && wcagContrast(c, '#111111') >= 4.5) || '#FFFFFF';
-  const ground = onPhoto ? 'photo' : slide.presentationFreeDesign.ground;
-  const chromeGround = onPhoto ? layout.ground : slide.presentationGround;
+  // Arte é exclusiva de páginas sem foto. Uma foto que a pessoa adicionou
+  // ocupa a geometria da família sobre a base do deck; o asset de arte fica
+  // guardado no slide, para continuar disponível sem ser desenhado por baixo.
+  const wasArt = slide.presentationFreeDesign.ground === 'art';
+  const ground = onPhoto ? 'photo' : wasArt ? 'bg' : slide.presentationFreeDesign.ground;
+  const chromeGround = onPhoto ? layout.ground : wasArt ? 'bg' : slide.presentationGround;
+  const rawChrome = familyPresentationFields(layout).presentationChrome;
+  const chrome = freeNeutralChrome(rawChrome.chrome);
+  // Algumas famílias só têm CENA/FIG. na nova geometria. Conserva o chapéu
+  // editorial existente junto ao título, sem trazer o rótulo da família.
+  if (!chrome.some(d => String(d.text || '').includes('{kicker'))) {
+    const before = slide.canvas?.zones?.title;
+    const title = layout.title;
+    const kicker = slide.presentationChrome?.chrome?.find(d => String(d.text || '').includes('{kicker'));
+    if (kicker && before && title) chrome.push({
+      ...kicker,
+      x: title.x + kicker.x - before.x,
+      y: title.y + kicker.y - before.y,
+      w: Math.min(kicker.w || title.w, title.w),
+      ...(onPhoto ? { color: lightInk } : {}),
+    });
+  }
   return {
     presentationFreeDesign: { ...slide.presentationFreeDesign, photo: photoSizeOfLayout(layout), ground },
     presentationGround: chromeGround,
-    presentationChrome: { ...familyPresentationFields(layout).presentationChrome, ground: chromeGround, fonts: slide.presentationChrome?.fonts },
+    presentationChrome: { ...rawChrome, chrome, ground: chromeGround, fonts: slide.presentationChrome?.fonts },
     ...(onPhoto ? { titleColor: lightInk, subtitleColor: lightInk, textColor: lightInk, customBg: palette.inverse || slide.customBg } : {}),
   };
 }

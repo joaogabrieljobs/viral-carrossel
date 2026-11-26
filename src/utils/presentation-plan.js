@@ -91,7 +91,7 @@ ${families}
 - photo: none quando a foto não acrescenta; então scene é null e nenhuma imagem é gerada. Com scene null, photo é none.
 - ground art: o fundo abstrato da identidade do deck (gerado uma vez, sem pessoas, com o grafismo na borda direita), para até ${FREE_ART_MAX_SLIDES} páginas sem foto de posicionamento, personalidade, síntese ou fecho; com art, photo é none e scene é null.
 - ground accent sem foto: texto em cor cheia com título grande, para uma página de frase, síntese ou comportamento.
-- Personalidade em pares: quando o material descreve a marca em 3 ou mais pares "traço sem ser / sem depender / sem recorrer…" (ex.: "Brasileira sem ser caricata"), a posição usa block comparison, a tabela de duas colunas (traço | "sem ser…", uma linha por par, até 5), em vez de um parágrafo.
+- Personalidade em pares: quando o material descreve a marca em 3 ou mais pares "traço sem ser / sem depender / sem recorrer…" (ex.: "Brasileira sem ser caricata"), a posição usa block comparison, a tabela de duas colunas (traço | "sem ser…", uma linha por par, até 7), em vez de um parágrafo.
 - block: comparison, metrics ou steps só quando a posição terá esses dados em presentationBlocks; quote só com citação literal do material; bignumber só com um número do material; icons com até 4 nomes desta lista: ${FREE_ICONS.join(', ')}; caso contrário none. icons é [] quando block não é icons.
 - Enums fechados: ground: ${FREE_GROUNDS.join(', ')}. photo: ${FREE_PHOTO_SIZES.join(', ')}. block: ${FREE_BLOCKS.join(', ')}. family: ${Object.keys(FREE_FAMILY_GUIDE).join(', ')}.
 - Capa e fecho mantêm o papel de sempre; a capa abre o tema e o fecho declara a decisão ou a próxima ação. O código garante contraste e ritmo e corrige o que sair do contrato.`;
@@ -371,13 +371,19 @@ export function validatePresentationPlan(raw, { count, sources = [], freeDesign 
  * livre, as cores de deckDesign. Sem referência, o plano volta igual.
  */
 export function snapPlanColorsToReference(plan, { referenceColors = [], kitColors = [] } = {}) {
-  const reference = normalizeReferencePalette(referenceColors).map(c => c.hex);
+  const reference = normalizeReferencePalette(referenceColors);
   if (!isObject(plan) || !reference.length) return plan;
-  const allowed = [...new Set([...(Array.isArray(kitColors) ? kitColors : []).map(c => String(c).toUpperCase()).filter(c => HEX6.test(c)), ...reference])];
+  const explicit = [...new Set((Array.isArray(kitColors) ? kitColors : []).map(c => String(c).toUpperCase()).filter(c => HEX6.test(c)))];
+  // Os pesos são parte do contrato: descartá-los aqui fazia o preto da borda
+  // ganhar da base índigo mesmo depois de extrair corretamente a referência.
+  const allowed = [...reference, ...explicit.filter(hex => !reference.some(color => color.hex === hex))];
+  const explicitDeckBase = explicit.includes(String(plan.deckDesign?.palette?.bg || '').toUpperCase()) ? plan.deckDesign.palette.bg : undefined;
+  const imageBase = plan.visualDirection?.palette?.find(color => color.role === 'base')?.hex;
+  const explicitImageBase = explicit.includes(String(imageBase || '').toUpperCase()) ? imageBase : undefined;
   return {
     ...plan,
-    ...(plan.visualDirection ? { visualDirection: snapVisualDirectionToPalette(plan.visualDirection, allowed) } : {}),
-    ...(isObject(plan.deckDesign) ? { deckDesign: normalizeDeckDesign(snapDeckDesignToPalette(plan.deckDesign, allowed)) } : {}),
+    ...(plan.visualDirection ? { visualDirection: snapVisualDirectionToPalette(plan.visualDirection, allowed, { explicitBase: explicitImageBase }) } : {}),
+    ...(isObject(plan.deckDesign) ? { deckDesign: normalizeDeckDesign(snapDeckDesignToPalette(plan.deckDesign, allowed, { explicitBase: explicitDeckBase })) } : {}),
   };
 }
 

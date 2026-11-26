@@ -14,7 +14,7 @@
  */
 import { explicitBrandColorsFromKit } from './style-kit-design.js';
 import { wcagContrast } from './wcag.js';
-import { kitReferencePalette, nearestPaletteHex } from './reference-palette.js';
+import { kitReferencePalette, nearestPaletteHex, preferredReferenceBaseHex } from './reference-palette.js';
 
 export const VISUAL_DIRECTION_ROLES = Object.freeze(['base', 'subject_light', 'shadow', 'graphic', 'accent']);
 export const VISUAL_DIRECTION_TEXT_LIMITS = Object.freeze({ finish: 240, atmosphere: 200, graphics: 240, avoid: 240 });
@@ -135,19 +135,24 @@ export function applyKitColors(visualDirection, kit) {
  * escritas no kit) vira o mais próximo dela. A IA só distribui os papéis.
  * Sem lista: o valor volta igual (comportamento de antes).
  */
-export function snapVisualDirectionToPalette(visualDirection, allowed = [], { source = 'reference' } = {}) {
+export function snapVisualDirectionToPalette(visualDirection, allowed = [], { source = 'reference', explicitBase } = {}) {
   const pool = (Array.isArray(allowed) ? allowed : []).map(c => visualHex(c?.hex || c)).filter(Boolean);
   if (!visualDirection || !Array.isArray(visualDirection.palette) || !pool.length) return visualDirection;
   // Cores diferentes na proposta ficam diferentes na lista enquanto houver
   // cor livre (a sombra quase preta não vira a própria base); a mesma cor
   // repetida pela IA continua repetida.
   const mapped = new Map();
+  const rawBase = visualHex(visualDirection.palette.find(item => item.role === 'base')?.hex);
+  const snappedBase = rawBase ? nearestPaletteHex(rawBase, pool) : null;
+  const preferredBase = snappedBase ? preferredReferenceBaseHex(snappedBase, allowed, { explicitBase }) : null;
+  const changedBase = preferredBase && preferredBase !== snappedBase;
+  if (changedBase) mapped.set(rawBase, preferredBase);
   for (const item of visualDirection.palette) {
     const hex = visualHex(item.hex);
     if (!hex || mapped.has(hex)) continue;
     const used = new Set(mapped.values());
     const free = pool.filter(c => !used.has(c));
-    mapped.set(hex, pool.includes(hex) ? hex : nearestPaletteHex(hex, free.length ? free : pool));
+    mapped.set(hex, pool.includes(hex) && !(changedBase && used.has(hex)) ? hex : nearestPaletteHex(hex, free.length ? free : pool));
   }
   const seen = new Set();
   const palette = visualDirection.palette.map(item => ({ ...item, hex: mapped.get(visualHex(item.hex)) || nearestPaletteHex(item.hex, pool) }))
@@ -208,7 +213,8 @@ export function resolveSlideVisualDirection({ slide = null, styleKit = null } = 
   // Paleta extraída da referência e guardada no kit: vale também ao refazer
   // uma imagem depois. As cores escritas no kit continuam vencendo.
   const reference = kitReferencePalette(styleKit);
-  if (reference.length) value = snapVisualDirectionToPalette(value, [...reference.map(c => c.hex), ...kitVisualColors(styleKit).colors]);
+  const kitColors = kitVisualColors(styleKit);
+  if (reference.length) value = snapVisualDirectionToPalette(value, [...reference, ...kitColors.colors], { explicitBase: kitColors.base });
   return applyKitColors(value, styleKit);
 }
 

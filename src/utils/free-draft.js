@@ -20,9 +20,14 @@ import { COMPARISON_PAIRS_MAX_ROWS } from './presentation-quality.js';
 
 export const PERSONALITY_PAIRS_MIN = 3;
 // "Traço sem ser/sem depender/sem recorrer/sem perder/sem cair …": o traço tem
-// 1 ou 2 palavras (Bem-humorada, Muito brasileira) e começa a frase.
-const PAIR = /^([\p{Lu}][\p{L}-]*(?:\s[\p{L}-]+)?)\s+(sem\s+(?:ser|depender|recorrer|perder|cair|virar|parecer|soar)\b[^.!?]*[.!?]?)$/u;
-const sentencesOf = text => String(text || '').replace(/\*\*/g, '').split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
+// 1 ou 2 palavras. O Teste 7 veio como lista em minúsculas depois de dois
+// pontos, com vírgulas entre os pares. Só separa uma vírgula quando o trecho
+// seguinte inicia outro par completo; vírgulas dentro de uma ressalva ficam.
+const TRAIT = String.raw`[\p{L}][\p{L}-]*(?:\s[\p{L}-]+)?`;
+const WITHOUT = String.raw`sem\s+(?:ser|depender|recorrer|perder|cair|virar|parecer|soar)\b`;
+const PAIR = new RegExp(String.raw`^(${TRAIT})\s+(${WITHOUT}[^.!?]*[.!?]?)$`, 'u');
+const PAIR_SEPARATOR = new RegExp(String.raw`(?<=[.!?])\s+|[,;]\s*(?=${TRAIT}\s+${WITHOUT})|(?<=:)\s*(?=${TRAIT}\s+${WITHOUT})`, 'u');
+const sentencesOf = text => String(text || '').replace(/\*\*/g, '').split(PAIR_SEPARATOR).map(s => s.trim()).filter(Boolean);
 
 /** Pares [traço, "sem ser…"] na ordem do texto; menos de 3 pares, []. */
 export function personalityPairs(text) {
@@ -98,6 +103,8 @@ const LANG_INDEX = { 'pt-BR': 0, pt: 0, en: 1, es: 2 };
 const THEMES = Object.freeze([
   ['A PERSONALIDADE', /\bpersonalidade\b|(?:\bsem (?:ser|depender|recorrer)\b.*){2}/],
   ['A MÚSICA', /\b(?:musica|musical|musicais|djs?|pista|repertorio|hip-hop|funk|eletronica)\b/],
+  // "Encontro" aparece como metáfora em muitos apoios; só nomeia o tema no título.
+  ['O ENCONTRO', /\b(?:encontro|encontros|reuniao|reunioes)\b/, true],
   ['O PÚBLICO', /\b(?:publico|convidados|frequenta|frequentadores|pessoas socialmente)\b/],
   ['O NOME', /\bo nome\b/],
   ['O POSICIONAMENTO', /\b(?:posicionamento|consolidar|ambicao)\b/],
@@ -124,9 +131,12 @@ export function deriveFreeEyebrow(slide, { index = 0, count = 1, used = new Set(
     if (name && !used.has(name)) return name;
   }
   if (langIndex === 0) {
-    const text = slideText(slide);
-    const theme = THEMES.find(([label, re]) => !used.has(label) && re.test(text));
-    if (theme) return theme[0];
+    // O título nomeia a ideia principal. Uma enumeração no apoio (música,
+    // moda, arte...) não deve consumir o rótulo da página sobre música.
+    for (const [text, title] of [[plain(slide?.title), true], [slideText(slide), false]]) {
+      const theme = THEMES.find(([label, re, titleOnly]) => (title || !titleOnly) && !used.has(label) && re.test(text));
+      if (theme) return theme[0];
+    }
   }
   const purpose = PURPOSE_EYEBROWS[slide?.presentationPlan?.purpose] || PURPOSE_EYEBROWS.other;
   return purpose[langIndex];

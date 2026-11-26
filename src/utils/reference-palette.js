@@ -62,18 +62,60 @@ function nearWhite(r, g, b) {
 }
 
 /**
+ * Retângulo da arte, sem faixas lisas que enquadram a referência. As duas
+ * bordas opostas precisam ter a mesma cor (tolerância pequena para JPEG).
+ * Assim, uma área lisa à esquerda da própria arte não é confundida com uma
+ * moldura. Uma imagem toda lisa continua inteira e ainda define sua cor.
+ */
+function referenceContentBounds(data, width, height) {
+  const bounds = { left: 0, right: width, top: 0, bottom: height };
+  const pixel = (x, y) => {
+    const i = (y * width + x) * 4;
+    return data[i + 3] < 128 ? [0, 0, 0, 0] : [data[i], data[i + 1], data[i + 2], 255];
+  };
+  const same = (a, b) => a[3] === b[3] && a.slice(0, 3).every((c, i) => Math.abs(c - b[i]) <= 6);
+  const lineMatches = (horizontal, position, color) => {
+    const from = horizontal ? bounds.left : bounds.top;
+    const to = horizontal ? bounds.right : bounds.bottom;
+    for (let at = from; at < to; at += 1) {
+      if (!same(pixel(horizontal ? at : position, horizontal ? position : at), color)) return false;
+    }
+    return true;
+  };
+  const trim = (horizontal) => {
+    const firstKey = horizontal ? 'top' : 'left'; const lastKey = horizontal ? 'bottom' : 'right';
+    const start = bounds[firstKey]; const end = bounds[lastKey];
+    if (end - start < 3) return;
+    const color = pixel(bounds.left, bounds.top);
+    if (!lineMatches(horizontal, start, color) || !lineMatches(horizontal, end - 1, color)) return;
+    let first = start; let last = end;
+    while (first < last && lineMatches(horizontal, first, color)) first += 1;
+    while (last > first && lineMatches(horizontal, last - 1, color)) last -= 1;
+    // A faixa precisa cercar uma arte com área própria, nunca remover tudo.
+    if (last - first < 2 || first === start || last === end) return;
+    bounds[firstKey] = first; bounds[lastKey] = last;
+  };
+  trim(true);
+  trim(false);
+  return bounds;
+}
+
+/**
  * Cores dominantes de um buffer RGBA (ImageData.data). Pura e determinística.
+ * `ignoreFlatBorders` é opt-in: o modo livre/apresentação o ativa; a extração
+ * dos carrosséis existentes permanece byte a byte no caminho anterior.
  * @returns {{hex:string, weight:number}[]} até `max` cores, da mais pesada à mais leve.
  */
-export function extractPaletteFromPixels(data, { width, height, max = REFERENCE_PALETTE_MAX } = {}) {
+export function extractPaletteFromPixels(data, { width, height, max = REFERENCE_PALETTE_MAX, ignoreFlatBorders = false } = {}) {
   const w = Number(width) || 0; const h = Number(height) || 0;
   if (!data || w < 1 || h < 1 || data.length < w * h * 4) return [];
-  const step = Math.max(1, Math.ceil(Math.sqrt((w * h) / MAX_SAMPLES)));
+  const bounds = ignoreFlatBorders ? referenceContentBounds(data, w, h) : { left: 0, right: w, top: 0, bottom: h };
+  const step = Math.max(1, Math.ceil(Math.sqrt(((bounds.right - bounds.left) * (bounds.bottom - bounds.top)) / MAX_SAMPLES)));
   // Histograma em 4 bits por canal: soma de RGB e contagem por caixa.
   const bins = new Map();
   let total = 0;
-  for (let y = Math.floor(step / 2); y < h; y += step) {
-    for (let x = Math.floor(step / 2); x < w; x += step) {
+  for (let y = bounds.top + Math.floor(step / 2); y < bounds.bottom; y += step) {
+    for (let x = bounds.left + Math.floor(step / 2); x < bounds.right; x += step) {
       const i = (y * w + x) * 4;
       const r = data[i]; const g = data[i + 1]; const b = data[i + 2];
       if (data[i + 3] < 128 || nearWhite(r, g, b)) continue;
@@ -188,6 +230,27 @@ export function nearestPaletteHex(hex, allowed = []) {
   return pool.reduce((best, c) => (d2(rgbToLab(fromHex(c)), lab) < d2(rgbToLab(fromHex(best)), lab) ? c : best), pool[0]);
 }
 
+/**
+ * Teste 7: preto/branco quase neutro não toma o lugar de uma base cromática
+ * escura com presença real na referência (>= 15%). L* <= 45 define escuro;
+ * C* >= 20 distingue cor saturada de cinzas. Tintas/acentos não são tocados.
+ * Cores explícitas do kit vencem. Listas antigas de hex sem peso ficam iguais.
+ */
+export function preferredReferenceBaseHex(baseHex, allowed = [], { explicitBase } = {}) {
+  const base = String(baseHex || '').toUpperCase();
+  const explicit = String(explicitBase || '').toUpperCase();
+  if (HEX6.test(explicit)) return explicit;
+  if (!HEX6.test(base)) return base;
+  const lab = rgbToLab(fromHex(base));
+  if (chroma(lab) > 12 || (lab[0] > 25 && lab[0] < 85)) return base;
+  const candidates = (Array.isArray(allowed) ? allowed : []).filter(item => item && typeof item === 'object')
+    .map(item => ({ hex: String(item.hex || '').toUpperCase(), weight: Number(item.weight) }))
+    .filter(item => HEX6.test(item.hex) && Number.isFinite(item.weight) && item.weight >= 0.15 && item.weight <= 1)
+    .filter(item => { const value = rgbToLab(fromHex(item.hex)); return value[0] <= 45 && chroma(value) >= 20; })
+    .sort((a, b) => b.weight - a.weight || a.hex.localeCompare(b.hex));
+  return candidates[0]?.hex || base;
+}
+
 /* Kit: a paleta guardada vale enquanto as referências forem as mesmas -------- */
 
 const refKey = ref => String(ref?.assetId || ref?.imageId || ref?.id || '');
@@ -218,7 +281,7 @@ export function referencePaletteKitField(kit, colors) {
  * junta as amostras. Falha de leitura de uma referência não impede as outras;
  * sem nenhuma, devolve [] (o roteiro segue como antes).
  */
-export async function extractReferencePaletteFromSources(sources = [], { doc = globalThis.document } = {}) {
+export async function extractReferencePaletteFromSources(sources = [], { doc = globalThis.document, ignoreFlatBorders = false } = {}) {
   if (!doc?.createElement) return [];
   const frames = [];
   for (const src of (Array.isArray(sources) ? sources : []).filter(s => typeof s === 'string' && s)) {
@@ -236,7 +299,16 @@ export async function extractReferencePaletteFromSources(sources = [], { doc = g
       canvas.width = width; canvas.height = height;
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       ctx.drawImage(img, 0, 0, width, height);
-      frames.push({ width, height, data: ctx.getImageData(0, 0, width, height).data });
+      const data = ctx.getImageData(0, 0, width, height).data;
+      if (ignoreFlatBorders) {
+        // Recortar cada referência antes de empilhar evita quantizar a borda
+        // de uma imagem que caiu no meio da faixa de várias referências.
+        const { left, right, top, bottom } = referenceContentBounds(data, width, height);
+        const croppedWidth = right - left; const croppedHeight = bottom - top;
+        const cropped = new globalThis.Uint8ClampedArray(croppedWidth * croppedHeight * 4);
+        for (let y = top; y < bottom; y += 1) cropped.set(data.subarray((y * width + left) * 4, (y * width + right) * 4), (y - top) * croppedWidth * 4);
+        frames.push({ width: croppedWidth, height: croppedHeight, data: cropped });
+      } else frames.push({ width, height, data });
     } catch { /* referência que não abre fica de fora */ }
   }
   if (!frames.length) return [];

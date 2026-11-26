@@ -24,7 +24,7 @@ import {
 } from './presentation-composition.js';
 import { rendererSubtitleSizePercent, rendererTitleSizePercent } from './presentation-families.js';
 import { pitchCompositionOverrides } from './pitch-content.js';
-import { resolveChromeColor } from './presentation-chrome.js';
+import { freeNeutralChrome, resolveChromeColor } from './presentation-chrome.js';
 import { titleTrackingBase } from './title-tracking.js';
 import { wcagContrast } from './wcag.js';
 import { markdownBoldAccentIntervalsUtf16 } from './text-spans.js';
@@ -32,9 +32,10 @@ import { PRESENTATION_ICON_NAMES } from './presentation-icons.js';
 import { FREE_FONT_ADVANCES, FREE_FONT_CHARSET } from './free-font-metrics.js';
 import { inkOver, mirrorChrome, mirrorTextZones, sideScrim, textOverPhoto } from './image-composition.js';
 import { reservedAreaColour, resolveSlideVisualDirection } from './visual-direction.js';
-import { nearestPaletteHex } from './reference-palette.js';
+import { nearestPaletteHex, preferredReferenceBaseHex } from './reference-palette.js';
 
 export { FREE_PRESENTATION_PRESET_ID };
+export { freeNeutralChrome };
 
 export const FREE_GROUNDS = Object.freeze(['bg', 'surface', 'inverse', 'accent', 'photo', 'art']);
 /**
@@ -252,13 +253,13 @@ export function deckDesignFromBrand(brand = {}, base = DEFAULT_DECK_DESIGN) {
  * inverse) continuam neutras e recalculadas pelo contraste. Sem lista: igual.
  */
 export const FREE_REFERENCE_SNAP_KEYS = Object.freeze(['bg', 'surface', 'accent', 'accent2']);
-export function snapDeckDesignToPalette(deckDesign, allowed = []) {
+export function snapDeckDesignToPalette(deckDesign, allowed = [], { explicitBase } = {}) {
   const pool = [...new Set((Array.isArray(allowed) ? allowed : []).map(c => normalizeHex(c?.hex || c)).filter(Boolean))];
   if (!deckDesign || typeof deckDesign !== 'object' || !pool.length) return deckDesign;
   const raw = deckDesign.palette && typeof deckDesign.palette === 'object' ? deckDesign.palette : {};
   const palette = { ...raw };
   const nearest = (hex, candidates) => (normalizeHex(hex) ? nearestPaletteHex(normalizeHex(hex), candidates.length ? candidates : pool) : null);
-  palette.bg = nearest(raw.bg, pool) || raw.bg;
+  palette.bg = preferredReferenceBaseHex(nearest(raw.bg, pool) || raw.bg, allowed, { explicitBase });
   const notBg = pool.filter(c => c !== palette.bg);
   palette.surface = nearest(raw.surface, pool) || raw.surface;
   const readableOnBg = notBg.filter(c => !palette.bg || wcagContrast(c, palette.bg) >= 3);
@@ -707,20 +708,31 @@ export function directFreeSlideDesign(input = {}) {
  */
 function directFreeSlide({ slide = {}, stage = {}, index = 0, count = 1, previous = [], deckDesign } = {}) {
   const prev = previousDesigns(previous);
-  const [before, last] = prev.slice(-2);
+  const before = prev.at(-2);
+  const last = prev.at(-1);
   const role = resolvePresentationCompositionKind({ slide, stage, index, count });
   const proposal = proposedSlideDesign(slide);
   const visual = hasVisual(slide);
-  let allowed = forceVariety(candidatesFor({ slide, stage, index, count }).filter(c => !(
+  const candidates = candidatesFor({ slide, stage, index, count });
+  const rhythmic = candidates.filter(c => !(
     (last && before && last.geometry === c.geometry && before.geometry === c.geometry)
-    || (last && last.family === c.family && last.kind === c.kind))), { prev, index, count, visual });
+    || (last && last.family === c.family && last.kind === c.kind)));
+  let allowed = forceVariety(rhythmic, { prev, index, count, visual });
   // Página com foto não perde a foto (a imagem existe ou foi pedida): sem
   // isso, abrir o projeto restaurava a foto e recompunha a página.
   const withPhoto = visual ? allowed.filter(c => c.photo !== 'none') : allowed;
   if (withPhoto.length) allowed = withPhoto;
-  // Direção de arte (parte 3): ground photo pedido pela IA é a foto cheia com
-  // o texto sobre o espaço reservado, quando alguma família a desenha aqui
-  // (Cinemático e Fotográfico); a família proposta cede, o fundo não.
+  // Teste 7: a família proposta é contrato, não apenas uma preferência no
+  // score. O teto de variedade (6 famílias) a trocava silenciosamente na
+  // página 8. Só as regras duras de ritmo podem excluir a família; dentro
+  // dela, usa a geometria mais próxima do restante da proposta.
+  if (proposal) {
+    const requested = allowed.filter(c => c.family === proposal.family);
+    if (requested.length) allowed = requested;
+  }
+  // Foto cheia com texto no espaço reservado, quando a família escolhida
+  // tem essa geometria. Uma proposta incompatível usa a mais próxima da
+  // mesma família, como as demais combinações de tamanho e fundo.
   if (visual && proposal?.ground === 'photo') {
     const onPhoto = allowed.filter(c => c.ground === 'photo');
     if (onPhoto.length) allowed = onPhoto;
@@ -757,7 +769,14 @@ function directFreeSlide({ slide = {}, stage = {}, index = 0, count = 1, previou
     family: chosen.family, ground: chosen.ground, photo: chosen.photo, block,
     emphasis: proposal?.emphasis || [], icons: proposal?.icons || [],
   }, slide);
-  return { design, kind: chosen.kind || null };
+  const familyOverride = proposal && chosen.family !== proposal.family ? {
+    fromFamily: proposal.family,
+    toFamily: chosen.family,
+    reason: !rhythmic.some(c => c.family === proposal.family)
+      ? (last?.family === proposal.family ? 'rhythm_family_kind' : 'rhythm_geometry')
+      : 'rhythm_variety',
+  } : null;
+  return { design, kind: chosen.kind || null, familyOverride };
 }
 
 /* ------------------------------------------------------------------------ */
@@ -1140,35 +1159,6 @@ function panelReading({ zones, chrome, slide, titleSize, subSize, display, text,
 
 /* Acabamento antes de publicar (revisão da folha livre-f3) ------------------- */
 
-/**
- * Adornos narrativos das famílias que não fazem sentido fora delas: o "CENA nn"
- * do Cinemático e os rótulos de ficha do Técnico ("FIG.", "TAB.", "§", "NOTA",
- * "FIM") apareciam em páginas do modo livre que não são cinema nem ficha. O
- * número da página em pílula (Modular) repetia o fólio do deck. Saem; o fólio
- * do deck continua numerando as páginas. O número de seção do divisor fica,
- * sem o "§". Presets comuns não passam por aqui.
- */
-const NARRATIVE_CHROME = /CENA|TAB\.|FIG\.|NOTA|FIM\b|§/;
-// Teste 6 (26/11), item 4: o "05" em pílula do Modular. No modo livre a
-// numeração como adorno (página, seção, total) sai; o fólio do deck fica.
-const NUMERAL_ORNAMENT = /^[\s§·|/\-–—.:#]*(?:\{(?:index|section|total)\}[\s§·|/\-–—.:#]*)+$/;
-export function freeNeutralChrome(chrome) {
-  const list = Array.isArray(chrome) ? chrome : [];
-  const numerals = list.filter(d => (d.t === 'text' || d.t === 'pill') && NUMERAL_ORNAMENT.test(String(d.text || '')));
-  // Cartão pequeno que só segurava o número sai junto (sem cartão vazio).
-  const host = d => d.t === 'block' && d.w * d.h <= 300 && numerals.some(n => {
-    const x = n.x + (n.w || 0) / 2; const y = n.y + 1;
-    return x >= d.x && x <= d.x + d.w && y >= d.y && y <= d.y + d.h;
-  });
-  return list.flatMap((d) => {
-    if (numerals.includes(d) || host(d)) return [];
-    if (d.t !== 'text' && d.t !== 'pill') return [d];
-    const value = String(d.text || '');
-    if (d.t === 'pill' && /\{index\}/.test(value)) return [];
-    return NARRATIVE_CHROME.test(value) ? [] : [d];
-  });
-}
-
 const round2 = value => Math.round(value * 100) / 100;
 /** Inset do texto dentro da zona (12 px de cada lado num slide de 1920). */
 const TEXT_INSET = 0.625;
@@ -1412,7 +1402,16 @@ export function compressForArt(composed, slide = {}) {
   // da margem até 72%, para manter a largura de leitura do quadro.
   const ev = nextZones.evidence;
   const widened = !!ev && ev.w < EVIDENCE_MIN_W && !supportCopy(slide);
-  if (widened) nextZones.evidence = { ...ev, x: left, w: round2(FREE_ART_TEXT_MAX - left) };
+  if (widened) {
+    const title = nextZones.title;
+    const besideX = FREE_ART_TEXT_MAX - EVIDENCE_MIN_W;
+    // Suíço mantém o título na coluna esquerda, na mesma faixa da tabela.
+    // Alargar até a margem esquerda cobria esse título. A tabela ainda cabe
+    // com seu piso de leitura de 50%, ao lado dele e antes do grafismo.
+    const besideTitle = title && ev.y < title.y + title.h && ev.y + ev.h > title.y
+      && besideX >= title.x + title.w + 0.5;
+    nextZones.evidence = { ...ev, x: besideTitle ? besideX : left, w: besideTitle ? EVIDENCE_MIN_W : round2(FREE_ART_TEXT_MAX - left) };
+  }
   const chrome = (composed.presentationChrome?.chrome || []).map((d) => {
     if (!Number.isFinite(d?.x) || d.t === 'grid') return d;
     if (Number.isFinite(d.w)) return { ...d, ...span(d.x, d.w) };
@@ -1468,7 +1467,7 @@ export function freePresentationCompositionOverrides(base, {
   slide = {}, stage = {}, index = 0, count = 1, previous = [], deckDesign = null,
 } = {}) {
   const deck = resolveDeckDesign(deckDesign, slide, previous);
-  const { design: directed, kind: chosenKind } = directFreeSlide({ slide, stage, index, count, previous, deckDesign: deck });
+  const { design: directed, kind: chosenKind, familyOverride } = directFreeSlide({ slide, stage, index, count, previous, deckDesign: deck });
   const visual = hasVisual(slide);
   const layoutSlide = directed.photo === 'none' || !visual ? withoutVisual(slide) : slide;
   const family = directed.family;
@@ -1480,7 +1479,11 @@ export function freePresentationCompositionOverrides(base, {
   // Arte de fundo só em página sem foto; com foto, o fundo da família.
   const art = ground === 'art' && photo === 'none';
   const design = { ...directed, photo, ground: ground === 'art' && !art ? layout.ground : ground };
-  const freeBase = { ...base, presentationFreeDesign: design };
+  // A resolução de família do compositor lê o preset antes de desenhar.
+  // Gravar o preset só no retorno deixava uma base legada desenhar outra
+  // família apesar de presentationFreeDesign já conter a decisão correta.
+  const freeBase = { ...base, presentationPresetId: FREE_PRESENTATION_PRESET_ID, presentationFreeDesign: design };
+  delete freeBase.presentationFreeDesignOverride;
   let composed = stage?.contentMode === 'pitch'
     ? pitchCompositionOverrides(freeBase, layoutSlide, kind)
     : contentAwarePresentationOverrides(freeBase, layoutSlide, kind, { deliveryMode: stage?.deliveryMode });
@@ -1593,6 +1596,7 @@ export function freePresentationCompositionOverrides(base, {
     presentationPresetId: FREE_PRESENTATION_PRESET_ID,
     presentationPatternId: FREE_PRESENTATION_PRESET_ID,
     presentationFreeDesign: design,
+    ...(familyOverride ? { presentationFreeDesignOverride: familyOverride } : {}),
     presentationDeckDesign: deck,
     presentationPaletteOverrides: palette,
     presentationGround: chromeGround,
@@ -1638,9 +1642,10 @@ export function freePresentationCompositionOverrides(base, {
 
 /** Campos que só existem no modo livre; saem quando o deck volta a um preset comum. */
 export const FREE_SLIDE_FIELDS = Object.freeze([
-  'presentationFreeDesign', 'presentationDeckDesign', 'presentationPaletteOverrides',
+  'presentationFreeDesign', 'presentationFreeDesignOverride', 'presentationDeckDesign', 'presentationPaletteOverrides',
   'presentationNumericTypography', 'presentationFreeTextSurfaces', 'customBg', 'titleColor', 'subtitleColor', 'textColor',
   'titleWeight', 'titleCase', 'presentationBlockAnchor', 'presentationArtScrim',
+  'presentationImageFallback', 'presentationPhotoRequested',
 ]);
 
 /** Slide composto no modo livre volta ao estado neutro antes de outro preset. */
@@ -1668,7 +1673,7 @@ export function isFreePresentationPreset(value) {
 
 /** Página do modo livre sem foto: não gera imagem (spec: `photo: none`). */
 export function slideSkipsImageGeneration(slide) {
-  return !!slide?.presentationFreeDesign && slide.presentationFreeDesign.photo === 'none';
+  return !!slide?.presentationFreeDesign && slide.presentationFreeDesign.photo === 'none' && !slide.presentationImageFallback;
 }
 
 /* ------------------------------------------------------------------------ */

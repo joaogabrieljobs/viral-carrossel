@@ -26,6 +26,31 @@ export function resolveChromeColor(familyKey, ground, token, overrides = {}) {
   return /^#|^rgb/.test(String(token)) ? token : inks.ink;
 }
 
+/**
+ * No modo livre, o fólio do deck substitui a numeração-ornamento e os
+ * rótulos narrativos das famílias (CENA, FIG., TAB., §...). O mesmo filtro
+ * vale na composição inicial e ao inserir foto numa página só de texto.
+ * Presets comuns não passam por aqui.
+ */
+const NARRATIVE_CHROME = /CENA|TAB\.|FIG\.|NOTA|FIM\b|§/;
+const NUMERAL_ORNAMENT = /^[\s§·|/\-–—.:#]*(?:\{(?:index|section|total)\}[\s§·|/\-–—.:#]*)+$/;
+export function freeNeutralChrome(chrome) {
+  const list = Array.isArray(chrome) ? chrome : [];
+  const numerals = list.filter(d => (d.t === 'text' || d.t === 'pill') && NUMERAL_ORNAMENT.test(String(d.text || '')));
+  // Cartão pequeno que só segurava o número sai junto (sem cartão vazio).
+  const host = d => d.t === 'block' && d.w * d.h <= 300 && numerals.some(n => {
+    const x = n.x + (n.w || 0) / 2; const y = n.y + 1;
+    return x >= d.x && x <= d.x + d.w && y >= d.y && y <= d.y + d.h;
+  });
+  return list.flatMap((d) => {
+    if (numerals.includes(d) || host(d)) return [];
+    if (d.t !== 'text' && d.t !== 'pill') return [d];
+    const value = String(d.text || '');
+    if (d.t === 'pill' && /\{index\}/.test(value)) return [];
+    return NARRATIVE_CHROME.test(value) ? [] : [d];
+  });
+}
+
 export function fillChromeTokens(text, tokens = {}) {
   let missing = false;
   // {nome} é obrigatório; {nome?} é opcional e some com o separador ' · '.

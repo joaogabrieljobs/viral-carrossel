@@ -113,6 +113,7 @@ Não transforme informação ausente em zero ou comparação inventada. Números
   // preset presentation_free pede; os outros continuam com o pedido de antes.
   return `${base}
 BLOCOS DO MODO LIVRE — além dos três acima, quando design.block da posição for quote, bignumber ou icons, presentationBlocks traz esse bloco, e só quando o material o sustentar:
+- personalidade em pares: comparison com variant: "pairs", headers com 2 colunas (traço e ressalva) e rows com 3 a 7 pares presentes no material. Essa variante admite os sete pares completos, sem aplicar o limite comum de 5 linhas.
 - citação: [{"type":"quote","text":"frase copiada literalmente do material","author":"autoria exatamente como está no material"}]. text até ${QUOTE_MAX} caracteres (prefira até 140), sem aspas; author opcional até 80, "" quando o material não diz quem falou. Nunca parafraseie nem atribua a frase a alguém que o material não nomeia: citação ou autoria sem fonte literal faz o bloco cair.
 - número grande: [{"type":"bignumber","value":"40 mil","label":"pessoas por edição","detail":"período ou condição"}]. value até 16 caracteres, com o número como está no material; label até 90; detail opcional até 160. Número que não está no material faz o bloco cair.
 - ícones: [{"type":"icons","items":[{"icon":"users","title":"Título curto","body":"Uma linha concreta"}]}]. 2–4 itens; icon só desta lista: ${PRESENTATION_ICON_NAMES.join(', ')}; title até 60 (prefira até 28); body opcional até 140 (prefira uma linha, até 60).

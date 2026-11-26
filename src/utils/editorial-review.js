@@ -7,6 +7,7 @@ import { presentationAIOptions, buildPresentationReviewRules, getPresentationPat
 import { buildPresentationPlanBlock, attachPresentationPlan } from './presentation-plan.js';
 import { generatePresentationPlan, parsePresentationPlanResponse, presentationResponseMetadata } from './presentation-planning.js';
 import { buildPresentationBlocksPrompt, mapPresentationBlockStrings, normalizePresentationBlocks } from './presentation-quality.js';
+import { finishFreeDraft } from './free-draft.js';
 import { requiresSocialTitles, recoverSocialTitle, recoverSocialTitleForEditing, missingSocialTitleIndexes, auditSocialTextDensity, buildSocialTextLimitsPrompt } from './social-generation.js';
 import { auditDraftFactuality, auditUnsupportedCommercialClaims, buildFactualGroundingPrompt, buildReviewFactCheckPrompt, goalTitleAsFactSlides, groundPresentationBlocks, replaceEmDashes, splitBriefingNotes } from './factual-grounding.js';
 export { auditUnsupportedCommercialClaims } from './factual-grounding.js';
@@ -26,6 +27,7 @@ ${JSON.stringify({ slides: (plan.slides || []).map(({ index, purpose, visualRole
 function presentationReviewBlockContract(nativeBlocks, free = false) {
   if (nativeBlocks === false) return 'Neste padrão personalizado presentationBlocks permanece [].';
   const freeTypes = free ? `
+- comparison com variant: "pairs": headers com 2 colunas e rows com até 7 pares de personalidade sustentados pelo material. Preserve todos os pares existentes; o limite comum de 5 linhas não se aplica a essa variante.
 - quote: type, text (até 240, frase literal do material, sem aspas) e author ("" ou autoria como está no material).
 - bignumber: type, value (até 16, com o número do material), label até 90 e detail opcional até 160.
 - icons: type, items (2–4 objetos com icon da lista fechada, title até 60 e body opcional até 140).` : '';
@@ -329,7 +331,7 @@ export function moveGapNotesOutOfSlides(draft) {
   return { draft: changed ? { ...draft, slides } : draft, gaps, emptiedTitles };
 }
 
-export function validateCarouselDraft(rawDraft, { count, presetId, densityId, presentationPath, nativeBlocks = true, narrativeMode, allowMissingSocialTitles = false, allowLongSocialSupport = false, allowIncompleteDraft = false }) {
+export function validateCarouselDraft(rawDraft, { count, presetId, densityId, presentationPath, nativeBlocks = true, freeDesign = false, narrativeMode, allowMissingSocialTitles = false, allowLongSocialSupport = false, allowIncompleteDraft = false }) {
   const normalized = normalizeCarouselDraftInput(rawDraft, { count, presetId, densityId });
   const draft = normalized.draft;
   if (!isObject(draft) || !Array.isArray(draft.slides)
@@ -362,9 +364,12 @@ export function validateCarouselDraft(rawDraft, { count, presetId, densityId, pr
     if (presetId === 'apresentacao' && draft.presentationPlan) {
       // Lote B (21/11): o travessão voltava dentro dos blocos ("brioche — três
       // opções"); a limpeza do texto gerado só passava por título e apoio.
-      // A marca de pares (até 7 linhas) é só do código do modo livre; a IA não a passa.
+      // Teste 7: o acabamento Livre já montou os sete pares antes da revisão.
+      // Tirar a variante aqui invalidava qualquer patch do deck. Só o Livre
+      // aceita essa forma; o normalizador confere duas colunas e "sem …".
+      // Nos presets comuns, a variante continua fora do contrato de escrita.
       slide.presentationBlocks = mapBlockText(normalizePresentationBlocks(Array.isArray(s.presentationBlocks)
-        ? s.presentationBlocks.map(block => (block && typeof block === 'object' && 'variant' in block ? (({ variant, ...rest }) => rest)(block) : block))
+        ? s.presentationBlocks.map(block => (!freeDesign && block && typeof block === 'object' && 'variant' in block ? (({ variant, ...rest }) => rest)(block) : block))
         : s.presentationBlocks), replaceEmDashes);
       if (!nativeBlocks && slide.presentationBlocks.length) throw Object.assign(new Error('Este padrão personalizado não permite quadros automáticos.'), { code: 'presentation_blocks_not_allowed', field: 'presentationBlocks', slideIndex: index });
       if (s.presentationBlocks != null && (!Array.isArray(s.presentationBlocks) || (s.presentationBlocks.length && !slide.presentationBlocks.length))) {
@@ -1590,7 +1595,10 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
   const generationPrompt = `${prompt}\nINSTRUÇÕES ATUAIS DO USUÁRIO — restrições também válidas para cada lote de redação:\n${config.userInstructions || ''}\n${buildPresentationPlanBlock(plan)}\n${blockRules}\nCONTRATO COMPLEMENTAR: em cada slide inclua presentationBlocks (ou [] quando não houver bloco), speakerNotes (complemento opcional no idioma definido, até 600 caracteres, ou "") e eyebrow (rótulo acima do título, 1 a 3 palavras em caixa alta no idioma definido, ou "").${config.freeDesign === true ? ` ${FREE_EYEBROW_RULE}` : ''} O texto visível deve ser autossuficiente. Não coloque nomes de arquivos, rótulos de extração nem instruções ao designer no texto final. Dados, exemplos e condições permanecem fiéis às evidências. Em slides com bloco, subtitle contextualiza sem repetir suas células; bodyAfterImage fica vazio e apenas aprofundamento vai para speakerNotes.${buildPresentationLimitsBlock(plannedConfig, config.count)}`;
   const written = await writePresentationBatches({ prompt: generationPrompt, plan, config: plannedConfig, textOptions, onStage, onDraft }, callAI);
   writingDiagnostics = written.diagnostics;
-  const draft = written.draft;
+  // Teste 7: a personalidade em pares vira tabela antes de medir os campos
+  // e pedir revisão. Auditar primeiro o parágrafo de origem deixava um erro
+  // de subtitle obsoleto bloquear as fotos mesmo com a tabela final válida.
+  const draft = config.freeDesign === true ? finishFreeDraft(written.draft) : written.draft;
   // Teste 4 (25/11): a assinatura do deck (roteiro, capa e fecho, ou a frase
   // curta do material citada na capa) sai da conta de repetição. Medida uma
   // vez, no rascunho, para que antes e depois do reparo usem a mesma régua.
