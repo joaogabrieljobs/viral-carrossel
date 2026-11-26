@@ -57,7 +57,9 @@ describe('Spec 1.1 entrega 1: contrato do roteiro v2', () => {
     expect(PRESENTATION_PLAN_PROMPT_VERSION).toBe('presentation-plan-v2');
     expect(prompt).toContain('{"schemaVersion":2,"promptVersion":"presentation-plan-v2"');
     expect(prompt).toContain('"rules":[{"id":"r1","level":"avoid","target":"image"');
-    expect(prompt).toContain('"scene":{"subject":"who or what","action":"what happens","setting":"where","shot":"wide"},"avoid":""}');
+    // Direção de arte (26/11, parte 2): a cena virou briefing de foto, com
+    // figurino, expressão, luz e grafismos opcionais entre os campos antigos.
+    expect(prompt).toContain('"scene":{"subject":"who or what","wardrobe":"","action":"what happens","expression":"","setting":"where","light":"","graphics":"","shot":"wide"},"avoid":""}');
     expect(prompt).toContain('a mesma combinação subject + shot aparece em no máximo 2 posições');
     expect(prompt).toContain('esse elemento vai para avoid e nunca para scene');
     expect(prompt).not.toContain('imageBrief');

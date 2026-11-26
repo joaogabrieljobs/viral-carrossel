@@ -55,10 +55,11 @@ describe('modo livre, fase 2: roteiro v2 inalterado para os outros presets', () 
   // do deck); hashes antes: 35b81b983596f508 e 135aebd49994edb4.
   // Direção de arte (26/11, parte 1): o pedido ganhou o bloco DIREÇÃO VISUAL
   // DO DECK e o campo visualDirection; hashes antes: 75c0191a0f0ec608 e
-  // dd161a18a566df9b.
-  it('o pedido v2 é byte a byte o esperado (hash medido depois do campo visualDirection)', () => {
-    expect(h(buildPresentationPlanPrompt({ brief: 'Festival', sources: SRC, count: 10, presentationPath: 'auto' }))).toBe('5a510b9f7d8c8020');
-    expect(h(buildPresentationPlanPrompt({ brief: 'Festival', sources: SRC, count: 8, presentationPath: 'pitch', compactRepair: true }))).toBe('bbf64c4a546a423b');
+  // dd161a18a566df9b. Parte 2: a cena virou briefing de foto (5a510b9f7d8c8020
+  // e bbf64c4a546a423b só com a parte 1).
+  it('o pedido v2 é byte a byte o esperado (hash medido depois da cena como briefing)', () => {
+    expect(h(buildPresentationPlanPrompt({ brief: 'Festival', sources: SRC, count: 10, presentationPath: 'auto' }))).toBe('987e46b9649fa96d');
+    expect(h(buildPresentationPlanPrompt({ brief: 'Festival', sources: SRC, count: 8, presentationPath: 'pitch', compactRepair: true }))).toBe('a5968190cbb52576');
   });
 
   it('o pedido v2 não fala em direção de arte, deckDesign ou design', () => {

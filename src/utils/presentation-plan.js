@@ -20,6 +20,11 @@ export const PRESENTATION_PLAN_V1 = Object.freeze({ schemaVersion: 1, promptVers
 export const PRESENTATION_PLAN_RULE_LEVELS = Object.freeze(['required', 'avoid']);
 export const PRESENTATION_PLAN_RULE_TARGETS = Object.freeze(['copy', 'image']);
 export const PRESENTATION_SCENE_FIELDS = Object.freeze(['subject', 'action', 'setting', 'shot']);
+// Direção de arte (26/11, parte 2): a cena vira briefing de foto. Os campos
+// novos são opcionais; a ordem é a do pedido de imagem montado da cena.
+export const PRESENTATION_SCENE_BRIEF_FIELDS = Object.freeze(['subject', 'wardrobe', 'action', 'expression', 'setting', 'light', 'graphics', 'shot']);
+export const PRESENTATION_SCENE_LIMITS = Object.freeze({ subject: 240, wardrobe: 160, action: 160, expression: 120, setting: 160, light: 160, graphics: 160, shot: 80 });
+const SCENE_EXTRA_FIELDS = Object.freeze(PRESENTATION_SCENE_BRIEF_FIELDS.filter(key => !PRESENTATION_SCENE_FIELDS.includes(key)));
 const SLIDE_KEYS_V1 = Object.freeze(['index', 'visualRole', 'purpose', 'question', 'keyMessage', 'evidenceIds', 'imageBrief']);
 const SLIDE_KEYS_V2 = Object.freeze(['index', 'visualRole', 'purpose', 'question', 'keyMessage', 'evidenceIds', 'scene', 'avoid']);
 // Modo livre (docs/product/modo-livre-apresentacao.md), fase 2: o roteiro v3 é
@@ -42,7 +47,9 @@ export function presentationPlanSchema(plan) {
 /** Pedido de imagem montado a partir da cena: sujeito, ação, lugar e plano. */
 export function presentationSceneQuery(scene) {
   if (!scene || typeof scene !== 'object') return '';
-  return PRESENTATION_SCENE_FIELDS.map(key => (typeof scene[key] === 'string' ? scene[key].replace(/\s+/g, ' ').trim() : '')).filter(Boolean).join(', ').slice(0, 600);
+  // Cena antiga (só os quatro campos) monta exatamente o texto de antes.
+  return PRESENTATION_SCENE_BRIEF_FIELDS.map(key => (typeof scene[key] === 'string' ? scene[key].replace(/\s+/g, ' ').trim() : '')).filter(Boolean).join(', ')
+    .slice(0, SCENE_EXTRA_FIELDS.some(key => typeof scene[key] === 'string' && scene[key].trim()) ? 900 : 600);
 }
 
 /** Imagem planejada de uma posição do roteiro, no v1 ou no v2. */
@@ -140,7 +147,7 @@ REGRAS DE PLANEJAMENTO:
 - A modalidade dos trechos precisa ser preservada: "pretendemos" e "em estudo" continuam proposta. A existência de um recurso não comprova retenção ou impacto. Um manual fornece método; seus exemplos não são fatos do projeto.
 - Em apresentação conceitual, use apenas os conceitos fornecidos; a ausência de dados próprios não autoriza acrescentar teoria externa. evidence é o catálogo do plano inteiro. Pode ser [] em um deck conceitual sem evidências citáveis, desde que a explicação se limite aos conceitos fornecidos. Para um slide sem evidência própria, use evidenceIds: [] apenas nessa posição. Fatos ou propostas específicos exigem os trechos literais definidos acima. Registre informação ausente essencial em gaps; não fabrique fonte para completar o plano.
 - purpose descreve a função semântica. visualRole escolhe uma composição apropriada, sem selecionar um layout pelo número da página: comparação e modelo econômico podem ser data; fluxo pode ser demo; exposição pode ser content. Fotografia só quando esclarecer a ideia. scene é null para gráficos, dados, tabelas, produto sem captura fornecida ou quando uma foto não acrescentar.
-- scene descreve em inglês, sem texto/logo, uma imagem ilustrativa: subject (quem ou o quê aparece), action (o que acontece), setting (onde) e shot (enquadramento: close-up, medium, wide, detail, overhead ou aerial). Nunca solicita testemunho, equipe real, screenshot ou evidência fictícia. Varie sujeito e enquadramento: a mesma combinação subject + shot aparece em no máximo 2 posições. Não prometa que uma imagem futura substituirá informação editável.
+- scene é o briefing da foto, em inglês, sem texto/logo, para uma imagem ilustrativa: subject (quem ou o quê aparece; com pessoas, o casting: quantas, idade adulta aproximada, tom de pele, gênero e traço marcante, com diversidade de idade adulta, tom de pele, corpo e gênero entre os slides, sem estereótipo), wardrobe (figurino ou objeto de cena, ou ""), action (o que acontece), expression (expressão e atitude, ou ""), setting (onde), light (a luz pela paleta de visualDirection: que cor ilumina o assunto e que cor faz a sombra), graphics (os grafismos deste slide na linguagem de visualDirection.graphics, ou "") e shot (enquadramento: close-up, medium, wide, detail, overhead ou aerial). Personagens originais: nunca uma pessoa real, celebridade ou alguém da imagem de referência; nenhuma marca, logotipo, texto legível ou tela com informação. Nunca solicita testemunho, equipe real, screenshot ou evidência fictícia. Varie sujeito e enquadramento: a mesma combinação subject + shot aparece em no máximo 2 posições. Não prometa que uma imagem futura substituirá informação editável.
 - avoid (inglês, curto) diz o que a imagem desta posição não pode mostrar, ou "". Quando keyMessage negar um elemento (ex.: "não como fantasia"), esse elemento vai para avoid e nunca para scene.
 - signature guarda a frase de assinatura ou gancho que o material apresenta como conceito central (slogan, linha de campanha), copiada literalmente de um excerpt, até 160 caracteres, ou "" quando não houver; ela pode abrir e fechar o deck sem contar como repetição.
 - rules guarda só o que o briefing ou as instruções do usuário exigem ou proíbem de forma explícita, sem deduzir: id (r1, r2...), level required (exige) ou avoid (proíbe), target copy (texto) ou image (imagem) e instruction curta no idioma do briefing. Sem restrição explícita, rules é [].
@@ -149,10 +156,10 @@ REGRAS DE PLANEJAMENTO:
 ${free ? `${buildFreeArtDirectionBlock()}\n\n` : ''}${buildVisualDirectionBlock({ kitColors, kitReferenceWithoutText, freeDesign: free })}
 
 CONTRATO JSON EXATO (sem markdown):
-{"schemaVersion":${schemaVersion},"promptVersion":"${promptVersion}","objective":"objetivo concreto","audience":"público","thesis":"tese sustentada","rules":[{"id":"r1","level":"avoid","target":"image","instruction":"o que o briefing proíbe na imagem"}],"evidence":[{"id":"e1","status":"fact","sourceId":"id existente","quote":"trecho literal","claim":"afirmação que ele sustenta"}],"gaps":["decisão essencial ainda aberta"],"signature":"","visualDirection":{"palette":[{"role":"base","hex":"#RRGGBB"},{"role":"subject_light","hex":"#RRGGBB"},{"role":"shadow","hex":"#RRGGBB"}],"finish":"","atmosphere":"","graphics":"none","avoid":""}${deckContract},"slides":[{"index":1,"visualRole":"cover","purpose":"introduction","question":"qual pergunta responde?","keyMessage":"contribuição deste slide, preservando estágio e limites","evidenceIds":["e1"],"scene":{"subject":"who or what","action":"what happens","setting":"where","shot":"wide"},"avoid":""${slideDesignContract}}]}
+{"schemaVersion":${schemaVersion},"promptVersion":"${promptVersion}","objective":"objetivo concreto","audience":"público","thesis":"tese sustentada","rules":[{"id":"r1","level":"avoid","target":"image","instruction":"o que o briefing proíbe na imagem"}],"evidence":[{"id":"e1","status":"fact","sourceId":"id existente","quote":"trecho literal","claim":"afirmação que ele sustenta"}],"gaps":["decisão essencial ainda aberta"],"signature":"","visualDirection":{"palette":[{"role":"base","hex":"#RRGGBB"},{"role":"subject_light","hex":"#RRGGBB"},{"role":"shadow","hex":"#RRGGBB"}],"finish":"","atmosphere":"","graphics":"none","avoid":""}${deckContract},"slides":[{"index":1,"visualRole":"cover","purpose":"introduction","question":"qual pergunta responde?","keyMessage":"contribuição deste slide, preservando estágio e limites","evidenceIds":["e1"],"scene":{"subject":"who or what","wardrobe":"","action":"what happens","expression":"","setting":"where","light":"","graphics":"","shot":"wide"},"avoid":""${slideDesignContract}}]}
 visualRole permitido: ${PRESENTATION_VISUAL_ROLES.join(', ')}.
 purpose permitido: ${PRESENTATION_SLIDE_PURPOSES.join(', ')}.
-Limites de redação do plano: objective/audience/thesis até ${compactRepair ? 120 : 180} caracteres cada; no máximo ${compactRepair ? 4 : 6} gaps de até 120; question até 80, keyMessage até ${keyMessageLimit}, cada campo de scene até 80 e avoid até 120 por posição; no máximo 8 rules de até 160; no máximo 4 evidenceIds por posição. Seja conciso: o limite da resposta é ${PRESENTATION_PLAN_MAX_TOKENS} tokens; use preferencialmente menos da metade, deixando espaço para fechar todos os arrays e o objeto. A profundidade vem da contribuição de cada página, sem redigir o slide inteiro aqui. Use scene null quando imagem não contribuir. Capa na primeira posição; fecho na última quando houver mais de uma. Não inclua campos extras. Confira versões, índices, enums e IDs antes de devolver o JSON. ${compactRepair ? 'Nesta recuperação, encurte a linguagem de planejamento, nunca fatos, condições essenciais ou a quantidade solicitada.' : ''}`;
+Limites de redação do plano: objective/audience/thesis até ${compactRepair ? 120 : 180} caracteres cada; no máximo ${compactRepair ? 4 : 6} gaps de até 120; question até 80, keyMessage até ${keyMessageLimit}; em scene, subject até 200 caracteres; wardrobe, action, setting, light e graphics até 120; expression e shot até 60; avoid até 120 por posição; no máximo 8 rules de até 160; no máximo 4 evidenceIds por posição. Seja conciso: o limite da resposta é ${PRESENTATION_PLAN_MAX_TOKENS} tokens; use preferencialmente menos da metade, deixando espaço para fechar todos os arrays e o objeto. A profundidade vem da contribuição de cada página, sem redigir o slide inteiro aqui. Use scene null quando imagem não contribuir. Capa na primeira posição; fecho na última quando houver mais de uma. Não inclua campos extras. Confira versões, índices, enums e IDs antes de devolver o JSON. ${compactRepair ? 'Nesta recuperação, encurte a linguagem de planejamento, nunca fatos, condições essenciais ou a quantidade solicitada.' : ''}`;
 }
 
 /**
@@ -179,7 +186,12 @@ export function coercePresentationPlanShape(raw, { count } = {}) {
   // Cena com todos os campos vazios é "sem imagem".
   const scene = (raw) => {
     if (!isObject(raw)) return null;
-    const fields = Object.fromEntries(PRESENTATION_SCENE_FIELDS.map(key => [key, typeof raw[key] === 'string' ? clip(raw[key], 160) : '']));
+    const fields = Object.fromEntries(PRESENTATION_SCENE_FIELDS.map(key => [key, typeof raw[key] === 'string' ? clip(raw[key], PRESENTATION_SCENE_LIMITS[key]) : '']));
+    // Campos do briefing (parte 2): só entram quando têm texto.
+    for (const key of SCENE_EXTRA_FIELDS) {
+      const text = typeof raw[key] === 'string' ? clip(raw[key], PRESENTATION_SCENE_LIMITS[key]) : '';
+      if (text) fields[key] = text;
+    }
     return Object.values(fields).some(Boolean) ? fields : null;
   };
   const slides = value.slides.map((slide, position) => {
@@ -306,8 +318,10 @@ export function validatePresentationPlan(raw, { count, sources = [], freeDesign 
     if (!compact(slide.question, 180) || !compact(slide.keyMessage, 400) || (!v2 && (typeof slide.imageBrief !== 'string' || slide.imageBrief.length > 220))) add('slide_text', path, `Posição ${position + 1}: texto fora do contrato.`);
     if (v2) {
       const scene = slide.scene;
-      const sceneOk = scene === null || (isObject(scene) && Object.keys(scene).every(key => PRESENTATION_SCENE_FIELDS.includes(key))
-        && PRESENTATION_SCENE_FIELDS.every(key => typeof scene[key] === 'string' && scene[key].length <= 160) && scene.subject.trim());
+      // Parte 2: todo campo é opcional menos subject; cada um com o seu limite.
+      const sceneOk = scene === null || (isObject(scene) && Object.keys(scene).every(key => PRESENTATION_SCENE_BRIEF_FIELDS.includes(key))
+        && Object.entries(scene).every(([key, text]) => typeof text === 'string' && text.length <= PRESENTATION_SCENE_LIMITS[key])
+        && typeof scene.subject === 'string' && scene.subject.trim());
       if (!sceneOk) add('slide_scene', `${path}.scene`, `Posição ${position + 1}: cena fora do contrato.`);
       if (slide.avoid != null && (typeof slide.avoid !== 'string' || slide.avoid.length > 200)) add('slide_avoid', `${path}.avoid`, `Posição ${position + 1}: avoid fora do contrato.`);
     }
@@ -332,7 +346,10 @@ export function validatePresentationPlan(raw, { count, sources = [], freeDesign 
     ...(v2 && value.visualDirection ? { visualDirection: coerceVisualDirection(value.visualDirection) } : {}),
     ...(v3 ? { deckDesign: value.deckDesign ? normalizeDeckDesign(value.deckDesign) : null } : {}),
     slides: value.slides.map(slide => ({ index: slide.index, visualRole: slide.visualRole, purpose: slide.purpose, question: slide.question.trim(), keyMessage: slide.keyMessage.trim(), evidenceIds: [...slide.evidenceIds],
-      ...(v2 ? { scene: slide.scene ? Object.fromEntries(PRESENTATION_SCENE_FIELDS.map(key => [key, slide.scene[key].trim()])) : null, avoid: String(slide.avoid || '').trim() }
+      ...(v2 ? { scene: slide.scene ? Object.fromEntries([
+        ...PRESENTATION_SCENE_FIELDS.map(key => [key, String(slide.scene[key] || '').trim()]),
+        ...SCENE_EXTRA_FIELDS.filter(key => String(slide.scene[key] || '').trim()).map(key => [key, slide.scene[key].trim()]),
+      ]) : null, avoid: String(slide.avoid || '').trim() }
         : { imageBrief: slide.imageBrief.trim() }),
       ...(v3 ? { design: slide.design ? normalizeProposedDesign(slide.design) : null } : {}) })),
   };
@@ -417,7 +434,7 @@ export function auditPresentationPlanScenes(plan) {
   const scenes = plan.slides.map(slide => (isObject(slide?.scene) ? {
     subject: new Set(sceneWords(slide.scene.subject)),
     shot: plainText(slide.scene.shot).replace(/[^a-z]/g, ''),
-    stems: new Set(sceneWords(PRESENTATION_SCENE_FIELDS.map(key => slide.scene[key]).join(' ')).map(stem5)),
+    stems: new Set(sceneWords(PRESENTATION_SCENE_BRIEF_FIELDS.map(key => slide.scene[key] || '').join(' ')).map(stem5)),
   } : null));
   const sameSubject = (a, b) => {
     const [small, large] = a.size <= b.size ? [a, b] : [b, a];
