@@ -30,6 +30,8 @@ import { wcagContrast } from './wcag.js';
 import { markdownBoldAccentIntervalsUtf16 } from './text-spans.js';
 import { PRESENTATION_ICON_NAMES } from './presentation-icons.js';
 import { FREE_FONT_ADVANCES, FREE_FONT_CHARSET } from './free-font-metrics.js';
+import { inkOver, mirrorChrome, mirrorTextZones, sideScrim, textOverPhoto } from './image-composition.js';
+import { reservedAreaColour, resolveSlideVisualDirection } from './visual-direction.js';
 
 export { FREE_PRESENTATION_PRESET_ID };
 
@@ -647,6 +649,13 @@ function directFreeSlide({ slide = {}, stage = {}, index = 0, count = 1, previou
   // isso, abrir o projeto restaurava a foto e recompunha a página.
   const withPhoto = visual ? allowed.filter(c => c.photo !== 'none') : allowed;
   if (withPhoto.length) allowed = withPhoto;
+  // Direção de arte (parte 3): ground photo pedido pela IA é a foto cheia com
+  // o texto sobre o espaço reservado, quando alguma família a desenha aqui
+  // (Cinemático e Fotográfico); a família proposta cede, o fundo não.
+  if (visual && proposal?.ground === 'photo') {
+    const onPhoto = allowed.filter(c => c.ground === 'photo');
+    if (onPhoto.length) allowed = onPhoto;
+  }
   // Nunca 3 fotos laterais seguidas do mesmo lado quando há outra geometria
   // com foto (também com a proposta da IA): o código garante o ritmo do lado.
   const sides = prev.map(p => p.side).filter(Boolean);
@@ -1196,9 +1205,24 @@ export function freePresentationCompositionOverrides(base, {
   const ground = onPhoto ? 'photo' : (directed.ground === 'photo' ? layout.ground : directed.ground);
   const design = { ...directed, photo, ground };
   const freeBase = { ...base, presentationFreeDesign: design };
-  const composed = stage?.contentMode === 'pitch'
+  let composed = stage?.contentMode === 'pitch'
     ? pitchCompositionOverrides(freeBase, layoutSlide, kind)
     : contentAwarePresentationOverrides(freeBase, layoutSlide, kind, { deliveryMode: stage?.deliveryMode });
+  // Foto cheia com texto num lado (direção de arte, parte 3): o lado do texto
+  // alterna entre as páginas assim. O lado direito é o espelho da geometria
+  // da família; nenhuma zona nova.
+  if (onPhoto) {
+    const natural = textOverPhoto(composed.canvas?.zones || {});
+    const lastSide = [...(Array.isArray(previous) ? previous : [])].reverse()
+      .find(item => item?.overlayMode === 'side' && ['left', 'right'].includes(item.overlaySide))?.overlaySide;
+    if (natural?.mode === 'overlay' && natural.fullBleed && natural.side === 'left' && lastSide === 'left') {
+      composed = {
+        ...composed,
+        canvas: { ...composed.canvas, zones: mirrorTextZones(composed.canvas.zones) },
+        presentationChrome: { ...composed.presentationChrome, chrome: mirrorChrome(composed.presentationChrome?.chrome) },
+      };
+    }
+  }
 
   const palette = freePaletteOverrides(deck);
   const chromeGround = onPhoto ? layout.ground : ground;
@@ -1212,10 +1236,23 @@ export function freePresentationCompositionOverrides(base, {
     return panel ? resolveChromeColor(family, chromeGround, panel.color, palette) : null;
   };
   let surfaceTitle = panelColor(zonesNow.title) || (onPhoto ? '#111111' : inks.bg);
-  const surfaceText = panelColor(zonesNow.subtitle) || (onPhoto ? '#111111' : inks.bg);
+  let surfaceText = panelColor(zonesNow.subtitle) || (onPhoto ? '#111111' : inks.bg);
   let titleInk = readable(surfaceTitle, [inks.ink, palette.ink, palette.inverseInk]);
   const textInk = readable(surfaceText, [inks.ink, palette.ink, palette.inverseInk]);
-  const mutedInk = readable(surfaceText, [inks.muted, palette.muted, palette.inverseMuted, textInk]);
+  let mutedInk = readable(surfaceText, [inks.muted, palette.muted, palette.inverseMuted, textInk]);
+  // Texto sobre a foto num lado: proteção lateral na cor escura do deck (a da
+  // direção visual que mais contrasta com a tinta), com 4,5:1 garantido sobre
+  // o pior pixel da foto. A superfície de pior caso vale para as conferências.
+  let scrim = null;
+  if (onPhoto) {
+    const vd = resolveSlideVisualDirection({ slide: { ...slide, presentationPresetId: FREE_PRESENTATION_PRESET_ID, presentationDeckDesign: deck } });
+    scrim = sideScrim({ zones: zonesNow, inks: [titleInk, textInk], colours: [reservedAreaColour(vd, titleInk), palette.inverse, palette.bg] });
+    if (scrim) {
+      surfaceTitle = scrim.surface;
+      surfaceText = scrim.surface;
+      mutedInk = inkOver(scrim.surface, mutedInk, textInk);
+    }
+  }
   const display = freeFontSpec(deck.fonts.display, 'display');
   const text = freeFontSpec(deck.fonts.text, 'text');
   const fam = familySpec(family).fonts.display;
@@ -1271,6 +1308,7 @@ export function freePresentationCompositionOverrides(base, {
     subtitleColor: textInk,
     textColor: mutedInk,
     presentationFreeTextSurfaces: { title: surfaceTitle, subtitle: surfaceText },
+    ...(scrim ? { overlay: scrim.overlay, overlayMode: scrim.overlayMode, overlaySide: scrim.overlaySide, overlayReach: scrim.overlayReach, overlayColor: scrim.overlayColor } : {}),
     presentationPhotoTreatment: FREE_PHOTO_TREATMENT,
     titleSize,
     titleWeight: display.weight,

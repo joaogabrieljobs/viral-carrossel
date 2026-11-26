@@ -42,6 +42,7 @@ import { textNudgePosition } from '../../utils/text-nudge-position.js';
 import { slideHasPendingPhotoIntent, inferCanvasDefaults, sandwichPhotoZoneImgStyle } from '../../utils/canvas-zones.js';
 import { cardPhotoZoneHasMedia } from '../../utils/card-photo-zone.js';
 import { DEFAULT_SLIDE_TEXT_INSET, SANDWICH_PHOTO_ZONE_MIN_H_PCT, clampRect, DEFAULT_CANVAS_ZONES_CLASSIC, CANVAS_AUTO_EDGE_PCT } from '../../utils/canvas-layout.js';
+import { sideScrimGradient } from '../../utils/image-composition.js';
 
 /**
  * Texto com os trechos de "Marcar destaque" pintados na cor de acento.
@@ -941,7 +942,10 @@ const ClassicCanvasInner = React.forwardRef(({
         {slide.bgImage && imgReady && !imgErr && slide.overlay > 0 && (
           <div style={{
             position:'absolute', inset:0, pointerEvents:'none',
-            background: slide.overlayMode === 'scrim' && Number.isFinite(slide.socialScrimTop)
+            // Foto cheia com texto num lado (direção de arte, parte 3): proteção lateral.
+            background: slide.overlayMode === 'side'
+              ? sideScrimGradient(slide)
+              : slide.overlayMode === 'scrim' && Number.isFinite(slide.socialScrimTop)
               ? socialScrimGradient(slide)
               : slide.overlayMode === 'scrim'
               // Capa social: escuro só onde o texto está; o resto da foto fica limpo.
@@ -3589,7 +3593,9 @@ const SlideCardInner = React.forwardRef(({
           // funcionar em alguns cards" (os sem foto, ou nos ornamentos, que
           // ficam num zIndex acima dele).
           position:'absolute', inset:0, pointerEvents:'none',
-          background: cultureCoverOnly
+          background: slide.overlayMode === 'side'
+            ? sideScrimGradient(slide)
+            : cultureCoverOnly
             ? `linear-gradient(to top, rgba(0,0,0,${Math.min(0.92, slide.overlay/100 * 1.05)}) 0%, rgba(0,0,0,${slide.overlay/100*0.35}) 45%, transparent 72%)`
             : `linear-gradient(175deg, rgba(0,0,0,${slide.overlay/100*0.4}) 0%, rgba(0,0,0,${slide.overlay/100}) 100%)`,
         }}/>

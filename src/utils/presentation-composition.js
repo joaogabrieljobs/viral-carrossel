@@ -7,6 +7,8 @@ import {
 } from './presentation-families.js';
 import { titleTrackingBase } from './title-tracking.js';
 import { wcagContrast } from './wcag.js';
+import { inkOver, sideScrim } from './image-composition.js';
+import { coerceVisualDirection, reservedAreaColour } from './visual-direction.js';
 const DATA_ROLES = new Set(['data', 'metric', 'result', 'matrix', 'comparison', 'priorities']);
 const DEMO_ROLES = new Set(['demo', 'example', 'evidence', 'story', 'people', 'application']);
 const DIVIDER_ROLES = new Set(['divider', 'agenda', 'question', 'reframe', 'contrast', 'statement', 'vision', 'objectives']);
@@ -330,9 +332,11 @@ export function contentAwarePresentationOverrides(base, slide = {}, kind = 'cont
     ? fitLimitsToZone(narrowed, zones.subtitle, subSize, bodyLeading)
     : narrowed;
   const { typography: familyTypography, ...visualFields } = fields;
+  const scrim = visual && layout.photo && layout.scrim ? photoTextScrim(zones, fields, slide) : null;
   return {
     ...base,
     ...visualFields,
+    ...(scrim || {}),
     // Texto e imagem possuem superfícies independentes; a foto mantém seu tom
     // salvo quando a família pede texto sobre a fotografia (scrim).
     textBg: false,
@@ -377,6 +381,22 @@ export function contentAwarePresentationOverrides(base, slide = {}, kind = 'cont
     },
     canvas: { ...base.canvas, preserveZones: true, zones },
   };
+}
+
+/**
+ * Foto em tela cheia com texto sobre o espaço reservado (direção de arte,
+ * parte 3): no Cinemático e no Fotográfico o texto fica num lado da foto
+ * cheia. A proteção passa a ser lateral, na cor da base da direção visual do
+ * deck (a que mais contrasta com a tinta), com a opacidade mínima que garante
+ * 4,5:1 sobre o pior pixel da foto. A tinta secundária sobe até ler.
+ */
+function photoTextScrim(zones, fields, slide) {
+  if (!fields.titleColor) return null;
+  const vd = coerceVisualDirection(slide?.presentationPlan?.visualDirection);
+  const scrim = sideScrim({ zones, inks: [fields.titleColor, fields.subtitleColor], colours: [reservedAreaColour(vd, fields.titleColor)].filter(Boolean) });
+  if (!scrim) return null;
+  const { surface, ...stored } = scrim;
+  return { ...stored, textColor: inkOver(surface, fields.textColor || fields.subtitleColor, fields.subtitleColor) };
 }
 
 /**

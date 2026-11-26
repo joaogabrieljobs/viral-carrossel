@@ -855,6 +855,10 @@ export function getPresentationCompositionOverrides(
     photoRegion: profile.photoRegion,
     bgFit: profile.bgFit,
     overlay: profile.overlay,
+    // Proteção lateral (direção de arte, parte 3) é da composição: recompor
+    // sem foto cheia com texto num lado não a deixa para trás.
+    overlaySide: undefined, overlayReach: undefined, overlayColor: undefined,
+    ...(slide.overlayMode === 'side' ? { overlayMode: undefined } : {}),
     showSwipeCue: false,
     canvas: {
       enabled: false,

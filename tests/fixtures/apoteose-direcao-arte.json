@@ -1,0 +1,31 @@
+{
+  "_sobre": "Direção visual e cenas simuladas para a Apoteose, inspiradas nos prompts reais do ChatGPT (docs/product/referencia-prompts-chatgpt-apoteose.md). Servem aos testes da direção de arte (docs/product/direcao-de-arte-imagens.md); não são saída de IA.",
+  "visualDirection": {
+    "palette": [
+      {
+        "role": "base",
+        "hex": "#171344"
+      },
+      {
+        "role": "subject_light",
+        "hex": "#FF6A1A"
+      },
+      {
+        "role": "shadow",
+        "hex": "#B41275"
+      },
+      {
+        "role": "graphic",
+        "hex": "#27DDE5"
+      },
+      {
+        "role": "accent",
+        "hex": "#60EC2E"
+      }
+    ],
+    "finish": "Realistic editorial photography with analogue grain and a tactile screen-print finish; visible pores and fabric texture.",
+    "atmosphere": "Urban, intimate, sensual and irreverent Brazilian party behaviour.",
+    "graphics": "Sparse organic cut-paper shapes in electric cyan laid over the photo like printed cut-outs.",
+    "avoid": "parade costumes, feathers, masks, confetti, flags, generic palm trees, festival crowds"
+  }
+}

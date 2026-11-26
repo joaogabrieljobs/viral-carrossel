@@ -2,6 +2,7 @@
 // visualDirection no roteiro (v2 e v3), uma vez por deck, opcional e
 // retrocompatível. O código valida enums e hex, dá prioridade às cores do kit
 // e, no modo livre, alinha a paleta da imagem com deckDesign.palette.
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   PRESENTATION_PLAN_PROMPT_VERSION, PRESENTATION_PLAN_SCHEMA_VERSION,
@@ -19,19 +20,7 @@ import { normalizeDeckDesign } from '../../src/utils/free-design.js';
 const SRC = [{ id: 's1', title: 'Fonte', text: 'O festival reúne 40 mil pessoas em 12 noites.' }];
 
 // Inspirada na referência do ChatGPT (docs/product/referencia-prompts-chatgpt-apoteose.md).
-export const APOTEOSE_VISUAL_DIRECTION = Object.freeze({
-  palette: [
-    { role: 'base', hex: '#171344' },
-    { role: 'subject_light', hex: '#FF6A1A' },
-    { role: 'shadow', hex: '#B41275' },
-    { role: 'graphic', hex: '#27DDE5' },
-    { role: 'accent', hex: '#60EC2E' },
-  ],
-  finish: 'Realistic editorial photography with analogue grain and a tactile screen-print finish; visible pores and fabric texture.',
-  atmosphere: 'Urban, intimate, sensual and irreverent Brazilian party behaviour.',
-  graphics: 'Sparse organic cut-paper shapes in electric cyan laid over the photo like printed cut-outs.',
-  avoid: 'parade costumes, feathers, masks, confetti, flags, generic palm trees, festival crowds',
-});
+const APOTEOSE_VISUAL_DIRECTION = Object.freeze(JSON.parse(readFileSync(new URL('../fixtures/apoteose-direcao-arte.json', import.meta.url), 'utf8')).visualDirection);
 
 const planoV2 = (extra = {}) => ({
   schemaVersion: PRESENTATION_PLAN_SCHEMA_VERSION,

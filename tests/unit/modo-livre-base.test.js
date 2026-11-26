@@ -56,15 +56,22 @@ const hash = value => createHash('sha256').update(JSON.stringify(value)).digest(
 
 // Medido antes da fase 1 (commit 3501c0a): composição dos 10 padrões na
 // Apoteose, ao aplicar o estilo nos slides e no documento.
+// Direção de arte (26/11, parte 3): no Cinemático e no Fotográfico a foto
+// cheia com texto num lado troca o véu de baixo para cima pela proteção
+// lateral com 4,5:1 garantido (overlay, overlayMode, overlaySide,
+// overlayReach, overlayColor) e a tinta do texto final sobe até ler. Com só
+// esses campos voltando ao valor antigo, os hashes dos slides voltam a
+// 0d186a4391fcf00a e 2e42802cb0529780 (conferido); doc antes:
+// 7dafb5fe71bd2d5c e 84851086c1c45d89.
 const BASELINE = {
   "presentation_executive_minimal": {"sequencia":"cover,content,content,content,content,content,demo,content,data,closing","slides":"f41260853aa60b04","doc":"d4484ad4bd9384c6"},
   "presentation_editorial_magazine": {"sequencia":"cover,content,content,content,content,content,demo,content,data,closing","slides":"d1f39ca16724bae2","doc":"12378acae456de4a"},
   "presentation_data_first": {"sequencia":"cover,content,content,content,content,content,demo,content,data,closing","slides":"71b7995a0f8f7751","doc":"ee36b4c6a69405e6"},
   "presentation_swiss_grid": {"sequencia":"cover,content,content,content,content,content,demo,content,data,closing","slides":"ab8d3d4dd7c5b9c3","doc":"b74dfddf7a212296"},
-  "presentation_cinematic": {"sequencia":"cover,content,content,content,content,content,demo,content,data,closing","slides":"0d186a4391fcf00a","doc":"7dafb5fe71bd2d5c"},
+  "presentation_cinematic": {"sequencia":"cover,content,content,content,content,content,demo,content,data,closing","slides":"beccba21088058ab","doc":"5e9790d2e0c062aa"},
   "presentation_typographic_bold": {"sequencia":"cover,content,demo,content,content,demo,content,content,data,closing","slides":"10719236b13bfe6d","doc":"7f83b23b3bf2d50d"},
   "presentation_modular_cards": {"sequencia":"cover,content,content,content,content,content,demo,content,data,closing","slides":"06fdb078f0818d9c","doc":"7ee85a225e7b60f7"},
-  "presentation_photo_essay": {"sequencia":"cover,content,content,content,content,content,demo,content,data,closing","slides":"2e42802cb0529780","doc":"84851086c1c45d89"},
+  "presentation_photo_essay": {"sequencia":"cover,content,content,content,content,content,demo,content,data,closing","slides":"56f7de6f9e710ce3","doc":"f057aad6be57cabb"},
   "presentation_technical_blueprint": {"sequencia":"cover,content,content,content,content,content,demo,content,data,closing","slides":"9e9af0b874924859","doc":"9927f7ac0046759f"},
   "presentation_premium_dark": {"sequencia":"cover,content,content,content,content,content,demo,content,data,closing","slides":"b1deafc38ee18c17","doc":"3b0af25911439eee"},
 };
