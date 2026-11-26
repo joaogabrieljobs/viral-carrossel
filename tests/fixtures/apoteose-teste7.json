@@ -1,0 +1,1641 @@
+{
+  "_origem": "Teste 7 da Apoteose: projeto 6f9lb44 consultado em produção em 26/11/2026, somente leitura, a partir da main c188ac77d23e7a3857565711422a0ae0caf75c02. Inclui apenas texto, design, direção visual e diagnósticos; não contém imagens, URLs de mídia, credenciais nem identificador da conta. Dados preservados com os defeitos observados.",
+  "_observacoes": [
+    "O roteiro pediu swiss/comparison/none no slide 8; a composição salva ficou cinematic/none/none e sem bloco.",
+    "O slide 6 foi salvo com bgImageFailed=true, sem imagem e bgImageError=image_operation_replayed. O timeout original descrito no handoff deve ser simulado pelo teste; não foi inferido a partir do erro atual salvo.",
+    "O slide 3 tem presentationFreeDesign.ground=art, presentationGround=bg e chrome.ground=bg. O campo de tinta bg pode ser intencional; confirmar a arte efetiva por deckArt e pelo DOM, sem inferir sua ausência apenas desses campos.",
+    "O campo eyebrow não existe nos slides salvos; a projeção somente leitura o representa como null.",
+    "O validador visual salvo declarou passed apesar dos defeitos."
+  ],
+  "styleKitStylePrompt": "# **crie uma apresentaçao sobre a festa apoteose. use essa imagem do flyer como referencia para criar as imagens. use esse estilo de paleta e visual",
+  "editorialTopic": "Apresentação da festa",
+  "styleKit": {
+    "contextMd": "",
+    "stylePrompt": "# **crie uma apresentaçao sobre a festa apoteose. use essa imagem do flyer como referencia para criar as imagens. use esse estilo de paleta e visual",
+    "referencePalette": {
+      "colors": [
+        {
+          "hex": "#0E0E0F",
+          "weight": 0.48
+        },
+        {
+          "hex": "#2B2158",
+          "weight": 0.231
+        },
+        {
+          "hex": "#28B2D4",
+          "weight": 0.048
+        },
+        {
+          "hex": "#9D2559",
+          "weight": 0.044
+        },
+        {
+          "hex": "#C43B42",
+          "weight": 0.039
+        },
+        {
+          "hex": "#F8701E",
+          "weight": 0.023
+        }
+      ]
+    }
+  },
+  "slides": [
+    {
+      "title": "**Apoteose**",
+      "subtitle": "O **esquenta de Carnaval** que começa antes do Carnaval.",
+      "bodyAfterImage": "São Paulo · pré-Carnaval",
+      "eyebrow": null,
+      "presentationBlocks": [],
+      "presentationDesignFamily": "cinematic",
+      "design": {
+        "block": "none",
+        "icons": [],
+        "photo": "full",
+        "family": "cinematic",
+        "ground": "photo",
+        "emphasis": [
+          "Apoteose",
+          "esquenta de Carnaval"
+        ]
+      },
+      "visualRole": "cover",
+      "purpose": "introduction",
+      "scene": {
+        "shot": "wide",
+        "light": "Warm orange neon on faces, deep purple shadows on background",
+        "action": "Walking together toward a glowing entrance, mid-laugh, one looking back over shoulder",
+        "setting": "São Paulo nighttime street, blurred city lights, architectural doorway with warm glow",
+        "subject": "Three adults, diverse skin tones and genders, one with curly hair and gold jewelry, one with short fade haircut, one with long braids, all in their late twenties",
+        "graphics": "Magenta and cyan geometric blocks at frame edges",
+        "wardrobe": "Contemporary urban party attire, sheer fabrics, structured jackets, bold accessories",
+        "expression": "Confident anticipation, shared excitement"
+      },
+      "avoid": "No carnival costumes, no feathers, no confetti, no text, no logos",
+      "saved": {
+        "presentationFreeDesign": {
+          "block": "none",
+          "icons": [],
+          "photo": "full",
+          "family": "cinematic",
+          "ground": "photo",
+          "emphasis": [
+            "Apoteose",
+            "esquenta de Carnaval"
+          ]
+        },
+        "presentationGround": "bg",
+        "presentationRequiresImage": false,
+        "presentationSuppressPhoto": false,
+        "presentationChrome": {
+          "fonts": {
+            "text": {
+              "css": "\"Inter Tight\", sans-serif",
+              "family": "Inter Tight",
+              "weight": 400,
+              "tracking": -0.4
+            },
+            "display": {
+              "css": "\"Syne\", Arial, sans-serif",
+              "family": "Syne",
+              "weight": 700,
+              "tracking": -2.6,
+              "widthFactor": 0.64
+            }
+          },
+          "chrome": [
+            {
+              "t": "text",
+              "w": 58.75,
+              "x": 6.63,
+              "y": 57.1,
+              "z": "over",
+              "case": "upper",
+              "role": "label",
+              "size": 24,
+              "text": "{kicker}",
+              "color": "#FFFFFF",
+              "weight": 700,
+              "tracking": 12
+            }
+          ],
+          "family": "cinematic",
+          "format": "16:9",
+          "ground": "bg"
+        },
+        "presentationCompositionId": "presentation_executive_minimal:cover",
+        "photoRegion": "full",
+        "customBg": "#F8F8F8",
+        "bgImageFailed": false,
+        "bgImageError": null,
+        "hasImage": true
+      }
+    },
+    {
+      "title": "A festa começa antes da festa",
+      "subtitle": "O brasileiro não espera o Carnaval chegar. Ele **antecipa**, **inventa** e **reinventa** motivos para celebrar, e é nesse território que a Apoteose existe.",
+      "bodyAfterImage": "Entre a promessa de se comportar e a falta de intenção de cumpri-la.",
+      "eyebrow": null,
+      "presentationBlocks": [],
+      "presentationDesignFamily": "editorial",
+      "design": {
+        "block": "none",
+        "icons": [],
+        "photo": "half",
+        "family": "editorial",
+        "ground": "bg",
+        "emphasis": [
+          "antecipa",
+          "inventa",
+          "reinventa"
+        ]
+      },
+      "visualRole": "content",
+      "purpose": "context",
+      "scene": {
+        "shot": "medium",
+        "light": "Cool cyan from phone screen on face, warm orange ambient from interior",
+        "action": "Looking at phone screen glowing, smiling, city skyline behind",
+        "setting": "Apartment balcony at night, São Paulo skyline, warm interior light spilling out",
+        "subject": "Single adult with medium brown skin, curly dark hair, late twenties, sitting on apartment balcony",
+        "graphics": "Thin geometric lines framing the subject",
+        "wardrobe": "Casual linen shirt unbuttoned, sunglasses pushed up on head",
+        "expression": "Quiet private excitement, anticipation"
+      },
+      "avoid": "No carnival imagery, no text on phone screen, no logos",
+      "saved": {
+        "presentationFreeDesign": {
+          "block": "none",
+          "icons": [],
+          "photo": "half",
+          "family": "editorial",
+          "ground": "bg",
+          "emphasis": [
+            "antecipa",
+            "inventa",
+            "reinventa"
+          ]
+        },
+        "presentationGround": "bg",
+        "presentationRequiresImage": false,
+        "presentationSuppressPhoto": false,
+        "presentationChrome": {
+          "fonts": {
+            "text": {
+              "css": "\"Inter Tight\", sans-serif",
+              "family": "Inter Tight",
+              "weight": 400,
+              "tracking": -0.4
+            },
+            "display": {
+              "css": "\"Syne\", Arial, sans-serif",
+              "family": "Syne",
+              "weight": 700,
+              "tracking": -2.6,
+              "widthFactor": 0.64
+            }
+          },
+          "chrome": [
+            {
+              "h": 0.1,
+              "t": "rule",
+              "w": 90,
+              "x": 5,
+              "y": 10.4,
+              "color": "#F8F8F8"
+            },
+            {
+              "t": "text",
+              "w": 60,
+              "x": 5,
+              "y": 6.4,
+              "role": "label",
+              "size": 22,
+              "text": "{kicker}",
+              "color": "#9A9A9A",
+              "italic": true
+            },
+            {
+              "t": "text",
+              "w": 33,
+              "x": 62,
+              "y": 87,
+              "role": "label",
+              "size": 22,
+              "text": "{caption}",
+              "color": "#9A9A9A",
+              "italic": true
+            }
+          ],
+          "family": "editorial",
+          "format": "16:9",
+          "ground": "bg"
+        },
+        "presentationCompositionId": "presentation_executive_minimal:content",
+        "photoRegion": "full",
+        "customBg": "#0E0E0F",
+        "bgImageFailed": false,
+        "bgImageError": null,
+        "hasImage": true
+      }
+    },
+    {
+      "title": "Apoteose é o **ápice**",
+      "subtitle": "O nome remete ao **ápice**, à **celebração**, à intensidade e à **liberdade**. É a festa que parte do comportamento do brasileiro: transformar qualquer ocasião em motivo para celebrar, com exagero, irreverência e o prazer de estar entre amigos.",
+      "bodyAfterImage": "Intensidade e liberdade como estado de espírito.",
+      "eyebrow": null,
+      "presentationBlocks": [],
+      "presentationDesignFamily": "typographic",
+      "design": {
+        "block": "none",
+        "icons": [],
+        "photo": "none",
+        "family": "typographic",
+        "ground": "accent",
+        "emphasis": [
+          "ápice",
+          "celebração",
+          "liberdade"
+        ]
+      },
+      "visualRole": "content",
+      "purpose": "vision",
+      "scene": null,
+      "avoid": "",
+      "saved": {
+        "presentationFreeDesign": {
+          "block": "none",
+          "icons": [],
+          "photo": "none",
+          "family": "typographic",
+          "ground": "art",
+          "emphasis": [
+            "ápice",
+            "celebração",
+            "liberdade"
+          ]
+        },
+        "presentationGround": "bg",
+        "presentationRequiresImage": false,
+        "presentationSuppressPhoto": true,
+        "presentationChrome": {
+          "fonts": {
+            "text": {
+              "css": "\"Inter Tight\", sans-serif",
+              "family": "Inter Tight",
+              "weight": 400,
+              "tracking": -0.4
+            },
+            "display": {
+              "css": "\"Syne\", Arial, sans-serif",
+              "family": "Syne",
+              "weight": 700,
+              "tracking": -2.6,
+              "widthFactor": 0.64
+            }
+          },
+          "chrome": [
+            {
+              "h": 0.5,
+              "t": "rule",
+              "w": 68,
+              "x": 4,
+              "y": 44.19,
+              "color": "#F8F8F8",
+              "follow": "subtitle"
+            },
+            {
+              "t": "text",
+              "w": 15.45,
+              "x": 4,
+              "y": 46.69,
+              "role": "text",
+              "size": 90,
+              "text": "→",
+              "color": "#F8701E",
+              "follow": "subtitle"
+            },
+            {
+              "t": "text",
+              "w": 52.84,
+              "x": 4.63,
+              "y": 4.8,
+              "z": "over",
+              "case": "upper",
+              "role": "label",
+              "size": 24,
+              "text": "{kicker}",
+              "color": "#28B2D4",
+              "weight": 700,
+              "tracking": 12
+            }
+          ],
+          "family": "typographic",
+          "format": "16:9",
+          "ground": "bg"
+        },
+        "presentationCompositionId": "presentation_executive_minimal:content",
+        "photoRegion": "full",
+        "customBg": "#0E0E0F",
+        "bgImageFailed": false,
+        "bgImageError": null,
+        "hasImage": true
+      }
+    },
+    {
+      "title": "Um encontro **exclusivo** para **convidados**",
+      "subtitle": "Apoteose reúne pessoas conectadas à música, à moda, à arte, à cultura contemporânea e à vida noturna em um encontro que privilegia a curadoria de público.",
+      "bodyAfterImage": "",
+      "eyebrow": null,
+      "presentationBlocks": [],
+      "presentationDesignFamily": "modular",
+      "design": {
+        "block": "none",
+        "icons": [],
+        "photo": "half",
+        "family": "modular",
+        "ground": "surface",
+        "emphasis": [
+          "exclusivo",
+          "convidados"
+        ]
+      },
+      "visualRole": "content",
+      "purpose": "solution",
+      "scene": {
+        "shot": "medium",
+        "light": "Warm orange spotlight from above, purple shadows on walls",
+        "action": "Standing close in conversation at a dimly lit venue, gesturing animatedly",
+        "setting": "Interior of contemporary venue, concrete walls, warm pendant lighting",
+        "subject": "Two adults, one with dark skin and short box braids, one with light skin and wavy auburn hair, both early thirties",
+        "graphics": "Cyan geometric overlay on lower third",
+        "wardrobe": "Elevated evening wear, one in silk slip dress, one in tailored oversized blazer",
+        "expression": "Engaged, amused, intimate connection"
+      },
+      "avoid": "No carnival costumes, no text, no logos, no feathers",
+      "saved": {
+        "presentationFreeDesign": {
+          "block": "none",
+          "icons": [],
+          "photo": "small",
+          "family": "modular",
+          "ground": "surface",
+          "emphasis": [
+            "exclusivo",
+            "convidados"
+          ]
+        },
+        "presentationGround": "surface",
+        "presentationRequiresImage": false,
+        "presentationSuppressPhoto": false,
+        "presentationChrome": {
+          "fonts": {
+            "text": {
+              "css": "\"Inter Tight\", sans-serif",
+              "family": "Inter Tight",
+              "weight": 400,
+              "tracking": -0.4
+            },
+            "display": {
+              "css": "\"Syne\", Arial, sans-serif",
+              "family": "Syne",
+              "weight": 700,
+              "tracking": -2.6,
+              "widthFactor": 0.64
+            }
+          },
+          "chrome": [
+            {
+              "t": "text",
+              "w": 60.75,
+              "x": 30.63,
+              "y": 29.8,
+              "z": "over",
+              "case": "upper",
+              "role": "label",
+              "size": 24,
+              "text": "{kicker}",
+              "color": "#F8701E",
+              "weight": 700,
+              "tracking": 12
+            }
+          ],
+          "family": "modular",
+          "format": "16:9",
+          "ground": "surface"
+        },
+        "presentationCompositionId": "presentation_executive_minimal:content",
+        "photoRegion": "full",
+        "customBg": "#2B2158",
+        "bgImageFailed": false,
+        "bgImageError": null,
+        "hasImage": true
+      }
+    },
+    {
+      "title": "Curadoria **brasileira**, **sem fronteiras**",
+      "subtitle": "Hip-hop, funk, música eletrônica, remixes e releituras de clássicos nacionais conduzidos por DJs que transitam entre universos musicais distintos.",
+      "bodyAfterImage": "Um Brasil contemporâneo, urbano, plural e culturalmente sofisticado, sem perder a essência popular.",
+      "eyebrow": null,
+      "presentationBlocks": [],
+      "presentationDesignFamily": "cultural",
+      "design": {
+        "block": "none",
+        "icons": [],
+        "photo": "half",
+        "family": "cultural",
+        "ground": "bg",
+        "emphasis": [
+          "brasileira",
+          "sem fronteiras"
+        ]
+      },
+      "visualRole": "content",
+      "purpose": "solution",
+      "scene": {
+        "shot": "close-up",
+        "light": "Cyan and magenta from equipment lights on face, deep shadow background",
+        "action": "Hands on DJ controller, head nodding, selecting next track",
+        "setting": "DJ booth in dark venue, equipment glowing, crowd blur behind",
+        "subject": "Adult with light brown skin, short fade haircut, headphones around neck, late twenties",
+        "graphics": "Waveform-like geometric lines across frame",
+        "wardrobe": "Graphic tee under open shirt, layered chains, rings",
+        "expression": "Focused concentration with subtle smile"
+      },
+      "avoid": "No text on equipment screens, no logos, no carnival imagery",
+      "saved": {
+        "presentationFreeDesign": {
+          "block": "none",
+          "icons": [],
+          "photo": "half",
+          "family": "cultural",
+          "ground": "bg",
+          "emphasis": [
+            "brasileira",
+            "sem fronteiras"
+          ]
+        },
+        "presentationGround": "bg",
+        "presentationRequiresImage": false,
+        "presentationSuppressPhoto": false,
+        "presentationChrome": {
+          "fonts": {
+            "text": {
+              "css": "\"Inter Tight\", sans-serif",
+              "family": "Inter Tight",
+              "weight": 400,
+              "tracking": -0.4
+            },
+            "display": {
+              "css": "\"Syne\", Arial, sans-serif",
+              "family": "Syne",
+              "weight": 700,
+              "tracking": -2.6,
+              "widthFactor": 0.64
+            }
+          },
+          "chrome": [
+            {
+              "t": "text",
+              "w": 46.75,
+              "x": 6.63,
+              "y": 9.8,
+              "z": "over",
+              "case": "upper",
+              "role": "label",
+              "size": 24,
+              "text": "{kicker}",
+              "color": "#F8701E",
+              "weight": 700,
+              "tracking": 12
+            }
+          ],
+          "family": "cultural",
+          "format": "16:9",
+          "ground": "bg"
+        },
+        "presentationCompositionId": "presentation_executive_minimal:content",
+        "photoRegion": "full",
+        "customBg": "#0E0E0F",
+        "bgImageFailed": false,
+        "bgImageError": null,
+        "hasImage": true
+      }
+    },
+    {
+      "title": "Público **formador de opinião**, **curadoria de público**",
+      "subtitle": "Pessoas socialmente ativas, conectadas a tendências de comportamento, moda, entretenimento e cultura, que valorizam a experiência e os encontros.",
+      "bodyAfterImage": "O acesso exclusivo para convidados fortalece o caráter social da festa.",
+      "eyebrow": null,
+      "presentationBlocks": [],
+      "presentationDesignFamily": "editorial",
+      "design": {
+        "block": "none",
+        "icons": [],
+        "photo": "half",
+        "family": "editorial",
+        "ground": "surface",
+        "emphasis": [
+          "formador de opinião",
+          "curadoria de público"
+        ]
+      },
+      "visualRole": "content",
+      "purpose": "context",
+      "scene": {
+        "shot": "wide",
+        "light": "Warm golden hour transitioning to blue hour, orange accent light",
+        "action": "Gathered around a high table with drinks, leaning in to talk over music",
+        "setting": "Rooftop bar at dusk, city lights beginning to glow, plants and modern furniture",
+        "subject": "Group of four adults, diverse skin tones, body types and genders, ages late twenties to mid thirties",
+        "graphics": "Magenta geometric block on right edge",
+        "wardrobe": "Mixed contemporary styles: oversized blazer, crop top, wide-leg pants, statement jewelry",
+        "expression": "Relaxed confidence, enjoyment, social ease"
+      },
+      "avoid": "No carnival costumes, no text, no logos, no stereotypes",
+      "saved": {
+        "presentationFreeDesign": {
+          "block": "none",
+          "icons": [],
+          "photo": "half",
+          "family": "editorial",
+          "ground": "surface",
+          "emphasis": [
+            "formador de opinião",
+            "curadoria de público"
+          ]
+        },
+        "presentationGround": "surface",
+        "presentationRequiresImage": false,
+        "presentationSuppressPhoto": false,
+        "presentationChrome": {
+          "fonts": {
+            "text": {
+              "css": "\"Inter Tight\", sans-serif",
+              "family": "Inter Tight",
+              "weight": 400,
+              "tracking": -0.4
+            },
+            "display": {
+              "css": "\"Syne\", Arial, sans-serif",
+              "family": "Syne",
+              "weight": 700,
+              "tracking": -2.6,
+              "widthFactor": 0.64
+            }
+          },
+          "chrome": [
+            {
+              "h": 0.1,
+              "t": "rule",
+              "w": 31,
+              "x": 64,
+              "y": 10.4,
+              "color": "#F8F8F8"
+            },
+            {
+              "t": "text",
+              "w": 31,
+              "x": 64,
+              "y": 92,
+              "role": "label",
+              "size": 22,
+              "text": "{caption}",
+              "color": "#9A9A9A",
+              "italic": true
+            },
+            {
+              "t": "text",
+              "w": 29.75,
+              "x": 64.63,
+              "y": 7,
+              "z": "over",
+              "case": "upper",
+              "role": "label",
+              "size": 24,
+              "text": "{kicker}",
+              "color": "#F8701E",
+              "weight": 700,
+              "tracking": 12
+            }
+          ],
+          "family": "editorial",
+          "format": "16:9",
+          "ground": "surface"
+        },
+        "presentationCompositionId": "presentation_executive_minimal:content",
+        "photoRegion": "full",
+        "customBg": "#2B2158",
+        "bgImageFailed": true,
+        "bgImageError": "image_operation_replayed",
+        "hasImage": false
+      }
+    },
+    {
+      "title": "Comunicação **provocativa**, **irreverente**, **bem-humorada**",
+      "subtitle": "O humor nasce da observação do comportamento humano, das contradições sociais e dos exageros que fazem parte da cultura das festas brasileiras. A marca não precisa anunciar que é exclusiva ou sofisticada, isso se percebe pela qualidade da comunicação.",
+      "bodyAfterImage": "Conteúdos exploram situações cotidianas, sátiras comportamentais e referências à cultura popular.",
+      "eyebrow": null,
+      "presentationBlocks": [],
+      "presentationDesignFamily": "photo",
+      "design": {
+        "block": "none",
+        "icons": [],
+        "photo": "half",
+        "family": "photo",
+        "ground": "photo",
+        "emphasis": [
+          "provocativa",
+          "irreverente",
+          "bem-humorada"
+        ]
+      },
+      "visualRole": "content",
+      "purpose": "vision",
+      "scene": {
+        "shot": "close-up",
+        "light": "Magenta and cyan split lighting on face, dark background",
+        "action": "Mid-laugh covering mouth slightly, looking off-camera at someone",
+        "setting": "Blurred party background, colorful lights bokeh",
+        "subject": "Single adult with dark skin, natural afro, mid thirties, distinctive cheekbones",
+        "graphics": "Cyan diagonal line cutting across frame",
+        "wardrobe": "Bold earrings, high-neck top, minimalist chic",
+        "expression": "Genuine unguarded amusement, irreverence"
+      },
+      "avoid": "No text, no logos, no carnival props, no stereotypes",
+      "saved": {
+        "presentationFreeDesign": {
+          "block": "none",
+          "icons": [],
+          "photo": "small",
+          "family": "photo",
+          "ground": "inverse",
+          "emphasis": [
+            "provocativa",
+            "irreverente",
+            "bem-humorada"
+          ]
+        },
+        "presentationGround": "inverse",
+        "presentationRequiresImage": false,
+        "presentationSuppressPhoto": false,
+        "presentationChrome": {
+          "fonts": {
+            "text": {
+              "css": "\"Inter Tight\", sans-serif",
+              "family": "Inter Tight",
+              "weight": 400,
+              "tracking": -0.4
+            },
+            "display": {
+              "css": "\"Syne\", Arial, sans-serif",
+              "family": "Syne",
+              "weight": 700,
+              "tracking": -2.6,
+              "widthFactor": 0.64
+            }
+          },
+          "chrome": [
+            {
+              "t": "text",
+              "w": 88.75,
+              "x": 5.63,
+              "y": 8.8,
+              "z": "over",
+              "case": "upper",
+              "role": "label",
+              "size": 24,
+              "text": "{kicker}",
+              "color": "#0E0E0F",
+              "weight": 700,
+              "tracking": 12
+            }
+          ],
+          "family": "photo",
+          "format": "16:9",
+          "ground": "inverse"
+        },
+        "presentationCompositionId": "presentation_executive_minimal:content",
+        "photoRegion": "full",
+        "customBg": "#F8F8F8",
+        "bgImageFailed": false,
+        "bgImageError": null,
+        "hasImage": true
+      }
+    },
+    {
+      "title": "**brasileira**, **sofisticada**, **irreverente**",
+      "subtitle": "A personalidade vive nos contrastes: brasileira sem ser caricata, sofisticada sem ser pretensiosa, exclusiva sem ser arrogante, sensual sem ser vulgar, irreverente sem ser infantil, contemporânea sem depender de tendências, bem-humorada sem recorrer ao humor óbvio.",
+      "bodyAfterImage": "",
+      "eyebrow": null,
+      "presentationBlocks": [],
+      "presentationDesignFamily": "cinematic",
+      "design": {
+        "block": "comparison",
+        "icons": [],
+        "photo": "none",
+        "family": "swiss",
+        "ground": "inverse",
+        "emphasis": [
+          "brasileira",
+          "sofisticada",
+          "irreverente"
+        ]
+      },
+      "visualRole": "content",
+      "purpose": "vision",
+      "scene": null,
+      "avoid": "No carnival imagery, no text, no logos",
+      "saved": {
+        "presentationFreeDesign": {
+          "block": "none",
+          "icons": [],
+          "photo": "none",
+          "family": "cinematic",
+          "ground": "inverse",
+          "emphasis": [
+            "brasileira",
+            "sofisticada",
+            "irreverente"
+          ]
+        },
+        "presentationGround": "inverse",
+        "presentationRequiresImage": false,
+        "presentationSuppressPhoto": true,
+        "presentationChrome": {
+          "fonts": {
+            "text": {
+              "css": "\"Inter Tight\", sans-serif",
+              "family": "Inter Tight",
+              "weight": 400,
+              "tracking": -0.4
+            },
+            "display": {
+              "css": "\"Syne\", Arial, sans-serif",
+              "family": "Syne",
+              "weight": 700,
+              "tracking": -2.6,
+              "widthFactor": 0.64
+            }
+          },
+          "chrome": [
+            {
+              "h": 50,
+              "t": "rule",
+              "w": 0.08,
+              "x": 53,
+              "y": 30,
+              "color": "#F8701E"
+            },
+            {
+              "t": "text",
+              "w": 42.75,
+              "x": 6.63,
+              "y": 13.8,
+              "z": "over",
+              "case": "upper",
+              "role": "label",
+              "size": 24,
+              "text": "{kicker}",
+              "color": "#0E0E0F",
+              "weight": 700,
+              "tracking": 12
+            }
+          ],
+          "family": "cinematic",
+          "format": "16:9",
+          "ground": "inverse"
+        },
+        "presentationCompositionId": "presentation_executive_minimal:content",
+        "photoRegion": "full",
+        "customBg": "#F8F8F8",
+        "bgImageFailed": false,
+        "bgImageError": null,
+        "hasImage": true
+      }
+    },
+    {
+      "title": "O **esquenta** que **São Paulo** **quer**",
+      "subtitle": "A Apoteose pretende se consolidar como o esquenta de Carnaval **mais badalado** de São Paulo. Uma festa com identidade própria, capaz de gerar desejo, conversas e expectativa antes mesmo de acontecer.",
+      "bodyAfterImage": "O brasileiro não espera o Carnaval chegar para começar o Carnaval.",
+      "eyebrow": null,
+      "presentationBlocks": [],
+      "presentationDesignFamily": "cinematic",
+      "design": {
+        "block": "none",
+        "icons": [],
+        "photo": "full",
+        "family": "cinematic",
+        "ground": "photo",
+        "emphasis": [
+          "esquenta",
+          "mais badalado",
+          "São Paulo"
+        ]
+      },
+      "visualRole": "content",
+      "purpose": "summary",
+      "scene": {
+        "shot": "wide",
+        "light": "Warm orange glow from venue, purple shadow street, cyan accent lights",
+        "action": "Moving toward a luminous venue entrance, energy of anticipation",
+        "setting": "Urban São Paulo street at night, venue entrance glowing warm orange",
+        "subject": "Wide crowd of adults, diverse skin tones, ages and genders, seen from behind",
+        "graphics": "Magenta geometric overlay on upper left",
+        "wardrobe": "Varied contemporary evening party attire",
+        "expression": "Collective forward momentum"
+      },
+      "avoid": "No carnival costumes, no feathers, no confetti, no text, no logos",
+      "saved": {
+        "presentationFreeDesign": {
+          "block": "none",
+          "icons": [],
+          "photo": "full",
+          "family": "cinematic",
+          "ground": "photo",
+          "emphasis": [
+            "esquenta",
+            "mais badalado",
+            "São Paulo"
+          ]
+        },
+        "presentationGround": "bg",
+        "presentationRequiresImage": false,
+        "presentationSuppressPhoto": false,
+        "presentationChrome": {
+          "fonts": {
+            "text": {
+              "css": "\"Inter Tight\", sans-serif",
+              "family": "Inter Tight",
+              "weight": 400,
+              "tracking": -0.4
+            },
+            "display": {
+              "css": "\"Syne\", Arial, sans-serif",
+              "family": "Syne",
+              "weight": 700,
+              "tracking": -2.6,
+              "widthFactor": 0.64
+            }
+          },
+          "chrome": [
+            {
+              "t": "text",
+              "w": 48.75,
+              "x": 44.63,
+              "y": 42.59,
+              "z": "over",
+              "case": "upper",
+              "role": "label",
+              "size": 24,
+              "text": "{kicker}",
+              "color": "#FFFFFF",
+              "weight": 700,
+              "tracking": 12
+            }
+          ],
+          "family": "cinematic",
+          "format": "16:9",
+          "ground": "bg"
+        },
+        "presentationCompositionId": "presentation_executive_minimal:content",
+        "photoRegion": "full",
+        "customBg": "#F8F8F8",
+        "bgImageFailed": false,
+        "bgImageError": null,
+        "hasImage": true
+      }
+    },
+    {
+      "title": "A festa já começou",
+      "subtitle": "A festa começa antes. E quando o Carnaval chega, já começou há tempo.",
+      "bodyAfterImage": "",
+      "eyebrow": null,
+      "presentationBlocks": [
+        {
+          "text": "Como se o Carnaval não fosse suficiente.",
+          "type": "quote",
+          "author": ""
+        }
+      ],
+      "presentationDesignFamily": "typographic",
+      "design": {
+        "block": "quote",
+        "icons": [],
+        "photo": "none",
+        "family": "typographic",
+        "ground": "accent",
+        "emphasis": [
+          "Carnaval não fosse suficiente"
+        ]
+      },
+      "visualRole": "closing",
+      "purpose": "decision",
+      "scene": null,
+      "avoid": "",
+      "saved": {
+        "presentationFreeDesign": {
+          "block": "quote",
+          "icons": [],
+          "photo": "none",
+          "family": "typographic",
+          "ground": "bg",
+          "emphasis": []
+        },
+        "presentationGround": "bg",
+        "presentationRequiresImage": false,
+        "presentationSuppressPhoto": true,
+        "presentationChrome": {
+          "fonts": {
+            "text": {
+              "css": "\"Inter Tight\", sans-serif",
+              "family": "Inter Tight",
+              "weight": 400,
+              "tracking": -0.4
+            },
+            "display": {
+              "css": "\"Syne\", Arial, sans-serif",
+              "family": "Syne",
+              "weight": 700,
+              "tracking": -2.6,
+              "widthFactor": 0.64
+            }
+          },
+          "chrome": [
+            {
+              "h": 0.6,
+              "t": "rule",
+              "w": 92,
+              "x": 4,
+              "y": 41,
+              "color": "#F8F8F8",
+              "follow": "subtitle"
+            },
+            {
+              "t": "text",
+              "w": 52.75,
+              "x": 4.63,
+              "y": 3.8,
+              "z": "over",
+              "case": "upper",
+              "role": "label",
+              "size": 24,
+              "text": "{kicker}",
+              "color": "#F8701E",
+              "weight": 700,
+              "tracking": 12
+            }
+          ],
+          "family": "typographic",
+          "format": "16:9",
+          "ground": "bg"
+        },
+        "presentationCompositionId": "presentation_executive_minimal:data",
+        "photoRegion": "full",
+        "customBg": "#0E0E0F",
+        "bgImageFailed": false,
+        "bgImageError": null,
+        "hasImage": true
+      }
+    }
+  ],
+  "signature": "Como se o Carnaval não fosse suficiente.",
+  "deckDesign": {
+    "mood": "Nighttime editorial with warm neon glow on skin, deep purple shadows, cyan and magenta graphic overlays, cinematic grain, diverse casting in urban party settings.",
+    "fonts": {
+      "text": "Inter Tight",
+      "display": "Syne"
+    },
+    "palette": {
+      "bg": "#0E0E0F",
+      "ink": "#F8F8F8",
+      "muted": "#9A9A9A",
+      "accent": "#F8701E",
+      "accent2": "#28B2D4",
+      "inverse": "#F8F8F8",
+      "surface": "#2B2158",
+      "inverseInk": "#0E0E0F"
+    }
+  },
+  "visualDirection": {
+    "avoid": "No clichê Carnaval imagery: no feathers, sequins, confetti, samba costumes, masks or literal fantasy; no real celebrities, no visible logos or text, no stereotypes.",
+    "finish": "Grão fino de filme editorial noturno, textura sutil de impressão offset, realismo contemporâneo com pós-tratamento de campanha publicitária.",
+    "palette": [
+      {
+        "hex": "#0E0E0F",
+        "role": "base"
+      },
+      {
+        "hex": "#F8701E",
+        "role": "subject_light"
+      },
+      {
+        "hex": "#2B2158",
+        "role": "shadow"
+      },
+      {
+        "hex": "#28B2D4",
+        "role": "graphic"
+      },
+      {
+        "hex": "#C43B42",
+        "role": "accent"
+      }
+    ],
+    "graphics": "Blocos geométricos sobrepostos em magenta e ciano, recortes tipográficos, linhas finas de blueprint editorial, sobreposição de cor translúcida.",
+    "atmosphere": "Noite urbana brasileira intensa, calor tropical sob luz neon, energia de festa que ainda não começou mas já é inevitável.",
+    "paletteSource": "reference"
+  },
+  "presentationPlan": {
+    "gaps": [
+      "Data, local e horário da festa não informados",
+      "Lineup de DJs e programação detalhada não informados",
+      "Informações sobre ingressos ou convites não fornecidas",
+      "Parceiros, patrocinadores ou apoiadores não informados"
+    ],
+    "rules": [
+      {
+        "id": "r1",
+        "level": "avoid",
+        "target": "image",
+        "instruction": "Evitar clichês visuais do Carnaval como fantasias, plumas e confetes; o Carnaval aparece como comportamento, não representação literal."
+      },
+      {
+        "id": "r2",
+        "level": "avoid",
+        "target": "image",
+        "instruction": "Não usar marcas, logotipos, texto legível ou tela com informação nas imagens."
+      },
+      {
+        "id": "r3",
+        "level": "avoid",
+        "target": "copy",
+        "instruction": "Não escrever metacomentários como 'este card mostra' ou 'card 1: o problema'; o texto é copy pronta para publicar."
+      },
+      {
+        "id": "r4",
+        "level": "avoid",
+        "target": "copy",
+        "instruction": "Não anunciar constantemente que é exclusiva, sofisticada ou desejada; essas características devem ser percebidas."
+      }
+    ],
+    "slides": [
+      {
+        "avoid": "No carnival costumes, no feathers, no confetti, no text, no logos",
+        "index": 1,
+        "scene": {
+          "shot": "wide",
+          "light": "Warm orange neon on faces, deep purple shadows on background",
+          "action": "Walking together toward a glowing entrance, mid-laugh, one looking back over shoulder",
+          "setting": "São Paulo nighttime street, blurred city lights, architectural doorway with warm glow",
+          "subject": "Three adults, diverse skin tones and genders, one with curly hair and gold jewelry, one with short fade haircut, one with long braids, all in their late twenties",
+          "graphics": "Magenta and cyan geometric blocks at frame edges",
+          "wardrobe": "Contemporary urban party attire, sheer fabrics, structured jackets, bold accessories",
+          "expression": "Confident anticipation, shared excitement"
+        },
+        "design": {
+          "block": "none",
+          "icons": [],
+          "photo": "full",
+          "family": "cinematic",
+          "ground": "photo",
+          "emphasis": [
+            "Apoteose",
+            "esquenta de Carnaval"
+          ]
+        },
+        "purpose": "introduction",
+        "question": "O que é Apoteose?",
+        "keyMessage": "Capa: Apoteose, o esquenta de Carnaval que começa antes do Carnaval.",
+        "visualRole": "cover",
+        "evidenceIds": [
+          "e1",
+          "e11"
+        ]
+      },
+      {
+        "avoid": "No carnival imagery, no text on phone screen, no logos",
+        "index": 2,
+        "scene": {
+          "shot": "medium",
+          "light": "Cool cyan from phone screen on face, warm orange ambient from interior",
+          "action": "Looking at phone screen glowing, smiling, city skyline behind",
+          "setting": "Apartment balcony at night, São Paulo skyline, warm interior light spilling out",
+          "subject": "Single adult with medium brown skin, curly dark hair, late twenties, sitting on apartment balcony",
+          "graphics": "Thin geometric lines framing the subject",
+          "wardrobe": "Casual linen shirt unbuttoned, sunglasses pushed up on head",
+          "expression": "Quiet private excitement, anticipation"
+        },
+        "design": {
+          "block": "none",
+          "icons": [],
+          "photo": "half",
+          "family": "editorial",
+          "ground": "bg",
+          "emphasis": [
+            "antecipa",
+            "inventa",
+            "reinventa"
+          ]
+        },
+        "purpose": "context",
+        "question": "Por que essa festa existe?",
+        "keyMessage": "Contexto: O brasileiro não espera o Carnaval chegar para começar a festejar.",
+        "visualRole": "content",
+        "evidenceIds": [
+          "e4"
+        ]
+      },
+      {
+        "avoid": "",
+        "index": 3,
+        "scene": null,
+        "design": {
+          "block": "none",
+          "icons": [],
+          "photo": "none",
+          "family": "typographic",
+          "ground": "accent",
+          "emphasis": [
+            "ápice",
+            "celebração",
+            "liberdade"
+          ]
+        },
+        "purpose": "vision",
+        "question": "O que o nome Apoteose significa?",
+        "keyMessage": "Conceito: Apoteose é o ápice, a celebração, a intensidade e a liberdade.",
+        "visualRole": "content",
+        "evidenceIds": [
+          "e3"
+        ]
+      },
+      {
+        "avoid": "No carnival costumes, no text, no logos, no feathers",
+        "index": 4,
+        "scene": {
+          "shot": "medium",
+          "light": "Warm orange spotlight from above, purple shadows on walls",
+          "action": "Standing close in conversation at a dimly lit venue, gesturing animatedly",
+          "setting": "Interior of contemporary venue, concrete walls, warm pendant lighting",
+          "subject": "Two adults, one with dark skin and short box braids, one with light skin and wavy auburn hair, both early thirties",
+          "graphics": "Cyan geometric overlay on lower third",
+          "wardrobe": "Elevated evening wear, one in silk slip dress, one in tailored oversized blazer",
+          "expression": "Engaged, amused, intimate connection"
+        },
+        "design": {
+          "block": "none",
+          "icons": [],
+          "photo": "half",
+          "family": "modular",
+          "ground": "surface",
+          "emphasis": [
+            "exclusivo",
+            "convidados"
+          ]
+        },
+        "purpose": "solution",
+        "question": "Que festa é essa?",
+        "keyMessage": "Corpo: Encontro exclusivo para convidados, conectando música, moda, arte e vida noturna.",
+        "visualRole": "content",
+        "evidenceIds": [
+          "e2"
+        ]
+      },
+      {
+        "avoid": "No text on equipment screens, no logos, no carnival imagery",
+        "index": 5,
+        "scene": {
+          "shot": "close-up",
+          "light": "Cyan and magenta from equipment lights on face, deep shadow background",
+          "action": "Hands on DJ controller, head nodding, selecting next track",
+          "setting": "DJ booth in dark venue, equipment glowing, crowd blur behind",
+          "subject": "Adult with light brown skin, short fade haircut, headphones around neck, late twenties",
+          "graphics": "Waveform-like geometric lines across frame",
+          "wardrobe": "Graphic tee under open shirt, layered chains, rings",
+          "expression": "Focused concentration with subtle smile"
+        },
+        "design": {
+          "block": "none",
+          "icons": [],
+          "photo": "half",
+          "family": "cultural",
+          "ground": "bg",
+          "emphasis": [
+            "brasileira",
+            "sem fronteiras"
+          ]
+        },
+        "purpose": "solution",
+        "question": "O que toca na Apoteose?",
+        "keyMessage": "Corpo: Curadoria brasileira sem fronteiras — hip-hop, funk, eletrônica e releituras de clássicos.",
+        "visualRole": "content",
+        "evidenceIds": [
+          "e5",
+          "e6"
+        ]
+      },
+      {
+        "avoid": "No carnival costumes, no text, no logos, no stereotypes",
+        "index": 6,
+        "scene": {
+          "shot": "wide",
+          "light": "Warm golden hour transitioning to blue hour, orange accent light",
+          "action": "Gathered around a high table with drinks, leaning in to talk over music",
+          "setting": "Rooftop bar at dusk, city lights beginning to glow, plants and modern furniture",
+          "subject": "Group of four adults, diverse skin tones, body types and genders, ages late twenties to mid thirties",
+          "graphics": "Magenta geometric block on right edge",
+          "wardrobe": "Mixed contemporary styles: oversized blazer, crop top, wide-leg pants, statement jewelry",
+          "expression": "Relaxed confidence, enjoyment, social ease"
+        },
+        "design": {
+          "block": "none",
+          "icons": [],
+          "photo": "half",
+          "family": "editorial",
+          "ground": "surface",
+          "emphasis": [
+            "formador de opinião",
+            "curadoria de público"
+          ]
+        },
+        "purpose": "context",
+        "question": "Quem é o público da Apoteose?",
+        "keyMessage": "Corpo: Público socialmente ativo, formador de opinião, conectado a cultura e entretenimento.",
+        "visualRole": "content",
+        "evidenceIds": [
+          "e7",
+          "e8"
+        ]
+      },
+      {
+        "avoid": "No text, no logos, no carnival props, no stereotypes",
+        "index": 7,
+        "scene": {
+          "shot": "close-up",
+          "light": "Magenta and cyan split lighting on face, dark background",
+          "action": "Mid-laugh covering mouth slightly, looking off-camera at someone",
+          "setting": "Blurred party background, colorful lights bokeh",
+          "subject": "Single adult with dark skin, natural afro, mid thirties, distinctive cheekbones",
+          "graphics": "Cyan diagonal line cutting across frame",
+          "wardrobe": "Bold earrings, high-neck top, minimalist chic",
+          "expression": "Genuine unguarded amusement, irreverence"
+        },
+        "design": {
+          "block": "none",
+          "icons": [],
+          "photo": "half",
+          "family": "photo",
+          "ground": "photo",
+          "emphasis": [
+            "provocativa",
+            "irreverente",
+            "bem-humorada"
+          ]
+        },
+        "purpose": "vision",
+        "question": "Como a Apoteose se comunica?",
+        "keyMessage": "Corpo: Comunicação inteligente, provocativa, irreverente e bem-humorada.",
+        "visualRole": "content",
+        "evidenceIds": [
+          "e12"
+        ]
+      },
+      {
+        "avoid": "No carnival imagery, no text, no logos",
+        "index": 8,
+        "scene": null,
+        "design": {
+          "block": "comparison",
+          "icons": [],
+          "photo": "none",
+          "family": "swiss",
+          "ground": "inverse",
+          "emphasis": [
+            "brasileira",
+            "sofisticada",
+            "irreverente"
+          ]
+        },
+        "purpose": "vision",
+        "question": "Qual é a personalidade da marca?",
+        "keyMessage": "Corpo: Brasileira sem ser caricata, sofisticada sem ser pretensiosa, sensual sem ser vulgar.",
+        "visualRole": "content",
+        "evidenceIds": []
+      },
+      {
+        "avoid": "No carnival costumes, no feathers, no confetti, no text, no logos",
+        "index": 9,
+        "scene": {
+          "shot": "wide",
+          "light": "Warm orange glow from venue, purple shadow street, cyan accent lights",
+          "action": "Moving toward a luminous venue entrance, energy of anticipation",
+          "setting": "Urban São Paulo street at night, venue entrance glowing warm orange",
+          "subject": "Wide crowd of adults, diverse skin tones, ages and genders, seen from behind",
+          "graphics": "Magenta geometric overlay on upper left",
+          "wardrobe": "Varied contemporary evening party attire",
+          "expression": "Collective forward momentum"
+        },
+        "design": {
+          "block": "none",
+          "icons": [],
+          "photo": "full",
+          "family": "cinematic",
+          "ground": "photo",
+          "emphasis": [
+            "esquenta",
+            "mais badalado",
+            "São Paulo"
+          ]
+        },
+        "purpose": "summary",
+        "question": "Onde a Apoteose quer chegar?",
+        "keyMessage": "Síntese: Pretende se consolidar como o esquenta de Carnaval mais badalado de São Paulo.",
+        "visualRole": "content",
+        "evidenceIds": [
+          "e10"
+        ]
+      },
+      {
+        "avoid": "",
+        "index": 10,
+        "scene": null,
+        "design": {
+          "block": "quote",
+          "icons": [],
+          "photo": "none",
+          "family": "typographic",
+          "ground": "accent",
+          "emphasis": [
+            "Carnaval não fosse suficiente"
+          ]
+        },
+        "purpose": "decision",
+        "question": "Como se o Carnaval não fosse suficiente?",
+        "keyMessage": "Fecho: Como se o Carnaval não fosse suficiente — a festa começa antes.",
+        "visualRole": "closing",
+        "evidenceIds": [
+          "e11"
+        ]
+      }
+    ],
+    "thesis": "Apoteose é uma festa pré-Carnaval em São Paulo que celebra o comportamento brasileiro de antecipar a festa, com curadoria musical brasileira plural e acesso exclusivo para convidados.",
+    "audience": "Convidados da festa: público socialmente ativo, formador de opinião, conectado a tendências de cultura e entretenimento.",
+    "evidence": [
+      {
+        "id": "e1",
+        "claim": "Apoteose é uma festa pré-Carnaval em São Paulo",
+        "quote": "A Apoteose é uma festa que nasce com a proposta de ocupar um espaço relevante no calendário pré-Carnaval de São Paulo.",
+        "status": "fact",
+        "sourceId": "source-base"
+      },
+      {
+        "id": "e2",
+        "claim": "Festa exclusiva para convidados conectados a cultura e vida noturna",
+        "quote": "Um encontro exclusivo para convidados, que reúne pessoas conectadas à música, à moda, à arte, à cultura contemporânea e à vida noturna.",
+        "status": "fact",
+        "sourceId": "source-base"
+      },
+      {
+        "id": "e3",
+        "claim": "Nome remete a ápice, celebração, intensidade e liberdade",
+        "quote": "O nome Apoteose remete ao ápice, à celebração, à intensidade e à liberdade.",
+        "status": "fact",
+        "sourceId": "source-base"
+      },
+      {
+        "id": "e4",
+        "claim": "Brasileiro antecipa e reinventa o Carnaval antes dele chegar",
+        "quote": "O brasileiro não espera o Carnaval chegar para começar o Carnaval. Ele antecipa, prolonga, inventa e reinventa a festa.",
+        "status": "fact",
+        "sourceId": "source-base"
+      },
+      {
+        "id": "e5",
+        "claim": "Curadoria musical brasileira plural sem fronteiras rígidas entre gêneros",
+        "quote": "A curadoria musical é essencialmente brasileira, mas sem fronteiras rígidas entre gêneros. Brasilidades, hip-hop, funk, música eletrônica, remixes e releituras de clássicos nacionais",
+        "status": "fact",
+        "sourceId": "source-base"
+      },
+      {
+        "id": "e6",
+        "claim": "Música reflete Brasil contemporâneo, urbano, plural e sofisticado",
+        "quote": "A música deve refletir um Brasil contemporâneo, urbano, plural e culturalmente sofisticado, sem perder sua essência popular.",
+        "status": "fact",
+        "sourceId": "source-base"
+      },
+      {
+        "id": "e7",
+        "claim": "Público formador de opinião conectado a tendências",
+        "quote": "A Apoteose é direcionada a um público socialmente ativo, formador de opinião, conectado às tendências de comportamento, moda, entretenimento e cultura.",
+        "status": "fact",
+        "sourceId": "source-base"
+      },
+      {
+        "id": "e8",
+        "claim": "Acesso exclusivo para convidados fortalece curadoria de público",
+        "quote": "O acesso exclusivo para convidados faz parte do posicionamento da festa, privilegiando a curadoria de público e fortalecendo seu caráter social.",
+        "status": "fact",
+        "sourceId": "source-base"
+      },
+      {
+        "id": "e9",
+        "claim": "Identidade visual explora cultura brasileira de forma autoral sem clichês",
+        "quote": "A identidade da Apoteose deve explorar a cultura brasileira de maneira autoral, evitando os clichês visuais do Carnaval.",
+        "status": "fact",
+        "sourceId": "source-base"
+      },
+      {
+        "id": "e10",
+        "claim": "Pretende se consolidar como esquenta de Carnaval mais badalado de SP",
+        "quote": "A Apoteose pretende se consolidar como o esquenta de Carnaval mais badalado de São Paulo.",
+        "status": "fact",
+        "sourceId": "source-base"
+      },
+      {
+        "id": "e11",
+        "claim": "Conceito central de campanha",
+        "quote": "Como se o Carnaval não fosse suficiente.",
+        "status": "fact",
+        "sourceId": "source-base"
+      },
+      {
+        "id": "e12",
+        "claim": "Comunicação inteligente, provocativa, irreverente e bem-humorada",
+        "quote": "A comunicação da Apoteose deve ser inteligente, provocativa, irreverente e bem-humorada.",
+        "status": "fact",
+        "sourceId": "source-base"
+      }
+    ],
+    "objective": "Apresentar a festa Apoteose como o esquenta de Carnaval de São Paulo, comunicando conceito, identidade e posicionamento.",
+    "signature": "Como se o Carnaval não fosse suficiente.",
+    "deckDesign": {
+      "mood": "Nighttime editorial with warm neon glow on skin, deep purple shadows, cyan and magenta graphic overlays, cinematic grain, diverse casting in urban party settings.",
+      "fonts": {
+        "text": "Inter Tight",
+        "display": "Syne"
+      },
+      "palette": {
+        "bg": "#0E0E0F",
+        "ink": "#F8F8F8",
+        "muted": "#9A9A9A",
+        "accent": "#F8701E",
+        "accent2": "#28B2D4",
+        "inverse": "#F8F8F8",
+        "surface": "#2B2158",
+        "inverseInk": "#0E0E0F"
+      }
+    },
+    "promptVersion": "presentation-plan-v3",
+    "schemaVersion": 3,
+    "visualDirection": {
+      "avoid": "No clichê Carnaval imagery: no feathers, sequins, confetti, samba costumes, masks or literal fantasy; no real celebrities, no visible logos or text, no stereotypes.",
+      "finish": "Grão fino de filme editorial noturno, textura sutil de impressão offset, realismo contemporâneo com pós-tratamento de campanha publicitária.",
+      "palette": [
+        {
+          "hex": "#0E0E0F",
+          "role": "base"
+        },
+        {
+          "hex": "#F8701E",
+          "role": "subject_light"
+        },
+        {
+          "hex": "#2B2158",
+          "role": "shadow"
+        },
+        {
+          "hex": "#28B2D4",
+          "role": "graphic"
+        },
+        {
+          "hex": "#C43B42",
+          "role": "accent"
+        }
+      ],
+      "graphics": "Blocos geométricos sobrepostos em magenta e ciano, recortes tipográficos, linhas finas de blueprint editorial, sobreposição de cor translúcida.",
+      "atmosphere": "Noite urbana brasileira intensa, calor tropical sob luz neon, energia de festa que ainda não começou mas já é inevitável.",
+      "paletteSource": "reference"
+    }
+  },
+  "presentationQuality": {
+    "issues": [],
+    "repairs": [],
+    "version": 1,
+    "checkedAt": "2026-11-26T11:58:37.081Z",
+    "reviewStatus": "repaired",
+    "renderedIssues": [],
+    "renderCheckedAt": "2026-11-26T12:06:35.508Z",
+    "renderCheckStatus": "passed",
+    "reviewDiagnostics": [
+      {
+        "attempt": 1,
+        "outcome": "over_limits"
+      },
+      {
+        "stage": "repetition",
+        "outcome": "repetition_repaired",
+        "targets": [
+          9
+        ],
+        "sizeAfter": 0,
+        "sizeBefore": 1
+      }
+    ],
+    "renderRepairStatus": "not_needed",
+    "writingDiagnostics": [
+      {
+        "to": 3,
+        "from": 1,
+        "stage": "writing",
+        "attempt": 1,
+        "outcome": "validated",
+        "response": {
+          "model": "glm-4.7",
+          "provider": "zai",
+          "maxTokens": 8192,
+          "totalTokens": 15808,
+          "finishReason": "stop",
+          "promptTokens": 15093,
+          "reasoningTokens": 0,
+          "completionTokens": 715
+        }
+      },
+      {
+        "to": 6,
+        "from": 4,
+        "stage": "writing",
+        "attempt": 1,
+        "outcome": "validated",
+        "response": {
+          "model": "glm-4.7",
+          "provider": "zai",
+          "maxTokens": 8192,
+          "totalTokens": 15801,
+          "finishReason": "stop",
+          "promptTokens": 15247,
+          "reasoningTokens": 0,
+          "completionTokens": 554
+        }
+      },
+      {
+        "to": 9,
+        "from": 7,
+        "issue": {
+          "code": "presentation_blocks_invalid",
+          "path": "slides[1].presentationBlocks",
+          "slideIndex": 7
+        },
+        "stage": "writing",
+        "attempt": 1,
+        "outcome": "failed",
+        "response": {
+          "model": "glm-4.7",
+          "provider": "zai",
+          "maxTokens": 8192,
+          "totalTokens": 15855,
+          "finishReason": "stop",
+          "promptTokens": 15138,
+          "reasoningTokens": 0,
+          "completionTokens": 717
+        }
+      },
+      {
+        "to": 9,
+        "from": 7,
+        "stage": "writing",
+        "attempt": 2,
+        "outcome": "validated",
+        "response": {
+          "model": "glm-4.7",
+          "provider": "zai",
+          "maxTokens": 8192,
+          "totalTokens": 16193,
+          "finishReason": "stop",
+          "promptTokens": 15275,
+          "reasoningTokens": 0,
+          "completionTokens": 918
+        }
+      },
+      {
+        "to": 10,
+        "from": 10,
+        "stage": "writing",
+        "attempt": 1,
+        "outcome": "validated",
+        "response": {
+          "model": "glm-4.7",
+          "provider": "zai",
+          "maxTokens": 8192,
+          "totalTokens": 15097,
+          "finishReason": "stop",
+          "promptTokens": 14744,
+          "reasoningTokens": 0,
+          "completionTokens": 353
+        }
+      }
+    ],
+    "movedToNotesSlideIds": []
+  }
+}
