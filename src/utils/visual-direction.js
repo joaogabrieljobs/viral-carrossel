@@ -138,8 +138,19 @@ export function applyKitColors(visualDirection, kit) {
 export function snapVisualDirectionToPalette(visualDirection, allowed = [], { source = 'reference' } = {}) {
   const pool = (Array.isArray(allowed) ? allowed : []).map(c => visualHex(c?.hex || c)).filter(Boolean);
   if (!visualDirection || !Array.isArray(visualDirection.palette) || !pool.length) return visualDirection;
+  // Cores diferentes na proposta ficam diferentes na lista enquanto houver
+  // cor livre (a sombra quase preta não vira a própria base); a mesma cor
+  // repetida pela IA continua repetida.
+  const mapped = new Map();
+  for (const item of visualDirection.palette) {
+    const hex = visualHex(item.hex);
+    if (!hex || mapped.has(hex)) continue;
+    const used = new Set(mapped.values());
+    const free = pool.filter(c => !used.has(c));
+    mapped.set(hex, pool.includes(hex) ? hex : nearestPaletteHex(hex, free.length ? free : pool));
+  }
   const seen = new Set();
-  const palette = visualDirection.palette.map(item => ({ ...item, hex: nearestPaletteHex(item.hex, pool) }))
+  const palette = visualDirection.palette.map(item => ({ ...item, hex: mapped.get(visualHex(item.hex)) || nearestPaletteHex(item.hex, pool) }))
     .filter(item => !seen.has(`${item.role}${item.hex}`) && seen.add(`${item.role}${item.hex}`));
   return { ...visualDirection, palette, paletteSource: visualDirection.paletteSource === 'kit' ? 'kit' : source };
 }

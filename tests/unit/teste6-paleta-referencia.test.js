@@ -123,7 +123,7 @@ describe('item 1: o código troca o hex fora da lista pelo mais próximo', () =>
     const { plan } = await generatePresentationPlan({ brief: 'Apoteose', sources: SRC, count: 6, freeDesign: true, referenceColors: palette }, async () => plano);
     for (const item of plan.visualDirection.palette) expect(allowed).toContain(item.hex);
     expect(plan.visualDirection.paletteSource).toBe('reference');
-    for (const key of ['bg', 'accent', 'accent2']) expect(allowed).toContain(plan.deckDesign.palette[key]);
+    for (const key of ['bg', 'accent', 'accent2', 'inverseInk']) expect(allowed).toContain(plan.deckDesign.palette[key]);
     expect(Object.values(plan.deckDesign.palette)).not.toContain('#F5C842');
   });
 
@@ -146,6 +146,10 @@ describe('item 1: o código troca o hex fora da lista pelo mais próximo', () =>
     const vd = snapVisualDirectionToPalette(structuredClone(T6.visualDirection), palette);
     expect(vd.palette.every(item => allowed.includes(item.hex))).toBe(true);
     expect(snapVisualDirectionToPalette(T6.visualDirection, [])).toBe(T6.visualDirection);
+    // Cores diferentes na proposta ficam diferentes: a sombra #0D0518 não vira a base.
+    const role = r => vd.palette.find(item => item.role === r).hex;
+    expect(role('shadow')).not.toBe(role('base'));
+    expect(role('accent')).toBe(role('subject_light'));
   });
 });
 

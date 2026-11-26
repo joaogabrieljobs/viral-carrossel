@@ -247,8 +247,9 @@ export function deckDesignFromBrand(brand = {}, base = DEFAULT_DECK_DESIGN) {
  * Teste 6, item 1: com a paleta extraída da referência, as cores do deck
  * (fundo, superfície, destaque e destaque 2) vêm da lista; o hex fora dela
  * vira o mais próximo. O destaque evita a cor do fundo (e lê sobre ele, 3:1,
- * quando a lista permite). Tintas de leitura (ink, muted, inverse e
- * inverseInk) continuam neutras e recalculadas pelo contraste. Sem lista: igual.
+ * quando a lista permite). A tinta da página invertida (inverseInk) vem da
+ * lista quando ainda lê 4,5:1. As outras tintas de leitura (ink, muted e
+ * inverse) continuam neutras e recalculadas pelo contraste. Sem lista: igual.
  */
 export const FREE_REFERENCE_SNAP_KEYS = Object.freeze(['bg', 'surface', 'accent', 'accent2']);
 export function snapDeckDesignToPalette(deckDesign, allowed = []) {
@@ -264,6 +265,10 @@ export function snapDeckDesignToPalette(deckDesign, allowed = []) {
   palette.accent = nearest(raw.accent, readableOnBg.length ? readableOnBg : notBg) || raw.accent;
   const rest = notBg.filter(c => c !== palette.accent);
   palette.accent2 = nearest(raw.accent2, rest.length ? rest : notBg) || raw.accent2;
+  // Tinta da página invertida: a cor da lista mais próxima, se ainda lê (4,5:1).
+  const inverse = normalizeHex(raw.inverse);
+  const inverseInk = inverse && normalizeHex(raw.inverseInk) ? nearest(raw.inverseInk, pool.filter(c => wcagContrast(c, inverse) >= 4.5)) : null;
+  if (inverseInk && wcagContrast(inverseInk, inverse) >= 4.5) palette.inverseInk = inverseInk;
   return { ...deckDesign, palette };
 }
 
