@@ -104,6 +104,7 @@ import { propagateBrandTypography } from './src/utils/brand-typography.js';
 import { imageAspectRatioForSlide } from './shared/image-aspect.js';
 import { normalizeVisualBible, visualBibleHasPerson, planPersonAnchor, pickPersonAnchorSlide } from './src/utils/visual-bible.js';
 import { composeImageDirection } from './src/utils/image-direction.js';
+import { kitVisualColors } from './src/utils/visual-direction.js';
 import { presentationPlanEntryImageQuery } from './src/utils/presentation-plan.js';
 import {
   PRESENTATION_VISUAL_PRESETS,
@@ -6151,6 +6152,10 @@ ${jsonShapeLine}`;
         nativeBlocks: !effectiveVisualPresetDef?.isCustom,
         planningContext: {
           brief: planningBrief,
+          // Direção visual do deck (roteiro): cores escritas no kit têm
+          // prioridade; referência sem texto não tem cor que a IA possa ler.
+          kitColors: kitVisualColors(styleKit).colors,
+          kitReferenceWithoutText: (styleKit?.refImages?.length || 0) > 0 && !kitVisualColors(styleKit).colors.length,
           sources: [{ id: 'request', title: 'Pedido atual e marca', kind: 'brief', text: planningBrief }, ...presentationSources],
         },
         presentationLimitsForPlan: (plan, draftedSlides = []) => {

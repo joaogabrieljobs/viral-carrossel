@@ -53,9 +53,12 @@ export const planoV3 = (n = 6, designOf = () => null, extra = {}) => ({
 describe('modo livre, fase 2: roteiro v2 inalterado para os outros presets', () => {
   // Teste 4 (25/11): o pedido ganhou a linha e o campo signature (assinatura
   // do deck); hashes antes: 35b81b983596f508 e 135aebd49994edb4.
-  it('o pedido v2 é byte a byte o esperado (hash medido depois do campo signature)', () => {
-    expect(h(buildPresentationPlanPrompt({ brief: 'Festival', sources: SRC, count: 10, presentationPath: 'auto' }))).toBe('75c0191a0f0ec608');
-    expect(h(buildPresentationPlanPrompt({ brief: 'Festival', sources: SRC, count: 8, presentationPath: 'pitch', compactRepair: true }))).toBe('dd161a18a566df9b');
+  // Direção de arte (26/11, parte 1): o pedido ganhou o bloco DIREÇÃO VISUAL
+  // DO DECK e o campo visualDirection; hashes antes: 75c0191a0f0ec608 e
+  // dd161a18a566df9b.
+  it('o pedido v2 é byte a byte o esperado (hash medido depois do campo visualDirection)', () => {
+    expect(h(buildPresentationPlanPrompt({ brief: 'Festival', sources: SRC, count: 10, presentationPath: 'auto' }))).toBe('5a510b9f7d8c8020');
+    expect(h(buildPresentationPlanPrompt({ brief: 'Festival', sources: SRC, count: 8, presentationPath: 'pitch', compactRepair: true }))).toBe('bbf64c4a546a423b');
   });
 
   it('o pedido v2 não fala em direção de arte, deckDesign ou design', () => {
