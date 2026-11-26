@@ -71,8 +71,8 @@ describe('Spec 1.1 referência: a referência do kit vai em todas as imagens da 
     expect(source).not.toContain('imageKit');
     expect(source).toContain('const baseRefs = await runAIJob(() => resolveImageReferences(styleKit, generationSnap.refImage,');
     expect(source).toContain('const baseRefs = await resolveImageReferences(styleKit, newSlides[i]?.refImage,');
-    expect(source).toContain("deckSlides: fmt === 'apresentacao' ? liveSlides : null,");
-    expect(source).toContain('deckSlides: isPresentationGeneration ? newSlides : null,');
+    expect(source).toContain("deckSlides: fmt === 'apresentacao' || isFreeSocialSlide(generationSnap) ? liveSlides : null,");
+    expect(source).toContain('deckSlides: isPresentationGeneration || isSocialFreeGeneration ? newSlides : null,');
   });
 });
 

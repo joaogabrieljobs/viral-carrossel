@@ -381,9 +381,9 @@ describe('modo livre, fase 1: pontos de montagem do deck (ViralCarrossel.jsx)', 
 
   it('geração: o deck do modo livre nasce do kit e vai para a composição, a marca e o projeto', () => {
     // Fase 2: o deck passa pelo deckDesign do roteiro v3, com o kit por cima.
-    expect(source).toMatch(/const freeDeckDesignFor = plan => \(effectiveVisualPresetDef\?\.isFree \? deckDesignFromBrand\(freeKitBrand, /);
+    expect(source).toMatch(/const freeDeckDesignFor = plan => \(isPresentationGeneration && effectiveVisualPresetDef\?\.isFree \? deckDesignFromBrand\(freeKitBrand, /);
     expect(source).toMatch(/const freeKitBrand = \{ \.\.\.explicitBrandColorsFromKit\(styleKit\)/);
-    expect(source).toMatch(/const freeDeckDesign = effectiveVisualPresetDef\?\.isFree\s*\?\s*freeDeckDesignFor\(/);
+    expect(source).toMatch(/const freeDeckDesign = isPresentationGeneration && effectiveVisualPresetDef\?\.isFree\s*\?\s*freeDeckDesignFor\(/);
     const montagem = trecho('const compositionOverrides = isPresentationGeneration && !effectiveVisualPresetDef?.isCustom', 900);
     expect(montagem).toMatch(/deckDesign: freeDeckDesign/);
     const gravacao = trecho('history.set(d => ({\n      ...d, brand: generationBrand, slides: newSlides', 900);

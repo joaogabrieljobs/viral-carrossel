@@ -46,7 +46,9 @@ describe('modo livre, fase 2: cartão Livre no seletor', () => {
 
   it('assistente de criação: Livre é o primeiro dos estilos para começar da apresentação', () => {
     const source = readFileSync(new URL('../../src/components/CreateProjectFlow.jsx', import.meta.url), 'utf8');
-    expect(source).toMatch(/const recommendedPresets = \[\s*\.\.\.\(isPresentation \? presets\.filter\(p => p\.isFree\) : \[\]\)/);
+    // O catálogo já está filtrado pelo produto; cada Livre abre sua lista.
+    expect(source).toContain("isPresentation ? p.productKind === 'apresentacao' : p.productKind !== 'apresentacao'");
+    expect(source).toMatch(/const recommendedPresets = \[\s*\.\.\.presets\.filter\(p => p\.isFree\)/);
   });
 
   it('escolher o Livre não grava as cores padrão do Livre como escolha da pessoa (a paleta é do roteiro)', () => {

@@ -299,7 +299,7 @@ describe('mudança 5, referência: em todas as imagens, em todo caminho', () => 
     const doc = applyTemplateToDoc({ fmt: 'apresentacao', slides: gerar('presentation_swiss_grid', 'auto', deck()) }, buildTemplateContent({ fmt: 'apresentacao', brand: {}, slides: origem }));
     expect(todos(pedidos(doc.slides), d => d.styleReferenceLook)).toBe(true);
     // A geração do deck manda o kit inteiro e o deck, por formato, não por preset.
-    expect(monolito).toContain('deckSlides: isPresentationGeneration ? newSlides : null,');
+    expect(monolito).toContain('deckSlides: isPresentationGeneration || isSocialFreeGeneration ? newSlides : null,');
     expect(monolito).not.toContain('presentationStyleKitForSlide');
   });
 });
