@@ -51,7 +51,6 @@ import {
   guardarImagemDoSlide,
   applyPersistedImagePatches,
   applySlidePatchIfImageCurrent,
-  applySlideImageToStoredProject,
   imageBatchSkipReason,
   slideImageIdentity,
   imageGet,
@@ -255,6 +254,8 @@ import {
 } from './src/utils/presentation-state.js';
 import { deckDesignFromBrand, freeBrandPatch, slideSkipsImageGeneration } from './src/utils/free-design.js';
 import { finishFreeDraft } from './src/utils/free-draft.js';
+import { freeImageGenerationSlide, reconcileFreeImageFallback, reconcileFreeImageDocument } from './src/utils/free-image-fallback.js';
+import { applyFreeSlideImageToStoredProject } from './src/utils/free-image-persistence.js';
 import { DECK_ART_SCENE, applyDeckArt, composeDeckArtImageDirection, deckNeedsArt } from './src/utils/deck-art.js';
 import {
   normalizeStyleKit,
@@ -1293,12 +1294,12 @@ export default function App() {
   // Helpers que aceitam value OU função, mantendo a API "useState-like"
   const setSlides = useCallback(next => history.set((d) => ({
     ...d,
-    slides: clearReplacedSlideAssets(d.slides, typeof next === 'function' ? next(d.slides) : next),
+    slides: clearReplacedSlideAssets(d.slides, reconcileFreeImageFallback(d.slides, typeof next === 'function' ? next(d.slides) : next)),
   })), [history]);
   // Troca de foto pela lista de slides (IA, importação em lote): o recorte
   // manual da foto antiga sai também das outras proporções.
   const setSlidesPhotoSwap = useCallback(next => history.set((d) => applyPhotoSwapSlides(
-    d, clearReplacedSlideAssets(d.slides, next(d.slides)),
+    d, clearReplacedSlideAssets(d.slides, reconcileFreeImageFallback(d.slides, next(d.slides))),
   )), [history]);
   const setBrand = useCallback(
     (next) =>
@@ -4555,7 +4556,7 @@ export default function App() {
 
   const updateSlide = useCallback(patch => {
     history.set((d) => {
-      const next = applyFormatEdit(d, activeIdx, patch);
+      const next = reconcileFreeImageDocument(d, applyFormatEdit(d, activeIdx, patch));
       const before = d.slides?.[activeIdx];
       const after = next.slides?.[activeIdx];
       const mayScaleZones =
@@ -4574,7 +4575,7 @@ export default function App() {
   }, [history, activeIdx]);
 
   const updateSlideAt = useCallback((idx, patch) => {
-    history.set((d) => applyFormatEdit(d, idx, patch));
+    history.set((d) => reconcileFreeImageDocument(d, applyFormatEdit(d, idx, patch)));
   }, [history]);
 
   const patchInlineTextAt = useCallback((idx, field, text) => {
@@ -5438,9 +5439,13 @@ export default function App() {
     const slideId = snap.id;
     const expectedImageIdentity = slideImageIdentity(snap);
     const queryOverride = String(target?.queryOverride || '').trim();
+    // Uma escolha individual pode acrescentar foto a uma página só de texto.
+    // O lote respeita photo:none; só o gesto explícito muda essa intenção.
+    const explicitFreePhoto = !parentSignal && slideSkipsImageGeneration(snap);
+    const recoveredImageLayout = freeImageGenerationSlide(snap);
     const generationSnap = queryOverride
-      ? { ...snap, imageQuery:queryOverride, imgMode:'dalle' }
-      : snap;
+      ? { ...recoveredImageLayout, imageQuery:queryOverride, imgMode:'dalle', ...(explicitFreePhoto ? { presentationPhotoRequested: true } : {}) }
+      : { ...recoveredImageLayout, ...(explicitFreePhoto ? { presentationPhotoRequested: true } : {}) };
     if (slideImgGenIdsRef.current.has(slideId)) return { ok: false, reason: 'already_generating', slideId };
 
     const itemLabel = fmt === 'apresentacao' ? 'slide' : 'card';
@@ -5515,10 +5520,11 @@ export default function App() {
           const storedPatch = storedTarget && slideImageIdentity(storedTarget) === expectedImageIdentity
             ? { id: slideId, expectedImageIdentity, patch: automaticPhotoFramingPatch({
               ...patchImg, imageQuery: imageState.query, imgMode: 'dalle', bgImageFailed: false, bgImageError: null, bgImageSource: 'ai',
+              ...(explicitFreePhoto ? { presentationPhotoRequested: true } : {}),
             }, storedTarget) }
             : null;
-          if (storedPatch && applySlideImageToStoredProject(libraryPersistRef.current, generationProjectId, storedPatch).applied) {
-            setLibrary(current => applySlideImageToStoredProject(current, generationProjectId, storedPatch).library);
+          if (storedPatch && applyFreeSlideImageToStoredProject(libraryPersistRef.current, generationProjectId, storedPatch).applied) {
+            setLibrary(current => applyFreeSlideImageToStoredProject(current, generationProjectId, storedPatch).library);
             toast(`A imagem do ${itemLabel} ${idx + 1} foi guardada no projeto de origem.`, 'info', 4500);
             return { ok: true, slideId, appliedToOriginProject: true };
           }
@@ -5536,6 +5542,7 @@ export default function App() {
           bgImageFailed: false,
           bgImageError: null,
           bgImageSource: 'ai',
+          ...(explicitFreePhoto ? { presentationPhotoRequested: true } : {}),
         }, liveTarget),
       }));
       toast(`${itemLabel === 'slide' ? 'Slide' : 'Card'} ${idx + 1}: imagem gerada`, 'success');
@@ -5545,14 +5552,14 @@ export default function App() {
       // IA-02: a pessoa não quis gerar com o pedido encurtado. Não é falha.
       if (e?.code === 'image_prompt_declined') return { ok: false, reason: 'image_prompt_declined', slideId };
       if (activeProjectRef.current === generationProjectId) {
-        setSlides(prev => applySlidePatchIfImageCurrent(prev, {
+        setSlides(prev => reconcileFreeImageFallback(prev, applySlidePatchIfImageCurrent(prev, {
           id: slideId,
           expectedImageIdentity,
           patch: {
             bgImageFailed: true,
             bgImageError: e?.code || e?.message || 'generation_failed',
           },
-        }));
+        }), { failedSlideIds: [slideId] }));
         toast(`Imagem do ${itemLabel} ${idx + 1}: ${e.message}`, 'error');
       }
       return { ok: false, slideId, error: e };
@@ -6189,7 +6196,7 @@ ${jsonShapeLine}`;
       referenceColors = kitReferencePalette(styleKit);
       if (!referenceColors.length) {
         try {
-          referenceColors = await extractReferencePaletteFromSources(await resolveImageReferences(styleKit, null, null, null));
+          referenceColors = await extractReferencePaletteFromSources(await resolveImageReferences(styleKit, null, null, null), { ignoreFlatBorders: true });
           referencePaletteField = referencePaletteKitField(styleKit, referenceColors);
         } catch { referenceColors = []; }
       }
@@ -6525,6 +6532,7 @@ ${jsonShapeLine}`;
           photoRegion: compositionOverrides.photoRegion || 'full',
           useCultureLayout: false,
           bodyAfterImage: restoreSourceHosts(stripLeadingSlideCardLabel(rawBodyAfterImage.trim()), sourceHosts),
+          eyebrow: s.eyebrow || '',
           presentationPlan: s.presentationPlan || null,
           ...(s.presentationPlan ? { presentationQualityVersion: 1, photoFraming: 'auto' } : {}),
           presentationBlocks: normalizePresentationBlocks(s.presentationBlocks),
@@ -6855,12 +6863,15 @@ ${jsonShapeLine}`;
             if (e?.code === 'image_prompt_declined') break;
             imgFailCount++;
             console.warn(`Image gen slide ${i+1}:`, e.message);
-            if (!abort.cancelled && activeProjectRef.current === generationProjectId)
-              setSlides(prev => applySlidePatchIfImageCurrent(prev, {
+            if (!abort.cancelled && activeProjectRef.current === generationProjectId) {
+              const applyImageFailure = prev => reconcileFreeImageFallback(prev, applySlidePatchIfImageCurrent(prev, {
                 id:slideId,
                 expectedImageIdentity,
                 patch:{ bgImageFailed:true, bgImageError:e?.code || e?.message || 'generation_failed' },
               }));
+              setSlides(applyImageFailure);
+              setCreationPreviewSlides(applyImageFailure);
+            }
             // Quota esgotada / plano sem imagens / sessão: os restantes cards falhariam igual — pára aqui (auditoria H6).
             if (['reference_unsupported', 'reference_invalid', 'reference_storage_unconfigured', 'reference_upload_failed', 'quota_exhausted', 'plan_no_images', 'session_required', 'subscription_inactive', 'rate_limited'].includes(e?.code)) {
               if (!abort.cancelled) toast(e.message, 'error', 7000);
@@ -6903,11 +6914,13 @@ ${jsonShapeLine}`;
             .filter(({ slideId }) => !attemptedImageSlideIds.has(slideId));
           if (remainingTargets.length) {
             imgFailCount += remainingTargets.length;
-            setSlides(prev => remainingTargets.reduce((current, target) => applySlidePatchIfImageCurrent(current, {
+            const stopPendingImages = prev => reconcileFreeImageFallback(prev, remainingTargets.reduce((current, target) => applySlidePatchIfImageCurrent(current, {
               id:target.slideId,
               expectedImageIdentity:target.expectedImageIdentity,
               patch:{ bgImageFailed:true, bgImageError:'batch_generation_stopped' },
             }), prev));
+            setSlides(stopPendingImages);
+            setCreationPreviewSlides(stopPendingImages);
           }
         }
         // Spec 1.1 entrega 5: auditoria de imagem, atrás da flag da conta. Uma
@@ -8945,6 +8958,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
               presentationQuality={doc.presentationQuality} slides={slides}
               onDismissMovedToNotes={() => history.set(current => ({ ...current, presentationQuality: { ...current.presentationQuality, movedToNotesReviewed: true } }))}
               imageAuditFindings={doc.imageAuditFindings} onRegenerateAuditImage={regenerateAuditImage}
+              onRetryImage={slideId => { const index = slides.findIndex(slide => slide.id === slideId); if (index >= 0) void generateSlideImageAt(index); }}
               onDismissImageAudit={() => history.set(current => ({ ...current, imageAuditFindings: [] }))}/>
             {empty ? (
               // Empty state

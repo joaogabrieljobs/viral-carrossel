@@ -1,4 +1,5 @@
 import { normalizeAccountUsage } from './account-usage.js';
+import { slideSkipsImageGeneration } from './free-design.js';
 
 const text = (value) => typeof value === 'string' ? value.trim() : '';
 const ready = { canGenerate: true, reason: null, message: '' };
@@ -137,7 +138,7 @@ export function slidesPendingImageGeneration(slides, selectedSlideIds = null) {
   const selected = Array.isArray(selectedSlideIds) && selectedSlideIds.length ? new Set(selectedSlideIds) : null;
   return (Array.isArray(slides) ? slides : [])
     .map((slide, index) => ({ slide, index }))
-    .filter(({ slide }) => text(slide?.imageQuery) && !slide?.bgImage && !slide?.bgImageAssetId
+    .filter(({ slide }) => !slideSkipsImageGeneration(slide) && text(slide?.imageQuery) && !slide?.bgImage && !slide?.bgImageAssetId
       && (!selected || selected.has(slide.id)));
 }
 

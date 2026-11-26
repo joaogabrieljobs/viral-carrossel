@@ -81,14 +81,38 @@ function ImageAuditNotice({ findings, slides, isPresentation, onRegenerate, onDi
   </section>;
 }
 
+function ImageGenerationNotice({ slides, isPresentation, onRetry }) {
+  const failed = (Array.isArray(slides) ? slides : [])
+    .map((slide, index) => ({ slide, index }))
+    .filter(({ slide }) => slide?.bgImageFailed && slide?.presentationImageFallback);
+  if (!failed.length) return null;
+  const label = isPresentation ? 'Slide' : 'Card';
+  return <section className="vc-editor-review-notice" aria-label="Imagens não geradas">
+    <strong>Imagens não geradas</strong>
+    <p>O texto foi preservado. Você pode gerar as imagens novamente; cada imagem concluída usa um crédito do plano ou sua chave configurada.</p>
+    <ul>{failed.map(({ slide, index }) => <li key={slide.id}>
+      <strong>{label} {index + 1}: </strong>
+      {['quota_exhausted', 'plan_no_images'].includes(slide.presentationImageFallback.reason)
+        ? 'a geração não pôde continuar. Confira o saldo de imagens antes de tentar novamente.'
+        : slide.presentationImageFallback.reason === 'batch_generation_stopped'
+        ? 'o lote foi interrompido antes de gerar esta imagem.'
+        : 'a imagem não foi concluída. O texto foi preservado.'}
+      {onRetry && <> <button type="button" className="vc-btn vc-btn-ghost"
+        aria-label={`Gerar imagem do ${label.toLowerCase()} ${index + 1}`}
+        onClick={() => onRetry(slide.id)}>Gerar imagem</button></>}
+    </li>)}</ul>
+  </section>;
+}
+
 export default function EditorialReviewNotice({ materialNotice = '', onDismissMaterialNotice, presentationQuality = null, slides = [], onDismissMovedToNotes,
-  imageAuditFindings = [], onRegenerateAuditImage, onDismissImageAudit, ...props }) {
+  imageAuditFindings = [], onRegenerateAuditImage, onDismissImageAudit, onRetryImage, ...props }) {
   const material = <MaterialNotice text={materialNotice} onDismiss={onDismissMaterialNotice} />;
   const moved = <MovedToNotesNotice quality={presentationQuality} slides={slides} onDismiss={onDismissMovedToNotes} />;
   const imageAudit = <ImageAuditNotice findings={imageAuditFindings} slides={slides} isPresentation={props.isPresentation}
     onRegenerate={onRegenerateAuditImage} onDismiss={onDismissImageAudit} />;
   const review = <ReviewNotice {...props} />;
-  return materialNotice || presentationQuality || imageAuditFindings?.length ? <>{material}{moved}{imageAudit}{review}</> : review;
+  const imageGeneration = <ImageGenerationNotice slides={slides} isPresentation={props.isPresentation} onRetry={onRetryImage} />;
+  return <>{material}{moved}{imageAudit}{imageGeneration}{review}</>;
 }
 
 function ReviewNotice({ status, issues = [], isPresentation = false, onReviewed }) {
