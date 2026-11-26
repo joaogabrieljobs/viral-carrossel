@@ -839,7 +839,18 @@ export const VISUAL_PRESETS = [
   ...SOCIAL_FAMILY_PRESETS.map((p) => ({ ...p, presetGroup: 'familias-editoriais' })),
 ];
 
-export const VISUAL_PRESET_BY_ID = Object.fromEntries(VISUAL_PRESETS.map(p => [p.id, p]));
+/** Opção de geração: a identidade vem do projeto e o diretor compõe cada card. */
+export const FREE_SOCIAL_VISUAL_PRESET = Object.freeze({
+  id: 'social_free', productKind: 'carrossel', isFree: true,
+  hidden: true, generationOnly: true,
+  label: 'Livre: o Moont decide',
+  desc: 'Cada card com a sua composição, seguindo a identidade do projeto.',
+  brand: Object.freeze({}), slideDefaults: Object.freeze({}),
+});
+
+// O catálogo dos 21 estilos permanece igual, inclusive para o Criar rápido.
+export const SOCIAL_VISUAL_PRESET_CATALOG = Object.freeze([...VISUAL_PRESETS, FREE_SOCIAL_VISUAL_PRESET]);
+export const VISUAL_PRESET_BY_ID = Object.fromEntries(SOCIAL_VISUAL_PRESET_CATALOG.map(p => [p.id, p]));
 
 /** Mini-card desenhado a partir da geometria real da capa da família. */
 function renderSocialFamilyPreview(preset, svgStyle = {}) {

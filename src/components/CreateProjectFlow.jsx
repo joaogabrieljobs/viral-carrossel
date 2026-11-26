@@ -11,7 +11,7 @@ import { sanitizeCustomVisualPresetBrand } from '../utils/custom-visual-presets.
 import { CONTENT_OBJECTIVES } from '../utils/editorial-strategy.js';
 import { generationToneOrDefault } from '../utils/brand-tone.js';
 import { PRESENTATION_PATHS, getPresentationPath } from '../utils/presentation.js';
-import { VISUAL_PRESETS, applyVisualPreset } from '../styles/visual-presets.jsx';
+import { SOCIAL_VISUAL_PRESET_CATALOG, applyVisualPreset } from '../styles/visual-presets.jsx';
 import { PRESENTATION_VISUAL_PRESETS } from '../styles/presentation-presets.jsx';
 import { normalizeStyleKit, MAX_REF_IMAGES, CONTEXT_MD_MAX, STYLE_PROMPT_MAX } from '../utils/style-kit.js';
 import { storeProjectReference } from '../utils/style-kit-storage.js';
@@ -116,7 +116,7 @@ export default function CreateProjectFlow({
   const selectedNarrative = isPresentation ? PATH_LABELS[path] : (NARRATIVE_CHOICES.find(c => c.id === narrative)?.label || PACK_LABELS[narrative] || specialPacks.find(p => p.id === narrative)?.label);
   const presets = useMemo(() => {
     const matching = visualPresets.filter(p => p && (isPresentation ? p.productKind === 'apresentacao' : p.productKind !== 'apresentacao'));
-    return matching.length ? matching : (isPresentation ? PRESENTATION_VISUAL_PRESETS : VISUAL_PRESETS);
+    return matching.length ? matching : (isPresentation ? PRESENTATION_VISUAL_PRESETS : SOCIAL_VISUAL_PRESET_CATALOG);
   }, [visualPresets, isPresentation]);
   const customPresets = presets.filter(p => p.isCustom);
   const visualSelection = resolveCreationVisualSelection({
@@ -127,13 +127,13 @@ export default function CreateProjectFlow({
   const visualSummary = visualSelection.automatic
     ? `${selectedVisualLabel} · recomendado${visualSelection.preserveBrandIdentity ? ' · cores e fontes da marca' : ''}`
     : selectedVisualLabel;
-  // Modo livre: "Livre: o Moont decide" abre os estilos para começar da apresentação.
+  // Livre é uma opção explícita; a recomendação e a seleção automática não mudam.
   const recommendedPresets = [
-    ...(isPresentation ? presets.filter(p => p.isFree) : []),
+    ...presets.filter(p => p.isFree),
     visualSelection.preset,
     ...['tabloid_keywords', 'social_revista', 'minimal_clean', 'social_documental', 'presentation_editorial_magazine', 'presentation_modular_cards', 'presentation_premium_dark'].map(id => presets.find(p => p.id === id)),
     ...presets.filter(p => !p.hidden && !p.isCustom)]
-    .filter((p, i, all) => p && all.findIndex(item => item?.id === p.id) === i).slice(0, isPresentation && presets.some(p => p.isFree) ? 4 : 3);
+    .filter((p, i, all) => p && all.findIndex(item => item?.id === p.id) === i).slice(0, presets.some(p => p.isFree) ? 4 : 3);
   const identitySummary = creationIdentitySummary(brand, styleKit);
   const identityLabel = identityPath === 'moont' ? 'Padrão do Moont' : identityPath === 'saved' ? (brandRoster.find(b => b.id === brandId)?.name || (visualPreset ? presets.find(p => p.id === visualPreset)?.label : 'Preset salvo')) : 'Identidade personalizada';
   const canContinue = step === 0 ? !!name.trim() : step === 1 ? brandId !== '__new__' || !!brand.name?.trim() : step === 2 ? sourceReady && !hasMaterialOverage : step === 4 ? countValid : true;
@@ -382,8 +382,8 @@ export default function CreateProjectFlow({
           <button type="button" className="vc-create-option" aria-pressed={visualPreset === 'auto'} onClick={() => chooseVisualPreset('auto')}><strong>Design recomendado pelo Moont</strong><span>{visualSelection.recommendedId ? presets.find(p => p.id === visualSelection.recommendedId)?.label : 'Estilo para esta narrativa'} · composição, hierarquia e tipografia pensadas para este conteúdo.</span><small>{identityPath !== 'moont' || identityVisualEdited ? 'Preserva as cores, fontes e arquivos da sua identidade.' : 'Aplica a paleta e as fontes do estilo recomendado. Você pode trocar abaixo.'}</small></button>
           <button type="button" className="vc-create-option" aria-pressed={visualPreset === null} onClick={() => chooseVisualPreset(null)}><strong>Usar somente minha identidade</strong><span>Mantém as cores e fontes configuradas. A organização do conteúdo continua automática.</span></button>
         </div>
-        <VisualStylePicker value={visualSelection.presetId} suggestedId={visualSelection.recommendedId} onChange={chooseVisualPreset} presets={recommendedPresets} title="Estilos para começar" aspectRatio={isPresentation ? '16 / 9' : '4 / 5'}/>
-        <details className="vc-create-details"><summary>Ver todos os estilos visuais{visualSelection.preset ? ` · ${selectedVisualLabel}` : ''}</summary><VisualStylePicker value={visualSelection.presetId} suggestedId={visualSelection.recommendedId} onChange={chooseVisualPreset} presets={presets} title={isPresentation ? 'Estilos para apresentação' : 'Estilos para redes'} aspectRatio={isPresentation ? '16 / 9' : '4 / 5'}/></details>
+        <VisualStylePicker value={visualSelection.presetId} suggestedId={visualSelection.recommendedId} onChange={chooseVisualPreset} presets={recommendedPresets} title="Estilos para começar" aspectRatio={isPresentation ? '16 / 9' : '4 / 5'} allowGenerationOnly/>
+        <details className="vc-create-details"><summary>Ver todos os estilos visuais{visualSelection.preset ? ` · ${selectedVisualLabel}` : ''}</summary><VisualStylePicker value={visualSelection.presetId} suggestedId={visualSelection.recommendedId} onChange={chooseVisualPreset} presets={presets} title={isPresentation ? 'Estilos para apresentação' : 'Estilos para redes'} aspectRatio={isPresentation ? '16 / 9' : '4 / 5'} allowGenerationOnly/></details>
         <fieldset className="vc-create-group"><legend>Como quer começar com as imagens?</legend><div className="vc-create-grid" role="radiogroup" aria-label="Imagens do projeto"><Option label="Criar o texto primeiro" desc="Organiza o conteúdo agora. Você pode enviar fotos ou gerar imagens no editor." selected={!wantImages} onClick={() => setWantImages(false)}/><Option label="Gerar texto e imagens" desc={hasOpenAI ? 'Cria imagens junto com o conteúdo. Essa opção leva mais tempo.' : 'Configure o acesso à geração de imagens para usar esta opção.'} selected={wantImages && hasOpenAI} disabled={!hasOpenAI} onClick={() => setWantImages(true)}/></div>{!hasOpenAI && onOpenKeys && <button type="button" className="vc-btn vc-btn-ghost" onClick={onOpenKeys}>Configurar geração de imagens</button>}</fieldset>
         {wantImages && hasOpenAI && <details className="vc-create-details"><summary>Ajustar a direção das imagens — opcional</summary><ImgParamsPanel value={params} onChange={(key, value) => setParams(p => ({ ...p, [key]:value }))}/></details>}
         <Field label="Direção visual adicional" hint="Ex.: fotografia natural, fundo claro, poucas cores e títulos elegantes."><textarea className="vc-input" rows={3} maxLength={STYLE_PROMPT_MAX} value={styleKit.stylePrompt} onChange={e => setStyleKit(k => ({ ...k, stylePrompt:e.target.value }))}/></Field>

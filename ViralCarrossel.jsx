@@ -92,7 +92,7 @@ import {
   openBillingPortal,
   logoutAccess,
 } from './src/lib/billing.js';
-import { VISUAL_PRESETS, applyVisualPreset, getSlideOverridesForPreset, PRESET_BRAND_SIGNATURE_KEYS } from './src/styles/visual-presets.jsx';
+import { VISUAL_PRESETS, SOCIAL_VISUAL_PRESET_CATALOG, applyVisualPreset, getSlideOverridesForPreset, PRESET_BRAND_SIGNATURE_KEYS } from './src/styles/visual-presets.jsx';
 import { recommendedGenerationVisualPreset } from './src/utils/generation-visual-choice.js';
 import { applySocialVisualComposition, isFlattenedSocialSlide, restoreSocialCompositionTypography, restyleSocialSlides, usesSocialLibrary } from './src/utils/social-visual-composition.js';
 import { buildSocialSequencePrompt } from './src/utils/social-sequence.js';
@@ -1450,7 +1450,7 @@ export default function App() {
   const visualPreset = doc.visualPreset ?? null;
   const [customVisualPresets, setCustomVisualPresets] = useState(() => readCustomVisualPresets());
   const visualPresets = useMemo(
-    () => [...VISUAL_PRESETS, ...PRESENTATION_VISUAL_PRESET_CATALOG, ...customVisualPresets],
+    () => [...SOCIAL_VISUAL_PRESET_CATALOG, ...PRESENTATION_VISUAL_PRESET_CATALOG, ...customVisualPresets],
     [customVisualPresets],
   );
   useEffect(() => {

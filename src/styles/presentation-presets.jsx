@@ -702,6 +702,7 @@ function presentationCompositionLimits(selected, fallbackLimits) {
  */
 function resolvePresentationDesignSystemPromptPreset(presetOrId) {
   if (presetOrId && typeof presetOrId === 'object') {
+    if (presetOrId.productKind && presetOrId.productKind !== 'apresentacao') return null;
     if (presetOrId.isCustom || (presetOrId.hidden && !presetOrId.isFree)) return null;
     // Modo livre: a redação recebe o mesmo bloco planejado, com a descrição do livre.
     if (presetOrId.isFree) return presetOrId;

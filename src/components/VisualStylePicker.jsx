@@ -60,13 +60,15 @@ export default function VisualStylePicker({
   suggestedId = null,
   /** Permite forçar a proporção; sem valor, cada preset declara seu produto. */
   aspectRatio = null,
+  /** Opções exclusivas do assistente e da geração, sem mudar o editor atual. */
+  allowGenerationOnly = false,
 }) {
   const catalog = Array.isArray(presets) ? presets : [];
   // Os 12 estilos de carrossel primeiro; as 9 famílias editoriais (biblioteca
   // v4) num grupo próprio logo abaixo.
   // Modo livre ("Livre: o Moont decide") é o primeiro cartão quando a lista o
   // traz; fica fora das outras listas de estilos (oculto no catálogo).
-  const free = catalog.filter((preset) => preset?.isFree);
+  const free = catalog.filter((preset) => preset?.isFree && (!preset.generationOnly || allowGenerationOnly));
   const visible = catalog.filter((preset) => !preset?.hidden);
   const main = visible.filter((preset) => preset?.presetGroup !== 'familias-editoriais');
   const families = visible.filter((preset) => preset?.presetGroup === 'familias-editoriais');

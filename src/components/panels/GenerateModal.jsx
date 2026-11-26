@@ -4,7 +4,7 @@ import { Sparkles, Loader2, Bookmark, X, ChevronRight, ChevronLeft, Check, Setti
 import { getHooksForNiche } from '../../utils/hooks-library.js';
 import VisualStylePicker from '../VisualStylePicker.jsx';
 import GenerationPreview, { PresentationStructureSummary } from '../GenerationPreview.jsx';
-import { VISUAL_PRESETS } from '../../styles/visual-presets.jsx';
+import { SOCIAL_VISUAL_PRESET_CATALOG } from '../../styles/visual-presets.jsx';
 import { GEN_MODE_BY_ID, CREATIVE_PRESETS, CREATIVE_PRESET_BY_ID, GENERATION_TOPIC_MAX_CHARS, SLIDE_TEXT_DENSITY_OPTIONS, quickTemplateIdFromPreset, isQuickTemplatePreset } from '../../utils/generation-prompts.js';
 import { ModePicker, ReferenceProfilesCuradoria, ImgParamsPanel } from './generate-modal-parts.jsx';
 import { PhotoRegionMiniIcon } from '../ui/mini-icons.jsx';
@@ -67,7 +67,7 @@ function filterVisualPresetsForProduct(presets, productKind) {
   ));
 
   if (matching.length) return matching;
-  return isPresentation ? PRESENTATION_VISUAL_PRESETS : VISUAL_PRESETS;
+  return isPresentation ? PRESENTATION_VISUAL_PRESETS : SOCIAL_VISUAL_PRESET_CATALOG;
 }
 
 function resolveInitialVisualPreset({
@@ -149,7 +149,7 @@ function GenerateModal({
   onCardVisualStyleChange,
   visualPreset: defaultVisualPreset = null,
   onVisualPresetChange,
-  visualPresets = VISUAL_PRESETS,
+  visualPresets = SOCIAL_VISUAL_PRESET_CATALOG,
   productKind = 'carrossel',
   presentationPath: defaultPresentationPath = DEFAULT_PRESENTATION_PATH_ID,
   material = { content: '', sources: '', context: '', refProfileId: null },
@@ -994,6 +994,7 @@ function GenerateModal({
                   Altera APENAS cores, fontes e tipografia; não muda o pacote
                   criativo nem o leiaute dos slides. */}
               <VisualStylePicker
+                allowGenerationOnly
                 value={visualPreset}
                 onChange={value => { visualEditedRef.current = true; setVisualPresetLocal(value); }}
                 presets={availableVisualPresets}
