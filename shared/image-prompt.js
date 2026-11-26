@@ -201,6 +201,13 @@ function keepWholeLines(text, max) {
   return mantidas.length > 1 ? mantidas.join('\n') : '';
 }
 
+/** Livre social: encurta só a explicação fixa; as entidades ficam literais. */
+function compactSocialSubjectsHeader(text) {
+  const line = String(text || '').indexOf('\n');
+  if (line < 0 || !String(text).startsWith('PROJECT SUBJECTS')) return text;
+  return `PROJECT SUBJECTS: Match each appearing subject's description and exclusions exactly across images. This slide's scene controls action, pose, setting and who appears. Add no conflicting attributes or unrequested subjects.${text.slice(line)}`;
+}
+
 /** Mantém cabeçalho e rodapé inteiros e reduz o corpo em fim de frase. */
 function shrinkBody(head, body, tail, max) {
   const corpo = cutAtBoundary(body, max - head.length - tail.length);
@@ -402,6 +409,13 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
     if (!bloco) continue;
     const menor = bloco.shrink ? bloco.shrink(bloco.text, bloco.text.length - excesso) : '';
     if (menor) { bloco.text = menor; trimmed.push(key); } else remover(key);
+  }
+  // No social, a ficha e a âncora não cedem seus dados para caber. Antes de
+  // reduzir o conteúdo da cena, simplifique a explicação fixa da ficha.
+  const ficha = socialFree && ativos.find(bloco => bloco.key === 'subjects');
+  if (ficha && tamanhoTotal(ativos) > teto) {
+    const shorter = compactSocialSubjectsHeader(ficha.text);
+    if (shorter.length < ficha.text.length) { ficha.text = shorter; trimmed.push('subjects'); }
   }
   // 2) Texto exigido pelo usuário: reduz em fim de frase ou de linha.
   for (const key of REQUIRED_SHRINK_ORDER) {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { composeImageDirection } from '../../src/utils/image-direction.js';
 import { buildImagePrompt, IMAGE_PROMPT_TEXT } from '../../shared/image-prompt.js';
 import { presentationSceneQuery } from '../../src/utils/presentation-plan.js';
+import { PERSON_IDENTITY_DIRECTION } from '../../src/utils/visual-bible.js';
 
 const visualDirection = {
   palette: [{ role: 'base', hex: '#17364B' }, { role: 'subject_light', hex: '#E6BC65' }, { role: 'graphic', hex: '#75BED0' }],
@@ -123,6 +124,25 @@ describe('Imagem do Livre social: visual próprio e geometria real', () => {
     expect(built.prompt).toContain('COMPOSITION');
     expect(built.prompt).toContain('#17364B');
     expect(built.chars).toBeLessThanOrEqual(4000);
+  });
+
+  it('uma ficha próxima ao teto ainda deixa a cena e o pedido dentro de 4.000 caracteres', () => {
+    const planned = { subject: 'A fictional recurring woman shaping clay', action: 'Working on a ceramic bowl', setting: 'A calm workshop', wardrobe: 'Plain cotton clothing', shot: 'medium shot' };
+    const direction = { palette: [{ role: 'base', hex: '#173E68' }, { role: 'subject_light', hex: '#E6BC65' }, { role: 'graphic', hex: '#75BED0' }],
+      finish: 'Fine printed texture. '.repeat(10), atmosphere: 'A quiet workshop. '.repeat(10), graphics: 'none', avoid: 'No crowds or lettering.' };
+    const slide = { id: 'one', socialPresetId: 'social_free', socialFreeDesign: { photo: 'half', ground: 'bg', family: 'editorial' }, socialPlan: { scene: planned, visualDirection: direction },
+      canvas: { applied: true, zones: { photo: { x: 7.5, y: 30.8, w: 85, h: 21.36 }, title: { x: 7.5, y: 14, w: 85, h: 12 } } } };
+    const bible = { entities: Array.from({ length: 4 }, (_, i) => ({ id: `person-${i}`,
+      en: 'A fictional recurring woman with consistent appearance and neutral cotton clothing. '.repeat(4),
+      never: 'Celebrity resemblance, branded clothing or unexpected changes in facial appearance, hairstyle and clothing.' })) };
+    const parts = composeImageDirection({ slide, fmt: 'quadrado', visualBible: bible, baseReferenceCount: 1,
+      anchorPlan: { direction: PERSON_IDENTITY_DIRECTION, refImages: ['data:image/png;base64,YQ=='] } });
+    const built = buildImagePrompt({ scene: presentationSceneQuery(planned), ...parts }, { route: 'sjinn' });
+    expect(built.chars).toBeLessThanOrEqual(4000);
+    for (const entityLine of parts.subjects.split('\n').slice(1)) expect(built.prompt).toContain(entityLine);
+    expect(built.prompt).toContain(planned.subject);
+    expect(built.prompt).toContain(PERSON_IDENTITY_DIRECTION);
+    expect(built.prompt).toContain('COMPOSITION');
   });
 
   it('card do catálogo não recebe campos ou papéis novos', () => {
