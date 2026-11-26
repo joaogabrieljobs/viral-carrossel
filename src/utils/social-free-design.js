@@ -168,6 +168,7 @@ function fitLayout(L, slide, design, deck, F) {
   const titleLeading = 1.1;
   const width = z => Math.max(40, z.w / 100 * F.w - 64);
   const pct = px => px / F.h * 100;
+  const photoTextGap = pct(F.eyebrow ? 28 * 1.3 + 16 + 16 : 24);
   const tNeed = () => textLines(slide.title, width(T), titlePx, deck.fonts.display, 'display') * titlePx * titleLeading + titlePx * 0.44 + 16;
   const sNeed = () => textLines(slide.subtitle, width(S), bodyPx, deck.fonts.text, 'text') * bodyPx * 1.4
     + (String(slide.bodyAfterImage || '').trim() ? textLines(slide.bodyAfterImage, width(S), supportPx, deck.fonts.text, 'text') * supportPx * 1.45 + 16 : 0) + 10;
@@ -200,14 +201,15 @@ function fitLayout(L, slide, design, deck, F) {
   // retirar a foto. É uma alternativa de geometria, não redução de texto.
   if (P && !L.onPhoto && T.w < 55 && textLines(slide.title, width(T), titlePx, deck.fonts.display, 'display') > 4) {
     const height = Math.min(32, (F.bottom - F.contentTop) * 0.42);
-    P = box(F.e, F.contentTop, right - F.e, height);
-    T = box(F.e, P.y + P.h + pct(24), right - F.e, 20);
+    P = box(F.e, F.top, right - F.e, height);
+    T = box(F.e, P.y + P.h + photoTextGap, right - F.e, 20);
     S = box(F.e, T.y + 22, right - F.e, 20);
   }
   const sameColumn = Math.min(T.x + T.w, S.x + S.w) > Math.max(T.x, S.x) + 1;
   if (sameColumn) {
     let top = Math.max(F.contentTop, Math.min(T.y, S.y));
     const photoAbove = P && !L.onPhoto && overlaps({ ...T, y: P.y, h: P.h }, P) && P.y + P.h <= top + 0.5;
+    if (photoAbove) top = Math.max(top, P.y + P.h + photoTextGap);
     const need = () => tNeed() + sNeed() + 24;
     if (need() > (F.bottom - top) / 100 * F.h) {
       if (photoAbove) {
@@ -261,7 +263,8 @@ function inksFor(design, deck, onPhoto) {
   const ink = readableInk(bg, [design.ground === 'inverse' ? p.inverseInk : p.ink, p.inverseInk]);
   const muted = readableInk(bg, [p.muted, ink]);
   const art = design.ground === 'art' ? artScrim(bg, [ink, muted]) : null;
-  return { bg, ink, muted, accent: readableInk(bg, [p.accent, ink]), surface: art?.surface || bg, art };
+  const surface = art?.surface || bg;
+  return { bg, ink, muted, accent: readableInk(surface, [p.accent, ink]), surface, art };
 }
 
 function resolvedChrome(raw, fit, F, inks, slide, deck) {
@@ -323,7 +326,7 @@ function composeSlide(slide, design, { deck, fn, formato, variant = 0, context =
     presentationArtScrim: inks.art || null,
     // Apenas a aparência do bloco nativo; não identifica o produto como apresentação.
     presentationArtDirectionVersion: 2, presentationDesignFamily: FAMILY_KEYS.includes(design.family) ? design.family : 'executive',
-    presentationPaletteOverrides: freePaletteOverrides(deck), presentationBlockAnchor: 'start',
+    presentationPaletteOverrides: { ...freePaletteOverrides(deck), accent: inks.accent }, presentationBlockAnchor: 'start',
     presentationNumericTypography: { fontFamily: display.css, weight: display.weight },
     canvas: { enabled: false, applied: true, variant: 'classic', source: 'social-preset', preserveZones: true, zones },
   };
@@ -458,6 +461,7 @@ function manualPhotoPatch(slide, proposed) {
   return { socialFreeDesign: design, socialArt, presentationSuppressPhoto: false, presentationArtScrim: null,
     canvas: hasZone ? slide.canvas : { ...slide.canvas, zones: { ...zones, photo } },
     ...(inks ? { customBg: bg, titleColor: inks.ink, subtitleColor: inks.ink, textColor: inks.muted,
+      presentationPaletteOverrides: { ...slide.presentationPaletteOverrides, accent: inks.accent },
       socialFreeTextSurfaces: { title: inks.surface, subtitle: inks.surface }, overlay: 70, overlayMode: 'scrim',
       socialScrimMin: inks.scrimMin, socialScrimTop: 0 } : {}) };
 }

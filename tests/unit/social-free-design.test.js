@@ -270,7 +270,7 @@ describe('Livre social: escolhas manuais e vistas gravadas têm prioridade', () 
   });
 
   it('sem espaço livre, o upload vira fundo protegido sem mover texto, tamanho ou offsets manuais', () => {
-    const base = compose()[1];
+    const base = compose()[3];
     const zones = { title: { x: 7.5, y: 8.5, w: 85, h: 35 }, subtitle: { x: 7.5, y: 43.5, w: 85, h: 48 }, photo: { x: 96, y: 94, w: 1, h: 1 } };
     const slide = { ...base, bgImage: 'blob:manual', canvas: { ...base.canvas, userEdited: true, zones }, titleSize: 91, subSize: 113 };
     const next = { ...slide, ...socialFreePhotoPatch(slide) };
@@ -281,6 +281,7 @@ describe('Livre social: escolhas manuais e vistas gravadas têm prioridade', () 
     expect(next).toMatchObject({ titleSize: 91, subSize: 113, presentationSuppressPhoto: false, socialFreeDesign: { photo: 'full', ground: 'photo' } });
     expect(next.socialScrimMin).toBeGreaterThan(0);
     for (const key of ['titleColor', 'subtitleColor', 'textColor']) expect(wcagContrast(next[key], next.socialFreeTextSurfaces.title)).toBeGreaterThanOrEqual(4.5);
+    expect(wcagContrast(next.presentationPaletteOverrides.accent, next.socialFreeTextSurfaces.title)).toBeGreaterThanOrEqual(4.5);
   });
 });
 
