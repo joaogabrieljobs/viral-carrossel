@@ -15,8 +15,9 @@ import { composeReferenceMap, normalizeSlideReferenceMention, slideReferenceDesc
 import { composeSceneParts } from './visual-bible.js';
 import { isAestheticDirection } from '../../shared/image-prompt.js';
 import { presentationSceneQuery } from './presentation-plan.js';
-import { composeVisualDirectionBlock, resolveSlideVisualDirection } from './visual-direction.js';
+import { composeVisualDirectionBlock, resolveSlideVisualDirection, resolveSocialFreeVisualDirection } from './visual-direction.js';
 import { composeCompositionBlock } from './image-composition.js';
+import { composeSocialFreeComposition, isSocialFreeSlide } from './social-free-prompt.js';
 
 const SLIDE_DIRECTION_MAX = 1200;
 
@@ -69,6 +70,16 @@ export function presentationOtherScenes(slides, index) {
     .slice(0, OTHER_SCENES_MAX)
     .sort((a, b) => a.position - b.position)
     .map((item) => item.text);
+}
+
+export function socialFreeImageAvoid(slide) {
+  const value = slide?.socialPlan?.avoid ?? slide?.avoid;
+  return [...new Set((Array.isArray(value) ? value : [value]).filter(line => typeof line === 'string' && line.trim())
+    .map(line => line.replace(/\s+/g, ' ').trim().slice(0, 240)))].slice(0, 8);
+}
+
+export function socialFreeOtherScenes(slides, index) {
+  return presentationOtherScenes((Array.isArray(slides) ? slides : []).map(slide => ({ presentationPlan: slide?.socialPlan })), index);
 }
 
 const clean = value => (typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().replace(/[.;,\s]+$/, '') : '');
@@ -140,7 +151,7 @@ function sentReferences({ kit, slide, anchorPlan, baseReferenceCount }) {
 export function composeImageDirection({
   styleKit = null, slide = null, fmt = 'carrossel', visualBible = null, slideDirection,
   anchorPlan = null, baseReferenceCount, presentationPanel = false, presentationFamily,
-  deckSlides = null, slideIndex = -1,
+  deckSlides = null, slideIndex = -1, socialFree = false, formatViews = null,
 } = {}) {
   const card = slide || {};
   const kit = normalizeStyleKit(styleKit);
@@ -151,21 +162,26 @@ export function composeImageDirection({
   // bloco próprio. Em nenhum dos casos conta como estilo.
   const referenceMap = composeReferenceMap(references, estetica ? '' : direcao);
   const apresentacao = fmt === 'apresentacao';
+  const livreSocial = !apresentacao && (socialFree === true || isSocialFreeSlide(card));
   // Direção de arte (partes 1 a 3): direção visual do deck (roteiro, modo
   // livre e kit), cena como briefing e o espaço do texto no quadro.
-  const visual = apresentacao ? resolveSlideVisualDirection({ slide: card, styleKit }) : null;
-  const plannedScene = apresentacao && card.presentationPlan?.scene && typeof card.presentationPlan.scene === 'object' ? card.presentationPlan.scene : null;
-  const composition = apresentacao ? composeCompositionBlock(card, { visualDirection: visual, shot: visual && plannedScene ? clean(plannedScene.shot) : '' }) : '';
+  const visual = apresentacao ? resolveSlideVisualDirection({ slide: card, styleKit })
+    : livreSocial ? resolveSocialFreeVisualDirection({ slide: card, styleKit }) : null;
+  const plan = apresentacao ? card.presentationPlan : livreSocial ? card.socialPlan : null;
+  const plannedScene = plan?.scene && typeof plan.scene === 'object' ? plan.scene : null;
+  const composition = apresentacao ? composeCompositionBlock(card, { visualDirection: visual, shot: visual && plannedScene ? clean(plannedScene.shot) : '' })
+    : livreSocial ? composeSocialFreeComposition(card, { fmt, formatViews, visualDirection: visual, shot: clean(plannedScene?.shot) }) : '';
   const sceneBrief = visual ? presentationSceneBrief(plannedScene, { shotInComposition: !!composition }) : null;
   const cena = composeSceneParts({
     visualBible, slide: card, fmt, excludeEntityIds: anchorPlan?.excludeEntityIds || [], presentationFamily,
     compositionAware: !!composition,
   });
-  const avoid = apresentacao ? presentationImageAvoid(card) : [];
-  const otherScenes = apresentacao ? presentationOtherScenes(deckSlides, slideIndex) : [];
-  const styleReferenceLook = apresentacao && references.some((ref) => ref.role === 'moodboard' && !ref.label);
+  const avoid = apresentacao ? presentationImageAvoid(card) : livreSocial ? socialFreeImageAvoid(card) : [];
+  const otherScenes = apresentacao ? presentationOtherScenes(deckSlides, slideIndex) : livreSocial ? socialFreeOtherScenes(deckSlides, slideIndex) : [];
+  const styleReferenceLook = (apresentacao || livreSocial) && references.some((ref) => ref.role === 'moodboard' && (livreSocial || !ref.label));
   return {
     format: fmt === 'apresentacao' ? 'presentation' : 'carousel',
+    ...(livreSocial ? { socialFree: true } : {}),
     framing: cena.framing,
     referenceCount: references.length,
     styleMoodboard: references.some((ref) => ref.role === 'moodboard'),
@@ -174,7 +190,7 @@ export function composeImageDirection({
     styleReferenceLook,
     referenceMap,
     identityAnchor: comAncora ? anchorPlan.direction : '',
-    presentationPanel: presentationPanel === true,
+    presentationPanel: !livreSocial && presentationPanel === true,
     slideAction: !estetica && direcao && !referenceMap ? composeImgExtraPrompt(null, direcao) : '',
     subjects: cena.subjects,
     // Segmentos separados: se o orçamento apertar, a bíblia do projeto cede

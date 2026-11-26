@@ -106,6 +106,7 @@ export const IMAGE_PROMPT_TEXT = Object.freeze({
   // (o cabeçalho I19 pedia cores naturais do assunto, o que a contradiz).
   styleHeaderVisual: 'PROJECT STYLE (written in the project kit; the VISUAL DIRECTION palette prevails for colour):',
   restrictionsVisual: 'FORMAT AND RESTRICTIONS: Original characters only, never a real person, a celebrity or anyone from the reference images. No brands or screens with information; the slide text is added later.',
+  restrictionsSocialFree: 'FORMAT AND RESTRICTIONS: Follow an explicitly assigned subject reference or identity anchor only for its stated role. Never copy people or scenes from moodboard references. No lettering, brands or screens with information; editable card text, CTA, arrows and logo are added later.',
   // I31 — regras fixas da rota do agente.
   agentRules: 'Output an illustrative image for this card. Keep the subject and essential action clear in the final crop, with room around key features. Do not depict a screenshot, chart, testimonial or evidence of a real event. No lettering, captions, logos or watermarks.',
 });
@@ -279,9 +280,11 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
   const teto = limit > 0 ? limit : caps.promptLimit;
   const agente = route === 'mcp';
   const presentation = parts.format === 'presentation';
+  const socialFree = !presentation && parts.socialFree === true;
+  const directed = presentation || socialFree;
   // Com COMPOSITION (direção de arte, parte 3) o espaço do texto e o recorte
   // vêm de lá; a regra genérica de tela não entra.
-  const withComposition = presentation && !agente && presente(parts.composition);
+  const withComposition = directed && (!agente || socialFree) && presente(parts.composition);
   const canvas = withComposition ? '' : presentation ? T.canvasPresentation : T.canvasSocial;
   const referenceCount = Math.max(0, Number(parts.referenceCount) || 0);
   const styleSegments = (Array.isArray(parts.styleBody) ? parts.styleBody : [parts.styleBody]).filter(presente).map((texto) => texto.trim());
@@ -289,7 +292,7 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
   const styleMoodboard = referenceCount > 0 && parts.styleMoodboard === true;
   // Apresentação com referência de estilo: o bloco "só o visual" é fixo, com
   // ou sem estilo escrito, e reservado como as regras.
-  const lookOnly = styleMoodboard && presentation && parts.styleReferenceLook === true;
+  const lookOnly = styleMoodboard && directed && parts.styleReferenceLook === true;
   const styleReference = lookOnly ? [
     T.styleReferenceLook,
     styleBody ? '' : T.styleReferenceOverride,
@@ -315,8 +318,8 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
   // Direção de arte (26/11): direção visual do deck, cena como briefing e o
   // espaço do texto no quadro (COMPOSITION). Sem direção visual, o pedido é o
   // de antes; COMPOSITION entra logo depois do enquadramento.
-  const visualDirection = presentation && !agente && presente(parts.visualDirection) ? parts.visualDirection.trim() : '';
-  const composition = presentation && !agente && presente(parts.composition) ? parts.composition.trim() : '';
+  const visualDirection = directed && (!agente || socialFree) && presente(parts.visualDirection) ? parts.visualDirection.trim() : '';
+  const composition = directed && (!agente || socialFree) && presente(parts.composition) ? parts.composition.trim() : '';
   const brief = visualDirection && parts.sceneBrief && presente(parts.sceneBrief.subject)
     && normalizarCena(parts.sceneBrief.query) === normalizarCena(parts.scene) && !trimmed.includes('scene') ? parts.sceneBrief : null;
 
@@ -334,9 +337,9 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
   add('framing', framing, agente ? 'required' : 'fixed');
   add('composition', composition, 'fixed');
   if (referenceCount > 0) {
-    add('referenceRoles', lookOnly ? T.referenceRolesPresentation : T.referenceRoles, 'required');
+    add('referenceRoles', lookOnly ? T.referenceRolesPresentation : T.referenceRoles, socialFree ? 'fixed' : 'required');
     add('referenceMap', parts.referenceMap, 'required');
-    add('identityAnchor', parts.identityAnchor, 'required');
+    add('identityAnchor', parts.identityAnchor, socialFree ? 'fixed' : 'required');
   }
   // No agente, I31 já proíbe captura, gráfico e depoimento.
   if (parts.presentationPanel && !agente) add('presentationPanel', visualDirection && composition ? T.presentationPanelVisual : T.presentationPanel, 'required');
@@ -344,7 +347,7 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
   // Com a cena como briefing não há bloco SCENE: as referências a ele apontam
   // para o assunto do slide.
   const paraBriefing = (texto) => (brief ? texto.replace("this slide's SCENE", "this slide's SUBJECT AND CASTING") : texto);
-  if (presentation) add('otherScenes', paraBriefing(composeOtherScenesBlock(parts.otherScenes)), 'optional', keepWholeLines);
+  if (directed) add('otherScenes', paraBriefing(composeOtherScenesBlock(parts.otherScenes)), 'optional', keepWholeLines);
   add('slideAction', parts.slideAction, 'required', (texto, max) => {
     const [cabecalho, ...resto] = texto.split('\n');
     return shrinkBody(`${cabecalho}\n`, resto.join('\n'), '', max);
@@ -368,7 +371,7 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
   } else if (styleMoodboard) {
     if (!lookOnly) add('moodboardOnly', T.moodboardOnly, 'required');
     add('medium', canvas, 'optional');
-  } else if (!agente) {
+  } else if (!agente && !(socialFree && visualDirection)) {
     add('medium', presentation ? (withComposition ? T.mediumPresentation.replace(`${CANVAS_PRESENTATION} `, '') : T.mediumPresentation) : T.mediumCarousel, 'optional');
   }
   add('styleReference', paraBriefing(styleReference), 'fixed');
@@ -378,7 +381,7 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
   if (!styleMoodboard && !visualDirection) add('treatment', composeFamilyTreatment(parts.familyEnglish), 'optional');
   if (!agente && !styleBody && !styleMoodboard && !visualDirection) add('defaultArtDirection', T.defaultArtDirection, 'optional');
   if (visualDirection) {
-    add('restrictions', T.restrictionsVisual, 'fixed');
+    add('restrictions', socialFree ? T.restrictionsSocialFree : T.restrictionsVisual, 'fixed');
     blocos.sort((a, b) => VISUAL_DIRECTION_ORDER.indexOf(a.key) - VISUAL_DIRECTION_ORDER.indexOf(b.key));
   }
 

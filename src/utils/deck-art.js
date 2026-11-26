@@ -18,16 +18,19 @@ import {
   FREE_ART_GRAPHIC_FROM, FREE_ART_TEXT_MAX, FREE_PRESENTATION_PRESET_ID, slideSkipsImageGeneration,
 } from './free-design.js';
 import {
-  alignVisualDirectionWithDeck, composeVisualDirectionBlock, resolveSlideVisualDirection, visualHex,
+  alignVisualDirectionWithDeck, composeVisualDirectionBlock, resolveSlideVisualDirection, resolveSocialFreeVisualDirection, visualHex,
 } from './visual-direction.js';
 import { composeImgExtraPrompt, normalizeStyleKit } from './style-kit.js';
 import { wcagContrast } from './wcag.js';
+import { composeSocialFreeArtComposition, isSocialFreeSlide, normalizeSocialFreeFormat } from './social-free-prompt.js';
 
 /** Pedido de cena da arte (o mesmo texto vai em `sceneBrief.query`). */
 export const DECK_ART_SCENE = 'Abstract identity background for this presentation deck, no people.';
+export const SOCIAL_DECK_ART_SCENE = 'Abstract identity background for this social carousel, no people.';
 export const DECK_ART_FIELDS = Object.freeze(['presentationArtImageId', 'presentationArtImage', 'presentationArtImageAssetId']);
 
-const isArt = slide => slide?.presentationFreeDesign?.ground === 'art';
+const isSocialArt = slide => isSocialFreeSlide(slide) && slide?.socialFreeDesign?.ground === 'art' && slide.socialFreeDesign.photo === 'none';
+const isArt = slide => slide?.presentationFreeDesign?.ground === 'art' || isSocialArt(slide);
 const hasArtImage = slide => DECK_ART_FIELDS.some(key => !!slide?.[key]);
 
 /** Páginas do deck com fundo de arte. */
@@ -48,7 +51,7 @@ export function deckNeedsArt(slides) {
  */
 export function deckImageCredits(slides) {
   const list = Array.isArray(slides) ? slides : [];
-  const photos = list.filter(slide => !slideSkipsImageGeneration(slide) && String(slide?.imageQuery || '').trim()).length;
+  const photos = list.filter(slide => !(isSocialFreeSlide(slide) ? slide?.socialFreeDesign?.photo === 'none' : slideSkipsImageGeneration(slide)) && String(slide?.imageQuery || '').trim()).length;
   const art = deckNeedsArt(list) ? 1 : 0;
   return { photos, art, total: photos + art };
 }
@@ -98,6 +101,8 @@ const roleHex = (vd, role) => vd?.palette?.find(item => item.role === role)?.hex
 
 /** Direção visual em vigor para a arte: a do roteiro alinhada ao deck, com o kit por cima. */
 function artVisualDirection(slide, styleKit) {
+  if (isSocialFreeSlide(slide)) return resolveSocialFreeVisualDirection({ slide, styleKit })
+    || (slide?.socialDeckDesign ? alignVisualDirectionWithDeck(null, slide.socialDeckDesign) : null);
   const free = { ...slide, presentationPresetId: slide?.presentationPresetId || FREE_PRESENTATION_PRESET_ID };
   return resolveSlideVisualDirection({ slide: free, styleKit })
     || (slide?.presentationDeckDesign ? alignVisualDirectionWithDeck(null, slide.presentationDeckDesign) : null);
@@ -110,10 +115,12 @@ function artVisualDirection(slide, styleKit) {
  * concentrado na borda direita e as restrições de sempre. A referência do kit,
  * quando enviada, vale só pelo visual.
  */
-export function composeDeckArtImageDirection({ slides = [], styleKit = null, baseReferenceCount = 0 } = {}) {
+export function composeDeckArtImageDirection({ slides = [], styleKit = null, baseReferenceCount = 0, fmt = null, formatViews = null } = {}) {
   const first = deckArtSlides(slides)[0] || (Array.isArray(slides) ? slides[0] : null) || {};
+  const socialFree = isSocialFreeSlide(first);
+  const socialFormat = normalizeSocialFreeFormat(fmt || first.socialPlan?.formato);
   const resolved = artVisualDirection(first, styleKit);
-  const deck = first.presentationDeckDesign?.palette || {};
+  const deck = (socialFree ? first.socialDeckDesign : first.presentationDeckDesign)?.palette || {};
   const base = roleHex(resolved, 'base') || visualHex(deck.bg) || '#111111';
   // Mesmo sem roteiro, o pedido é de arte abstrata: uma direção mínima
   // impede o montador comum de reintroduzir a fotografia/grão padrão.
@@ -124,11 +131,17 @@ export function composeDeckArtImageDirection({ slides = [], styleKit = null, bas
   const tone = isLightInk(ink) ? 'dark' : 'light';
   const kit = normalizeStyleKit(styleKit);
   const refs = Math.max(0, Number(baseReferenceCount) || 0);
-  const subject = `SUBJECT AND CASTING: No people, faces, hands or bodies. An abstract identity background for this deck: about three quarters of the image is one uniform ${tone} field in ${base}.`;
-  const graphics = `LIGHT, TEXTURE AND GRAPHICS OF THIS SLIDE: Apply the finish, atmosphere and light/shadow roles specified in VISUAL DIRECTION to this abstract background, without a photographic subject. ${hasGraphics ? 'Use only the specified graphic language near the right edge, with large areas of breathing room; do not add other motifs or textures.' : `No graphic interventions or added motifs. Keep the whole frame uniform in ${base}.`}`;
-  const composition = `COMPOSITION (space for the slide text): Type is laid over the left ${FREE_ART_TEXT_MAX}% of the frame, several lines of ${tone === 'dark' ? 'white' : 'dark'} type. Keep that area flat, ${tone} and calm in ${base}: a uniform, low-detail surface with no shapes, dots, gradients or texture changes in it.${hasGraphics ? ` Keep the graphics near the right edge, mostly from about ${FREE_ART_GRAPHIC_FROM}% of the frame width onward.` : ' Keep the rest of the frame equally calm, with no graphic interventions.'}`;
+  const subject = socialFree
+    ? `SUBJECT AND CASTING: No people, faces, hands or bodies. An abstract identity background shared by this social carousel: a uniform ${tone} field in ${base}, with editable text zones defined by COMPOSITION.`
+    : `SUBJECT AND CASTING: No people, faces, hands or bodies. An abstract identity background for this deck: about three quarters of the image is one uniform ${tone} field in ${base}.`;
+  const graphicLocation = socialFree ? 'outside the actual protected text areas' : 'near the right edge';
+  const graphics = `LIGHT, TEXTURE AND GRAPHICS OF THIS SLIDE: Apply the finish, atmosphere and light/shadow roles specified in VISUAL DIRECTION to this abstract background, without a photographic subject. ${hasGraphics ? `Use only the specified graphic language ${graphicLocation}, with large areas of breathing room; do not add other motifs or textures.` : `No graphic interventions or added motifs. Keep the whole frame uniform in ${base}.`}`;
+  const composition = socialFree
+    ? composeSocialFreeArtComposition(deckArtSlides(slides), { fmt: socialFormat, formatViews, base, graphics: hasGraphics })
+    : `COMPOSITION (space for the slide text): Type is laid over the left ${FREE_ART_TEXT_MAX}% of the frame, several lines of ${tone === 'dark' ? 'white' : 'dark'} type. Keep that area flat, ${tone} and calm in ${base}: a uniform, low-detail surface with no shapes, dots, gradients or texture changes in it.${hasGraphics ? ` Keep the graphics near the right edge, mostly from about ${FREE_ART_GRAPHIC_FROM}% of the frame width onward.` : ' Keep the rest of the frame equally calm, with no graphic interventions.'}`;
   return {
-    format: 'presentation',
+    format: socialFree ? 'carousel' : 'presentation',
+    ...(socialFree ? { socialFree: true } : {}),
     framing: '',
     referenceCount: refs,
     styleMoodboard: refs > 0,
@@ -143,6 +156,6 @@ export function composeDeckArtImageDirection({ slides = [], styleKit = null, bas
     avoid: [vd.avoid, 'people, faces, hands, bodies or silhouettes', 'photographs of places or objects', 'unrequested decorative motifs'].filter(Boolean),
     composition,
     visualDirection: composeVisualDirectionBlock(vd, { referenceLook: refs > 0 }),
-    sceneBrief: { query: DECK_ART_SCENE, subject, action: '', light: graphics },
+    sceneBrief: { query: socialFree ? SOCIAL_DECK_ART_SCENE : DECK_ART_SCENE, subject, action: '', light: graphics },
   };
 }

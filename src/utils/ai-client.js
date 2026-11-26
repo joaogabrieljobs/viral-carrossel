@@ -556,6 +556,7 @@ function imagePromptParts(q, imgParams, direction, { aspectRatio = '4:5', withRe
     scene: q,
     axisTags: buildImgParamsTagsEN(imgParams),
     format: d.format || (normalizeImageAspectRatio(aspectRatio) === '16:9' ? 'presentation' : 'carousel'),
+    ...(d.socialFree === true ? { socialFree: true } : {}),
     framing: typeof d.framing === 'string' ? d.framing : `FRAMING: ${imageFramingDirection({}, 'carrossel')}`,
     referenceCount: anexos,
     styleMoodboard: anexos > 0 && (typeof d.styleMoodboard === 'boolean' ? d.styleMoodboard : true),

@@ -218,6 +218,23 @@ export function resolveSlideVisualDirection({ slide = null, styleKit = null } = 
   return applyKitColors(value, styleKit);
 }
 
+/** Opt-in social: a direção persistida do card e a marca efetiva do projeto. */
+export function resolveSocialFreeVisualDirection({ slide = null, styleKit = null } = {}) {
+  const raw = slide?.socialPlan?.visualDirection;
+  let value = raw ? coerceVisualDirection(raw) : null;
+  if (value && raw?.paletteSource) value.paletteSource = raw.paletteSource;
+  value = applyKitColors(value, styleKit);
+  if (isObject(slide?.socialDeckDesign)) value = alignVisualDirectionWithDeck(value, slide.socialDeckDesign);
+  if (!value) return null;
+  const reference = kitReferencePalette(styleKit);
+  const kitColors = kitVisualColors(styleKit);
+  const deckBase = visualHex(slide?.socialDeckDesign?.palette?.bg);
+  if (reference.length) value = snapVisualDirectionToPalette(value, [...reference, ...kitColors.colors, ...(deckBase ? [deckBase] : [])], { explicitBase: deckBase || kitColors.base });
+  // A marca efetiva inclui os overrides explícitos do assistente. Não deixar
+  // a reaplicação do kit na regeneração reverter essa escolha persistida.
+  return isObject(slide?.socialDeckDesign) ? alignVisualDirectionWithDeck(value, slide.socialDeckDesign) : value;
+}
+
 /* ------------------------------------------------------------------------ */
 /* Bloco do pedido de imagem                                                */
 /* ------------------------------------------------------------------------ */
