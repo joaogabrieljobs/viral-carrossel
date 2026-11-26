@@ -90,7 +90,7 @@ Falta uma linha de base da composição do carrossel. Ela precisa ser criada **a
 
 ## Implementação da Frente B — 26/11/2026
 
-Este adendo registra o código implementado depois do fechamento da Frente A, a partir de `cdd3a97`. As seções anteriores são a análise e as decisões originais; a implantação não amplia aquelas decisões para os estilos existentes. Os gates finais de navegador e a inspeção das capturas ainda estavam em andamento ao registrar este adendo.
+Este adendo registra o código implementado depois do fechamento da Frente A, a partir de `cdd3a97`. As seções anteriores são a análise e as decisões originais; a implantação não amplia aquelas decisões para os estilos existentes. As 24 capturas-base de `head-5` foram inspecionadas individualmente; os gates finais da Frente B ainda estavam em andamento ao atualizar este registro.
 
 ### Entrada explícita e identidade do projeto
 
@@ -122,6 +122,8 @@ O piso de leitura é 28 px, incluindo apoio, chapéu, blocos e assinatura da mar
 
 `socialFreeChromeGeometry` compartilha as posições automáticas e as reservas entre diretor e renderer. Logo, cabeçalho, handle, contador, barra e selo entram nas faixas seguras; Stories mantém também a elevação do rodapé. A reserva considera o retângulo real da marca. Nos cards quadrados mais densos, foto ou título podem ocupar a área livre ao lado dela, sem invadir o logo, reduzir a marca ou cortar conteúdo. Posições manuais permanecem sob controle do usuário.
 
+A proteção do cabeçalho e da barra contra uma foto considera a interseção de seus retângulos efetivos, depois da margem segura e dos offsets. A posição antiga do chrome não é usada como aproximação. Essa verificação é exclusiva do Livre; os estilos anteriores conservam suas posições e sua detecção.
+
 O diretor evita três geometrias iguais seguidas, registra uma troca necessária para o ritmo e conserva a família proposta quando possível. A seta aparece somente na capa. Arte pode aparecer em até três cards elegíveis, sempre sem foto; a geração compartilha um único asset de arte. Texto, CTA, logo e blocos continuam sendo camadas editáveis.
 
 O chapéu tem prioridade na reserva de texto. Um fólio ou outro ornamento textual que colidir com ele é omitido somente naquele card Livre; o conteúdo editorial permanece inteiro.
@@ -132,6 +134,8 @@ O lote exclui cards com `photo: 'none'`. Uma solicitação individual explícita
 
 Em card manual, a foto utiliza uma zona existente ou um espaço livre; se não houver área disponível, pode ser inserida como fundo protegido. Zonas de texto, offsets e mídia do usuário não são apagados. Estilo próprio, canvas manual e edições por formato são reconhecidos antes de qualquer reset de estilo. A geração Livre também evita os ajustes genéricos posteriores que sobrescreveriam as zonas e escalas calculadas.
 
+Quando a vista ativa tem uma composição manual salva, o reconciliador de mídia atualiza também essa entrada de `formatViews`. Isso evita que uma antiga zona de foto de 1×1 se sobreponha à foto recém-enviada no documento-base. A correção só ocorre diante de mídia nova em uma vista Livre: preserva as caixas de texto, os offsets, os demais cards e as outras vistas. Hidratação do mesmo asset e uma vista já convertida para estilo fixo não acionam essa adaptação.
+
 Os pedidos de foto levam a cena do card, as cenas dos outros cards, a ficha visual e a âncora de pessoa já existentes. A referência de estilo fornece aparência; não autoriza copiar seu sujeito ou composição. O bloco de composição usa as zonas reais do card e o formato atual, inclusive uma vista editada. A arte usa a união das áreas de texto dos cards que a compartilham e respeita `graphics`, `finish`, iluminação e `avoid`, inclusive ausência de grafismos ou de grão.
 
 O remix de texto conserva direção, geometria, mídia, blocos e rótulos aprovados, aplicando somente os campos de redação. Com imagens solicitadas, a cena pode ser atualizada nos cards que já admitem foto. A quantidade é preservada e cards sem foto continuam fora do lote.
@@ -140,4 +144,8 @@ O remix de texto conserva direção, geometria, mídia, blocos e rótulos aprova
 
 A linha de base de composição protege os 21 estilos anteriores nos três formatos; os catálogos existentes de pedidos de texto e imagem não foram regravados. Os testes novos cobrem opt-in, plano e revisão, direção da imagem, arte, piso e contraste, mudança de formato, importação de foto, remix e chrome. A correção das faixas da marca foi reproduzida antes da implementação: oito testes falharam; o conjunto focal seguinte passou com 143 testes, além de `check:undef` e `check:props`.
 
-O E2E da Apoteose começa no assistente com uma conta vazia e recebe uma resposta de redação com plano, sem injetar um projeto composto. Confere geração, chamadas de imagem, persistência local e remota simulada, reabertura e geometria no DOM de exportação. APIs, armazenamento remoto e imagens geradas são simulados; isso prova a integração e os contratos enviados, não a qualidade artística de uma geração real da IA nem o serviço de produção. As capturas nativas e os gates completos precisam terminar antes do fechamento da Frente B.
+A detecção do header sobre foto teve seis casos vermelhos antes da correção e 149 testes focais verdes depois. O upload em vista manual foi reproduzido nas três direções de formato, com três falhas e duas guardas já passando; após a correção, a regressão focal A+B passou em 171 testes de nove arquivos. Esses conjuntos se sobrepõem e não devem ser somados como uma suíte única.
+
+O E2E da Apoteose começa no assistente com uma conta vazia e recebe uma resposta de redação com plano, sem injetar um projeto composto. Confere geração, chamadas de imagem, persistência local e remota simulada, reabertura e geometria no DOM de exportação. As 24 capturas-base de `head-5` — oito de Feed, oito de Quadrado e oito de Stories — foram abertas em resolução nativa. A inspeção confirmou texto integral, tabela e lista completas, chapéus separados, arte visível, assinatura na capa e no fecho e rodapé dentro da faixa segura. As etapas adicionais de edição e os gates completos continuam necessários para fechar a Frente B.
+
+APIs, armazenamento remoto e imagens geradas são simulados; isso prova a integração e os contratos enviados, não a qualidade artística de uma geração real da IA nem o serviço de produção. O retrato determinístico é repetido nos cards fotográficos e não foi composto para suas zonas; em Stories 1 e 3, o cabeçalho protegido atravessa partes do rosto. Essa limitação fica registrada na avaliação visual e impede tratar as capturas de teste como aprovação criativa da fotografia final.
