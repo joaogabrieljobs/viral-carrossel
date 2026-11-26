@@ -10,6 +10,8 @@ import { buildPresentationBlocksPrompt, mapPresentationBlockStrings, normalizePr
 import { finishFreeDraft } from './free-draft.js';
 import { requiresSocialTitles, recoverSocialTitle, recoverSocialTitleForEditing, missingSocialTitleIndexes, auditSocialTextDensity, buildSocialTextLimitsPrompt } from './social-generation.js';
 import { auditDraftFactuality, auditUnsupportedCommercialClaims, buildFactualGroundingPrompt, buildReviewFactCheckPrompt, goalTitleAsFactSlides, groundPresentationBlocks, replaceEmDashes, splitBriefingNotes } from './factual-grounding.js';
+import { buildSocialFreePrompt, buildSocialFreeReviewRules } from './social-free-prompt.js';
+import { normalizeSocialFreePlan, socialPlanAfterReview } from './social-free-plan.js';
 export { auditUnsupportedCommercialClaims } from './factual-grounding.js';
 
 const isObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -331,7 +333,7 @@ export function moveGapNotesOutOfSlides(draft) {
   return { draft: changed ? { ...draft, slides } : draft, gaps, emptiedTitles };
 }
 
-export function validateCarouselDraft(rawDraft, { count, presetId, densityId, presentationPath, nativeBlocks = true, freeDesign = false, narrativeMode, allowMissingSocialTitles = false, allowLongSocialSupport = false, allowIncompleteDraft = false }) {
+export function validateCarouselDraft(rawDraft, { count, presetId, densityId, presentationPath, nativeBlocks = true, freeDesign = false, socialFree = false, narrativeMode, allowMissingSocialTitles = false, allowLongSocialSupport = false, allowIncompleteDraft = false }) {
   const normalized = normalizeCarouselDraftInput(rawDraft, { count, presetId, densityId });
   const draft = normalized.draft;
   if (!isObject(draft) || !Array.isArray(draft.slides)
@@ -356,7 +358,7 @@ export function validateCarouselDraft(rawDraft, { count, presetId, densityId, pr
     delete slide.funcao;
     // Rótulo acima do título (direção de arte, parte 5): só na apresentação,
     // 1–3 palavras em caixa alta; fora do contrato, sai inteiro.
-    if (presetId === 'apresentacao' && hasOwn(s, 'eyebrow')) slide.eyebrow = normalizePresentationEyebrow(s.eyebrow);
+    if ((presetId === 'apresentacao' || socialFree === true) && hasOwn(s, 'eyebrow')) slide.eyebrow = normalizePresentationEyebrow(s.eyebrow);
     else delete slide.eyebrow;
     if (presetId === 'apresentacao' && draft.presentationPlan && !String(slide.title || '').trim()) {
       throw Object.assign(new Error(`O slide ${index + 1} precisa de um título específico.`), { code: 'presentation_title_missing', field: 'title', slideIndex: index });
@@ -955,21 +957,25 @@ Cada edição exige slideIndex e reason; inclua somente os campos que mudam: ${e
   const emptyRule = emptyCards.length
     ? `\nCARD SEM TEXTO — ${emptyCards.length > 1 ? `os slideIndex ${emptyCards.join(', ')} vieram vazios` : `o slideIndex ${emptyCards[0]} veio vazio`}. Só preencha com uma informação do material que ainda não está em outro card; não copie nem parafraseie o CTA ou outro card. Sem informação nova, deixe title e subtitle vazios.`
     : '';
-  const repeatRule = repeatedTitleRule(draft?.slides) + repeatedContentRule(draft?.slides) + repeatedFactRule(draft?.slides) + TITLE_SUPPORT_RULE + emptyRule;
+  const socialSignatures = config.socialFree === true ? deckSignatures(draft?.slides, config.socialPlan) : [];
+  const repetitionSlides = config.socialFree === true ? socialFreeWithoutEdgeSignatures(draft?.slides, socialSignatures) : draft?.slides;
+  const repeatRule = repeatedTitleRule(repetitionSlides) + repeatedContentRule(repetitionSlides) + repeatedFactRule(repetitionSlides) + TITLE_SUPPORT_RULE + emptyRule;
   const explicitScriptRule = config?.explicitCardScript?.count
     ? `\nROTEIRO EXPLÍCITO DO USUÁRIO — preserve a correspondência entre cada bloco e o slideIndex equivalente. Não funda, reordene, mova para outro card nem omita um bloco. A revisão pode melhorar clareza e encaixe dentro do próprio card, sem trocar sua função, fatos ou intenção.`
     : '';
+  const socialFreeRule = config.socialFree === true
+    ? buildSocialFreeReviewRules({ signatures: socialSignatures, violations: auditSocialFreeTextContract(draft?.slides) }) : '';
   return `REVISÃO EDITORIAL — UMA RODADA, SOMENTE TEXTO.
 O briefing abaixo é referência, não um pedido para gerar o carrossel novamente.
 <briefing>\n${prompt}\n</briefing>
 <rascunho>\n${JSON.stringify(draft)}\n</rascunho>
 ${buildFactualGroundingPrompt(config)}
 ${buildReviewFactCheckPrompt()}
-Verifique também: promessa da capa entregue pelo miolo; slide 2 útil; progressão sem repetição; exemplos concretos; afirmações sustentadas pelo material; voz e densidade; legenda complementar; um CTA coerente com o objetivo; linguagem idiomática e natural. Corrija traduções literais, provérbios inventados, ditados combinados e metáforas ambíguas ou sem sentido.${titleRule}${claimsRule}${echoRule}${repeatRule}${explicitScriptRule}
+Verifique também: promessa da capa entregue pelo miolo; slide 2 útil; progressão sem repetição; exemplos concretos; afirmações sustentadas pelo material; voz e densidade; legenda complementar; um CTA coerente com o objetivo; linguagem idiomática e natural. Corrija traduções literais, provérbios inventados, ditados combinados e metáforas ambíguas ou sem sentido.${titleRule}${claimsRule}${echoRule}${repeatRule}${explicitScriptRule}${socialFreeRule}
 Corrija apenas problemas identificados. Preserve ordem, quantidade, assunto, arco, números e fatos sustentados. Remova ou qualifique alegações sem apoio; não acrescente fontes ou fatos. Não altere imageQuery, cultureTone, layout nem qualquer configuração visual.
 Use slideIndex começando em zero. Não envie edições para slides que já estejam bons. Cada índice aparece no máximo uma vez. Nunca preencha bodyAfterImage onde o layout exige vazio.
 Resposta: um único objeto JSON {"edits":[{"slideIndex":0,"reason":"problema concreto","title":"texto corrigido"}],"caption":"legenda corrigida apenas se necessário"}.
-Cada edição exige slideIndex e reason; inclua somente os campos que mudam: title, subtitle, bodyAfterImage. caption é opcional. Se estiver adequado, retorne {"edits":[]}. Sem notas, notas numéricas, previsão de viralização ou campos extras.`;
+Cada edição exige slideIndex e reason; inclua somente os campos que mudam: title, subtitle, bodyAfterImage. caption é opcional. Se estiver adequado, retorne {"edits":[]}. Sem notas, notas numéricas, previsão de viralização ou campos extras.${config.socialFree === true ? ' No Livre social, eyebrow e presentationBlocks também são campos editoriais permitidos; preserve-os quando já estiverem corretos.' : ''}`;
 }
 
 function unwrapEditorialReview(review) {
@@ -989,8 +995,9 @@ export function applyEditorialReview(draft, review, config, { deferQualityChecks
   }
   const isPresentation = config?.presetId === 'apresentacao';
   const planned = isPresentation && !!config.presentationPlan;
-  const editableTextFields = ['title', 'subtitle', 'bodyAfterImage', ...(planned ? ['speakerNotes', 'eyebrow'] : [])];
-  if (planned && Object.keys(review).some(key => !['edits', 'caption'].includes(key))) throw new Error('A revisão deve retornar somente correções, não outro deck.');
+  const socialFree = !isPresentation && config?.socialFree === true;
+  const editableTextFields = ['title', 'subtitle', 'bodyAfterImage', ...(planned ? ['speakerNotes', 'eyebrow'] : socialFree ? ['eyebrow'] : [])];
+  if ((planned || socialFree) && Object.keys(review).some(key => !['edits', 'caption'].includes(key))) throw new Error('A revisão deve retornar somente correções, não outro deck.');
   const seen = new Set();
   const slides = draft.slides.map(s => ({ ...s }));
   for (const edit of review.edits) {
@@ -998,7 +1005,7 @@ export function applyEditorialReview(draft, review, config, { deferQualityChecks
         seen.has(edit.slideIndex) || typeof edit.reason !== 'string' || !edit.reason.trim()) {
       throw new Error('Edição inválida');
     }
-    if (planned && Object.keys(edit).some(key => !['slideIndex', 'reason', ...editableTextFields, 'presentationBlocks'].includes(key))) throw new Error('Campo não permitido na revisão.');
+    if ((planned || socialFree) && Object.keys(edit).some(key => !['slideIndex', 'reason', ...editableTextFields, 'presentationBlocks'].includes(key))) throw new Error('Campo não permitido na revisão.');
     seen.add(edit.slideIndex);
     for (const field of editableTextFields) {
       if (!hasOwn(edit, field)) continue;
@@ -1007,7 +1014,7 @@ export function applyEditorialReview(draft, review, config, { deferQualityChecks
       }
       slides[edit.slideIndex][field] = edit[field];
     }
-    if (planned && hasOwn(edit, 'presentationBlocks')) {
+    if ((planned || socialFree) && hasOwn(edit, 'presentationBlocks')) {
       const normalized = normalizePresentationBlocks(edit.presentationBlocks);
       if (!Array.isArray(edit.presentationBlocks) || (edit.presentationBlocks.length && !normalized.length)) throw new Error('Bloco de revisão inválido');
       slides[edit.slideIndex].presentationBlocks = normalized;
@@ -1101,11 +1108,13 @@ export function assertSocialRefinement(previous, candidate, config) {
 
 /** Two normal calls: draft + review. At most one targeted repair when the
  * response still violates a measurable contract. Never silently truncate copy. */
-export async function generateReviewedCarousel({ prompt, config, aiOptions, onReview, onStage, onDraft, onPlan }, callAI) {
+export async function generateReviewedCarousel({ prompt, config, aiOptions, onReview, onStage, onDraft, onPlan, socialFree = false }, callAI) {
   if (config?.presetId === 'apresentacao' && config.presentationPlanning) {
     return generatePlannedPresentation({ prompt, config, aiOptions, onStage, onReview, onDraft, onPlan }, callAI);
   }
   const isPresentation = config?.presetId === 'apresentacao';
+  const freeOptions = !isPresentation && (socialFree === true || isObject(socialFree)) ? (isObject(socialFree) ? socialFree : {}) : null;
+  if (freeOptions) config = { ...config, socialFree: true, keepCardCount: true };
   const textOptions = {
     ...aiOptions,
     ...presentationAIOptions(config?.presetId, config?.presentationPath),
@@ -1114,19 +1123,27 @@ export async function generateReviewedCarousel({ prompt, config, aiOptions, onRe
     // budget and was exhausting it before the social JSON could finish.
     // The transport scopes this option to models that support the switch.
     thinking: 'disabled',
+    ...(freeOptions ? { maxTokens: Math.max(8192, Number(aiOptions?.maxTokens) || 0) } : {}),
   };
   // Entregue os limites ao primeiro rascunho, quando ainda há liberdade para
   // estruturar cada slide. A revisão continua sendo a segunda barreira, mas
   // não deve ser a primeira vez que a IA descobre quanto texto realmente cabe.
   const generationPrompt = isPresentation
     ? `${prompt}${buildPresentationLimitsBlock(config, config?.count || 0)}`
-    : `${prompt}\n${buildSocialTextLimitsPrompt(config)}\n${buildFactualGroundingPrompt(config)}`;
+    : `${prompt}\n${buildSocialTextLimitsPrompt(config)}\n${buildFactualGroundingPrompt(config)}${freeOptions ? `\n${buildSocialFreePrompt(freeOptions)}` : ''}`;
   // Recover complete opening sentences without losing copy, then send missing
   // titles and excessive text through the same editorial review.
   throwIfGenerationCancelled(aiOptions?.signal);
   const rawDraft = await callAI(generationPrompt, textOptions);
   throwIfGenerationCancelled(aiOptions?.signal);
-  const draft = validateCarouselDraft(rawDraft, { ...config, allowMissingSocialTitles: true, allowLongSocialSupport: true, allowIncompleteDraft: true });
+  let draft = validateCarouselDraft(rawDraft, { ...config, allowMissingSocialTitles: true, allowLongSocialSupport: true, allowIncompleteDraft: true });
+  let socialPlan = null;
+  if (freeOptions) {
+    const normalized = normalizeSocialFreePlan(draft, { ...freeOptions, source: [prompt, config.factualSource, config.userInstructions].filter(Boolean).join('\n') });
+    draft = normalized.result;
+    socialPlan = normalized.socialPlan;
+    config = { ...config, socialPlan };
+  }
   const draftLimitViolations = isPresentation
     ? auditPresentationTextLimits(draft.slides, config?.presentationTextLimits)
     : [];
@@ -1135,6 +1152,7 @@ export async function generateReviewedCarousel({ prompt, config, aiOptions, onRe
   throwIfGenerationCancelled(aiOptions?.signal);
   onReview?.();
   if (!isPresentation) {
+    if (freeOptions) return reviewSocialFreeDraft({ prompt, draft, config, socialPlan, textOptions, onStage }, callAI);
     return reviewSocialDraft({ prompt, draft, config, textOptions, onStage }, callAI);
   }
   try {
@@ -1214,6 +1232,183 @@ function salvageSocialReview(draft, review, config) {
   // Nada aproveitável numa resposta com partes inválidas: revisão inválida.
   if (dropped && !edits.length && !hasOwn(salvaged, 'caption')) return value;
   return salvaged;
+}
+
+/* Livre social: revisão separada, para não alterar os pedidos do catálogo. */
+function socialFreeWithoutEdgeSignatures(slides, signatures) {
+  const list = Array.isArray(slides) ? slides : [];
+  const escaped = value => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+  return list.map((slide, index) => index !== 0 && index !== list.length - 1 ? slide : {
+    ...slide,
+    ...Object.fromEntries(['title', 'subtitle', 'bodyAfterImage'].map(field => [field,
+      signatures.reduce((value, signature) => value.replace(new RegExp(escaped(signature), 'giu'), ''), String(slide?.[field] || '').replace(/[*_]/g, '')),
+    ])),
+  });
+}
+
+function keepSocialFreeSignatures(before, after, signatures) {
+  const runs = signatures.map(tokensOf).filter(run => run.length);
+  if (!runs.length) return after;
+  const has = value => runs.some(run => containsRun(tokensOf(value), run));
+  const slides = after.slides.map((slide, index) => {
+    if (index !== 0 && index !== after.slides.length - 1) return slide;
+    const preserved = Object.fromEntries(['title', 'subtitle', 'bodyAfterImage']
+      .filter(field => has(before.slides[index]?.[field]) && !has(slide?.[field])).map(field => [field, before.slides[index][field]]));
+    return Object.keys(preserved).length ? { ...slide, ...preserved } : slide;
+  });
+  return { ...after, slides };
+}
+
+export function auditSocialFreeTextContract(slides) {
+  const list = Array.isArray(slides) ? slides : [];
+  if (!list.length) return [];
+  const issues = [];
+  const title = String(list[0]?.title || '').replace(/[*_]/g, '').trim();
+  const words = title ? title.split(/\s+/u).length : 0;
+  if (words > 8) issues.push({ kind: 'social_free', code: 'social_free_cover_title', slideIndex: 0, field: 'title', words, maxWords: 8 });
+  const closing = plainWords(['title', 'subtitle', 'bodyAfterImage'].map(key => list.at(-1)?.[key] || '').join(' '));
+  const action = /\b(?:participe|comente|compartilhe|salve|saiba|descubra|conheca|veja|leia|acompanhe|acesse|escolha|fale|envie|inscreva|siga|reserve|garanta|experimente|venha|vem|vamos|join|save|follow|learn|share|comment|visit|read|discover|conoce|comparte|guarda|visita|unete|sigue)\b/u;
+  if (list.length > 1 && !action.test(closing) && !/\?\s*$/.test(closing)) {
+    issues.push({ kind: 'social_free', code: 'social_free_closing_cta', slideIndex: list.length - 1, field: 'subtitle' });
+  }
+  return issues;
+}
+
+function socialFreeRepetition(slides, signatures) {
+  const cleaned = socialFreeWithoutEdgeSignatures(slides, signatures);
+  const sentences = repeatedSentenceSlides(cleaned, { signatures: [] });
+  const titles = repeatedTitleIndexes(cleaned);
+  const contents = repeatedContentSlides(cleaned).filter(item => !titles.includes(item.slideIndex));
+  const facts = repeatedFactSlides(cleaned);
+  const groups = [...sentences.map(item => ({ ...item, kind: 'sentence' })), ...facts.map(item => ({ ...item, phrase: item.fact, kind: 'fact' }))];
+  const indexes = [...new Set([...groups.flatMap(item => item.slideIndexes), ...titles, ...contents.flatMap(item => [item.duplicateOf, item.slideIndex])])].sort((a, b) => a - b);
+  return { groups, titles, contents, indexes, size: groups.reduce((sum, item) => sum + item.slideIndexes.length - 1, 0) + titles.length + contents.length };
+}
+
+function socialFreeFacts(draft, config) {
+  const core = auditDraftFactuality(draft, config);
+  const blocks = auditDraftFactuality({ slides: draft.slides.map(slide => ({ title: '', subtitle: blockText(slide.presentationBlocks), bodyAfterImage: '' })), caption: '' }, config)
+    .map(issue => ({ ...issue, field: 'presentationBlocks' }));
+  const grounded = groundPresentationBlocks(draft.slides, config).dropped.map(issue => ({
+    slideIndex: issue.slideIndex, field: 'presentationBlocks', category: 'bloco sem fonte', claim: issue.reason,
+  }));
+  return [...core, ...blocks, ...grounded];
+}
+
+function socialFreeViolations(draft, config, signatures) {
+  const repetition = socialFreeRepetition(draft.slides, signatures);
+  return [
+    ...auditSocialDraft(draft, config).filter(issue => !['repeated_title', 'repeated_content', 'factual'].includes(issue.kind)),
+    ...socialFreeFacts(draft, config).map(issue => ({ kind: 'factual', ...issue })),
+    ...goalTitleAsFactSlides(draft.slides).map(slideIndex => ({ kind: 'factual', category: 'intenção como fato', claim: draft.slides[slideIndex].title, slideIndex, field: 'title', code: 'social_free_goal_as_fact' })),
+    ...auditSocialFreeTextContract(draft.slides),
+    ...repetition.indexes.map(slideIndex => ({ kind: 'repetition', slideIndex, field: null, code: 'repetition_remaining' })),
+  ];
+}
+
+function retainSocialFreeGroundedFields(proposed, previous, config) {
+  const key = issue => JSON.stringify([issue.slideIndex, issue.field, issue.category, issue.claim]);
+  const before = new Set(socialFreeFacts(previous, config).map(key));
+  const added = socialFreeFacts(proposed, config).filter(issue => !before.has(key(issue)));
+  if (!added.length) return { result: proposed, rejected: false };
+  const result = { ...proposed, slides: proposed.slides.map(slide => ({ ...slide })) };
+  for (const issue of added) {
+    if (issue.field === 'caption') result.caption = previous.caption;
+    else result.slides[issue.slideIndex][issue.field] = previous.slides[issue.slideIndex][issue.field];
+  }
+  return { result, rejected: true };
+}
+
+async function reviewSocialFreeDraft({ prompt, draft, config, socialPlan, textOptions, onStage }, callAI) {
+  const signatures = deckSignatures(draft.slides, socialPlan);
+  const reviewDiagnostics = [];
+  let candidate = draft;
+  let reviewResponded = false;
+  let applied = false;
+  for (let attempt = 0; attempt < 2 && !applied; attempt += 1) {
+    let responded = false;
+    try {
+      const response = await callAI(buildEditorialReviewPrompt(prompt, draft, config), textOptions);
+      throwIfGenerationCancelled(textOptions.signal);
+      responded = reviewResponded = true;
+      const proposed = keepSocialFreeSignatures(draft, applyEditorialReview(draft, response, config, { deferQualityChecks: true }), signatures);
+      const grounded = retainSocialFreeGroundedFields(proposed, draft, config);
+      candidate = grounded.result;
+      applied = true;
+      reviewDiagnostics.push({ stage: 'review', attempt, outcome: grounded.rejected ? 'salvaged' : 'applied' });
+    } catch (error) {
+      if (isGenerationCancelled(error) || textOptions.signal?.aborted) throw error;
+      reviewDiagnostics.push({ stage: 'review', attempt, outcome: responded ? 'invalid_response' : 'request_failed', message: String(error?.message || '').slice(0, 160) });
+      if (!responded) break;
+    }
+  }
+  candidate = withoutEchoedSocialSupport(candidate);
+  let violations = socialFreeViolations(candidate, config, signatures);
+  const before = socialFreeRepetition(candidate.slides, signatures);
+  let status = applied ? JSON.stringify(candidate) === JSON.stringify(draft) ? 'unchanged' : 'revised' : 'unavailable';
+  let diagnostic = before.size ? { stage: 'repetition', outcome: '', sizeBefore: before.size, sizeAfter: before.size }
+    : { stage: 'repetition', outcome: 'repetition_none', sizeBefore: 0, sizeAfter: 0 };
+  if (violations.length && reviewResponded) {
+    const last = candidate.slides.length - 1;
+    const repetitionTargets = before.indexes.length > 1 && before.indexes.includes(last) ? before.indexes.filter(index => index !== last) : before.indexes;
+    const targets = [...new Set([...violations.filter(issue => issue.kind !== 'repetition' && issue.slideIndex != null).map(issue => issue.slideIndex), ...repetitionTargets])].sort((a, b) => a - b);
+    const repairCaption = violations.some(issue => issue.field === 'caption');
+    const repairDiagnostic = before.size ? diagnostic : { stage: 'social_free', outcome: '', targets };
+    repairDiagnostic.targets = targets;
+    onStage?.('repairing');
+    let repairResponded = false;
+    try {
+      const response = unwrapEditorialReview(await callAI(`${buildEditorialReviewPrompt(prompt, candidate, config)}
+${before.size ? 'REPARO DE REPETIÇÃO' : 'REPARO DIRECIONADO'} — última passagem do Livre social, sem gerar outro carrossel.
+Edite somente slideIndex ${targets.join(', ') || '(nenhum)'}. ${repairCaption ? 'Corrija também caption.' : 'Preserve caption.'}
+Problemas medidos: ${JSON.stringify(violations)}.
+Frases repetidas em dois ou mais cards: ${before.groups.map(item => `"${item.phrase}" nos slideIndex ${item.slideIndexes.join(', ')}`).join('; ') || 'nenhuma'}.
+Mantenha a frase no card em que ela é assunto; quando inclui o fecho, preserve-a no fecho e repare os outros cards. Preserve a assinatura na capa e no fecho. Corrija apenas os campos indicados, sem trocar a quantidade, a ordem, scene, avoid, design ou imageQuery. Não corte frases no meio nem acrescente fatos. Capa com até 8 palavras; fecho com uma ação coerente com o objetivo.`, textOptions));
+      repairResponded = true;
+      throwIfGenerationCancelled(textOptions.signal);
+      if (!Array.isArray(response?.edits)) {
+        repairDiagnostic.outcome = before.size ? 'repetition_invalid_response' : 'invalid_response';
+      } else if (response.edits.some(edit => !targets.includes(edit?.slideIndex)) || (!repairCaption && hasOwn(response, 'caption'))) {
+        repairDiagnostic.outcome = before.size ? 'repetition_out_of_scope' : 'out_of_scope';
+        repairDiagnostic.outOfScope = [...new Set(response.edits.map(edit => edit?.slideIndex).filter(index => !targets.includes(index)))];
+      } else {
+        const proposed = keepSocialFreeSignatures(candidate, applyEditorialReview(candidate, response, config, { deferQualityChecks: true }), signatures);
+        const grounded = retainSocialFreeGroundedFields(proposed, candidate, config);
+        const repaired = withoutEchoedSocialSupport(grounded.result);
+        const remaining = socialFreeViolations(repaired, config, signatures);
+        const after = socialFreeRepetition(repaired.slides, signatures);
+        const priorOther = violations.filter(issue => issue.kind !== 'repetition');
+        const afterOther = remaining.filter(issue => issue.kind !== 'repetition');
+        const repetitionImproves = after.size < before.size;
+        const improves = repetitionImproves || afterOther.length < priorOther.length;
+        const worsens = after.size > before.size || afterOther.length > priorOther.length;
+        if (improves && !worsens) {
+          candidate = repaired;
+          violations = remaining;
+          status = 'repaired';
+        }
+        repairDiagnostic.outcome = before.size
+          ? repetitionImproves && !worsens ? grounded.rejected ? 'repetition_partially_salvaged' : 'repetition_repaired'
+            : grounded.rejected || worsens ? 'repetition_rejected_facts_or_limits' : 'repetition_not_improved'
+          : improves && !worsens ? 'repaired' : grounded.rejected ? 'rejected_facts' : 'not_improved';
+        if (before.size) repairDiagnostic.sizeAfter = socialFreeRepetition(candidate.slides, signatures).size;
+      }
+    } catch (error) {
+      if (isGenerationCancelled(error) || textOptions.signal?.aborted) throw error;
+      repairDiagnostic.outcome = before.size
+        ? repairResponded ? 'repetition_invalid_response' : 'repetition_request_failed'
+        : repairResponded ? 'invalid_response' : 'request_failed';
+      if (Number.isInteger(error?.status)) repairDiagnostic.status = error.status;
+      repairDiagnostic.message = String(error?.message || '').slice(0, 160);
+    }
+    if (!before.size) reviewDiagnostics.push(repairDiagnostic);
+  } else if (before.size) {
+    diagnostic = { ...diagnostic, outcome: 'repetition_not_attempted', reason: 'review_unavailable' };
+  }
+  reviewDiagnostics.push(diagnostic);
+  throwIfGenerationCancelled(textOptions.signal);
+  const finished = finishSocialReview(candidate, status, violations);
+  return { ...finished, ...socialPlanAfterReview(finished.result, socialPlan), reviewDiagnostics };
 }
 
 async function reviewSocialDraft({ prompt, draft, config, textOptions, onStage }, callAI) {
