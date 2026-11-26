@@ -7,6 +7,8 @@ import { describe, expect, it } from 'vitest';
 // checkout/portal), não fetch; Wikimedia não é buscada pelo cliente.
 // OpenAI continua: no modo BYOK o navegador chama api.openai.com direto
 // (src/utils/ai-client.js). Plausible recebe os eventos de analytics.
+// Os três hosts do Google são do GA4, que só carrega depois do consentimento
+// (public/ga4-consent.js).
 const source = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 
 const vercel = () => JSON.parse(source('vercel.json'));
@@ -27,8 +29,11 @@ describe('CSP connect-src mínimo (MOO-42)', () => {
   // Policy". Quebrava "Aplicar logo em todos", a cópia de imagens em edição ao
   // trocar de conta e guardar foto vinda de endereço blob. Uma URL blob: só
   // existe para a origem que a criou; liberar não abre saída para outro site.
-  it('libera apenas self, blob: (imagens do próprio app), OpenAI (BYOK direto) e Plausible', () => {
-    expect(connectSrc()).toEqual(["'self'", 'blob:', 'https://api.openai.com', 'https://plausible.io']);
+  it('libera apenas self, blob: (imagens do próprio app), OpenAI (BYOK direto), Plausible e GA4', () => {
+    expect(connectSrc()).toEqual([
+      "'self'", 'blob:', 'https://api.openai.com', 'https://plausible.io',
+      'https://*.google-analytics.com', 'https://*.analytics.google.com', 'https://*.googletagmanager.com',
+    ]);
   });
 
   it('build da Vercel força o proxy da Anthropic — sem ele, api.anthropic.com seria bloqueado', () => {

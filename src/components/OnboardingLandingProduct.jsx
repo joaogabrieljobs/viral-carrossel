@@ -561,6 +561,7 @@ export default function OnboardingLandingProduct({ onEnter, onLogin, onRegister 
           <p>Carrosséis e apresentações que começam com contexto.</p>
           <a href="/privacidade">Privacidade</a>
           <a href="/termos">Termos</a>
+          <button type="button" onClick={() => window.moontGA4?.abrirPreferencias()}>Preferências de cookies</button>
           <button type="button" onClick={onLogin}>Entrar</button>
         </div>
         <nav className="moont-lp-container moont-lp-platforms" aria-label="Conheça nossas plataformas">
