@@ -61,10 +61,20 @@ export function photoTextGeometry(slide) {
   return textOverPhoto(slide.canvas?.zones || {});
 }
 
-/** Lado do texto espelhado (mesma geometria da família, do outro lado). A foto cheia não muda. */
+/**
+ * Lado do texto espelhado (mesma geometria da família, do outro lado). O
+ * bloco de texto se move inteiro: título e apoio continuam alinhados pela
+ * esquerda entre si (espelhar zona a zona desalinhava as caixas de larguras
+ * diferentes). A foto cheia não muda.
+ */
 export function mirrorTextZones(zones = {}) {
+  const texts = TEXT_KEYS.filter(key => validZone(zones[key]));
+  if (!texts.length) return { ...zones };
+  const left = Math.min(...texts.map(key => zones[key].x));
+  const right = Math.max(...texts.map(key => zones[key].x + zones[key].w));
+  const dx = (100 - right) - left;
   const out = { ...zones };
-  for (const key of TEXT_KEYS) if (validZone(zones[key])) out[key] = { ...zones[key], x: round2(100 - zones[key].x - zones[key].w) };
+  for (const key of texts) out[key] = { ...zones[key], x: round2(zones[key].x + dx) };
   return out;
 }
 

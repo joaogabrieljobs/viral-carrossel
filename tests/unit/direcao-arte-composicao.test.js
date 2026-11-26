@@ -50,6 +50,8 @@ describe('geometria texto × foto', () => {
   it('tela cheia com texto à direita (lado espelhado)', () => {
     const zones = mirrorTextZones({ photo: FULL, title: { x: 6, y: 46, w: 44, h: 30 }, subtitle: { x: 6, y: 77, w: 40, h: 11 } });
     expect(zones.title).toEqual({ x: 50, y: 46, w: 44, h: 30 });
+    // O bloco se move inteiro: título e apoio seguem alinhados pela esquerda.
+    expect(zones.subtitle).toEqual({ x: 50, y: 77, w: 40, h: 11 });
     expect(zones.photo).toEqual(FULL);
     const slide = manual(zones);
     expect(photoTextGeometry(slide)).toMatchObject({ mode: 'overlay', side: 'right', reserve: 50, vertical: 'lower' });
