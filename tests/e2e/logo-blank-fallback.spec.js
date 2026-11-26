@@ -1,9 +1,11 @@
 import { enterEditorFromHome, selectEditorMode } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockOutfitFont } from './helpers/outfit-font.js';
 
 async function seed(page, { blankBrand = false } = {}) {
   await mockApi(page, { session: SESSAO_ATIVA });
+  await mockOutfitFont(page);
   await page.addInitScript(({ blankBrand }) => {
     if (localStorage.getItem('vc_library')) return;
     const png = (color, blank = false) => {

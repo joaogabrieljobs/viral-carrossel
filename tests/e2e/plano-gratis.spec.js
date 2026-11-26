@@ -5,6 +5,7 @@
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ANONIMA, SESSAO_ATIVA } from './helpers/api-mock.js';
 import { selectEditorMode } from './helpers/project-entry.js';
+import { mockOutfitFont } from './helpers/outfit-font.js';
 
 const EMAIL = 'gratis@teste.exemplo';
 const DONO = `email:${EMAIL}`;
@@ -233,6 +234,7 @@ test.describe('Plano grátis', () => {
   test('conta grátis cria, edita e exporta um carrossel à mão, sem chamar nenhuma rota paga', async ({ page }) => {
     test.setTimeout(120_000);
     const chamadas = [];
+    await mockOutfitFont(page);
     await abrirGratis(page, { chamadas });
     await criarProjetoManual(page, 'Meu carrossel manual');
 

@@ -1,9 +1,11 @@
 import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockOutfitFont } from './helpers/outfit-font.js';
 
 async function seedLogoCard(page, tone) {
   await mockApi(page, { session: SESSAO_ATIVA });
+  await mockOutfitFont(page);
   await page.addInitScript(({ logoTone }) => {
     const logoCanvas = document.createElement('canvas');
     logoCanvas.width = 100;

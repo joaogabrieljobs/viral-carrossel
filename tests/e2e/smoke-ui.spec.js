@@ -5,6 +5,7 @@ import { enterEditorFromHome } from './helpers/project-entry.js';
 // painel pouco usado não apareceria em nenhuma jornada de negócio.
 import { test, expect } from '@playwright/test';
 import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockOutfitFont } from './helpers/outfit-font.js';
 
 /** ruído conhecido e inofensivo — qualquer coisa fora disto reprova */
 const IGNORAR = [
@@ -26,6 +27,12 @@ function coletorDeErros(page) {
 }
 
 test.describe('Smoke da UI inteira (auditoria do refactor)', () => {
+  test.beforeEach(async ({ page }) => {
+    // Só a Outfit original vem desta fixture; as 20 famílias da biblioteca
+    // continuam nos WOFF locais. Não renomeia as 57 famílias para Outfit.
+    await mockOutfitFont(page);
+  });
+
   test('editor: todas as abas de todos os modos renderizam sem erro', async ({ page }) => {
     test.setTimeout(180_000);
     const erros = coletorDeErros(page);

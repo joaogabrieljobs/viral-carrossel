@@ -4,6 +4,7 @@ import { enterEditorFromHome } from './helpers/project-entry.js';
 // externo permitido neste E2E (documentado; remoção = backlog #7 do audit).
 import { test, expect } from '@playwright/test';
 import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockOutfitFont } from './helpers/outfit-font.js';
 
 test.describe('Produto (RF-02)', () => {
   // Render 2160x2700 via html2canvas (CDN) fica lento com workers paralelos
@@ -14,6 +15,7 @@ test.describe('Produto (RF-02)', () => {
       if (m.type() === 'error' || m.type() === 'warning') console.log('[browser]', m.type(), m.text().slice(0, 200));
     });
     await mockApi(page, { session: SESSAO_ATIVA });
+    await mockOutfitFont(page);
     // applyTemplate dispara geração de imagem por card — sem chave, iria pra
     // rede real da OpenAI. Responde 401 na hora (determinístico, sem rede).
     await page.route('https://api.openai.com/**', (r) =>
