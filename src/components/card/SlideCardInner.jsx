@@ -8,7 +8,7 @@ import AutoFitText from '../AutoFitText.jsx';
 import PresentationBlocks from '../PresentationBlocks.jsx';
 import PresentationArtChrome from './PresentationArtChrome.jsx';
 import SocialArtChrome from './SocialArtChrome.jsx';
-import { socialScrimAlphas } from '../../utils/social-chrome.js';
+import { readableInk, socialScrimAlphas } from '../../utils/social-chrome.js';
 import { normalizePresentationBlocks } from '../../utils/presentation-quality.js';
 import { hydrateBrandTextColors, effectiveTitleFontFamily } from '../../utils/brand-helpers.js';
 import { SectionLabel as S } from '../ui/SectionLabel.jsx';
@@ -44,6 +44,18 @@ import { slideHasPendingPhotoIntent, inferCanvasDefaults, sandwichPhotoZoneImgSt
 import { cardPhotoZoneHasMedia } from '../../utils/card-photo-zone.js';
 import { DEFAULT_SLIDE_TEXT_INSET, SANDWICH_PHOTO_ZONE_MIN_H_PCT, clampRect, DEFAULT_CANVAS_ZONES_CLASSIC, CANVAS_AUTO_EDGE_PCT } from '../../utils/canvas-layout.js';
 import { sideScrimGradient } from '../../utils/image-composition.js';
+
+/** O Livre social mantém o piso de leitura também na assinatura da marca. */
+function socialReadingPx(slide, frame, pixels) {
+  return slide.socialFreeDesign ? Math.max(frame.w * 28 / 1080, pixels) : pixels;
+}
+
+/** A redução cabe no menor texto da zona sem atravessar28px a1080. */
+function socialReadingScaleFloor(slide, frame, sizes, fallback) {
+  if (!slide.socialFreeDesign) return fallback;
+  const valid = sizes.filter(size => Number.isFinite(size) && size > 0);
+  return valid.length ? Math.min(1, (frame.w * 28 / 1080) / Math.min(...valid)) : 1;
+}
 
 /**
  * Texto com os trechos de "Marcar destaque" pintados na cor de acento.
@@ -1049,8 +1061,8 @@ const ClassicCanvasInner = React.forwardRef(({
           resolvedTitleTracking, resolvedTitleTransform, resolvedTitleItalic,
           slide.presentationAutofit?.minScale,
         ]}
-        minScale={presentationAutofitSoftFloor(slide, 0.45)}
-        strictMinScale={strictPresentationAutofit(slide)}
+        minScale={socialReadingScaleFloor(slide, f, [f.w * 0.084 * presentationTitleSizePercent(slide) / 100], presentationAutofitSoftFloor(slide, 0.45))}
+        strictMinScale={!!slide.socialFreeDesign || strictPresentationAutofit(slide)}
         // Piso frouxo só no deck. O carrossel gerado também tem texto de apoio,
         // mas num card de 1080 um título a 32% some: fica no piso social.
         hardMinScale={presentationMode ? 0.32 : 0.45}
@@ -1165,8 +1177,11 @@ const ClassicCanvasInner = React.forwardRef(({
           resolvedSubtitleItalic,
           slide.presentationAutofit?.minScale,
         ]}
-        minScale={presentationAutofitSoftFloor(slide, 0.62)}
-        strictMinScale={strictPresentationAutofit(slide)}
+        minScale={socialReadingScaleFloor(slide, f, [
+          slide.subtitle && brand.subtitleVisible !== false ? f.w * 0.028 * resolvedSubtitleSize / 100 : null,
+          supportingText ? f.w * 0.018 * bodyAfterSizePercent(slide, brand) / 100 : null,
+        ], presentationAutofitSoftFloor(slide, 0.62))}
+        strictMinScale={!!slide.socialFreeDesign || strictPresentationAutofit(slide)}
         hardMinScale={presentationMode ? 0.45 : 0.62}
         flagOverflowAtLowestFloor={!presentationMode}
       >
@@ -1251,7 +1266,7 @@ const ClassicCanvasInner = React.forwardRef(({
                 brand,
                 `${(-0.4 + (slide.subTracking ?? 0)) / 100}em`,
               ),
-              opacity: presentationMode ? 1 : 0.82,
+              opacity: presentationMode || slide.socialFreeDesign ? 1 : 0.82,
               textShadow: shadow,
             }) }}
           >
@@ -1330,7 +1345,7 @@ const ClassicCanvasInner = React.forwardRef(({
         <div style={{
           ...vcHandleBadgeBoxPositionStyle(brand),
           display:'flex', alignItems:'center', gap:f.w*0.012,
-          background:'rgba(255,255,255,0.08)',
+          background:slide.socialFreeDesign ? bg : 'rgba(255,255,255,0.08)',
           backdropFilter:'blur(12px)',
           padding:`${f.h*0.01}px ${f.w*0.022}px`,
           borderRadius:999,
@@ -1360,7 +1375,7 @@ const ClassicCanvasInner = React.forwardRef(({
               )}
             </div>
           </div>
-          <span style={{ color:brand.titleColor, fontSize:f.w*0.022, fontWeight:600, fontFamily: getTextFont(slide, 'handleBadge', bodyFF), letterSpacing:'-0.01em' }}>
+          <span style={{ color:slide.socialFreeDesign ? readableInk(bg, [titleInk, bodyInk]) : brand.titleColor, fontSize:socialReadingPx(slide, f, f.w*0.022), fontWeight:600, fontFamily: getTextFont(slide, 'handleBadge', bodyFF), letterSpacing:'-0.01em' }}>
             {vcHandleLabel(brand)}
           </span>
         </div>
@@ -2238,6 +2253,7 @@ const SlideCardInner = React.forwardRef(({
   // Reteste 21/11 (A01): no fundo próprio da família (marinho, acento) o
   // destaque aparece dentro do apoio, que é texto de corpo: 4,5:1, não 3:1.
   if (familyGround && !photoInk) cultureAccentCol = accentInkOnSurface(brandAccent, familyGround.bg, 4.5);
+  if (slide.socialFreeDesign) cultureAccentCol = accentInkOnSurface(brandAccent, inkSurface, 4.5);
   let displayTitleInk = carouselTitleInk;
   let displayBodyInk = familyGround ? (slide.textColor || familyGround.muted || carouselBodyInk)
     : ((slide.presentationFreeDesign || slide.socialFreeDesign) && slide.textColor) || carouselBodyInk;
@@ -2306,6 +2322,8 @@ const SlideCardInner = React.forwardRef(({
   const escBadge = escalaDe(brand.pageBadgeScale);
   const escFooterBar = escalaDe(brand.footerBarScale);
   const escPill = escalaDe(brand.footerPillScale);
+  const freeChrome = !!slide.socialFreeDesign;
+  const freeChromeInk = freeChrome ? readableInk(slideCardBg, [displayBodyInk, displayTitleInk]) : null;
 
   const brandHeaderChrome = (
     <>
@@ -2328,9 +2346,9 @@ const SlideCardInner = React.forwardRef(({
           // Cor branca translúcida só quando a foto está de fato atrás do topo;
           // com a foto numa caixa mais abaixo (ou sem carregar), tom da marca.
           const fotoAtrasDoTopo = photoBehindHeaderChrome(slide, { imgErr });
-          const headerColor = fotoAtrasDoTopo ? 'rgba(255,255,255,0.85)' : (displayBodyInk || '#555');
-          const badgeBg = fotoAtrasDoTopo ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.12)';
-          const badgeColor = fotoAtrasDoTopo ? '#fff' : (displayBodyInk || '#222');
+          const headerColor = freeChrome ? freeChromeInk : fotoAtrasDoTopo ? 'rgba(255,255,255,0.85)' : (displayBodyInk || '#555');
+          const badgeBg = freeChrome ? slideCardBg : fotoAtrasDoTopo ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.12)';
+          const badgeColor = freeChrome ? freeChromeInk : fotoAtrasDoTopo ? '#fff' : (displayBodyInk || '#222');
           return (
             <>
               {hasHeaderBar && (
@@ -2340,21 +2358,22 @@ const SlideCardInner = React.forwardRef(({
                   zIndex:25,
                   display:'flex', justifyContent:'space-between', alignItems:'center',
                   gap:f.w*0.02,
+                  ...(freeChrome && fotoAtrasDoTopo ? { background: slideCardBg } : {}),
                   pointerEvents: movableElements ? 'auto' : 'none',
                 })}>
                   <span style={{
-                    fontSize:f.w*0.020*escHeader, color:headerColor, fontFamily:getTextFont(slide, 'headerBar', bodyFF),
+                    fontSize:socialReadingPx(slide, f, f.w*0.020*escHeader), color:headerColor, fontFamily:getTextFont(slide, 'headerBar', bodyFF),
                     fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase',
                     maxWidth:'32%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
                   }}>{hLeft}</span>
                   <span style={{
                     flex:1, textAlign:'center',
-                    fontSize:f.w*0.020*escHeader, color:headerColor, fontFamily:getTextFont(slide, 'headerBar', bodyFF),
+                    fontSize:socialReadingPx(slide, f, f.w*0.020*escHeader), color:headerColor, fontFamily:getTextFont(slide, 'headerBar', bodyFF),
                     fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase',
                     overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
                   }}>{hCenter}</span>
                   <span style={{
-                    fontSize:f.w*0.020*escHeader, color:headerColor, fontFamily:getTextFont(slide, 'headerBar', bodyFF),
+                    fontSize:socialReadingPx(slide, f, f.w*0.020*escHeader), color:headerColor, fontFamily:getTextFont(slide, 'headerBar', bodyFF),
                     fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase',
                     maxWidth:'32%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', textAlign:'right',
                   }}>{hRight}</span>
@@ -2365,7 +2384,7 @@ const SlideCardInner = React.forwardRef(({
                   position:'absolute', top:f.h*0.024, right:f.w*0.05, zIndex:30,
                   background: badgeBg, color: badgeColor,
                   padding:`${f.h*0.006*escBadge}px ${f.w*0.022*escBadge}px`, borderRadius:9999,
-                  fontSize:f.w*0.024*escBadge, fontWeight:600, fontFamily:getTextFont(slide, 'pageBadge', bodyFF),
+                  fontSize:socialReadingPx(slide, f, f.w*0.024*escBadge), fontWeight:600, fontFamily:getTextFont(slide, 'pageBadge', bodyFF),
                   letterSpacing:'-0.011em',
                   backdropFilter:'blur(6px)', WebkitBackdropFilter:'blur(6px)',
                   ...(quietFolio ? {
@@ -2425,17 +2444,17 @@ const SlideCardInner = React.forwardRef(({
             const zonaFoto = (slide.canvas?.applied || slide.canvas?.enabled) ? slide.canvas?.zones?.photo : null;
             const fotoAtrasDaBarra = !!slide.bgImage && (!zonaFoto
               || (zonaFoto.y + zonaFoto.h >= 95 && zonaFoto.x <= 5 && zonaFoto.x + zonaFoto.w >= 95));
-            const labelColor = fotoAtrasDaBarra ? 'rgba(255,255,255,0.55)' : (displayBodyInk || '#888');
-            const valueColor = fotoAtrasDaBarra ? '#ffffff' : (displayTitleInk || '#000');
+            const labelColor = freeChrome ? freeChromeInk : fotoAtrasDaBarra ? 'rgba(255,255,255,0.55)' : (displayBodyInk || '#888');
+            const valueColor = freeChrome ? readableInk(slideCardBg, [displayTitleInk, freeChromeInk]) : fotoAtrasDaBarra ? '#ffffff' : (displayTitleInk || '#000');
             const Col = ({ data }) => {
               if (!data) return <div style={{ flex:1 }}/>;
               const [label, value] = String(data).split('|');
               return (
                 <div style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center', gap:f.h*0.004 }}>
-                  <span style={{ fontSize: f.w*0.020*escFooterBar, fontFamily: getTextFont(slide, 'footerBar', bodyFF), color: labelColor,
+                  <span style={{ fontSize: socialReadingPx(slide, f, f.w*0.020*escFooterBar), fontFamily: getTextFont(slide, 'footerBar', bodyFF), color: labelColor,
                     letterSpacing:'0.04em', textTransform:'uppercase' }}>{label || ''}</span>
                   {value && (
-                    <span style={{ fontSize: f.w*0.022*escFooterBar, fontFamily: getTextFont(slide, 'footerBar', bodyFF), color: valueColor,
+                    <span style={{ fontSize: socialReadingPx(slide, f, f.w*0.022*escFooterBar), fontFamily: getTextFont(slide, 'footerBar', bodyFF), color: valueColor,
                       fontWeight: 700 }}>{value}</span>
                   )}
                 </div>
@@ -2448,6 +2467,7 @@ const SlideCardInner = React.forwardRef(({
                   : { position:'absolute', bottom: f.h*0.038 + liftStories, left: barLeft, right: barRight, zIndex: 25 }),
                 display:'flex', justifyContent:'space-between', alignItems:'flex-start',
                 gap: f.w*0.02, pointerEvents: movableElements ? 'auto' : 'none',
+                ...(freeChrome && fotoAtrasDaBarra ? { background: slideCardBg } : {}),
               })}>
                 <Col data={fLeft}/>
                 <Col data={fCenter}/>
@@ -2480,7 +2500,7 @@ const SlideCardInner = React.forwardRef(({
                   padding: `${f.h*0.012*escPill}px ${padRight}px ${f.h*0.012*escPill}px ${f.w*0.028*escPill}px`,
                   borderRadius: 9999,
                   display:'inline-flex', alignItems:'center', gap: f.w*0.018,
-                  fontSize: f.w*0.026*escPill, fontWeight:700, fontFamily: getTextFont(slide, 'pill', bodyFF),
+                  fontSize: socialReadingPx(slide, f, f.w*0.026*escPill), fontWeight:700, fontFamily: getTextFont(slide, 'pill', bodyFF),
                   letterSpacing:'-0.011em', whiteSpace:'nowrap',
                   textTransform: 'uppercase',
                 }}>
@@ -2490,7 +2510,7 @@ const SlideCardInner = React.forwardRef(({
                       width: f.w*0.05*escPill, height: f.w*0.05*escPill, borderRadius:'50%',
                       background: pillFg, color: pillArrow,
                       display:'inline-flex', alignItems:'center', justifyContent:'center',
-                      fontSize: f.w*0.030*escPill, fontWeight:700, lineHeight:1,
+                      fontSize: socialReadingPx(slide, f, f.w*0.030*escPill), fontWeight:700, lineHeight:1,
                       flexShrink:0,
                     }}>→</span>
                   )}
@@ -4277,6 +4297,7 @@ export {
   effectiveSubtitleFontFamily,
   presentationTypographyToken,
   presentationAutofitSoftFloor,
+  socialReadingScaleFloor,
   strictPresentationAutofit,
   presentationTitleSizePercent,
   presentationTitleLeadingPercent,
