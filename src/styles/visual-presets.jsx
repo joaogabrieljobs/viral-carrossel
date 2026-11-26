@@ -938,6 +938,9 @@ function resolveVisualPreset(presetId, presets = VISUAL_PRESETS) {
 export function applyVisualPreset(brand, presetId, presets = VISUAL_PRESETS) {
   const preset = resolveVisualPreset(presetId, presets);
   if (!preset) return brand;
+  // Livre usa a identidade do projeto como entrada; não troca a assinatura
+  // da marca pelos ornamentos de um estilo fixo.
+  if (preset.id === 'social_free') return { ...brand, subtitleVisible: true, visualIdentityLocked: true };
   const limpo = { ...brand };
   for (const k of PRESET_BRAND_SIGNATURE_KEYS) delete limpo[k];
   const next = {

@@ -37,7 +37,9 @@ describe('Livre social: escolha explícita, preservando o catálogo atual', () =
 
   it('selecionar Livre preserva a paleta, fontes e logo da marca para o roteiro', () => {
     expect(catalog.FREE_SOCIAL_VISUAL_PRESET).toBeDefined();
-    const brand = { bg: '#173E2F', accent: '#F5C460', titleFont: 6, bodyFont: 2, logoImageId: 'marca-local', name: 'Minha marca' };
+    const brand = { bg: '#173E2F', accent: '#F5C460', titleFont: 6, bodyFont: 2, subtitleFont: 2,
+      logoImageId: 'marca-local', name: 'Minha marca', footerPillText: 'APOTEOSE', footerPillArrow: false,
+      footerBarLeft: 'Acompanhe|As novidades', cultureHeaderLeft: 'Minha marca', showPageBadge: true };
     const result = catalog.applyVisualPreset(brand, 'social_free', catalog.SOCIAL_VISUAL_PRESET_CATALOG);
     expect(result).toMatchObject(brand);
     expect(brand).not.toHaveProperty('visualIdentityLocked');
