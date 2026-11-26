@@ -547,10 +547,10 @@ function candidatesFor({ slide, stage, index, count }) {
       // Cartão atrás do texto: o fundo da página fica o da família, senão o
       // cartão (cor de superfície) pode cair sobre um fundo do mesmo tom da tinta.
       // Arte de fundo (parte 4): só página sem foto e sem cartão atrás do texto.
-      // Com bloco, só a comparação e a citação (personalidade, frase); métricas e
-      // etapas ficam no fundo claro ou de superfície, como antes.
+      // Com bloco, só a comparação (a personalidade em duas colunas); os outros
+      // blocos ficam no fundo claro ou de superfície, como antes.
       const art = size === 'none' && !onPhoto && !hasTextPanel(layout)
-        && slideBlockTypes(slide).every(type => ['comparison', 'quote'].includes(type)) ? ['art'] : [];
+        && slideBlockTypes(slide).every(type => type === 'comparison') ? ['art'] : [];
       const grounds = onPhoto ? ['photo']
         : hasTextPanel(layout) ? [layout.ground]
         : hasBlocks(slide) ? ['bg', 'surface', ...art]
@@ -558,6 +558,7 @@ function candidatesFor({ slide, stage, index, count }) {
       for (const ground of grounds) {
         out.push({
           family, kind, photo: size, ground, native: onPhoto || ground === layout.ground, side: photoSide(layout.photo, size),
+          artBlock: ground === 'art' && slideBlockTypes(slide).includes('comparison'),
           geometry: geometryOf({ ground, photo: layout.photo, scrim: !!layout.scrim, title: layout.title, subtitle: layout.subtitle }),
           shape: geometryOf({ ground: '', photo: layout.photo, scrim: !!layout.scrim, title: layout.title, subtitle: layout.subtitle }),
         });
@@ -573,9 +574,9 @@ const slidePurpose = slide => String(slide?.presentationPlan?.purpose || '');
  * Páginas em que a arte de fundo faz sentido (parte 4): posicionamento e
  * visão, personalidade e comportamento (other), síntese e fecho.
  */
-const ART_PURPOSES = new Set(['vision', 'other', 'summary', 'decision']);
+const ART_PURPOSES = new Set(['vision', 'summary', 'decision']);
 /** Páginas de frase, síntese ou comportamento: candidatas a texto em cor cheia (parte 5). */
-const ACCENT_TEXT_PURPOSES = new Set(['other', 'summary', 'vision', 'objection', 'learning']);
+const ACCENT_TEXT_PURPOSES = new Set(['other', 'summary', 'objection', 'learning']);
 
 /** Peso da proposta da IA (roteiro v3): forte o bastante para valer, sem passar por cima das regras duras. */
 const PROPOSAL_WEIGHT = Object.freeze({ family: 10, photo: 6, ground: 6 });
@@ -616,7 +617,8 @@ function scoreCandidate(c, { prev, role, visual, order, enough, proposal, purpos
   }
   // Arte de fundo (parte 4): só onde a página pede posicionamento,
   // personalidade, síntese ou fecho; nas outras, um fundo como os demais.
-  if (c.ground === 'art') s += ART_PURPOSES.has(purpose) || c.kind === 'closing' ? -4 : 5;
+  // A personalidade em duas colunas (comparação) também pede arte.
+  if (c.ground === 'art') s += ART_PURPOSES.has(purpose) || c.kind === 'closing' || c.artBlock ? -4 : 5;
   // Texto em cor cheia com título grande (parte 5): página de frase.
   if (c.ground === 'accent' && c.photo === 'none' && c.kind === 'divider' && ACCENT_TEXT_PURPOSES.has(purpose)) s -= 4;
   // A IA propõe, o código garante: cada campo que bate com a proposta pesa a
@@ -1225,6 +1227,23 @@ function closingReading({ zones, chrome, slide, titleSize, subSize, display, tex
   };
 }
 
+/* Rótulo acima do título (parte 5) ------------------------------------------- */
+
+/**
+ * Adorno do eyebrow no modo livre: logo acima das linhas do título (a âncora
+ * da família decide onde elas começam), alinhado ao texto, 24 px em caixa
+ * alta, na primeira cor que lê sobre a superfície do título.
+ */
+function eyebrowDevice({ title, anchor = 'start', surface, inks, measure }) {
+  if (!title || !(title.w > 1) || !surface) return null;
+  const needed = measuredTitleZone(title, measure).h;
+  const top = anchor === 'end' ? title.y + title.h - needed : anchor === 'center' ? title.y + (title.h - needed) / 2 : title.y;
+  return {
+    t: 'text', x: round2(title.x + TEXT_INSET), y: round2(Math.max(2, top - 4.2)), w: round2(Math.max(10, title.w - 2 * TEXT_INSET)),
+    text: '{kicker}', role: 'label', size: 24, weight: 700, tracking: 12, case: 'upper', color: readable(surface, inks),
+  };
+}
+
 /* Arte de fundo (parte 4) ---------------------------------------------------- */
 
 const ART_TEXT_KEYS = ['title', 'subtitle', 'evidence'];
@@ -1400,9 +1419,18 @@ export function freePresentationCompositionOverrides(base, {
   }
   // Sobre a arte, o adorno lê contra a superfície de pior caso do lado liso;
   // texto de adorno sobre o grafismo (borda direita) sai.
-  const chrome = freeChromeDevices(reading ? reading.chrome : familyChrome, art
+  const devices = freeChromeDevices(reading ? reading.chrome : familyChrome, art
     ? { family, ground: chromeGround, palette: { ...palette, bg: artProtection.surface }, photoZone: { x: FREE_ART_TEXT_MAX, y: 0, w: 100 - FREE_ART_TEXT_MAX, h: 100 } }
     : { family, ground: chromeGround, palette, photoZone });
+  // Rótulo acima do título (eyebrow, parte 5): no modo livre toda página tem
+  // lugar para ele, logo acima da primeira linha do título, na cor de destaque
+  // que lê sobre o que fica atrás (4,5:1); sem rótulo no slide, nada aparece.
+  const chrome = devices.some(d => String(d.text || '').includes('{kicker'))
+    ? devices
+    : [...devices, eyebrowDevice({
+      title: reading?.titleZone || zones.title, anchor: layout.anchors?.title, surface: surfaceTitle,
+      inks: [palette.accent, palette.accent2, titleInk], measure: { slide, titleSize, display, titleLeading: familySpec(family).type.titleLeading || 1.05 },
+    })].filter(Boolean);
   return {
     ...composed,
     presentationPresetId: FREE_PRESENTATION_PRESET_ID,

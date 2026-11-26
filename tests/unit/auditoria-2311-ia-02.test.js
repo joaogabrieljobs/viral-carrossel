@@ -115,9 +115,11 @@ describe('auditoria 23/11 IA-02: corte do pedido de imagem é avisado antes do c
 
   it('as três gerações do editor passam o aviso e tratam o não sem marcar falha', () => {
     const calls = app.split('await generateDALLEWithRetry(').slice(1);
-    expect(calls).toHaveLength(3);
+    // Direção de arte, parte 4: a arte de fundo do deck é a quarta geração.
+    expect(calls).toHaveLength(4);
     for (const call of calls) expect(call.slice(0, 2600)).toContain('onPromptPlan: plan => imagePromptCutGateRef.current(plan,');
     expect(app.split("e?.code === 'image_prompt_declined'").length - 1).toBe(3);
+    expect(app.split("?.code !== 'image_prompt_declined'").length - 1).toBe(2);
     expect(app).toContain("result?.reason === 'image_prompt_declined'");
     expect(app).toContain('createImagePromptCutGate({ ask: message => window.confirm(message) })');
   });

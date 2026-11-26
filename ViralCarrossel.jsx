@@ -6850,8 +6850,9 @@ ${jsonShapeLine}`;
             });
           } catch (e) {
             if (isGenerationCancelled(e) || job.signal.aborted) throw e;
+            // IA-02: sem o sim para o pedido encurtado, a arte não sai e nada é marcado.
             // Sem a arte, as páginas ficam na cor base; não é falha de foto.
-            console.warn('Arte de fundo do deck:', e?.message);
+            if (e?.code !== 'image_prompt_declined') console.warn('Arte de fundo do deck:', e?.message);
             if (['quota_exhausted', 'plan_no_images', 'subscription_inactive'].includes(e?.code)) toast('A arte de fundo não foi gerada: não há crédito de imagem. As páginas ficaram na cor do deck.', 'info', 6000);
           }
           doneImgs++;
@@ -8324,7 +8325,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
             if (art?.ok) generated++;
           } catch (error) {
             if (isGenerationCancelled(error)) throw error;
-            failed++;
+            if (error?.code !== 'image_prompt_declined') failed++;
           }
         }
         const parts = [];

@@ -33,7 +33,8 @@ describe('auditoria 23/11 FE-11: foto que existe na conta não entra em "Gerar i
   });
 
   it('a contagem do painel e os candidatos do lote usam a mesma regra', () => {
-    expect(sidebar).toContain('const pendingImageCreditCount = slidesPendingImageGeneration(slides, selectedSlideIds).length;');
+    // Direção de arte, parte 4: a arte de fundo do deck que faltou soma 1 à mesma contagem.
+    expect(sidebar).toContain('const pendingImageCreditCount = slidesPendingImageGeneration(slides, selectedSlideIds).length\n');
     const start = app.indexOf('generateMissingImages: async (targetSlideIds = null) => {');
     const end = app.indexOf("trackEvent('criar_rapido_images'", start);
     expect(start).toBeGreaterThanOrEqual(0);

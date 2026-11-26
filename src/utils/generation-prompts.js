@@ -4,6 +4,7 @@
  * Único consumidor: ViralCarrossel.jsx. attachGenerationCanvasLayouts ficou no
  * monólito (acoplado ao motor de canvas), importando os helpers daqui.
  */
+import { PRESENTATION_TITLE_EYEBROW_RULES } from './presentation-eyebrow.js';
 import {
   Newspaper, Brain, HeartHandshake, TrendingUp, BookOpen,
   GraduationCap, ScrollText, Megaphone,
@@ -1002,7 +1003,8 @@ REGRA DE IDIOMA (obrigatória — definida ${language.source === 'instructions' 
 /** Regras de tamanho/layout por slide — modos narrativos não podem usar o bloco “denso analítico” dos editoriais. */
 function buildGenerationSlideLayoutRulesBody(narrativeModeId, creativePresetId, textDensityId = '1_1', slideCount = 9, presentationPath = 'auto') {
   if (creativePresetId === 'apresentacao') {
-    if (isPitchPath(presentationPath)) return buildPitchFieldRules();
+    // Direção de arte, parte 5: título de autor e rótulo valem também no pitch.
+    if (isPitchPath(presentationPath)) return `${buildPitchFieldRules()}\n${PRESENTATION_TITLE_EYEBROW_RULES}`;
     return buildPresentationFieldRules(presentationPath);
   }
   if (isPersoHybridDensity(creativePresetId, textDensityId)) {
@@ -1203,7 +1205,8 @@ function buildNarrativeModeReminder(modeId) {
 function buildRefineSingleSlideRulesBody(narrativeModeId, textDensityId = '1_1', { presetId = 'livre', slideIndex, slideCount, presentationPath = 'auto' } = {}) {
   const positioned = Number.isInteger(slideIndex) && slideCount > 0;
   if (presetId === 'apresentacao') {
-    if (isPitchPath(presentationPath)) return buildPitchFieldRules();
+    // Direção de arte, parte 5: título de autor e rótulo valem também no pitch.
+    if (isPitchPath(presentationPath)) return `${buildPitchFieldRules()}\n${PRESENTATION_TITLE_EYEBROW_RULES}`;
     return buildPresentationFieldRules(presentationPath);
   }
   const culture = isTendenciaCulturaPreset(presetId);

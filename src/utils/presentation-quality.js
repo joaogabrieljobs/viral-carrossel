@@ -59,6 +59,18 @@ export function normalizePresentationBlocks(raw) {
 
 const QUOTE_MAX = 240;
 
+/**
+ * Direção de arte, parte 5: a personalidade em duas colunas ("traço / sem
+ * ser…", página 10 do deck da Apoteose) é um comparison de 2 colunas em que a
+ * segunda coluna nega o excesso de cada traço. O render a desenha como pares
+ * (traço em destaque, sem zebra nem fios); o resto é a tabela de sempre.
+ */
+const PAIR_NEGATION = /^(sem|nem|nunca|mas\s+sem|não|without|never|not|sin|nunca)\b/iu;
+export function comparisonVariant(block) {
+  if (block?.type !== 'comparison' || !Array.isArray(block.headers) || block.headers.length !== 2 || !Array.isArray(block.rows) || !block.rows.length) return 'table';
+  return block.rows.every(row => Array.isArray(row) && PAIR_NEGATION.test(String(row[1] || '').trim())) ? 'pairs' : 'table';
+}
+
 /** Textos visíveis de um bloco (sem tipo nem nome de ícone), na ordem de leitura. */
 export function presentationBlockStrings(block) {
   if (!block || typeof block !== 'object') return [];

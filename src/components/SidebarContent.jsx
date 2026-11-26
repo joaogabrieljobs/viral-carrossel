@@ -1372,6 +1372,22 @@ function SidebarContent({
                   style={{ fontSize:17, color:'var(--text-secondary)', fontWeight:400 }}
                 />
               </div>
+              {isPresentationProject && (
+                <div>
+                  {/* Direção de arte, parte 5: rótulo acima do título (1 a 3 palavras, caixa alta). */}
+                  <label className="vc-label-sm" htmlFor="vc-presentation-eyebrow">Rótulo acima do título</label>
+                  <input
+                    id="vc-presentation-eyebrow"
+                    data-key="presentation-eyebrow"
+                    value={slide.eyebrow ?? ''}
+                    maxLength={32}
+                    placeholder="Ex.: A FESTA"
+                    onChange={(e) => updateSlide({ eyebrow: e.target.value })}
+                    className="vc-input"
+                    style={{ fontSize:15, textTransform:'uppercase', letterSpacing:'0.06em' }}
+                  />
+                </div>
+              )}
               {(creativePreset === 'tendencia_cultura' || slide.useCultureLayout) && (
                 <>
                   <div>

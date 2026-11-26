@@ -4,7 +4,7 @@ import {
   Lightbulb, MapPin, MessageCircle, Music, Rocket, Shield, Sparkles, Star, Target, TrendingDown, TrendingUp, User, Users, Zap,
 } from 'lucide-react';
 import LegacyPresentationBlocks from './LegacyPresentationBlocks.jsx';
-import { normalizePresentationBlocks } from '../utils/presentation-quality.js';
+import { comparisonVariant, normalizePresentationBlocks } from '../utils/presentation-quality.js';
 import { evidenceDetailInk, familyEvidenceStyle, familyFont, normalizeFamilyKey } from '../utils/presentation-families.js';
 import { readTypedText } from '../utils/inline-edit-text.js';
 import { accentInkOnSurface } from '../utils/brand-visuals.js';
@@ -300,7 +300,21 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, stro
       boxSizing: 'border-box', overflow: 'hidden', zIndex: 5, color: ink, backgroundColor: panel ? 'transparent' : background,
       fontFamily, fontSize, lineHeight: 1.4, textAlign: 'left', textShadow: 'none' }}
   >
-    {block.type === 'comparison' ? <table aria-label="Comparação" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 'inherit', color: panelInk,
+    {block.type === 'comparison' && strongInk && comparisonVariant(block) === 'pairs' ? (() => {
+      // Direção de arte, parte 5 (modo livre): personalidade em duas colunas,
+      // "traço / sem ser…". Traço na cor de destaque (4,5:1 sobre a superfície),
+      // negação na tinta do texto, sem zebra nem fios; cabeçalho como rótulo.
+      const traitInk = accentInkOnSurface(st.accent, detailSurface, 4.5);
+      const pad = `${12 * unit}px ${18 * unit}px ${12 * unit}px 0`;
+      return <table aria-label="Comparação" data-vc-comparison-variant="pairs" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 28 * unit, color: panelInk, ...panelBox }}>
+        <thead><tr>{block.headers.map((value, col) => <th key={col} scope="col" style={{ textAlign: 'left', padding: `0 ${18 * unit}px ${14 * unit}px 0`, fontFamily, fontWeight: 600, fontSize: 24 * unit, letterSpacing: '0.12em', textTransform: 'uppercase', color: metricDetail.color }}>
+          {cell(value, ['headers', col], `cabeçalho ${col + 1}`)}
+        </th>)}</tr></thead>
+        <tbody>{block.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((value, col) => <td key={col} style={{ verticalAlign: 'top', padding: pad, fontWeight: col === 0 ? 500 : 400, color: col === 0 ? traitInk : panelInk }}>
+          {cell(value, ['rows', rowIndex, col], `linha ${rowIndex + 1}, coluna ${col + 1}`)}
+        </td>)}</tr>)}</tbody>
+      </table>;
+    })() : block.type === 'comparison' ? <table aria-label="Comparação" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 'inherit', color: panelInk,
       ...(panel ? { backgroundColor: st.panelColor, borderRadius: st.radius * unit, overflow: 'hidden', boxShadow: st.offsetShadow ? `${10 * unit}px ${10 * unit}px 0 ${st.offsetShadow}` : 'none' } : {}) }}>
       <thead><tr>{block.headers.map((value, col) => <th key={col} scope="col" style={{ textAlign: 'left', verticalAlign: 'bottom', padding: `${14 * unit}px ${18 * unit}px`, borderBottom: `${Math.max(1, st.headerRule * unit)}px solid ${panelInk}`,
         fontFamily: headerFont.css, fontWeight: st.headerRole === 'display' ? headerFont.weight : 600, fontSynthesisWeight: 'none',

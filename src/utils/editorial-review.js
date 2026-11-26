@@ -1,3 +1,4 @@
+import { normalizePresentationEyebrow } from './presentation-eyebrow.js';
 import { isGenerationCancelled, throwIfGenerationCancelled } from './generation-control.js';
 import { isPersoHybridDensity, isTendenciaCulturaPreset } from './generation-prompts.js';
 import { normalizeInstagramCaption } from './editorial-strategy.js';
@@ -308,7 +309,9 @@ export function moveGapNotesOutOfSlides(draft) {
   let changed = false;
   const slides = (Array.isArray(draft?.slides) ? draft.slides : []).map((slide, slideIndex) => {
     const next = { ...slide };
-    for (const field of PRESENTATION_TEXT_FIELDS) {
+    // O rótulo acima do título (eyebrow, parte 5) passa pela mesma limpeza de
+    // metacomentário; vazio, ele só some (não é título).
+    for (const field of [...PRESENTATION_TEXT_FIELDS, 'eyebrow']) {
       if (typeof slide?.[field] !== 'string') continue;
       const { text, notes } = splitBriefingNotes(slide[field]);
       if (text === slide[field]) continue;
@@ -349,6 +352,10 @@ export function validateCarouselDraft(rawDraft, { count, presetId, densityId, pr
     // "funcao" orienta a escrita card a card (roteiro do modo, MF-06); não é
     // conteúdo do card e não vai para o projeto.
     delete slide.funcao;
+    // Rótulo acima do título (direção de arte, parte 5): só na apresentação,
+    // 1–3 palavras em caixa alta; fora do contrato, sai inteiro.
+    if (presetId === 'apresentacao' && hasOwn(s, 'eyebrow')) slide.eyebrow = normalizePresentationEyebrow(s.eyebrow);
+    else delete slide.eyebrow;
     if (presetId === 'apresentacao' && draft.presentationPlan && !String(slide.title || '').trim()) {
       throw Object.assign(new Error(`O slide ${index + 1} precisa de um título específico.`), { code: 'presentation_title_missing', field: 'title', slideIndex: index });
     }
@@ -865,12 +872,12 @@ export function buildEditorialReviewPrompt(prompt, draft, config = {}) {
     const reviewDraft = config.presentationPlan ? {
       // Auditoria 23/11 (B7): o índice explícito evita a edição contada a partir
       // de 1 (Relatório 5 e 6, Caso 6 e 8: texto do slide vizinho no slide errado).
-      slides: draft.slides.map((slide, slideIndex) => ({ slideIndex, ...Object.fromEntries(['title', 'subtitle', 'bodyAfterImage', 'speakerNotes', 'presentationBlocks']
+      slides: draft.slides.map((slide, slideIndex) => ({ slideIndex, ...Object.fromEntries(['title', 'eyebrow', 'subtitle', 'bodyAfterImage', 'speakerNotes', 'presentationBlocks']
         .filter(field => hasOwn(slide, field)).map(field => [field, slide[field]])) })),
       caption: draft.caption,
     } : draft;
     const editableFields = config.presentationPlan
-      ? 'title, subtitle, bodyAfterImage, speakerNotes ou presentationBlocks'
+      ? 'title, eyebrow, subtitle, bodyAfterImage, speakerNotes ou presentationBlocks'
       : 'title, subtitle ou bodyAfterImage';
     return `REVISÃO DE APRESENTAÇÃO — UMA RODADA, SOMENTE TEXTO.
 O briefing abaixo é referência, não um pedido para gerar o deck novamente.
@@ -937,7 +944,7 @@ export function applyEditorialReview(draft, review, config, { deferQualityChecks
   }
   const isPresentation = config?.presetId === 'apresentacao';
   const planned = isPresentation && !!config.presentationPlan;
-  const editableTextFields = ['title', 'subtitle', 'bodyAfterImage', ...(planned ? ['speakerNotes'] : [])];
+  const editableTextFields = ['title', 'subtitle', 'bodyAfterImage', ...(planned ? ['speakerNotes', 'eyebrow'] : [])];
   if (planned && Object.keys(review).some(key => !['edits', 'caption'].includes(key))) throw new Error('A revisão deve retornar somente correções, não outro deck.');
   const seen = new Set();
   const slides = draft.slides.map(s => ({ ...s }));
@@ -1341,7 +1348,7 @@ async function writePresentationBatches({ prompt, plan, config, textOptions, onS
 O projeto completo tem ${plan.slides.length} slides. Nesta chamada, devolva EXATAMENTE ${entries.length} objetos em slides, apenas as posições ${entries.map(entry => entry.index).join(', ')} do plano, na ordem. Não devolva posições anteriores nem posteriores, não reinicie a narrativa ou crie outra capa/fecho. O plano completo é contexto; as posições abaixo são a tarefa atual.
 POSIÇÕES DESTA CHAMADA: ${JSON.stringify(entries)}
 TÍTULOS JÁ ESCRITOS (continuidade, nunca novas evidências): ${JSON.stringify(slides.map(slide => slide.title))}
-${lessonContinuity.length ? `ATIVIDADES JÁ REDIGIDAS — CONTINUIDADE, NÃO FONTE FACTUAL:\n${JSON.stringify(lessonContinuity)}\nSe esta chamada inclui a correção, responda à mesma tarefa e ao critério anunciados acima. Confira o conteúdo nas fontes originais; não legitime um cenário que o lote anterior inventou. Não troque a entrega do caso por uma pergunta pessoal ou por outro conceito.\n` : ''}Todo slide exige título específico, curto e não vazio. Respeite os limites de cada posição. speakerNotes é opcional, até 600 caracteres; não copie o briefing nem repita o slide nas notas. Limites são tetos, não metas de preenchimento. Não gere configuração visual, plano ou evidências no JSON de redação. Escreva apenas title, subtitle, bodyAfterImage, imageQuery, presentationBlocks e speakerNotes em cada slide, mais caption (resumo breve ou vazio).
+${lessonContinuity.length ? `ATIVIDADES JÁ REDIGIDAS — CONTINUIDADE, NÃO FONTE FACTUAL:\n${JSON.stringify(lessonContinuity)}\nSe esta chamada inclui a correção, responda à mesma tarefa e ao critério anunciados acima. Confira o conteúdo nas fontes originais; não legitime um cenário que o lote anterior inventou. Não troque a entrega do caso por uma pergunta pessoal ou por outro conceito.\n` : ''}Todo slide exige título específico, curto e não vazio. Respeite os limites de cada posição. speakerNotes é opcional, até 600 caracteres; não copie o briefing nem repita o slide nas notas. Limites são tetos, não metas de preenchimento. Não gere configuração visual, plano ou evidências no JSON de redação. Escreva apenas title, eyebrow (rótulo acima do título, 1 a 3 palavras em caixa alta, ou ""), subtitle, bodyAfterImage, imageQuery, presentationBlocks e speakerNotes em cada slide, mais caption (resumo breve ou vazio).
 ${attempt > 1 ? `A resposta anterior deste lote não pôde ser utilizada. Refaça somente estas posições com JSON completo e conciso; preserve fatos e condições essenciais, sem adicionar detalhes para preencher espaço. Diagnóstico estrutural (sem conteúdo): ${JSON.stringify(previousIssue)}. O caminho refere-se ao array deste lote; slideIndex identifica a posição no deck completo, começando em zero. Corrija o campo indicado conforme o contrato; todos os valores textuais de blocos devem ser strings e o array aceita no máximo um bloco.` : ''}`;
       try {
         const raw = await callAI(prompt + task, { ...textOptions, maxTokens: 8192, jsonParser: parsePresentationPlanResponse,
@@ -1497,7 +1504,7 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
       : config.presentationTextLimits,
   };
   const blockRules = config.nativeBlocks === false ? 'Neste padrão personalizado presentationBlocks deve ser []. Preserve a composição livre do usuário.' : buildPresentationBlocksPrompt({ free: config.freeDesign === true });
-  const generationPrompt = `${prompt}\nINSTRUÇÕES ATUAIS DO USUÁRIO — restrições também válidas para cada lote de redação:\n${config.userInstructions || ''}\n${buildPresentationPlanBlock(plan)}\n${blockRules}\nCONTRATO COMPLEMENTAR: em cada slide inclua presentationBlocks (ou [] quando não houver bloco) e speakerNotes (complemento opcional no idioma definido, até 600 caracteres, ou ""). O texto visível deve ser autossuficiente. Não coloque nomes de arquivos, rótulos de extração nem instruções ao designer no texto final. Dados, exemplos e condições permanecem fiéis às evidências. Em slides com bloco, subtitle contextualiza sem repetir suas células; bodyAfterImage fica vazio e apenas aprofundamento vai para speakerNotes.${buildPresentationLimitsBlock(plannedConfig, config.count)}`;
+  const generationPrompt = `${prompt}\nINSTRUÇÕES ATUAIS DO USUÁRIO — restrições também válidas para cada lote de redação:\n${config.userInstructions || ''}\n${buildPresentationPlanBlock(plan)}\n${blockRules}\nCONTRATO COMPLEMENTAR: em cada slide inclua presentationBlocks (ou [] quando não houver bloco), speakerNotes (complemento opcional no idioma definido, até 600 caracteres, ou "") e eyebrow (rótulo acima do título, 1 a 3 palavras em caixa alta no idioma definido, ou ""). O texto visível deve ser autossuficiente. Não coloque nomes de arquivos, rótulos de extração nem instruções ao designer no texto final. Dados, exemplos e condições permanecem fiéis às evidências. Em slides com bloco, subtitle contextualiza sem repetir suas células; bodyAfterImage fica vazio e apenas aprofundamento vai para speakerNotes.${buildPresentationLimitsBlock(plannedConfig, config.count)}`;
   const written = await writePresentationBatches({ prompt: generationPrompt, plan, config: plannedConfig, textOptions, onStage, onDraft }, callAI);
   writingDiagnostics = written.diagnostics;
   const draft = written.draft;

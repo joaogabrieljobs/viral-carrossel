@@ -9,6 +9,7 @@
  */
 import { FORMAT_SPECS, familyFont, familySpec, groundInks } from './presentation-families.js';
 import { localizeLabelTemplate } from './fixed-labels.js';
+import { PRESENTATION_EYEBROW_MIN_PX } from './presentation-eyebrow.js';
 
 const pct = (value) => `${value}%`;
 
@@ -100,13 +101,17 @@ export function chromeElements(layout, { frame, tokens = {}, overrides = {}, lan
       // Modo livre: numerais e rótulos com o par de fontes do deck.
       const f = (layout.fonts && (role === 'numeric' || role === 'display' ? layout.fonts.display : layout.fonts.text))
         || familyFont(family, role);
-      const size = d.size * scale;
+      // Rótulo acima do título (eyebrow, direção de arte parte 5): caixa alta e
+      // piso de leitura de 24 px num slide de 1920, em qualquer família.
+      // Sem rótulo no slide, o adorno fica exatamente como era.
+      const eyebrow = String(d.text || '').includes('{kicker') && !!String(tokens.kicker || '').trim();
+      const size = (eyebrow ? Math.max(d.size || 0, PRESENTATION_EYEBROW_MIN_PX) : d.size) * scale;
       const style = {
         left: pct(d.x), top: pct(d.y), fontFamily: f.css, fontSize: size,
         fontWeight: d.weight || (d.role === 'display' ? f.weight : d.role === 'numeric' ? (f.weight || 500) : 500),
         fontStyle: d.italic ? 'italic' : 'normal', lineHeight: d.leading || 1.2,
         letterSpacing: d.tracking ? `${d.tracking / 100}em` : f.tracking ? `${f.tracking / 100}em` : 0,
-        textTransform: d.case === 'upper' ? 'uppercase' : undefined,
+        textTransform: d.case === 'upper' || eyebrow ? 'uppercase' : undefined,
         color: d.t === 'pill' ? color(d.ink || 'inverseInk') : color(d.color), opacity: d.opacity ?? 1,
         // Sem algarismos tabulares: o html2canvas desenha o algarismo padrão na
         // posição do tabular e o "1" ficava solto ("1 0") no arquivo.

@@ -5,7 +5,7 @@ import { suggestCreativePresetForVisual } from './slide-design-system.js';
 import { applyFormatEdit, applyBrandEdit, brandForFormatDisplay, slideForFormatDisplay, transformFormatVisuals } from './format-view.js';
 import { dropKeysFromFormatViews } from './format-view-keys.js';
 
-const CONTENT_KEYS = ['id', 'title', 'subtitle', 'bodyAfterImage', 'eyebrowText', 'strikethroughText', 'afterTitleText', 'caption', 'bgImage', 'bgImageId', 'bgImageAssetId', 'imageQuery', 'overlays'];
+const CONTENT_KEYS = ['id', 'title', 'subtitle', 'bodyAfterImage', 'eyebrow', 'eyebrowText', 'strikethroughText', 'afterTitleText', 'caption', 'bgImage', 'bgImageId', 'bgImageAssetId', 'imageQuery', 'overlays'];
 
 /** Applying a look never inserts sample prices or replaces the author's copy. */
 export function preserveVisualPresetContent(styled, source) {
