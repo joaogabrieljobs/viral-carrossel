@@ -19,7 +19,8 @@ const render = (fmt, free = true, photo = false) => {
       title: { x: 10, y: 20, w: 80, h: 18 }, subtitle: { x: 10, y: 40, w: 80, h: 28 },
       photo: photo ? { x: 0, y: 0, w: 100, h: 100 } : { x: 0, y: 0, w: 0, h: 0 },
     } },
-    ...(free ? { socialFreeDesign: { family: 'minimal', ground: photo ? 'photo' : 'bg', photo: photo ? 'full' : 'none' }, socialCompositionVersion: 4 } : {}),
+    ...(free ? { socialFreeDesign: { family: 'minimal', ground: photo ? 'photo' : 'bg', photo: photo ? 'full' : 'none' }, socialCompositionVersion: 4,
+      ...(photo ? { socialFreeTextSurfaces: { title: '#666666', subtitle: '#666666' } } : {}) } : {}),
   };
   return renderToStaticMarkup(React.createElement(SlideCardInner, { slide, fmt, brand, num: 2, total: 3, creativePreset: 'livre', forExport: true }));
 };
@@ -55,6 +56,12 @@ describe('Livre social: leitura do apoio e da assinatura da marca', () => {
     const color = tag.match(/(?:^|[;" ])color:([^;"]+)/)?.[1];
     expect(color).toBeTruthy();
     expect(wcagContrast(color, '#FFFFFF')).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('mede o destaque na foto contra a superfície protegida calculada pelo diretor', () => {
+    const tag = openingTag(render('carrossel', true, true), 'BOLD_MARKER');
+    const color = tag.match(/(?:^|[;" ])color:([^;"]+)/)?.[1];
+    expect(wcagContrast(color, '#666666')).toBeGreaterThanOrEqual(4.5);
   });
 
   it('o ajuste automático para no piso de28px mesmo quando a caixa continua pequena', () => {

@@ -2247,7 +2247,7 @@ const SlideCardInner = React.forwardRef(({
     ? groundInks(slide.presentationChrome.family, slide.presentationChrome.ground, slidePaletteOverrides(slide, slide.presentationChrome.family, brand)) : null;
   const slideCardBg = familyGround?.bg || resolveSlideBrandBg(brand, slideIdx, slide) || '#fafafc';
   const photoInk = needsLightPhotoText(slide);
-  const inkSurface = photoInk ? '#111111' : slideCardBg;
+  const inkSurface = (slide.socialFreeDesign && slide.socialFreeTextSurfaces?.title) || (photoInk ? '#111111' : slideCardBg);
   const readableInks = cultureReadableInks(inkSurface, carouselTitleInk, carouselBodyInk, brandAccent);
   let cultureAccentCol = photoInk ? accentInkOnSurface(brandAccent, '#111111') : readableInks.accentInk;
   // Reteste 21/11 (A01): no fundo próprio da família (marinho, acento) o

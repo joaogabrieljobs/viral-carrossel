@@ -3,6 +3,19 @@ import { chromeElements, chromeTokensForSlide } from '../../utils/presentation-c
 import { ContentLabelLanguageContext } from '../../utils/content-label-language.js';
 import { deckArtLayer } from '../../utils/deck-art.js';
 
+function DeckArtLayers({ art }) {
+  if (!art) return null;
+  return <>
+    <div data-vc-deck-art="1" style={{
+      position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0,
+      backgroundImage: `url(${art.image})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
+    }} />
+    <div data-vc-deck-art-scrim="1" style={{
+      position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0, background: art.gradient,
+    }} />
+  </>;
+}
+
 /**
  * Linguagem gráfica da família (fios, numerais, grade, blocos de cor, marcas
  * de corte, fita). Dispositivos de alinhamento e ritmo, não conteúdo gerado:
@@ -11,6 +24,11 @@ import { deckArtLayer } from '../../utils/deck-art.js';
  */
 export default function PresentationArtChrome({ slide, frame, accent, ink, index = 0, total = 1, paletteOverrides = {} }) {
   const lang = React.useContext(ContentLabelLanguageContext);
+  // O Livre social compartilha a mídia, sem herdar o chrome de apresentação.
+  if (slide.socialFreeDesign) {
+    const art = deckArtLayer(slide);
+    return art ? <div aria-hidden="true" data-vc-social-deck-art="1"><DeckArtLayers art={art} /></div> : null;
+  }
   if (slide.presentationArtDirectionVersion === 2 && slide.presentationChrome?.chrome) {
     const { family, format, ground, chrome, fonts } = slide.presentationChrome;
     const elements = chromeElements({ family, format, ground, chrome, fonts }, {
@@ -20,13 +38,7 @@ export default function PresentationArtChrome({ slide, frame, accent, ink, index
     // proteção na cor base fica do lado do texto. Sem imagem, a cor base.
     const art = deckArtLayer(slide);
     return <div aria-hidden="true" data-vc-presentation-art={family}>
-      {art && <div data-vc-deck-art="1" style={{
-        position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0,
-        backgroundImage: `url(${art.image})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
-      }} />}
-      {art && <div data-vc-deck-art-scrim="1" style={{
-        position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0, background: art.gradient,
-      }} />}
+      <DeckArtLayers art={art} />
       {elements.map((item) => <div key={item.key} data-vc-art-device={item.key} style={{
         position: 'absolute', pointerEvents: 'none', boxSizing: 'border-box', zIndex: item.z, ...item.style,
       }}>{item.text}</div>)}
