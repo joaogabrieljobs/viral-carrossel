@@ -16,6 +16,7 @@
  * Este módulo só conhece texto: quem monta cada bloco (ficha visual, mapa de
  * referências, estilo do projeto, enquadramento) entrega a string pronta.
  */
+import { buildDirectedImagePrompt, isDirectedImagePrompt } from './directed-image-prompt.js';
 
 /** Teto do pedido completo na rota do plano (SJinn) e no DALL·E 3. */
 export const SJINN_PROMPT_LIMIT = 4000;
@@ -285,6 +286,7 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
   const T = IMAGE_PROMPT_TEXT;
   const caps = imageRouteCapabilities(route, model);
   const teto = limit > 0 ? limit : caps.promptLimit;
+  if (isDirectedImagePrompt(parts.directedPrompt)) return buildDirectedImagePrompt(parts, { limit: Math.min(teto, caps.promptLimit) });
   const agente = route === 'mcp';
   const presentation = parts.format === 'presentation';
   const socialFree = !presentation && parts.socialFree === true;
@@ -467,5 +469,10 @@ export function planImageRequest(parts = {}, { route = 'openai', model = '', lim
       prompt: '', chars: 0, dropped: [], trimmed: [], defaultAesthetic: false, route, model,
     };
   }
-  return { status: 'ready', route, model, limit: limit > 0 ? limit : caps.promptLimit, ...buildImagePrompt(parts, { route, model, limit }) };
+  const plannedLimit = limit > 0 ? limit : caps.promptLimit;
+  return {
+    status: 'ready', route, model,
+    limit: isDirectedImagePrompt(parts.directedPrompt) ? Math.min(plannedLimit, caps.promptLimit) : plannedLimit,
+    ...buildImagePrompt(parts, { route, model, limit }),
+  };
 }
