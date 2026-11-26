@@ -283,7 +283,10 @@ function inksFor(design, deck, onPhoto) {
 }
 
 function resolvedChrome(raw, fit, F, inks, slide, deck) {
-  const textZones = [fit.title, fit.subtitle, fit.evidence].filter(Boolean);
+  const eyebrow = F.eyebrow ? { t: 'text', text: '{eyebrow}', requires: 'eyebrow', x: fit.title.x,
+    y: round(fit.eyebrowY ?? Math.max(F.top, fit.title.y - (28 * 1.3 + 16) / F.h * 100)), w: fit.title.w,
+    size: 28, role: 'body', weight: 600, color: inks.ink, opacity: 1, tracking: 5, z: 'over' } : null;
+  const textZones = [fit.title, fit.subtitle, fit.evidence, eyebrow && { ...eyebrow, h: 28 * 1.3 / F.h * 100 }].filter(Boolean);
   const colors = { ink: inks.ink, body: inks.ink, muted: inks.muted, accent: inks.accent, accent2: deck.palette.accent2, bg: inks.bg, ground: inks.bg, surface: inks.bg, rule: inks.muted };
   const chrome = freeNeutralChrome(raw || []).flatMap(d => {
     if (d.t === 'text' && /kicker|eyebrow|subtitle|title/.test(d.text || '')) return [];
@@ -292,11 +295,10 @@ function resolvedChrome(raw, fit, F, inks, slide, deck) {
     const r = { x: d.x || 0, y: d.y || 0, w: d.w || d.d || 30, h };
     if (d.t === 'text' && (r.y < F.top || r.y + r.h > F.bottom || textZones.some(z => overlaps(z, r)))) return [];
     if (['rule', 'block', 'circle'].includes(d.t) && textZones.some(z => overlaps(z, r))) return [];
+    if (d.t === 'text') textZones.push(r);
     return [{ ...d, color: colors[d.color] || inks.muted, ...(d.t === 'text' ? { size, role: d.role === 'display' ? 'title' : 'body', opacity: 1, z: 'over' } : {}) }];
   });
-  if (F.eyebrow) chrome.push({ t: 'text', text: '{eyebrow}', requires: 'eyebrow', x: fit.title.x,
-    y: round(fit.eyebrowY ?? Math.max(F.top, fit.title.y - (28 * 1.3 + 16) / F.h * 100)), w: fit.title.w,
-    size: 28, role: 'body', weight: 600, color: inks.ink, opacity: 1, tracking: 5, z: 'over' });
+  if (eyebrow) chrome.push(eyebrow);
   return chrome;
 }
 

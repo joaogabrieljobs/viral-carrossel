@@ -68,6 +68,11 @@ describe('Livre social: assinatura inteira dentro das zonas seguras', () => {
         const zone = slide.canvas.zones[key];
         if (zone) expect(overlaps(zone, logo), `${slide.title}: ${key}/logo`).toBe(false);
       }
+      const textChrome = slide.socialArt.chrome.filter(item => item.t === 'text')
+        .map(item => ({ ...item, h: item.size * 1.3 / f.h * 100 }));
+      for (const [index, item] of textChrome.entries()) for (const other of textChrome.slice(index + 1)) {
+        expect(overlaps(item, other), `${slide.title}: ${item.text}/${other.text}`).toBe(false);
+      }
       expect(slide.subSize * 1080 * 0.028 / 100).toBeGreaterThanOrEqual(28);
       expect(slide.socialArt.density, slide.title).toBe('ok');
       if (slide.socialFreeDesign.photo !== 'none' && !slide.socialArt.textOnPhoto) {
