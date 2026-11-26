@@ -37,6 +37,14 @@ export async function mockEditorApi(page, opts = {}) {
  */
 export async function mockApi(page, opts = {}) {
   const session = opts.session ?? SESSAO_ANONIMA;
+  // Analytics não participa dos cenários de produto. O script externo pode
+  // falhar na rede do CI; responder localmente mantém o console estrito sem
+  // enviar eventos reais nem substituir stubs de window.plausible dos testes.
+  await page.route('https://plausible.io/js/script.tagged-events.js', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/javascript',
+    body: '/* Plausible simulado: nenhum evento externo no E2E. */',
+  }));
   // Onboarding (tour z=120) e intro de modos auto-abrem ~600-850ms após o boot
   // e interceptam cliques quando a CPU está saturada por outro worker. Semeia
   // as flags de "já visto" antes do primeiro script da página.
