@@ -57,6 +57,7 @@ import { DEFAULT_SLIDE_TEXT_INSET } from '../utils/canvas-layout.js';
 import { guardarImagemDoSlide } from '../utils/image-store.js';
 import { styleKitHasContent } from '../utils/style-kit.js';
 import { slideImageGenerationState, slidesPendingImageGeneration } from '../utils/image-generation-readiness.js';
+import { deckNeedsArt } from '../utils/deck-art.js';
 import { creationMaterialLimits, creationMaterialOverages } from '../utils/create-project-flow.js';
 
 function guessFontFileFormat(file) {
@@ -396,7 +397,9 @@ function SidebarContent({
   const itemsLabel = isPresentationProject ? 'slides' : 'cards';
   const editorTabs = visibleEditorTabs(appMode);
   const storyboardThumb = storyboardThumbDimensions(isPresentationProject);
-  const pendingImageCreditCount = slidesPendingImageGeneration(slides, selectedSlideIds).length;
+  // Direção de arte, parte 4: a arte de fundo do deck que faltou conta 1 imagem.
+  const pendingImageCreditCount = slidesPendingImageGeneration(slides, selectedSlideIds).length
+    + (isPresentationProject && !(Array.isArray(selectedSlideIds) && selectedSlideIds.length) && deckNeedsArt(slides) ? 1 : 0);
   const editorScrollRef = useRef(null);
   useLayoutEffect(() => {
     if (editorScrollRef.current) editorScrollRef.current.scrollTop = 0;

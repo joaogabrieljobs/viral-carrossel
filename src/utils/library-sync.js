@@ -184,6 +184,15 @@ async function packSlideForCloud(slide, assets) {
     || (refDataUrl ? newImageId() : undefined);
   const imageReferences = await packReferenceListForCloud(sl.imageReferences, assets);
 
+  // Direção de arte, parte 4: a arte de fundo do deck viaja como as fotos. As
+  // páginas de arte levam a mesma imagem; o hash do conteúdo a envia uma vez.
+  let artDataUrl = typeof sl.presentationArtImage === 'string' && sl.presentationArtImage.startsWith('data:image/')
+    ? sl.presentationArtImage : null;
+  if (!artDataUrl && sl.presentationArtImageId) {
+    try { artDataUrl = await imagemComoDataUrl(sl.presentationArtImageId); } catch { /* mantém o asset já conhecido */ }
+  }
+  const artAssetId = await collectAsset(artDataUrl, assets) || sl.presentationArtImageAssetId || null;
+
   // DB-05: o pacote não muda o que não é mídia. Uma chave que o card tinha
   // como `null` continua `null` e nenhuma chave nova aparece; assim o card que
   // volta da conta é igual ao que foi salvo.
@@ -195,6 +204,8 @@ async function packSlideForCloud(slide, assets) {
     refImageAssetId: refIdentity,
   };
   if (has('imageReferences') || imageReferences.length) packed.imageReferences = imageReferences;
+  if (artAssetId) packed.presentationArtImageAssetId = artAssetId;
+  if (has('presentationArtImage')) packed.presentationArtImage = null;
   for (const key of ['bgImage', 'logoImage', 'refImage']) {
     if (!has(key)) continue;
     packed[key] = key === 'refImage' && typeof sl.refImage === 'string' && /^https:\/\//i.test(sl.refImage)
@@ -839,6 +850,19 @@ async function hydrateSlideFromCloud(slide, assetCache, localSlide, imageResult)
             if (imageResult) imageResult.loaded = true;
           }
         } catch { /* continua com os textos e a referência remota */ }
+      }
+    }
+    const artAsset = sl.presentationArtImageAssetId;
+    if (artAsset) {
+      const sameLocalArt = localSlide?.presentationArtImageAssetId === artAsset;
+      const dataUrl = await resolveCachedAsset(artAsset, assetCache);
+      if (dataUrl) {
+        try {
+          const packed = await guardarImagemDoSlide(dataUrl, { id: (sameLocalArt && localSlide?.presentationArtImageId) || artAsset });
+          sl = { ...sl, presentationArtImageId: packed.bgImageId || null, presentationArtImage: packed.bgImage || null };
+        } catch { /* a página fica na cor base */ }
+      } else if (sameLocalArt && localSlide?.presentationArtImageId) {
+        sl = { ...sl, presentationArtImageId: localSlide.presentationArtImageId };
       }
     }
     const logoAsset = sl.logoImageAssetId;

@@ -165,7 +165,8 @@ describe('modo livre, fase 1: modelo e normalizador (sem IA)', () => {
     const icones = { type: 'icons', items: [{ icon: 'star', title: 'A' }, { icon: 'users', title: 'B' }] };
     expect(normalizeSlideDesign({ block: 'icons', icons: ['star', 'foguete', 'users', 'heart', 'globe', 'zap'] }, { presentationBlocks: [icones] }).icons).toEqual(['star', 'users']);
     expect(normalizeSlideDesign({ block: 'metrics' }, deck()[8]).block).toBe('metrics');
-    expect(FREE_GROUNDS).toEqual(['bg', 'surface', 'inverse', 'accent', 'photo']);
+    // Direção de arte, parte 4: fundo de arte reaproveitada (ground art).
+    expect(FREE_GROUNDS).toEqual(['bg', 'surface', 'inverse', 'accent', 'photo', 'art']);
     expect(FREE_PHOTO_SIZES).toEqual(['none', 'small', 'half', 'full']);
     expect(FREE_BLOCKS).toEqual(['none', 'comparison', 'metrics', 'steps', 'quote', 'bignumber', 'icons']);
     expect(FREE_ICONS.length).toBeGreaterThan(10);

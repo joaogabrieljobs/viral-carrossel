@@ -3,7 +3,7 @@ import { getPresentationPath } from './presentation.js';
 import { presentationPlanningForRoute } from './presentation-content.js';
 import { buildPresentationRoadmapPrompt } from './presentation-roadmap.js';
 import {
-  FREE_BLOCKS, FREE_DISPLAY_ONLY_FONTS, FREE_FAMILY_GUIDE, FREE_FONT_FAMILIES, FREE_GROUNDS, FREE_ICONS,
+  FREE_ART_MAX_SLIDES, FREE_BLOCKS, FREE_DISPLAY_ONLY_FONTS, FREE_FAMILY_GUIDE, FREE_FONT_FAMILIES, FREE_GROUNDS, FREE_ICONS,
   FREE_PALETTE_KEYS, FREE_PHOTO_SIZES, normalizeDeckDesign, normalizeProposedDesign,
 } from './free-design.js';
 import {
@@ -80,7 +80,7 @@ export function buildFreeArtDirectionBlock() {
   const families = Object.entries(FREE_FAMILY_GUIDE).map(([key, line]) => `- ${key}: ${line}`).join('\n');
   return `DIREÇÃO DE ARTE — MODO LIVRE (o Moont decide o visual):
 Você também é o diretor de arte deste deck. Para cada posição, escolha em design uma composição que o Moont já sabe desenhar, como um diretor de arte que monta um deck variado e coerente para este briefing. Não escreva HTML, CSS nem coordenadas: só os valores abaixo.
-- Diversidade de composição: alterne o fundo (bg claro, surface superfície, inverse escuro, accent cor de destaque, photo foto inteira atrás do texto), o tamanho da foto (none, small, half, full), o bloco e a família, e o lado da foto quando a família permite. Nunca 3 posições seguidas com a mesma família, o mesmo fundo e o mesmo tamanho de foto; nunca 2 seguidas com a mesma família e a mesma visualRole. Use pelo menos 3 fundos e 3 tamanhos de foto no deck. Uma página sem foto e com fundo forte dá respiro entre páginas de foto.
+- Diversidade de composição: alterne o fundo (bg claro, surface superfície, inverse escuro, accent cor de destaque, photo foto inteira atrás do texto, art arte abstrata da identidade), o tamanho da foto (none, small, half, full), o bloco e a família, e o lado da foto quando a família permite. Nunca 3 posições seguidas com a mesma família, o mesmo fundo e o mesmo tamanho de foto; nunca 2 seguidas com a mesma família e a mesma visualRole. Use pelo menos 3 fundos e 3 tamanhos de foto no deck. Uma página sem foto e com fundo forte dá respiro entre páginas de foto.
 - Negrito: em emphasis, até 3 expressões curtas (1 a 4 palavras) da ideia que o público precisa guardar, como um número, um nome ou um verbo; a redação as repete literalmente no texto do slide e o app as mostra em negrito na cor de destaque. Use [] quando nada merece destaque.
 - Coerência: uma paleta e um par de fontes valem para o deck inteiro (deckDesign), para não virar colagem. Parta do briefing, do assunto e da referência: bg e surface com diferença de luminosidade visível; ink legível sobre bg e surface; muted legível sobre bg; inverse escuro quando bg é claro (claro quando bg é escuro) com inverseInk legível; accent forte que leia sobre bg; accent2 de apoio. Todas as cores em hex #RRGGBB.
 - Fontes: display (títulos) e text (texto corrido) só desta biblioteca local: ${fonts}. Só para display, nunca em text: ${FREE_DISPLAY_ONLY_FONTS.join(', ')}. Combine uma display com personalidade e uma text de leitura fácil.
@@ -88,6 +88,8 @@ Você também é o diretor de arte deste deck. Para cada posição, escolha em d
 - family (de onde vem a geometria da página):
 ${families}
 - photo: none quando a foto não acrescenta; então scene é null e nenhuma imagem é gerada. Com scene null, photo é none.
+- ground art: o fundo abstrato da identidade do deck (gerado uma vez, sem pessoas, com o grafismo na borda direita), para até ${FREE_ART_MAX_SLIDES} páginas sem foto de posicionamento, personalidade, síntese ou fecho; com art, photo é none e scene é null.
+- ground accent sem foto: texto em cor cheia com título grande, para uma página de frase, síntese ou comportamento.
 - block: comparison, metrics ou steps só quando a posição terá esses dados em presentationBlocks; quote só com citação literal do material; bignumber só com um número do material; icons com até 4 nomes desta lista: ${FREE_ICONS.join(', ')}; caso contrário none. icons é [] quando block não é icons.
 - Enums fechados: ground: ${FREE_GROUNDS.join(', ')}. photo: ${FREE_PHOTO_SIZES.join(', ')}. block: ${FREE_BLOCKS.join(', ')}. family: ${Object.keys(FREE_FAMILY_GUIDE).join(', ')}.
 - Capa e fecho mantêm o papel de sempre; a capa abre o tema e o fecho declara a decisão ou a próxima ação. O código garante contraste e ritmo e corrige o que sair do contrato.`;

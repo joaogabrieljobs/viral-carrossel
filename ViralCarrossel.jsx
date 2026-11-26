@@ -253,6 +253,7 @@ import {
   presentationStageAt,
 } from './src/utils/presentation-state.js';
 import { applyPlanEmphasisToDraft, deckDesignFromBrand, freeBrandPatch, slideSkipsImageGeneration } from './src/utils/free-design.js';
+import { DECK_ART_SCENE, applyDeckArt, composeDeckArtImageDirection, deckNeedsArt } from './src/utils/deck-art.js';
 import {
   normalizeStyleKit,
   buildProjectContextBlock,
@@ -3586,6 +3587,38 @@ export default function App() {
     return () => { cancelled = true; };
   }, [slides, activeEntry?.id, history.setSilent]);
 
+  // Direção de arte, parte 4: a arte de fundo do deck vive no IndexedDB como as
+  // fotos; o documento guarda só o id. Sem os bytes, a página fica na cor base.
+  useEffect(() => {
+    let cancelled = false;
+    const ids = [...new Set(slides.filter(sl => sl.presentationArtImageId && !sl.presentationArtImage).map(sl => sl.presentationArtImageId))];
+    if (!ids.length) return undefined;
+    Promise.all(ids.map(async (id) => {
+      let url = imagemUrlsRef.current.get(id);
+      if (!url) {
+        const entry = await imageGet(id).catch(() => null);
+        if (!entry?.blob) return null;
+        url = URL.createObjectURL(entry.blob);
+        imagemUrlsRef.current.set(id, url);
+      }
+      return [id, url];
+    })).then((pairs) => {
+      const urls = new Map(pairs.filter(Boolean));
+      if (cancelled || !urls.size) return;
+      history.setSilent((d) => {
+        let changed = false;
+        const next = (d.slides || []).map((sl) => {
+          const url = sl.presentationArtImageId && !sl.presentationArtImage ? urls.get(sl.presentationArtImageId) : null;
+          if (!url) return sl;
+          changed = true;
+          return { ...sl, presentationArtImage: url };
+        });
+        return changed ? { ...d, slides: next } : d;
+      });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [slides, activeEntry?.id, history.setSilent]);
+
   useEffect(() => {
     let cancelado = false;
     (async () => {
@@ -5532,6 +5565,34 @@ export default function App() {
     }
   }, [slides, fmt, imageGenerationAvailability, openaiKey, imgParams, styleKit, setSlides, setSlidesPhotoSwap, toast, activeEntry?.name, doc.visualBible, access, useOwnImageKey]);
 
+  // Direção de arte, parte 4: arte de fundo do deck (modo livre). Uma imagem
+  // abstrata da identidade, pedida uma vez (1 crédito) pelo mesmo caminho das
+  // fotos e guardada como elas (IndexedDB e nuvem) nas páginas `ground: 'art'`.
+  // Sem crédito, sem chave ou com falha, as páginas ficam na cor base.
+  const deckArtGenRef = useRef(null);
+  deckArtGenRef.current = async ({ projectId, signal, axes, deckSlides, onSlides = null }) => {
+    if (!deckNeedsArt(deckSlides)) return { ok: false, reason: 'not_needed' };
+    const baseRefs = await resolveImageReferences(styleKit, null, null, null);
+    const url = await generateDALLEWithRetry(DECK_ART_SCENE, openaiKey, axes, {
+      signal,
+      refImages: baseRefs,
+      imageDirection: composeDeckArtImageDirection({ slides: deckSlides, styleKit, baseReferenceCount: baseRefs.length }),
+      aspectRatio: '16:9',
+      onPromptPlan: plan => imagePromptCutGateRef.current(plan, projectId),
+      usageContext: { projectId, projectName: activeEntry?.name || '', cardId: 'deck-art' },
+    });
+    const patchImg = await guardarImagemDoSlide(url);
+    if (signal?.aborted || activeProjectRef.current !== projectId) {
+      if (patchImg.bgImageId) imageDelete(patchImg.bgImageId).catch(() => {});
+      return { ok: false, reason: 'stale_target' };
+    }
+    if (patchImg.bgImageId && patchImg.bgImage) imagemUrlsRef.current.set(patchImg.bgImageId, patchImg.bgImage);
+    const artPatch = { presentationArtImageId: patchImg.bgImageId || null, presentationArtImage: patchImg.bgImage || null };
+    setSlides(prev => applyDeckArt(prev, artPatch));
+    onSlides?.(artPatch);
+    return { ok: true };
+  };
+
   // Spec 1.1 entrega 5: a auditoria só aponta. Gerar outra imagem do slide
   // apontado é escolha da pessoa: pergunta antes com o custo e usa o caminho
   // normal de crédito de imagem (generateSlideImageAt).
@@ -6653,7 +6714,9 @@ ${jsonShapeLine}`;
         }))
           // Modo livre: página que o diretor deixou sem foto não pede imagem.
           .filter(x => !concurrentMediaSlideIds.has(x.slideId) && !slideSkipsImageGeneration(x.sl) && !!(x.q && String(x.q).trim()));
-        const totalImgs = slidesWithImage.length;
+        // Direção de arte, parte 4: a arte de fundo conta 1 imagem a mais no lote.
+        const wantsDeckArt = isPresentationGeneration && deckNeedsArt(newSlides);
+        const totalImgs = slidesWithImage.length + (wantsDeckArt ? 1 : 0);
         let doneImgs = 0;
         const attemptedImageSlideIds = new Set();
         // Spec 1.1 entrega 5: imagens deste laço, em memória, para o mosaico da auditoria.
@@ -6774,6 +6837,22 @@ ${jsonShapeLine}`;
           } finally {
             slideImgGenIdsRef.current.delete(slideId);
             setSlideImgGenBusy(prev => { const next = { ...prev }; delete next[slideId]; return next; });
+          }
+          doneImgs++;
+          setGenProgress({ phase: 'images', current: doneImgs, total: totalImgs, label: `Gerando imagens (${doneImgs}/${totalImgs})…` });
+        }
+        if (wantsDeckArt && !imgQuotaStop && !abort.cancelled && activeProjectRef.current === generationProjectId) {
+          setGenProgress({ phase: 'images', current: doneImgs, total: totalImgs, label: `Gerando a arte de fundo (${doneImgs + 1}/${totalImgs})…` });
+          try {
+            await deckArtGenRef.current({
+              projectId: generationProjectId, signal: job.signal, axes: effectiveAxes, deckSlides: newSlides,
+              onSlides: patch => setCreationPreviewSlides(prev => applyDeckArt(prev, patch)),
+            });
+          } catch (e) {
+            if (isGenerationCancelled(e) || job.signal.aborted) throw e;
+            // Sem a arte, as páginas ficam na cor base; não é falha de foto.
+            console.warn('Arte de fundo do deck:', e?.message);
+            if (['quota_exhausted', 'plan_no_images', 'subscription_inactive'].includes(e?.code)) toast('A arte de fundo não foi gerada: não há crédito de imagem. As páginas ficaram na cor do deck.', 'info', 6000);
           }
           doneImgs++;
           setGenProgress({ phase: 'images', current: doneImgs, total: totalImgs, label: `Gerando imagens (${doneImgs}/${totalImgs})…` });
@@ -8162,7 +8241,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
       // FE-11: mesma regra da contagem do painel; foto que existe na conta não é candidata.
       const candidates = slidesPendingImageGeneration(slides, targetSlideIds)
         .map(({ slide, index }) => ({ s: slide, i: index }));
-      if (!candidates.length) {
+      // Direção de arte, parte 4: a arte de fundo que faltou entra no lote (1 imagem).
+      const missingDeckArt = activeProductKind === 'apresentacao' && !(Array.isArray(targetSlideIds) && targetSlideIds.length) && deckNeedsArt(slides);
+      if (!candidates.length && !missingDeckArt) {
         toast(`Nenhum ${activeProductKind === 'apresentacao' ? 'slide' : 'card'} pendente de imagem (ou sem palavras-chave).`, 'info');
         return;
       }
@@ -8236,6 +8317,15 @@ Retorne APENAS JSON: ${refineAllWantsBody
             }
           }
           throwIfGenerationCancelled(batchJob.signal);
+        }
+        if (missingDeckArt && activeProjectRef.current === generationProjectId) {
+          try {
+            const art = await deckArtGenRef.current({ projectId: generationProjectId, signal: batchJob.signal, axes: imgParams, deckSlides: slidesLiveRef.current || slides });
+            if (art?.ok) generated++;
+          } catch (error) {
+            if (isGenerationCancelled(error)) throw error;
+            failed++;
+          }
         }
         const parts = [];
         if (generated) parts.push(`${generated} gerada${generated === 1 ? '' : 's'}`);

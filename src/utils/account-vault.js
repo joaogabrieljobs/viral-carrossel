@@ -209,7 +209,7 @@ async function durableMedia(value, context = { externalize: true, imageStoreUnav
   if (!value || typeof value !== 'object') return value;
   const next = {};
   for (const [key, child] of Object.entries(value)) next[key] = await durableMedia(child, context);
-  const pairs = [['bgImage', 'bgImageId'], ['logoImage', 'logoImageId'], ['refImage', 'refImageId'], ['logo', 'logoImageId'], ['dataUrl', 'imageId']];
+  const pairs = [['bgImage', 'bgImageId'], ['logoImage', 'logoImageId'], ['refImage', 'refImageId'], ['logo', 'logoImageId'], ['dataUrl', 'imageId'], ['presentationArtImage', 'presentationArtImageId']];
   for (const [sourceKey, idKey] of pairs) {
     const source = next[sourceKey];
     if (typeof source !== 'string' || (!source.startsWith('blob:') && !source.startsWith('data:image/'))) continue;
@@ -505,7 +505,7 @@ async function getAccountVaultMediaIds(fields) {
 /** Imagens do cofre também estão em uso, mesmo com outra conta aberta. */
 export async function getAccountVaultImageIds() {
   return getAccountVaultMediaIds([
-    'bgImageId', 'logoImageId', 'refImageId', 'imageId', 'refImageAssetId', 'assetId',
+    'bgImageId', 'logoImageId', 'refImageId', 'imageId', 'refImageAssetId', 'assetId', 'presentationArtImageId',
   ]);
 }
 

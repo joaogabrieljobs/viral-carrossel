@@ -35,7 +35,16 @@ import { reservedAreaColour, resolveSlideVisualDirection } from './visual-direct
 
 export { FREE_PRESENTATION_PRESET_ID };
 
-export const FREE_GROUNDS = Object.freeze(['bg', 'surface', 'inverse', 'accent', 'photo']);
+export const FREE_GROUNDS = Object.freeze(['bg', 'surface', 'inverse', 'accent', 'photo', 'art']);
+/**
+ * Direção de arte, parte 4 (docs/product/direcao-de-arte-imagens.md): arte de
+ * fundo reaproveitada. Uma imagem abstrata da identidade por deck, com o
+ * grafismo a partir de ~78% da largura e o resto liso na cor base; até 3
+ * páginas sem foto a usam como fundo, com o texto até 72% da largura.
+ */
+export const FREE_ART_MAX_SLIDES = 3;
+export const FREE_ART_TEXT_MAX = 72;
+export const FREE_ART_GRAPHIC_FROM = 78;
 export const FREE_PHOTO_SIZES = Object.freeze(['none', 'small', 'half', 'full']);
 export const FREE_BLOCKS = Object.freeze(['none', 'comparison', 'metrics', 'steps', 'quote', 'bignumber', 'icons']);
 /** Lista fechada de ícones lucide (nomes kebab-case) para o bloco de ícones. */
@@ -266,6 +275,7 @@ const GROUND_ALIASES = {
   dark: 'inverse', escuro: 'inverse', invertido: 'inverse', inverted: 'inverse', black: 'inverse', preto: 'inverse',
   color: 'accent', cor: 'accent', destaque: 'accent', brand: 'accent',
   image: 'photo', foto: 'photo', fullbleed: 'photo', imagem: 'photo',
+  arte: 'art', artwork: 'art', identidade: 'art', identity: 'art', abstract: 'art', abstrato: 'art', grafismo: 'art',
 };
 const PHOTO_ALIASES = {
   sem: 'none', semfoto: 'none', no: 'none', off: 'none', nenhuma: 'none', false: 'none',
@@ -520,6 +530,10 @@ function candidatesFor({ slide, stage, index, count }) {
     if (visual && !fixedKind(slide, index, count)) {
       // Divisor tem caixa de apoio curta: só para página de texto curto.
       for (const kind of [role, ...ALTERNATIVE_KINDS]) if (kind !== 'divider' || shortCopy(slide)) tries.push([kind, slide]);
+    } else if (!visual && !fixedKind(slide, index, count) && shortCopy(slide) && ACCENT_TEXT_PURPOSES.has(slidePurpose(slide))) {
+      // Direção de arte, parte 5: página de frase, síntese ou comportamento
+      // sem foto pode virar texto em cor cheia com título grande (divisor).
+      tries.push(['divider', slide]);
     }
     for (const [kind, layoutSlide] of tries) {
       const layout = contentAwarePresentationLayout(kind, layoutSlide, family);
@@ -532,10 +546,15 @@ function candidatesFor({ slide, stage, index, count }) {
       // paleta, desenhada para esses fundos.
       // Cartão atrás do texto: o fundo da página fica o da família, senão o
       // cartão (cor de superfície) pode cair sobre um fundo do mesmo tom da tinta.
+      // Arte de fundo (parte 4): só página sem foto e sem cartão atrás do texto.
+      // Com bloco, só a comparação e a citação (personalidade, frase); métricas e
+      // etapas ficam no fundo claro ou de superfície, como antes.
+      const art = size === 'none' && !onPhoto && !hasTextPanel(layout)
+        && slideBlockTypes(slide).every(type => ['comparison', 'quote'].includes(type)) ? ['art'] : [];
       const grounds = onPhoto ? ['photo']
         : hasTextPanel(layout) ? [layout.ground]
-        : hasBlocks(slide) ? ['bg', 'surface']
-          : ['bg', 'surface', 'inverse', ...(ACCENT_KINDS.has(kind) ? ['accent'] : [])];
+        : hasBlocks(slide) ? ['bg', 'surface', ...art]
+          : ['bg', 'surface', 'inverse', ...(ACCENT_KINDS.has(kind) ? ['accent'] : []), ...art];
       for (const ground of grounds) {
         out.push({
           family, kind, photo: size, ground, native: onPhoto || ground === layout.ground, side: photoSide(layout.photo, size),
@@ -548,10 +567,20 @@ function candidatesFor({ slide, stage, index, count }) {
   return out;
 }
 
+/** Função semântica da página no roteiro (purpose), ou ''. */
+const slidePurpose = slide => String(slide?.presentationPlan?.purpose || '');
+/**
+ * Páginas em que a arte de fundo faz sentido (parte 4): posicionamento e
+ * visão, personalidade e comportamento (other), síntese e fecho.
+ */
+const ART_PURPOSES = new Set(['vision', 'other', 'summary', 'decision']);
+/** Páginas de frase, síntese ou comportamento: candidatas a texto em cor cheia (parte 5). */
+const ACCENT_TEXT_PURPOSES = new Set(['other', 'summary', 'vision', 'objection', 'learning']);
+
 /** Peso da proposta da IA (roteiro v3): forte o bastante para valer, sem passar por cima das regras duras. */
 const PROPOSAL_WEIGHT = Object.freeze({ family: 10, photo: 6, ground: 6 });
 
-function scoreCandidate(c, { prev, role, visual, order, enough, proposal }) {
+function scoreCandidate(c, { prev, role, visual, order, enough, proposal, purpose = '' }) {
   const last = prev.at(-1);
   const count = (key, value) => prev.filter(p => p[key] === value).length;
   const families = new Set(prev.map(p => p.family).filter(Boolean));
@@ -585,6 +614,11 @@ function scoreCandidate(c, { prev, role, visual, order, enough, proposal }) {
     if (sides.at(-1) === c.side) s += 1.5;
     if (sides.length >= 2 && sides.slice(-2).every(side => side === c.side)) s += 3;
   }
+  // Arte de fundo (parte 4): só onde a página pede posicionamento,
+  // personalidade, síntese ou fecho; nas outras, um fundo como os demais.
+  if (c.ground === 'art') s += ART_PURPOSES.has(purpose) || c.kind === 'closing' ? -4 : 5;
+  // Texto em cor cheia com título grande (parte 5): página de frase.
+  if (c.ground === 'accent' && c.photo === 'none' && c.kind === 'divider' && ACCENT_TEXT_PURPOSES.has(purpose)) s -= 4;
   // A IA propõe, o código garante: cada campo que bate com a proposta pesa a
   // favor; regras de ritmo e de variedade já filtraram os candidatos.
   if (proposal) {
@@ -656,6 +690,11 @@ function directFreeSlide({ slide = {}, stage = {}, index = 0, count = 1, previou
     const onPhoto = allowed.filter(c => c.ground === 'photo');
     if (onPhoto.length) allowed = onPhoto;
   }
+  // Arte de fundo em até 3 páginas por deck (parte 4).
+  if (prev.filter(p => p.ground === 'art').length >= FREE_ART_MAX_SLIDES) {
+    const withoutArt = allowed.filter(c => c.ground !== 'art');
+    if (withoutArt.length) allowed = withoutArt;
+  }
   // Nunca 3 fotos laterais seguidas do mesmo lado quando há outra geometria
   // com foto (também com a proposta da IA): o código garante o ritmo do lado.
   const sides = prev.map(p => p.side).filter(Boolean);
@@ -665,7 +704,7 @@ function directFreeSlide({ slide = {}, stage = {}, index = 0, count = 1, previou
   // outro lado: o lado não troca a família que o diretor de arte escolheu.
   const familyAlternates = !proposal || alternated.some(c => c.family === proposal.family);
   if (alternated.length && familyAlternates) allowed = alternated;
-  const context = { prev, role, visual, order: familyOrder(deckDesign), enough: count >= 6, proposal };
+  const context = { prev, role, visual, order: familyOrder(deckDesign), enough: count >= 6, proposal, purpose: slidePurpose(slide) };
   let best = null;
   let bestScore = Infinity;
   for (const c of allowed) {
@@ -1186,6 +1225,70 @@ function closingReading({ zones, chrome, slide, titleSize, subSize, display, tex
   };
 }
 
+/* Arte de fundo (parte 4) ---------------------------------------------------- */
+
+const ART_TEXT_KEYS = ['title', 'subtitle', 'evidence'];
+const ART_IMAGE_FIELDS = ['presentationArtImageId', 'presentationArtImage', 'presentationArtImageAssetId'];
+
+/**
+ * Página com arte de fundo: o grafismo ocupa a borda direita (a partir de
+ * ~78%), então o texto da família vai para o lado liso. As zonas de texto e os
+ * adornos são comprimidos na horizontal, da margem esquerda da família até
+ * 72% da largura, mantendo a mesma geometria (proporções, alinhamento e
+ * ordem). O que já cabe fica igual.
+ */
+export function compressForArt(composed) {
+  const zones = composed?.canvas?.zones || {};
+  const texts = ART_TEXT_KEYS.map(key => zones[key]).filter(z => z && z.w > 1 && z.h > 1);
+  if (!texts.length) return composed;
+  const left = Math.min(...texts.map(z => z.x));
+  const right = Math.max(...texts.map(z => z.x + z.w));
+  if (right <= FREE_ART_TEXT_MAX) return composed;
+  const k = (FREE_ART_TEXT_MAX - left) / (right - left);
+  const map = v => (v <= left ? v : round2(left + (v - left) * k));
+  const span = (x, w) => { const x0 = map(x); return { x: x0, w: round2(Math.max(0, map(x + w) - x0)) }; };
+  const nextZones = { ...zones };
+  for (const key of ART_TEXT_KEYS) {
+    const z = zones[key];
+    if (z && z.w > 1 && z.h > 1) nextZones[key] = { ...z, ...span(z.x, z.w) };
+  }
+  const chrome = (composed.presentationChrome?.chrome || []).map((d) => {
+    if (!Number.isFinite(d?.x) || d.t === 'grid') return d;
+    if (Number.isFinite(d.w)) return { ...d, ...span(d.x, d.w) };
+    return { ...d, x: map(d.x) };
+  });
+  return {
+    ...composed,
+    canvas: { ...composed.canvas, zones: nextZones },
+    presentationChrome: { ...composed.presentationChrome, chrome },
+  };
+}
+
+/** Imagem de arte do deck já guardada no slide ou numa página anterior. */
+function deckArtFields(slide, previous) {
+  const carrier = [slide, ...[...(Array.isArray(previous) ? previous : [])].reverse()]
+    .find(item => item && ART_IMAGE_FIELDS.some(key => item[key]));
+  return carrier ? Object.fromEntries(ART_IMAGE_FIELDS.filter(key => carrier[key]).map(key => [key, carrier[key]])) : {};
+}
+
+/**
+ * Proteção do texto sobre a arte, na cor base: cheia do lado do texto até
+ * além de 72%, com a menor opacidade que garante 4,5:1 para todas as tintas
+ * mesmo se o lado "liso" da imagem vier com o pior pixel (branco ou preto).
+ */
+export function artScrim(base, inks = []) {
+  const tintas = inks.filter(Boolean);
+  const surfaces = a => ['#FFFFFF', '#000000'].map(worst => mixHex(base, worst, a / 100));
+  let opacity = 100;
+  for (let a = 30; a <= 100; a += 1) {
+    if (surfaces(a).every(surface => tintas.every(ink => wcagContrast(ink, surface) >= 4.5))) { opacity = a; break; }
+  }
+  // Superfície de pior caso para as conferências: a que menos contrasta com o título.
+  const [white, black] = surfaces(opacity);
+  const surface = !tintas.length || wcagContrast(tintas[0], white) <= wcagContrast(tintas[0], black) ? white : black;
+  return { side: 'left', color: base, opacity, reach: FREE_ART_TEXT_MAX + 4, surface };
+}
+
 /**
  * Compõe a página no modo livre: geometria da família escolhida, fundo e
  * tinta pela paleta do deck, fontes do deck e foto no tamanho decidido.
@@ -1203,7 +1306,9 @@ export function freePresentationCompositionOverrides(base, {
   const photo = visual ? photoSizeOfLayout(layout) : 'none';
   const onPhoto = photo !== 'none' && textOnPhoto(layout);
   const ground = onPhoto ? 'photo' : (directed.ground === 'photo' ? layout.ground : directed.ground);
-  const design = { ...directed, photo, ground };
+  // Arte de fundo só em página sem foto; com foto, o fundo da família.
+  const art = ground === 'art' && photo === 'none';
+  const design = { ...directed, photo, ground: ground === 'art' && !art ? layout.ground : ground };
   const freeBase = { ...base, presentationFreeDesign: design };
   let composed = stage?.contentMode === 'pitch'
     ? pitchCompositionOverrides(freeBase, layoutSlide, kind)
@@ -1224,11 +1329,14 @@ export function freePresentationCompositionOverrides(base, {
     }
   }
 
+  if (art) composed = compressForArt(composed);
+
   const palette = freePaletteOverrides(deck);
-  const chromeGround = onPhoto ? layout.ground : ground;
+  // A arte é a cor base (bg) com o grafismo na borda direita: tintas e adornos do fundo claro/base.
+  const chromeGround = onPhoto ? layout.ground : art ? 'bg' : design.ground;
   const inks = onPhoto
     ? { bg: palette.inverse, ink: readable('#111111', [palette.inverseInk, palette.bg, '#FFFFFF']), muted: readable('#111111', [palette.inverseMuted, palette.inverseInk, '#F5F5F7']) }
-    : groundInks(family, ground, palette);
+    : groundInks(family, chromeGround, palette);
   // Texto sobre cartão da família lê contra o cartão.
   const zonesNow = composed.canvas?.zones || {};
   const panelColor = (zone) => {
@@ -1253,6 +1361,12 @@ export function freePresentationCompositionOverrides(base, {
       mutedInk = inkOver(scrim.surface, mutedInk, textInk);
     }
   }
+  // Arte de fundo: proteção na cor base com 4,5:1 sobre o pior pixel do lado liso.
+  const artProtection = art ? artScrim(palette.bg, [titleInk, textInk, mutedInk]) : null;
+  if (artProtection) {
+    surfaceTitle = artProtection.surface;
+    surfaceText = artProtection.surface;
+  }
   const display = freeFontSpec(deck.fonts.display, 'display');
   const text = freeFontSpec(deck.fonts.text, 'text');
   const fam = familySpec(family).fonts.display;
@@ -1260,7 +1374,8 @@ export function freePresentationCompositionOverrides(base, {
   // deck mais larga começa proporcionalmente menor e passa pelo mesmo ajuste.
   const scale = Math.min(1, (fam.widthFactor || 0.55) / (display.widthFactor || 0.55));
   const zones = composed.canvas?.zones || {};
-  const fittedSize = scale < 1 && zones.title
+  // Coluna comprimida para o lado liso da arte: o título passa pelo mesmo ajuste.
+  const fittedSize = (scale < 1 || art) && zones.title
     ? fittedTitleSize(Math.round(composed.titleSize * scale), slide.title, zones.title, display.css)
     : composed.titleSize;
   const titleCap = rendererTitleSizePercent(FREE_TITLE_MAX_PX[kind] || FREE_TITLE_MAX_PX.other);
@@ -1283,7 +1398,11 @@ export function freePresentationCompositionOverrides(base, {
     surfaceTitle = resolveChromeColor(family, chromeGround, reading.titlePanel.color, palette);
     titleInk = readable(surfaceTitle, [inks.ink, palette.ink, palette.inverseInk]);
   }
-  const chrome = freeChromeDevices(reading ? reading.chrome : familyChrome, { family, ground: chromeGround, palette, photoZone });
+  // Sobre a arte, o adorno lê contra a superfície de pior caso do lado liso;
+  // texto de adorno sobre o grafismo (borda direita) sai.
+  const chrome = freeChromeDevices(reading ? reading.chrome : familyChrome, art
+    ? { family, ground: chromeGround, palette: { ...palette, bg: artProtection.surface }, photoZone: { x: FREE_ART_TEXT_MAX, y: 0, w: 100 - FREE_ART_TEXT_MAX, h: 100 } }
+    : { family, ground: chromeGround, palette, photoZone });
   return {
     ...composed,
     presentationPresetId: FREE_PRESENTATION_PRESET_ID,
@@ -1309,6 +1428,10 @@ export function freePresentationCompositionOverrides(base, {
     textColor: mutedInk,
     presentationFreeTextSurfaces: { title: surfaceTitle, subtitle: surfaceText },
     ...(scrim ? { overlay: scrim.overlay, overlayMode: scrim.overlayMode, overlaySide: scrim.overlaySide, overlayReach: scrim.overlayReach, overlayColor: scrim.overlayColor } : {}),
+    ...(artProtection ? {
+      presentationArtScrim: { side: artProtection.side, color: artProtection.color, opacity: artProtection.opacity, reach: artProtection.reach },
+      ...deckArtFields(slide, previous),
+    } : {}),
     presentationPhotoTreatment: FREE_PHOTO_TREATMENT,
     titleSize,
     titleWeight: display.weight,
@@ -1332,7 +1455,7 @@ export function freePresentationCompositionOverrides(base, {
 export const FREE_SLIDE_FIELDS = Object.freeze([
   'presentationFreeDesign', 'presentationDeckDesign', 'presentationPaletteOverrides',
   'presentationNumericTypography', 'presentationFreeTextSurfaces', 'customBg', 'titleColor', 'subtitleColor', 'textColor',
-  'titleWeight', 'titleCase', 'presentationBlockAnchor',
+  'titleWeight', 'titleCase', 'presentationBlockAnchor', 'presentationArtScrim',
 ]);
 
 /** Slide composto no modo livre volta ao estado neutro antes de outro preset. */
@@ -1441,6 +1564,8 @@ export function freeDeckViolations(slides = []) {
     }
   });
   const withDesign = list.filter(s => s.presentationFreeDesign);
+  // Arte de fundo (parte 4): até 3 páginas por deck.
+  if (withDesign.filter(s => s.presentationFreeDesign.ground === 'art').length > FREE_ART_MAX_SLIDES) out.push({ code: 'free_art_limit', slideIndex: null });
   if (withDesign.length >= 6) {
     // Superfície que quase não se distingue do fundo conta como o mesmo fundo.
     const groundOf = (s) => {

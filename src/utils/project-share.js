@@ -272,6 +272,11 @@ export async function packDocWithImagesForShare(doc) {
       }
       next = { ...next, imageReferences:portable };
     }
+    // Arte de fundo do deck (direção de arte, parte 4): não vai embutida no
+    // compartilhamento; sem ela, a página de quem recebe fica na cor base.
+    if (next.presentationArtImage || next.presentationArtImageId) {
+      next = { ...next, presentationArtImage: null, presentationArtImageId: undefined };
+    }
     // A foto já está na nuvem de quem publica. Embutir aqui a reduziria a
     // 720 px. A outra conta lê o arquivo original pelo código.
     if (next.bgImageAssetId) {

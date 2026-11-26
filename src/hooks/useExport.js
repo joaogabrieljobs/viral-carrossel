@@ -8,6 +8,7 @@
 import { useCallback, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import { slideShowsDeckArt } from '../utils/deck-art.js';
 import JSZip from 'jszip';
 import { FORMATS } from '../utils/formats.js';
 import { videoGet } from '../utils/video-store.js';
@@ -46,8 +47,10 @@ export function exportFileStem(projectName, isPresentation = false) {
 export const PDF_PHOTO_JPEG_QUALITY = 0.92;
 
 export function pdfPageImageFormat(slide = {}) {
-  const photo = !!(slide?.bgImage || slide?.bgImageId || slide?.bgImageAssetId)
-    && slide.bgImageFailed !== true && slide.presentationSuppressPhoto !== true;
+  const photo = (!!(slide?.bgImage || slide?.bgImageId || slide?.bgImageAssetId)
+    && slide.bgImageFailed !== true && slide.presentationSuppressPhoto !== true)
+    // Direção de arte, parte 4: a página com a arte de fundo do deck também é "com foto".
+    || slideShowsDeckArt(slide);
   return photo
     ? { mime: 'image/jpeg', format: 'JPEG', quality: PDF_PHOTO_JPEG_QUALITY }
     : { mime: 'image/png', format: 'PNG' };

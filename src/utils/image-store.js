@@ -497,6 +497,8 @@ export function idsDeImagemEmUso(library, brands = []) {
     ...(library || []).flatMap((e) => [
       ...(e?.doc?.slides || []).flatMap(s => [
         s?.bgImageId, s?.logoImageId, s?.refImageId || s?.refImageAssetId,
+        // Arte de fundo do deck (modo livre): a mesma imagem em até 3 páginas.
+        s?.presentationArtImageId,
         ...(s?.imageReferences || []).map(ref => ref?.imageId || ref?.assetId),
       ]),
       ...kitIds(e?.doc?.styleKit),
@@ -544,7 +546,9 @@ export function semImagensDeRuntime(library) {
       const jaGuardada = !!s.bgImageId && (bg.startsWith('blob:') || bg.startsWith('data:'));
       const logoRuntime = !!s.logoImageId || String(s.logoImage || '').startsWith('blob:');
       const refRuntime = String(s.refImage || '').startsWith('blob:');
-      if (!ehRuntime && !jaGuardada && !logoRuntime && !refRuntime) return s;
+      const art = typeof s.presentationArtImage === 'string' ? s.presentationArtImage : '';
+      const artRuntime = art.startsWith('blob:') || (!!s.presentationArtImageId && art.startsWith('data:'));
+      if (!ehRuntime && !jaGuardada && !logoRuntime && !refRuntime && !artRuntime) return s;
       mudou = true;
       const next = { ...s };
       if (ehRuntime || jaGuardada) delete next.bgImage;
@@ -552,6 +556,7 @@ export function semImagensDeRuntime(library) {
       // A migração só remove base64 depois de confirmar a gravação. Um ID
       // legado pode estar órfão: não apague a cópia inline só porque ele existe.
       if (refRuntime) delete next.refImage;
+      if (artRuntime) delete next.presentationArtImage;
       return next;
     });
     const brand = semLogoDeRuntime(doc.brand);
