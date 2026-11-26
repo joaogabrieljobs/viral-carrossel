@@ -1667,13 +1667,15 @@ export function stripFreeSlideFields(slide) {
 }
 
 export function isFreePresentationPreset(value) {
-  if (value && typeof value === 'object') return value.isFree === true || value.id === FREE_PRESENTATION_PRESET_ID;
+  if (value && typeof value === 'object') return value.id ? value.id === FREE_PRESENTATION_PRESET_ID
+    : value.isFree === true && value.productKind === 'apresentacao';
   return value === FREE_PRESENTATION_PRESET_ID;
 }
 
 /** Página do modo livre sem foto: não gera imagem (spec: `photo: none`). */
 export function slideSkipsImageGeneration(slide) {
-  return !!slide?.presentationFreeDesign && slide.presentationFreeDesign.photo === 'none' && !slide.presentationImageFallback;
+  return !!slide?.socialFreeDesign && slide.socialFreeDesign.photo === 'none'
+    || !!slide?.presentationFreeDesign && slide.presentationFreeDesign.photo === 'none' && !slide.presentationImageFallback;
 }
 
 /* ------------------------------------------------------------------------ */

@@ -5,6 +5,7 @@ import { slideImageIdentity } from './image-store.js';
 import { hasPresentationDesign, presentationForSocialFormat } from './presentation-format.js';
 import { restorePresentationPhotoComposition } from './presentation-composition.js';
 import { socialFormatPatch } from './social-visual-composition.js';
+import { isFreeSocialSlide } from './social-free-design.js';
 
 /** Ajustes visuais que podem ser diferentes em cada proporção. Texto e foto continuam no slide. */
 const VIEW_KEYS = [
@@ -142,8 +143,12 @@ export function slideForFormatDisplay(slide, fmt, formatViews, creativePreset) {
   if (!slide || !fmt || !FORMATS[fmt]) return slide;
   const source = restorePresentationPhotoComposition(slide);
   const adaptPresentation = fmt !== 'apresentacao' && hasPresentationDesign(slide, creativePreset);
-  if (fmt === 'carrossel' && !adaptPresentation) return slide;
   const entry = viewEntry(formatViews, fmt, slide.id) || {};
+  // O Livre pode nascer em qualquer proporção. Só o Feed legado é sempre
+  // a vista canônica; um Livre criado em Stories precisa da geometria 4:5.
+  const freeSocial = isFreeSocialSlide(slide);
+  const freeFeedDerived = freeSocial && slide.socialArt?.formato && slide.socialArt.formato !== 'carrossel';
+  if (fmt === 'carrossel' && !adaptPresentation && !freeFeedDerived && (!freeSocial || !Object.keys(entry).length)) return slide;
   // Carrossel da biblioteca v4: Quadrado e Stories são recompostos (zonas,
   // escala e dispositivos do formato), não o Feed reduzido.
   const socialLibrary = !adaptPresentation && fmt !== 'apresentacao' && slide.socialCompositionVersion >= 4 && !!slide.socialArt;
@@ -175,7 +180,8 @@ export function slideForFormatDisplay(slide, fmt, formatViews, creativePreset) {
 export function applyBrandEdit(doc, brandNext) {
   if (!doc || !brandNext) return doc;
   const fmt = FORMATS[doc.fmt] ? doc.fmt : 'carrossel';
-  if (fmt === 'carrossel' && !doc.slides?.some(slide => hasPresentationDesign(slide, doc.creativePreset))) {
+  if (fmt === 'carrossel' && !doc.slides?.some(slide => hasPresentationDesign(slide, doc.creativePreset)
+    || isFreeSocialSlide(slide) && slide.socialArt?.formato && slide.socialArt.formato !== 'carrossel')) {
     return { ...doc, brand: brandNext };
   }
   const base = doc.brand || {};
@@ -283,7 +289,7 @@ export function applyFormatEdit(doc, index, patch) {
     ['bgX', 'bgY', 'bgZoom', 'bgFit'].some(key => rest[key] !== undefined) || rest.elementOffsets?.photo
   )) rest.photoFraming = 'manual';
   const view = {};
-  if (fmt !== 'carrossel' || hasPresentationDesign(slide, doc.creativePreset)) {
+  if (isDerivedView(doc, slide)) {
     for (const key of VIEW_KEYS) {
       if (rest[key] !== undefined) {
         view[key] = rest[key];
@@ -332,7 +338,8 @@ export function applyFormatEdit(doc, index, patch) {
 
 function isDerivedView(doc, slide) {
   const fmt = FORMATS[doc.fmt] ? doc.fmt : 'carrossel';
-  return fmt !== 'carrossel' || hasPresentationDesign(slide, doc.creativePreset);
+  return fmt !== 'carrossel' || hasPresentationDesign(slide, doc.creativePreset)
+    || isFreeSocialSlide(slide) && slide.socialArt?.formato && slide.socialArt.formato !== 'carrossel';
 }
 
 function withViewEntry(doc, slideId, entry) {

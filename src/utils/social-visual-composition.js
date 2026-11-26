@@ -10,6 +10,7 @@ import { assignSocialFunctions, rhythmVariants } from './social-sequence.js';
 import { socialGround, luminance, socialChromeTokens, photoInkFor, minScrimAlpha, socialScrimAlphas, scrimSurface, inkOverSurface, contrastRatio, SOCIAL_SCRIM_MAX } from './social-chrome.js';
 import { normalizePresentationBlocks } from './presentation-quality.js';
 import { VIRAL_STYLES, PILL_ROLE_VISIBLE, pillRoleFor } from './social-viral-styles.js';
+import { applyFreeSocialDesign, isFreeSocialPreset, isFreeSocialSlide, socialFreeFormatPatch } from './social-free-design.js';
 
 const box = (x, y, w, h) => ({ x, y, w, h });
 const PHOTO_ESSAY = new Set(['editorial_magazine', 'mood_sepia', 'reflexivo_cream', 'cinematic_hybrid']);
@@ -128,8 +129,9 @@ function supportChars(slide) {
  * O alinhamento horizontal vem do preset (`slideDefaults.align`); a âncora
  * vertical continua sendo da composição — capa embaixo, miolo em cima.
  */
-export function applySocialVisualComposition(slides, { preset, photoRegion = 'full', brand = null, formato = 'carrossel', narrative = 'editorial' } = {}) {
+export function applySocialVisualComposition(slides, { preset, photoRegion = 'full', brand = null, formato = 'carrossel', narrative = 'editorial', deckDesign, plan } = {}) {
   if (!preset || preset.productKind === 'apresentacao' || photoRegion !== 'full') return slides;
+  if (isFreeSocialPreset(preset)) return applyFreeSocialDesign(slides, { preset, brand, formato, narrative, deckDesign, plan });
   if (usesSocialLibrary(preset)) return composeSocialLibrary(slides, { preset, brand, formato, narrative });
   return applySocialVisualCompositionV3(slides, { preset, photoRegion, brand, formato });
 }
@@ -219,8 +221,11 @@ export const SOCIAL_COMPOSITION_FIELDS = ['socialComposition', 'socialCompositio
  * própria (personalizado), o card volta ao clássico já com véu e sombra.
  * Projeto que nunca foi composto recebe só o reset, como antes.
  */
-export function restyleSocialSlides(slides, { preset, brand = null, formato = 'carrossel', overrides = {}, narrative = 'editorial' } = {}) {
+export function restyleSocialSlides(slides, { preset, brand = null, formato = 'carrossel', overrides = {}, narrative = 'editorial', deckDesign, plan } = {}) {
   if (!Array.isArray(slides)) return slides;
+  // Livre examina o original: o reset apagaria justamente os sinais de
+  // estilo próprio, zonas manuais e offsets que precisam ser preservados.
+  if (isFreeSocialPreset(preset)) return applyFreeSocialDesign(slides, { preset, brand, formato, narrative, deckDesign, plan });
   const eraComposto = slides.some((slide) => slide?.socialComposition);
   const base = slides.map((slide) => ({ ...slide, ...overrides }));
   if (!eraComposto && !(preset?.socialFamily && usesSocialLibrary(preset))) return base;
@@ -564,6 +569,7 @@ function photoScrimFloor(slide, art, L, chrome, { scrimAmount, textTop, scrimTop
  * para a vista Quadrado/Stories (format-view.js). Nunca toca em texto ou foto.
  */
 export function socialFormatPatch(slide, formato = 'carrossel') {
+  if (isFreeSocialSlide(slide)) return socialFreeFormatPatch(slide, formato);
   const art = slide?.socialArt;
   if (!art || !SOCIAL_COMPOSERS[art.family]) return {};
   const F = { ...formatFrame(formato) };
