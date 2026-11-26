@@ -243,7 +243,7 @@ export async function extractReferencePaletteFromSources(sources = [], { doc = g
   // Várias referências: empilhadas numa faixa só, cada uma na sua largura.
   const width = Math.max(...frames.map(fr => fr.width));
   const height = frames.reduce((sum, fr) => sum + fr.height, 0);
-  const data = new Uint8ClampedArray(width * height * 4);
+  const data = new globalThis.Uint8ClampedArray(width * height * 4);
   let row = 0;
   for (const fr of frames) {
     for (let y = 0; y < fr.height; y += 1) data.set(fr.data.subarray(y * fr.width * 4, (y + 1) * fr.width * 4), ((row + y) * width) * 4);
