@@ -6,6 +6,7 @@
  */
 
 import { canAutoApplyExplicitCardScript, parseExplicitCardScript } from './structured-card-script.js';
+import { normalizeReferencePalette } from './reference-palette.js';
 
 const STYLE_PROMPT_MAX = 4000;
 const CONTEXT_MD_MAX = 48000;
@@ -31,6 +32,13 @@ function asString(v) {
   return typeof v === 'string' ? v : '';
 }
 
+function referencePaletteOf(raw) {
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.refIds) || !Array.isArray(raw.colors)) return null;
+  const refIds = raw.refIds.filter(id => typeof id === 'string' && id).slice(0, MAX_REF_IMAGES);
+  const colors = normalizeReferencePalette(raw.colors);
+  return refIds.length && colors.length && colors.length === raw.colors.length ? { refIds, colors } : null;
+}
+
 function normalizeStyleKit(raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
   const refs = Array.isArray(src.refImages) ? src.refImages : [];
@@ -48,6 +56,9 @@ function normalizeStyleKit(raw) {
     stylePrompt: asString(src.stylePrompt).slice(0, STYLE_PROMPT_MAX),
     contextMd: asString(src.contextMd).slice(0, CONTEXT_MD_MAX),
     logoOnGenerate: src.logoOnGenerate === false ? false : true,
+    // Paleta extraída das referências pelo código (Teste 6, item 1), presa
+    // aos IDs das referências de onde saiu; forma inválida não é guardada.
+    ...(referencePaletteOf(src.referencePalette) ? { referencePalette: referencePaletteOf(src.referencePalette) } : {}),
     refImages: refs
       .filter((r) => r && typeof r === 'object' && (asString(r.imageId) || asString(r.assetId)
         || asString(r.dataUrl).startsWith('data:image/')))

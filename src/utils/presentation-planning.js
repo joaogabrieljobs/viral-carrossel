@@ -1,4 +1,4 @@
-import { coercePresentationPlanShape, auditPresentationPlanScenes,
+import { coercePresentationPlanShape, auditPresentationPlanScenes, snapPlanColorsToReference,
   buildPresentationPlanPrompt, validatePresentationPlan,
   PRESENTATION_PLAN_MAX_TOKENS, PRESENTATION_PLAN_SYSTEM_PROMPT,
 } from './presentation-plan.js';
@@ -59,7 +59,7 @@ ${sceneRepairLine(issues)}${quoteCandidatesBlock(previous, issues, sources)}Copi
  * Only a validated plan can reach onPlan or the writing stage. Diagnostics
  * intentionally contain no generated values, evidence IDs, source text or
  * provider error messages. The caller controls how to display/store them. */
-export async function generatePresentationPlan({ brief = '', userInstructions = '', sources = [], count = 12, presentationPath = 'auto', freeDesign = false, kitColors = [], kitReferenceWithoutText = false, aiOptions = {}, onStage, onPlan }, callAI) {
+export async function generatePresentationPlan({ brief = '', userInstructions = '', sources = [], count = 12, presentationPath = 'auto', freeDesign = false, kitColors = [], kitReferenceWithoutText = false, referenceColors = [], aiOptions = {}, onStage, onPlan }, callAI) {
   if (!Number.isInteger(Number(count)) || Number(count) < 1 || Number(count) > 72) {
     throw Object.assign(new Error('Escolha uma quantidade válida de slides antes de gerar.'), { code: 'presentation_input_invalid' });
   }
@@ -68,7 +68,9 @@ export async function generatePresentationPlan({ brief = '', userInstructions = 
   let issues = [];
   // Roteiro válido cuja cena pediu reparo: fica como reserva se o reparo falhar.
   let fallback = null;
-  const accept = (plan, attempt) => {
+  const accept = (validPlan, attempt) => {
+    // Teste 6, item 1: cores fora da referência extraída viram a mais próxima.
+    const plan = snapPlanColorsToReference(validPlan, { referenceColors, kitColors });
     const metadata = { attempts: attempt, diagnostics };
     onPlan?.(plan, metadata);
     throwIfGenerationCancelled(aiOptions.signal);
@@ -78,7 +80,7 @@ export async function generatePresentationPlan({ brief = '', userInstructions = 
     throwIfGenerationCancelled(aiOptions.signal);
     onStage?.(attempt === 1 ? 'planning' : 'planning_repair', { attempt, diagnostics });
     throwIfGenerationCancelled(aiOptions.signal);
-    const prompt = buildPresentationPlanPrompt({ brief, userInstructions, sources, count, presentationPath, compactRepair: attempt > 1, freeDesign: freeDesign === true, kitColors, kitReferenceWithoutText })
+    const prompt = buildPresentationPlanPrompt({ brief, userInstructions, sources, count, presentationPath, compactRepair: attempt > 1, freeDesign: freeDesign === true, kitColors, kitReferenceWithoutText, referenceColors })
       + (attempt > 1 ? repairBlock(previous, issues, sources) : '');
     let raw;
     let response;

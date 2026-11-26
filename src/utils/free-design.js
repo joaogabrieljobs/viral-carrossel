@@ -32,6 +32,7 @@ import { PRESENTATION_ICON_NAMES } from './presentation-icons.js';
 import { FREE_FONT_ADVANCES, FREE_FONT_CHARSET } from './free-font-metrics.js';
 import { inkOver, mirrorChrome, mirrorTextZones, sideScrim, textOverPhoto } from './image-composition.js';
 import { reservedAreaColour, resolveSlideVisualDirection } from './visual-direction.js';
+import { nearestPaletteHex } from './reference-palette.js';
 
 export { FREE_PRESENTATION_PRESET_ID };
 
@@ -240,6 +241,30 @@ export function deckDesignFromBrand(brand = {}, base = DEFAULT_DECK_DESIGN) {
     },
     mood: start.mood,
   });
+}
+
+/**
+ * Teste 6, item 1: com a paleta extraída da referência, as cores do deck
+ * (fundo, superfície, destaque e destaque 2) vêm da lista; o hex fora dela
+ * vira o mais próximo. O destaque evita a cor do fundo (e lê sobre ele, 3:1,
+ * quando a lista permite). Tintas de leitura (ink, muted, inverse e
+ * inverseInk) continuam neutras e recalculadas pelo contraste. Sem lista: igual.
+ */
+export const FREE_REFERENCE_SNAP_KEYS = Object.freeze(['bg', 'surface', 'accent', 'accent2']);
+export function snapDeckDesignToPalette(deckDesign, allowed = []) {
+  const pool = [...new Set((Array.isArray(allowed) ? allowed : []).map(c => normalizeHex(c?.hex || c)).filter(Boolean))];
+  if (!deckDesign || typeof deckDesign !== 'object' || !pool.length) return deckDesign;
+  const raw = deckDesign.palette && typeof deckDesign.palette === 'object' ? deckDesign.palette : {};
+  const palette = { ...raw };
+  const nearest = (hex, candidates) => (normalizeHex(hex) ? nearestPaletteHex(normalizeHex(hex), candidates.length ? candidates : pool) : null);
+  palette.bg = nearest(raw.bg, pool) || raw.bg;
+  const notBg = pool.filter(c => c !== palette.bg);
+  palette.surface = nearest(raw.surface, pool) || raw.surface;
+  const readableOnBg = notBg.filter(c => !palette.bg || wcagContrast(c, palette.bg) >= 3);
+  palette.accent = nearest(raw.accent, readableOnBg.length ? readableOnBg : notBg) || raw.accent;
+  const rest = notBg.filter(c => c !== palette.accent);
+  palette.accent2 = nearest(raw.accent2, rest.length ? rest : notBg) || raw.accent2;
+  return { ...deckDesign, palette };
 }
 
 /** Paleta completa no formato das famílias (groundInks, chrome e blocos). */

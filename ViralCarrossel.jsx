@@ -105,6 +105,7 @@ import { imageAspectRatioForSlide } from './shared/image-aspect.js';
 import { normalizeVisualBible, visualBibleHasPerson, planPersonAnchor, pickPersonAnchorSlide } from './src/utils/visual-bible.js';
 import { composeImageDirection } from './src/utils/image-direction.js';
 import { kitVisualColors } from './src/utils/visual-direction.js';
+import { extractReferencePaletteFromSources, kitReferencePalette, referencePaletteKitField } from './src/utils/reference-palette.js';
 import { presentationPlanEntryImageQuery } from './src/utils/presentation-plan.js';
 import {
   PRESENTATION_VISUAL_PRESETS,
@@ -6178,6 +6179,20 @@ ${jsonShapeLine}`;
     setGenProgress({ phase: 'text', current: 1, total: isPresentationGeneration ? 5 : 3, label: isPresentationGeneration ? 'Etapa 1 de 5 · Organizando o roteiro e as evidências' : 'Etapa 1 de 3 · Escrevendo o texto' });
     // Orçamento de saída cresce com o número de cards (T/C 1/1 traz subtitle + bodyAfterImage por slide) — auditoria M2.
     const genMaxTokens = Math.min(8192, 3072 + Math.max(1, Number(count) || 1) * 512);
+    // Teste 6, item 1: a IA do roteiro não vê a referência do kit; as cores
+    // saem da própria imagem, no navegador (sem IA, sem rede), e ficam no kit
+    // do projeto, presas às referências, para refazer uma imagem depois.
+    let referenceColors = [];
+    let referencePaletteField = null;
+    if (isPresentationGeneration && !remix && (styleKit?.refImages?.length || 0) > 0) {
+      referenceColors = kitReferencePalette(styleKit);
+      if (!referenceColors.length) {
+        try {
+          referenceColors = await extractReferencePaletteFromSources(await resolveImageReferences(styleKit, null, null, null));
+          referencePaletteField = referencePaletteKitField(styleKit, referenceColors);
+        } catch { referenceColors = []; }
+      }
+    }
     const planningBrief = [
       buildGenerationTaskBlock(topic, announcement),
       n ? `Área ou contexto: ${n}` : '',
@@ -6217,6 +6232,7 @@ ${jsonShapeLine}`;
           // prioridade; referência sem texto não tem cor que a IA possa ler.
           kitColors: kitVisualColors(styleKit).colors,
           kitReferenceWithoutText: (styleKit?.refImages?.length || 0) > 0 && !kitVisualColors(styleKit).colors.length,
+          referenceColors,
           sources: [{ id: 'request', title: 'Pedido atual e marca', kind: 'brief', text: planningBrief }, ...presentationSources],
         },
         presentationLimitsForPlan: (plan, draftedSlides = []) => {
@@ -6619,6 +6635,8 @@ ${jsonShapeLine}`;
           }),
       visualPreset: generationPresetId || null,
       ...(freeDeckDesign ? { presentationDeckDesign: freeDeckDesign } : {}),
+      // Paleta extraída da referência, guardada com o kit do projeto.
+      ...(referencePaletteField ? { styleKit: { ...normalizeStyleKit(d.styleKit), referencePalette: referencePaletteField } } : {}),
       presentationDesignSystemId: isPresentationGeneration
         ? (effectiveVisualPresetDef?.sourceId || null)
         : undefined,

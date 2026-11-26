@@ -14,6 +14,7 @@
  */
 import { explicitBrandColorsFromKit } from './style-kit-design.js';
 import { wcagContrast } from './wcag.js';
+import { kitReferencePalette, nearestPaletteHex } from './reference-palette.js';
 
 export const VISUAL_DIRECTION_ROLES = Object.freeze(['base', 'subject_light', 'shadow', 'graphic', 'accent']);
 export const VISUAL_DIRECTION_TEXT_LIMITS = Object.freeze({ finish: 240, atmosphere: 200, graphics: 240, avoid: 240 });
@@ -126,6 +127,24 @@ export function applyKitColors(visualDirection, kit) {
 }
 
 /* ------------------------------------------------------------------------ */
+/* Referência: as cores extraídas da imagem do kit (Teste 6, item 1)        */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * Hex da direção visual que não está na lista (cores da referência mais as
+ * escritas no kit) vira o mais próximo dela. A IA só distribui os papéis.
+ * Sem lista: o valor volta igual (comportamento de antes).
+ */
+export function snapVisualDirectionToPalette(visualDirection, allowed = [], { source = 'reference' } = {}) {
+  const pool = (Array.isArray(allowed) ? allowed : []).map(c => visualHex(c?.hex || c)).filter(Boolean);
+  if (!visualDirection || !Array.isArray(visualDirection.palette) || !pool.length) return visualDirection;
+  const seen = new Set();
+  const palette = visualDirection.palette.map(item => ({ ...item, hex: nearestPaletteHex(item.hex, pool) }))
+    .filter(item => !seen.has(`${item.role}${item.hex}`) && seen.add(`${item.role}${item.hex}`));
+  return { ...visualDirection, palette, paletteSource: visualDirection.paletteSource === 'kit' ? 'kit' : source };
+}
+
+/* ------------------------------------------------------------------------ */
 /* Modo livre: a paleta da imagem combina com a do deck                     */
 /* ------------------------------------------------------------------------ */
 
@@ -175,6 +194,10 @@ export function resolveSlideVisualDirection({ slide = null, styleKit = null } = 
   const free = slide?.presentationPresetId === FREE_PRESET && isObject(slide?.presentationDeckDesign);
   if (free) value = alignVisualDirectionWithDeck(value, slide.presentationDeckDesign);
   if (!value) return null;
+  // Paleta extraída da referência e guardada no kit: vale também ao refazer
+  // uma imagem depois. As cores escritas no kit continuam vencendo.
+  const reference = kitReferencePalette(styleKit);
+  if (reference.length) value = snapVisualDirectionToPalette(value, [...reference.map(c => c.hex), ...kitVisualColors(styleKit).colors]);
   return applyKitColors(value, styleKit);
 }
 
@@ -207,7 +230,8 @@ export function composeVisualDirectionBlock(visualDirection, { referenceLook = f
     'VISUAL DIRECTION (shared by every image of this deck):',
     `Palette: ${palette}.`,
     // A IA não vê a referência: se ela anexada mostrar outra cor, vale a dela.
-    referenceLook && !['kit'].includes(visualDirection.paletteSource) ? 'If the attached style reference has other colours, its colours win; keep these roles.' : '',
+    // Paleta que já saiu da referência (extraída pelo código) dispensa a frase.
+    referenceLook && !['kit', 'reference'].includes(visualDirection.paletteSource) ? 'If the attached style reference has other colours, its colours win; keep these roles.' : '',
     visualDirection.finish ? `Finish: ${sentence(visualDirection.finish)}` : '',
     visualDirection.atmosphere ? `Atmosphere: ${sentence(visualDirection.atmosphere)}` : '',
     graphics ? `Graphics: ${graphics}` : '',

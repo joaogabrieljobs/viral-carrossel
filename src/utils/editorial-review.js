@@ -1451,6 +1451,8 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
     freeDesign: config.freeDesign === true,
     // Direção visual do deck: cores escritas no kit e referência que a IA não vê.
     kitColors: Array.isArray(planning.kitColors) ? planning.kitColors : [], kitReferenceWithoutText: planning.kitReferenceWithoutText === true,
+    // Teste 6, item 1: cores extraídas da imagem de referência do kit.
+    referenceColors: Array.isArray(planning.referenceColors) ? planning.referenceColors : [],
     aiOptions: textOptions, onStage, onPlan,
   }, callAI);
   let writingDiagnostics = [];
