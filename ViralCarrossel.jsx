@@ -256,6 +256,7 @@ import { deckDesignFromBrand, freeBrandPatch, slideSkipsImageGeneration } from '
 import { isFreeSocialPreset, isFreeSocialSlide, socialFreeDeckViolations, socialFreePhotoPatch } from './src/utils/social-free-design.js';
 import { socialFreeImageSlide } from './src/utils/social-free-prompt.js';
 import { preserveSocialFreeRemix } from './src/utils/social-free-remix.js';
+import { clearSocialFreeDocumentState } from './src/utils/social-free-state.js';
 import { finishFreeDraft } from './src/utils/free-draft.js';
 import { freeImageGenerationSlide, reconcileFreeImageFallback, reconcileFreeImageDocument } from './src/utils/free-image-fallback.js';
 import { applyFreeSlideImageToStoredProject } from './src/utils/free-image-persistence.js';
@@ -1505,7 +1506,8 @@ export default function App() {
               ...(freeSocial ? { deckDesign: d.socialDeckDesign, plan: d.socialPlan } : {}),
             }),
           };
-      return preserveVisualPresetContent(fromPreset ? { ...next, creativePreset: fromPreset } : next, d);
+      const styled = preserveVisualPresetContent(fromPreset ? { ...next, creativePreset: fromPreset } : next, d);
+      return freeSocial ? styled : clearSocialFreeDocumentState(styled);
     });
     // O aviso leva o próprio Desfazer: no celular não há atalho de teclado e a
     // troca vale para o projeto inteiro por padrão.
@@ -5439,12 +5441,18 @@ export default function App() {
       return { ok: false, reason: 'stale_target' };
     }
     const liveSlides = slidesLiveRef.current || slides;
-    const snap = target?.slideId
+    const sourceSnap = target?.slideId
       ? liveSlides.find((slide) => slide.id === target.slideId)
       : (liveSlides[idx] || slides[idx]);
-    if (!snap) return { ok: false, reason: 'slide_missing' };
-    const slideId = snap.id;
-    const expectedImageIdentity = slideImageIdentity(snap);
+    if (!sourceSnap) return { ok: false, reason: 'slide_missing' };
+    const slideId = sourceSnap.id;
+    // A corrida de mídia acompanha o original; a direção acompanha o que
+    // a pessoa vê, inclusive a saída do Livre apenas neste formato.
+    const expectedImageIdentity = slideImageIdentity(sourceSnap);
+    const resolvedSocialView = isFreeSocialSlide(sourceSnap);
+    const snap = resolvedSocialView
+      ? socialFreeImageSlide(sourceSnap, { fmt, formatViews: doc.formatViews })
+      : sourceSnap;
     const queryOverride = String(target?.queryOverride || '').trim();
     // Uma escolha individual pode acrescentar foto a uma página só de texto.
     // O lote respeita photo:none; só o gesto explícito muda essa intenção.
@@ -5496,7 +5504,7 @@ export default function App() {
         // Estilo, anexos, âncora, ficha visual, família e enquadramento seguem
         // separados por papel; a proporção acompanha a zona real da foto.
         imageDirection: composeImageDirection({
-          styleKit, slide: generationSnap, fmt, formatViews: doc.formatViews, visualBible: doc.visualBible,
+          styleKit, slide: generationSnap, fmt, formatViews: resolvedSocialView ? null : doc.formatViews, visualBible: doc.visualBible,
           slideDirection: imageState.extraPrompt, anchorPlan, baseReferenceCount: baseRefs.length,
           presentationPanel: fmt === 'apresentacao' && [2, 3].includes(generationSnap.presentationCompositionVersion),
           // Spec 1.1 (referência): a referência do kit vai em toda imagem; as
@@ -5504,8 +5512,7 @@ export default function App() {
           deckSlides: fmt === 'apresentacao' || isFreeSocialSlide(generationSnap) ? liveSlides : null,
           slideIndex: liveSlides.findIndex((slide) => slide.id === slideId),
         }),
-        aspectRatio: imageAspectRatioForSlide(isFreeSocialSlide(generationSnap)
-          ? socialFreeImageSlide(generationSnap, { fmt, formatViews: doc.formatViews }) : generationSnap, fmt),
+        aspectRatio: imageAspectRatioForSlide(generationSnap, fmt),
         onPromptPlan: plan => imagePromptCutGateRef.current(plan, generationProjectId),
         usageContext: {
           projectId: generationProjectId,
