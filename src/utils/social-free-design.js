@@ -12,7 +12,7 @@ import {
 import { assignSocialFunctions } from './social-sequence.js';
 import { normalizePresentationBlocks } from './presentation-quality.js';
 import { readableInk, minScrimAlpha, scrimSurface } from './social-chrome.js';
-import { footerChromeReservePct, STORIES_FOOTER_LIFT } from './card-chrome.js';
+import { socialFreeChromeGeometry } from './card-chrome.js';
 import { resolvePresetChrome } from './preset-tokens.js';
 import { titleTrackingBase } from './title-tracking.js';
 import { wcagContrast } from './wcag.js';
@@ -81,21 +81,26 @@ function cardPlan(plan, slide, index) {
 function chromeContext(slide, brand = {}) {
   brand = brand || {};
   const chrome = resolvePresetChrome(brand);
-  const footer = Object.fromEntries(Object.keys(FORMATS).map(fmt => {
-    const reserve = footerChromeReservePct(chrome, fmt);
-    return [fmt, reserve + (fmt === 'stories' && reserve > 0 ? STORIES_FOOTER_LIFT * 100 : 0)];
+  const frames = Object.fromEntries(Object.keys(FORMATS).map(fmt => {
+    const F = formatFrame(fmt);
+    return [fmt, { ...socialFreeChromeGeometry(chrome, F, fmt, slide), height: F.h }];
   }));
+  const footer = Object.fromEntries(Object.entries(frames).map(([fmt, geometry]) => [fmt, geometry.bottomReservePx / geometry.height * 100]));
+  const topReserve = Object.fromEntries(Object.entries(frames).map(([fmt, geometry]) => [fmt, geometry.topReservePx / geometry.height * 100]));
+  const brandLead = Object.fromEntries(Object.entries(frames).map(([fmt, geometry]) => [fmt, geometry.lead
+    ? box(geometry.lead.x / 1080 * 100, geometry.lead.y / geometry.height * 100,
+      geometry.lead.w / 1080 * 100, geometry.lead.h / geometry.height * 100) : null]));
   const logo = !slide.logoHidden && (slide.logoImage || slide.logoImageId || brand.logo || brand.logoImageId)
     ? { pos: slide.logoPosition || brand.logoPosition || 'tr', size: Number(slide.logoSize ?? brand.logoSize) || 150, drop: !!brand.showHandle } : null;
-  return { footer, logo };
+  return { footer, logo, topReserve, brandLead };
 }
 
 function usefulFrame(formato, context, slide) {
   const F = formatFrame(FORMATS[formato] ? formato : 'carrossel');
-  let top = F.t;
+  let top = Math.max(F.t, context.topReserve?.[F.key] || 0);
   let bottom = Math.min(100 - F.b, 100 - (context.footer?.[F.key] || 0));
   const logo = context.logo;
-  if (logo && /^[tb][lr]$/.test(logo.pos)) {
+  if (!context.topReserve && logo && /^[tb][lr]$/.test(logo.pos)) {
     const margin = F.w * 0.045;
     const gap = 24 / F.h * 100;
     if (logo.pos.startsWith('t')) top = Math.max(top, (margin + logo.size) / F.h * 100 + gap
@@ -104,7 +109,10 @@ function usefulFrame(formato, context, slide) {
   }
   const eyebrow = String(slide.eyebrowText || slide.eyebrow || slide.socialPlan?.eyebrow || '').trim();
   const eyebrowSpace = eyebrow ? (28 * 1.3 + 16) / F.h * 100 : 0;
-  return { ...F, top, bottom, eyebrow, contentTop: top + eyebrowSpace };
+  const lead = context.brandLead?.[F.key];
+  const brandLead = lead ? box(Math.max(F.e, lead.x), lead.y,
+    Math.min(100 - F.e, lead.x + lead.w) - Math.max(F.e, lead.x), lead.h) : null;
+  return { ...F, top, bottom, eyebrow, eyebrowSpace, contentTop: top + eyebrowSpace, brandLead };
 }
 
 /** Arquétipo explícito usa só geometria existente, nunca coordenadas da IA. */
@@ -176,7 +184,9 @@ function fitLayout(L, slide, design, deck, F) {
   // Blocos são um terceiro elemento: título e eventual contexto ficam acima
   // deles, medidos com as fontes de 1080 e sem reduzir células abaixo de 28.
   if (structured) {
-    T = box(F.e, F.contentTop, right - F.e, 20);
+    const lead = F.useBrandLead && F.brandLead;
+    T = lead ? box(lead.x, lead.y + F.eyebrowSpace, Math.min(lead.w, right - lead.x), 20)
+      : box(F.e, F.contentTop, right - F.e, 20);
     S = box(F.e, F.contentTop + 22, right - F.e, 10);
     if (P && !L.onPhoto) {
       // A foto enviada continua visível, mas não compete com a tabela. O
@@ -189,13 +199,15 @@ function fitLayout(L, slide, design, deck, F) {
     bodyPx = 30; supportPx = 28;
     const block = nativeBlocks(slide)[0];
     const blockPx = blockHeight(block, (right - F.e) / 100 * F.w, deck);
-    for (let n = 0; n < 20 && tNeed() + sNeed() + blockPx + 48 > (F.bottom - F.contentTop) / 100 * F.h && titlePx > 56; n += 1) titlePx = Math.max(56, titlePx - 2);
+    const neededEnd = () => Math.max(lead ? F.top : 0, T.y + pct(tNeed())) + pct(sNeed() + blockPx + 48);
+    for (let n = 0; n < 20 && neededEnd() > F.bottom && titlePx > 56; n += 1) titlePx = Math.max(56, titlePx - 2);
     T.h = round(pct(tNeed()));
-    S.y = round(T.y + T.h + pct(16));
+    S.y = round(Math.max(lead ? F.top : 0, T.y + T.h) + pct(16));
     S.h = round(Math.max(1, pct(sNeed())));
     const ey = Math.max(S.y + S.h + pct(String(copy(slide)).trim() ? 24 : 10), P && !L.onPhoto ? P.y + P.h + pct(24) : 0);
     const evidence = box(F.e, ey, right - F.e, Math.max(1, F.bottom - ey));
-    return { title: T, subtitle: S, evidence, photo: P, titlePx, bodyPx, supportPx, over: blockPx > evidence.h / 100 * F.h, titleLeading };
+    return { title: T, subtitle: S, evidence, photo: P, titlePx, bodyPx, supportPx,
+      over: blockPx > evidence.h / 100 * F.h, titleLeading, ...(lead ? { eyebrowY: lead.y } : {}) };
   }
   // Coluna estreita que pede uma palavra por linha ganha o empilhado, sem
   // retirar a foto. É uma alternativa de geometria, não redução de texto.
@@ -213,7 +225,10 @@ function fitLayout(L, slide, design, deck, F) {
     const need = () => tNeed() + sNeed() + 24;
     if (need() > (F.bottom - top) / 100 * F.h) {
       if (photoAbove) {
-        const freed = Math.min(P.h - 22, pct(need()) - (F.bottom - top));
+        // Marca e rodapé podem consumir mais altura no Quadrado. O módulo
+        // fotográfico pode ficar menor, até 180 px reais, antes de comprometer
+        // a leitura; nunca desaparecer nem reduzir o texto abaixo do piso.
+        const freed = Math.min(P.h - Math.min(22, pct(180)), pct(need()) - (F.bottom - top));
         if (freed > 0) { P.h = round(P.h - freed); top -= freed; }
       } else if (!P || L.onPhoto) top = Math.max(F.contentTop, Math.min(top, F.bottom - pct(need())));
     }
@@ -280,7 +295,7 @@ function resolvedChrome(raw, fit, F, inks, slide, deck) {
     return [{ ...d, color: colors[d.color] || inks.muted, ...(d.t === 'text' ? { size, role: d.role === 'display' ? 'title' : 'body', opacity: 1, z: 'over' } : {}) }];
   });
   if (F.eyebrow) chrome.push({ t: 'text', text: '{eyebrow}', requires: 'eyebrow', x: fit.title.x,
-    y: round(Math.max(F.top, fit.title.y - (28 * 1.3 + 16) / F.h * 100)), w: fit.title.w,
+    y: round(fit.eyebrowY ?? Math.max(F.top, fit.title.y - (28 * 1.3 + 16) / F.h * 100)), w: fit.title.w,
     size: 28, role: 'body', weight: 600, color: inks.ink, opacity: 1, tracking: 5, z: 'over' });
   return chrome;
 }
@@ -291,7 +306,15 @@ function composeSlide(slide, design, { deck, fn, formato, variant = 0, context =
   let L = rawLayout(design, original, fn, F.key, variant);
   const onPhoto = design.photo !== 'none' && !!(L.onPhoto || L.scrim || L.inkOnPhoto);
   if (onPhoto && design.ground !== 'photo') design = { ...design, ground: 'photo' };
-  const fit = fitLayout(L, original, design, deck, F);
+  let fit = fitLayout(L, original, design, deck, F);
+  if (fit.over && F.brandLead) {
+    const lead = F.brandLead;
+    const alternative = design.block !== 'none' ? fitLayout(L, original, design, deck, { ...F, useBrandLead: true })
+      : !onPhoto && design.photo !== 'none' && lead.h / 100 * F.h >= 180
+        ? fitLayout({ ...L, photo: lead, title: box(F.e, F.contentTop, 100 - 2 * F.e, 20),
+          subtitle: box(F.e, F.contentTop + 22, 100 - 2 * F.e, 20) }, original, design, deck, F) : null;
+    if (alternative && !alternative.over) fit = alternative;
+  }
   const inks = inksFor(design, deck, onPhoto);
   const display = freeFontSpec(deck.fonts.display, 'display');
   const text = freeFontSpec(deck.fonts.text, 'text');
@@ -299,7 +322,7 @@ function composeSlide(slide, design, { deck, fn, formato, variant = 0, context =
     ? socialDevices(design.family, fn, { ...L, ...fit, hasSub: !!copy(slide).trim(), subUsed: fit.subtitle.h, titleUsed: fit.title.h }, F.key, { photo: !!fit.photo }) : L.chrome;
   const chrome = resolvedChrome(rawChrome, fit, F, inks, original, deck);
   const socialArt = { family: design.family, fn, variant, index, count, formato: F.key, archetype: L.archetype,
-    ground: design.ground, chrome, density: fit.over ? 'over' : 'ok', footer: context.footer || {}, logo: context.logo || null,
+    ground: design.ground, chrome, density: fit.over ? 'over' : 'ok', footer: context.footer || {}, topReserve: context.topReserve || {}, brandLead: context.brandLead || {}, logo: context.logo || null,
     typo: { titleFont: display.css, bodyFont: text.css, titleLeading: Math.round(fit.titleLeading * 100), titleCase: 'normal' },
     textOnPhoto: onPhoto, photoInks: { title: inks.ink, body: inks.ink, accent: inks.accent } };
   socialArt.rhythmKey = [design.ground, L.photo ? [L.photo.x, L.photo.y, L.photo.w, L.photo.h].map(Math.round).join(':') : 'none',
@@ -388,7 +411,7 @@ export function socialFreeFormatPatch(slide, formato = 'carrossel') {
   if (!isFreeSocialSlide(slide) || socialFreeSlideLocked(slide) || !FORMATS[formato] || slide.socialArt?.formato === formato) return {};
   const art = slide.socialArt || {};
   return composeSlide(slide, slide.socialFreeDesign, { deck: normalizeDeckDesign(slide.socialDeckDesign), fn: art.fn || slide.socialFunction || 'development',
-    formato, variant: art.variant || 0, context: { footer: art.footer, logo: art.logo }, index: art.index || 0, count: art.count || 1 });
+    formato, variant: art.variant || 0, context: { footer: art.footer, logo: art.logo, topReserve: art.topReserve, brandLead: art.brandLead }, index: art.index || 0, count: art.count || 1 });
 }
 
 /** Ação explícita de inserir mídia. `requested` prepara só o snapshot do pedido
@@ -400,7 +423,7 @@ export function socialFreePhotoPatch(slide, { requested = false } = {}) {
   if (socialFreeSlideLocked(slide)) return manualPhotoPatch(slide, design);
   return composeSlide(slide, design, { deck: normalizeDeckDesign(slide.socialDeckDesign), fn: art.fn || slide.socialFunction || 'development',
     formato: art.formato || slide.socialPlan?.formato || 'carrossel', variant: art.variant || 0,
-    context: { footer: art.footer, logo: art.logo }, index: art.index || 0, count: art.count || 1 });
+    context: { footer: art.footer, logo: art.logo, topReserve: art.topReserve, brandLead: art.brandLead }, index: art.index || 0, count: art.count || 1 });
 }
 
 function manualOccupiedZones(slide, F) {
@@ -441,7 +464,7 @@ function emptyPhotoZone(occupied, F) {
 function manualPhotoPatch(slide, proposed) {
   const art = slide.socialArt || {};
   const deck = normalizeDeckDesign(slide.socialDeckDesign);
-  const F = usefulFrame(art.formato || slide.socialPlan?.formato || 'carrossel', { footer: art.footer, logo: art.logo }, slide);
+  const F = usefulFrame(art.formato || slide.socialPlan?.formato || 'carrossel', { footer: art.footer, logo: art.logo, topReserve: art.topReserve, brandLead: art.brandLead }, slide);
   const zones = slide.canvas?.zones || {};
   const occupied = manualOccupiedZones(slide, F);
   const hasZone = zones.photo?.w > 2 && zones.photo?.h > 2;

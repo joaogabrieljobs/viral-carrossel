@@ -20,6 +20,62 @@ const temTexto = (valor) => !!String(valor || '').trim();
  */
 export const STORIES_FOOTER_LIFT = 0.13;
 
+/** Posição e reserva do chrome exclusivamente no Livre social. As fontes e
+ * as escalas são as mesmas do renderer; o catálogo antigo não usa esta régua. */
+export function socialFreeChromeGeometry(brand = {}, f, formato = 'carrossel', slide = {}) {
+  const safe = { carrossel: [0.085, 0.085], quadrado: [0.09, 0.09], stories: [0.14, 0.18] }[formato] || [0.085, 0.085];
+  const frame = f || FORMATS[formato] || FORMATS.carrossel;
+  const { w, h } = frame, unit = w / 1080, gap = 24 * unit;
+  const scale = value => Math.min(2, Math.max(0.5, (Number(value) || 100) / 100));
+  const font = px => Math.max(28 * unit, px);
+  const topSafePx = h * safe[0], bottomSafePx = h * safe[1];
+  const barScale = scale(brand.footerBarScale), pillScale = scale(brand.footerPillScale);
+  const barColumns = [brand.footerBarLeft, brand.footerBarCenter, brand.footerBarRight];
+  const hasBar = barColumns.some(temTexto);
+  const hasPill = temTexto(brand.footerPillText) && slide.hideFooterPill !== true;
+  const barHeight = hasBar ? font(w * 0.020 * barScale) * 1.3
+    + (barColumns.some(value => String(value || '').includes('|')) ? h * 0.004 + font(w * 0.022 * barScale) * 1.3 : 0) : 0;
+  const pillHeight = hasPill ? h * 0.024 * pillScale
+    + Math.max(font(w * 0.026 * pillScale) * 1.25, brand.footerPillArrow !== false ? w * 0.05 * pillScale : 0) : 0;
+  const lift = formato === 'stories' ? h * STORIES_FOOTER_LIFT : 0;
+  const barBottomPx = Math.max(bottomSafePx, h * 0.038 + lift);
+  const pillBottomPx = hasBar ? barBottomPx + barHeight + h * 0.022 : Math.max(bottomSafePx, h * 0.058 + lift);
+  const footerReservePx = hasPill ? pillBottomPx + pillHeight + h * 0.018 : hasBar ? barBottomPx + barHeight + h * 0.018 : 0;
+
+  const hasHeader = temTexto(brand.cultureHeaderLeft) || temTexto(brand.cultureHeaderYear);
+  const hasBadge = !!brand.showPageBadge;
+  const hasHandle = !!brand.showHandle && !!slide.showHandle && temTexto(brand.handle);
+  const hasLogo = !slide.logoHidden && !!(slide.logoImage || slide.logoImageId || brand.logo || brand.logoImageId);
+  let logoPos = slide.logoPosition || brand.logoPosition || 'tr';
+  if (logoPos === 'c' && !slide.elementOffsets?.logo && `${slide.title || ''} ${slide.subtitle || ''} ${slide.bodyAfterImage || ''}`.trim().length > 24) logoPos = 'tr';
+  const logoSize = Math.round((Number(slide.logoSize ?? brand.logoSize) || 260) * unit);
+  const margin = w * 0.045;
+  const headerScale = scale(brand.cultureHeaderScale), badgeScale = scale(brand.pageBadgeScale);
+  const rowHeight = Math.max(hasHeader ? font(w * 0.020 * headerScale) * 1.3 : 0,
+    hasBadge ? font(w * 0.024 * badgeScale) * 1.3 + h * 0.012 * badgeScale : 0);
+  const left = hasLogo && logoPos === 'tl' ? margin + logoSize + gap : w * 0.05;
+  const right = hasLogo && logoPos === 'tr' ? margin + logoSize + gap : w * 0.05;
+  const headerRightPx = right + (hasBadge ? w * 0.16 * badgeScale + gap : 0);
+  const handleTopPx = Math.max(topSafePx, h * (Number(brand.handleBadgeY) || 4) / 100) + (rowHeight ? rowHeight + gap : 0);
+  const handleHeight = Math.max(w * 0.034, font(w * 0.022) * 1.3) + h * 0.02 + 2 * unit;
+  const logoBottomPx = Math.max(bottomSafePx, footerReservePx ? footerReservePx + gap : 0);
+  const textChromeBottomPx = Math.max(topSafePx, rowHeight ? topSafePx + rowHeight + gap : 0,
+    hasHandle ? handleTopPx + handleHeight + gap : 0);
+  const topReservePx = Math.max(textChromeBottomPx, hasLogo && logoPos.startsWith('t') ? topSafePx + logoSize + gap : 0);
+  // A marca ocupa um retângulo, não toda a largura. Esta área pode receber
+  // uma foto ou um título quando a composição abaixo do logo ficaria densa.
+  const lead = hasLogo && /^t[lr]$/.test(logoPos) && textChromeBottomPx < topSafePx + logoSize
+    ? { x: left, y: textChromeBottomPx, w: w - left - right, h: topSafePx + logoSize - textChromeBottomPx } : null;
+  const bottomReservePx = Math.max(bottomSafePx, footerReservePx,
+    hasLogo && logoPos.startsWith('b') ? logoBottomPx + logoSize + gap : 0);
+  return { topSafePx, bottomSafePx, topReservePx, bottomReservePx, footerReservePx,
+    barBottomPx, pillBottomPx, barHeight, pillHeight,
+    headerTopPx: topSafePx, headerLeftPx: left, headerRightPx,
+    badgeTopPx: topSafePx, badgeRightPx: right,
+    handleTopPx, handleLeftPx: Math.max(left, w * (Number(brand.handleBadgeX) || 5) / 100), handleRightPx: right,
+    logoTopPx: topSafePx, logoBottomPx, logoSize, logoPos, lead };
+}
+
 /** Altura em px da barra de três colunas; 0 quando nenhuma coluna tem texto. */
 export function footerBarHeightPx(brand, f, escala = 1) {
   const colunas = [brand?.footerBarLeft, brand?.footerBarCenter, brand?.footerBarRight];

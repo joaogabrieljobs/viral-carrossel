@@ -28,7 +28,7 @@ import { groundInks, slidePaletteOverrides } from '../../utils/presentation-fami
 import { resolvePresetChrome, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
 import { localizeFixedLabel } from '../../utils/fixed-labels.js';
 import { ContentLabelLanguageContext } from '../../utils/content-label-language.js';
-import { cultureHeaderInks, footerChromeReservePx, footerGuardApplies, footerPillBottomPx, footerPillColors, photoBehindHeaderChrome, textZonesAboveFooter, STORIES_FOOTER_LIFT } from '../../utils/card-chrome.js';
+import { cultureHeaderInks, footerChromeReservePx, footerGuardApplies, footerPillBottomPx, footerPillColors, photoBehindHeaderChrome, textZonesAboveFooter, STORIES_FOOTER_LIFT, socialFreeChromeGeometry } from '../../utils/card-chrome.js';
 import { titleLetterSpacingEm } from '../../utils/title-tracking.js';
 import { photoPlaceholderRect } from '../../utils/photo-placeholder.js';
 import { cultureAccentRenderablePieces } from '../../utils/text-spans.js';
@@ -417,11 +417,11 @@ function logoWithoutWhitePlate(img) {
   }
 }
 
-function vcApplyLogoPosition(style, pos, margin, sizePx, topOffset = margin) {
-  if (pos === 'tl') Object.assign(style, { top: margin, left: margin });
+function vcApplyLogoPosition(style, pos, margin, sizePx, topOffset = margin, verticalMargin = margin) {
+  if (pos === 'tl') Object.assign(style, { top: verticalMargin, left: margin });
   else if (pos === 'tr') Object.assign(style, { top: topOffset, right: margin });
-  else if (pos === 'bl') Object.assign(style, { bottom: margin, left: margin });
-  else if (pos === 'br') Object.assign(style, { bottom: margin, right: margin });
+  else if (pos === 'bl') Object.assign(style, { bottom: verticalMargin, left: margin });
+  else if (pos === 'br') Object.assign(style, { bottom: verticalMargin, right: margin });
   else if (pos === 'c') Object.assign(style, {
     top: '50%', left: '50%', marginTop: -sizePx / 2, marginLeft: -sizePx / 2,
   });
@@ -441,6 +441,7 @@ function BrandLogoLayer({
   pos = 'tr',
   margin,
   topOffset,
+  verticalMargin,
   zIndex = 23,
   elementProps = null,
   movable = false,
@@ -510,7 +511,7 @@ function BrandLogoLayer({
     pointerEvents: 'none',
     transform: incoming.transform,
   };
-  vcApplyLogoPosition(style, pos, margin, box, topOffset ?? margin);
+  vcApplyLogoPosition(style, pos, margin, box, topOffset ?? margin, verticalMargin ?? margin);
   const { style: _ignored, ...handlers } = elementProps || {};
   const hitBox = hit || { left: 0, top: 0, width: box, height: box };
   return (
@@ -828,6 +829,7 @@ const ClassicCanvasInner = React.forwardRef(({
 }, ref) => {
   void imgModeNorm;
   const logoFallback = fallbackLogo && fallbackLogo !== brand?.logo ? fallbackLogo : '';
+  const freeChromeGeometry = slide.socialFreeDesign ? socialFreeChromeGeometry(brand, f, fmt, slide) : null;
   const movOu = React.useCallback(
     (chave, estilo) => (mov ? mov(chave, estilo) : { style: estilo }),
     [mov],
@@ -880,7 +882,7 @@ const ClassicCanvasInner = React.forwardRef(({
   // gravadas (projeto antigo, ou assinatura acrescentada depois) entram na
   // faixa deles, o texto sobe aqui. Zona ou elemento que a pessoa moveu fica.
   if (footerGuardApplies(slide, hasElementOffset)) {
-    const reservaPx = footerChromeReservePx(brand, f);
+    const reservaPx = freeChromeGeometry?.bottomReservePx || footerChromeReservePx(brand, f);
     if (reservaPx > 0) ({ title: tr, subtitle: sr } = textZonesAboveFooter({ title: tr, subtitle: sr }, 100 - (reservaPx / f.h) * 100));
   }
   // Perna em cima de acento e perna cortada na última linha: o título que tem
@@ -1342,8 +1344,12 @@ const ClassicCanvasInner = React.forwardRef(({
       })()}
 
       {brand.showHandle && slide.showHandle && !hideInstaBadge && !(forExport && !String(brand.handle || '').trim()) && (
-        <div style={{
+        <div data-vc-chrome={slide.socialFreeDesign ? 'handleBadge' : undefined} style={{
           ...vcHandleBadgeBoxPositionStyle(brand),
+          ...(freeChromeGeometry && !hasElementOffset(slide, 'handleBadge') ? {
+            top: freeChromeGeometry.handleTopPx, left: freeChromeGeometry.handleLeftPx,
+            maxWidth: f.w - freeChromeGeometry.handleLeftPx - freeChromeGeometry.handleRightPx,
+          } : {}),
           display:'flex', alignItems:'center', gap:f.w*0.012,
           background:slide.socialFreeDesign ? bg : 'rgba(255,255,255,0.08)',
           backdropFilter:'blur(12px)',
@@ -1386,7 +1392,8 @@ const ClassicCanvasInner = React.forwardRef(({
         const pos = visibleLogoPosition(brand, slide);
         const margin = f.w * 0.045;
         const sizePx = logoRenderPx(fmt, f.w, brand.logoSize ?? LOGO_SIZE_DEFAULT);
-        const topOffset = handleAtTop && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.05 : margin;
+        const automatic = freeChromeGeometry && !hasElementOffset(slide, 'logo');
+        const topOffset = automatic ? freeChromeGeometry.logoTopPx : handleAtTop && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.05 : margin;
         return (
           <BrandLogoLayer
             src={brand.logo}
@@ -1398,6 +1405,7 @@ const ClassicCanvasInner = React.forwardRef(({
             pos={pos}
             margin={margin}
             topOffset={topOffset}
+            verticalMargin={automatic ? pos.startsWith('b') ? freeChromeGeometry.logoBottomPx : freeChromeGeometry.logoTopPx : undefined}
             zIndex={23}
             movable={!forExport && !showCanvasChrome}
             elementProps={movOu('logo', {})}
@@ -2324,6 +2332,7 @@ const SlideCardInner = React.forwardRef(({
   const escPill = escalaDe(brand.footerPillScale);
   const freeChrome = !!slide.socialFreeDesign;
   const freeChromeInk = freeChrome ? readableInk(slideCardBg, [displayBodyInk, displayTitleInk]) : null;
+  const freeChromeGeometry = freeChrome ? socialFreeChromeGeometry(brand, f, fmt, slide) : null;
 
   const brandHeaderChrome = (
     <>
@@ -2355,6 +2364,10 @@ const SlideCardInner = React.forwardRef(({
                 <div data-vc-chrome="headerBar" {...mov('headerBar', {
                   position:'absolute', top:f.h*0.028, left:f.w*0.05,
                   right: hasPageBadge ? f.w*0.16 : f.w*0.05,
+                  ...(freeChromeGeometry && !hasElementOffset(slide, 'headerBar') ? {
+                    top: freeChromeGeometry.headerTopPx, left: freeChromeGeometry.headerLeftPx, right: freeChromeGeometry.headerRightPx,
+                    lineHeight: 1.3,
+                  } : {}),
                   zIndex:25,
                   display:'flex', justifyContent:'space-between', alignItems:'center',
                   gap:f.w*0.02,
@@ -2382,6 +2395,9 @@ const SlideCardInner = React.forwardRef(({
               {hasPageBadge && (
                 <div data-vc-chrome="pageBadge" data-vc-presentation-folio={quietFolio ? '1' : undefined} {...mov('pageBadge', {
                   position:'absolute', top:f.h*0.024, right:f.w*0.05, zIndex:30,
+                  ...(freeChromeGeometry && !hasElementOffset(slide, 'pageBadge') ? {
+                    top: freeChromeGeometry.badgeTopPx, right: freeChromeGeometry.badgeRightPx, lineHeight: 1.3,
+                  } : {}),
                   background: badgeBg, color: badgeColor,
                   padding:`${f.h*0.006*escBadge}px ${f.w*0.022*escBadge}px`, borderRadius:9999,
                   fontSize:socialReadingPx(slide, f, f.w*0.024*escBadge), fontWeight:600, fontFamily:getTextFont(slide, 'pageBadge', bodyFF),
@@ -2420,6 +2436,7 @@ const SlideCardInner = React.forwardRef(({
           // Stories composto na v4: selo e barra sobem para fora da faixa da
           // interface do app (18% de baixo). Projeto v3 fica onde estava.
           const liftStories = slide.socialCompositionVersion >= 4 && fmt === 'stories' ? f.h * STORIES_FOOTER_LIFT : 0;
+          const safeFooter = freeChromeGeometry && !hasElementOffset(slide, 'pill') && !hasElementOffset(slide, 'footerBar') ? freeChromeGeometry : null;
           // O selo tem papel na sequência (arrastar, CTA, etiqueta): a composição
           // pode desligá-lo por card. A reserva do rodapé continua a mesma.
           const hasPill = !!brand.footerPillText && slide.hideFooterPill !== true;
@@ -2464,9 +2481,10 @@ const SlideCardInner = React.forwardRef(({
               <div data-vc-chrome="footerBar" {...mov('footerBar', {
                 ...(empilhado
                   ? { position:'relative', alignSelf:'stretch' }
-                  : { position:'absolute', bottom: f.h*0.038 + liftStories, left: barLeft, right: barRight, zIndex: 25 }),
+                  : { position:'absolute', bottom: safeFooter?.barBottomPx ?? f.h*0.038 + liftStories, left: barLeft, right: barRight, zIndex: 25 }),
                 display:'flex', justifyContent:'space-between', alignItems:'flex-start',
                 gap: f.w*0.02, pointerEvents: movableElements ? 'auto' : 'none',
+                ...(freeChrome ? { lineHeight: 1.3 } : {}),
                 ...(freeChrome && fotoAtrasDaBarra ? { background: slideCardBg } : {}),
               })}>
                 <Col data={fLeft}/>
@@ -2491,7 +2509,7 @@ const SlideCardInner = React.forwardRef(({
               <div data-vc-chrome="pill" {...mov('pill', {
                 ...(empilhado
                   ? { position:'relative' }
-                  : { position:'absolute', bottom: footerPillBottomPx(brand, f, escFooterBar) + liftStories,
+                  : { position:'absolute', bottom: safeFooter?.pillBottomPx ?? footerPillBottomPx(brand, f, escFooterBar) + liftStories,
                       left:`${pillCenterPct}%`, transform:'translateX(-50%)', zIndex:25 }),
                 pointerEvents: movableElements ? 'auto' : 'none',
               })}>
@@ -2499,7 +2517,8 @@ const SlideCardInner = React.forwardRef(({
                   background: pillBg, color: pillFg,
                   padding: `${f.h*0.012*escPill}px ${padRight}px ${f.h*0.012*escPill}px ${f.w*0.028*escPill}px`,
                   borderRadius: 9999,
-                  display:'inline-flex', alignItems:'center', gap: f.w*0.018,
+                  display:freeChrome ? 'flex' : 'inline-flex', alignItems:'center', gap: f.w*0.018,
+                  ...(freeChrome ? { lineHeight: 1.25 } : {}),
                   fontSize: socialReadingPx(slide, f, f.w*0.026*escPill), fontWeight:700, fontFamily: getTextFont(slide, 'pill', bodyFF),
                   letterSpacing:'-0.011em', whiteSpace:'nowrap',
                   textTransform: 'uppercase',
@@ -2522,7 +2541,7 @@ const SlideCardInner = React.forwardRef(({
           if (!empilhado) return <>{barra}{selo}</>;
           return (
             <div data-vc-chrome-stack="footer" style={{
-              position:'absolute', bottom: f.h*0.038 + liftStories, left: barLeft, right: barRight, zIndex: 25,
+              position:'absolute', bottom: safeFooter?.barBottomPx ?? f.h*0.038 + liftStories, left: barLeft, right: barRight, zIndex: 25,
               display:'flex', flexDirection:'column', alignItems:'center', gap: f.h*0.022,
               pointerEvents:'none',
             }}>
