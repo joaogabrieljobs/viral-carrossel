@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { decodePng } from '../helpers/png.js';
 import {
-  extractPaletteFromPixels, hexDeltaE, kitReferencePalette, nearestPaletteHex, referencePaletteKitField,
+  REFERENCE_PALETTE_THUMB, extractPaletteFromPixels, hexDeltaE, kitReferencePalette, nearestPaletteHex, referencePaletteKitField,
 } from '../../src/utils/reference-palette.js';
 import { buildPresentationPlanPrompt } from '../../src/utils/presentation-plan.js';
 import { generatePresentationPlan } from '../../src/utils/presentation-planning.js';
@@ -62,6 +62,23 @@ describe('item 1: extração determinística da paleta do flyer', () => {
   it('não tem o amarelo #F5C842 que a IA inventou', () => {
     expect(palette.every(c => hexDeltaE(c.hex, '#F5C842') > 20)).toBe(true);
     expect(has(palette, c => c.h > 45 && c.h < 70 && c.l > 0.5)).toBe(false);
+  });
+
+  it('a miniatura do navegador não apaga os acentos: flyer reduzido à metade (média 2×2) mantém as cores', () => {
+    // Conferido no Chromium (qa-harness-local/teste6/paleta-navegador.mjs):
+    // com miniatura de 128 px o verde e o laranja sumiam na média.
+    expect(REFERENCE_PALETTE_THUMB).toBeGreaterThanOrEqual(480);
+    const w = Math.floor(FLYER.width / 2); const h = Math.floor(FLYER.height / 2);
+    const data = new Uint8ClampedArray(w * h * 4);
+    for (let y = 0; y < h; y += 1) for (let x = 0; x < w; x += 1) for (let c = 0; c < 4; c += 1) {
+      const at = (yy, xx) => FLYER.data[((y * 2 + yy) * FLYER.width + x * 2 + xx) * 4 + c];
+      data[(y * w + x) * 4 + c] = (at(0, 0) + at(0, 1) + at(1, 0) + at(1, 1)) / 4;
+    }
+    const half = extractPaletteFromPixels(data, { width: w, height: h });
+    expect(has(half, c => c.h >= 220 && c.h <= 290 && c.l < 0.3)).toBe(true);
+    expect(has(half, c => c.h >= 10 && c.h <= 45 && c.s > 0.5 && c.l > 0.4)).toBe(true);
+    expect(has(half, c => c.h >= 180 && c.h <= 215 && c.l > 0.5)).toBe(true);
+    expect(has(half, c => c.h >= 80 && c.h <= 150 && c.s > 0.4)).toBe(true);
   });
 
   it('determinística e sem branco de texto/logo', () => {

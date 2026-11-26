@@ -34,7 +34,7 @@ const CLUSTERS = 12;
 const ITERATIONS = 12;
 const MERGE_DELTA_E = 14;
 /** Lado máximo da miniatura desenhada no canvas do navegador. */
-export const REFERENCE_PALETTE_THUMB = 128;
+export const REFERENCE_PALETTE_THUMB = 512;
 
 const HEX6 = /^#[0-9A-F]{6}$/;
 const toHex = ([r, g, b]) => `#${[r, g, b].map(c => Math.max(0, Math.min(255, Math.round(c))).toString(16).padStart(2, '0')).join('').toUpperCase()}`;
