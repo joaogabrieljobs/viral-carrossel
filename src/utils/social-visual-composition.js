@@ -712,6 +712,118 @@ function viralCardFields(style, fn, slide) {
   return out;
 }
 
+/* ------------------------------------------------------------------ */
+/* Ritmo de layout (etapa 2 do plano do carrossel, 26/11/2026)         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * O que o olho vê como "mesma página" num card v4: chão, foto (posição e
+ * tamanho), texto sobre a foto, coluna e altura do título, coluna do apoio e
+ * alinhamento. Medido na geometria do arquétipo (antes do ajuste de
+ * densidade), que é a mesma para cards de texto diferente. A altura do título
+ * entra porque no retrato ela muda a página (o numeral do miolo só aparece
+ * com o título mais abaixo). null para card fora da biblioteca v4.
+ */
+export function socialRhythmKey(slide, formato = 'carrossel') {
+  const art = slide?.socialArt;
+  if (!art || !SOCIAL_COMPOSERS[art.family] || slide.socialCompositionVersion < 4) return null;
+  const photo = hasPhoto(slide);
+  const L = socialCardLayout(art.family, art.fn, {
+    formato, photo, structured: art.structured, variant: art.variant, wide: art.archetype === 'wideStack',
+  });
+  const r = (v) => Math.round(Number(v) || 0);
+  const P = L.photo;
+  return [
+    L.ground || 'bg',
+    P ? `${r(P.x)}:${r(P.y)}:${r(P.w)}:${r(P.h)}` : 'sem-foto',
+    L.onPhoto ? 'sobre-foto' : '',
+    `${r(L.title.x)}:${r(L.title.y)}:${r(L.title.w)}`,
+    r(L.subtitle.x),
+    L.align,
+  ].join('|');
+}
+
+/** Funções de miolo sem foto que a família desenha para o mesmo texto. */
+const TEXT_FUNCTIONS = ['opener', 'development'];
+/** Afirmação como alternativa só com apoio curto (o apoio vai para a faixa de baixo). */
+const RHYTHM_STATEMENT_MAX_SUPPORT = 120;
+
+/** Card que o ritmo não toca: capa, fecho, estilo próprio, zonas editadas, ajuste manual ou quadro. */
+function rhythmLocked(slide, index, count, presetId) {
+  if (index === 0 || index >= count - 1) return true;
+  if (slide.visualPresetId && slide.visualPresetId !== presetId) return true;
+  if (slide.canvas?.userEdited || slide.canvas?.enabled === true) return true;
+  if (normalizePresentationBlocks(slide.presentationBlocks).length > 0) return true;
+  return ['title', 'subtitle', 'bodyAfterImage', 'text', 'photo'].some((key) => {
+    const offset = slide.elementOffsets?.[key];
+    return offset && Object.values(offset).some((value) => Number(value) !== 0);
+  });
+}
+
+/**
+ * Ritmo de layout, com a lógica da apresentação (rhythmKind): se os dois
+ * cards anteriores têm a geometria que este teria, ou se o anterior tem e o
+ * seguinte não tem como sair dela, este passa para outra página que a família
+ * já desenha, nesta ordem: a outra variante da mesma função, a outra função
+ * de miolo (abertura ⇄ desenvolvimento) e, só sem foto e com apoio curto, a
+ * afirmação (nunca duas seguidas). Nenhum arquétipo novo. A alternativa
+ * precisa mudar o que se vê, manter a foto e caber sem pedir revisão do texto;
+ * se nenhuma serve, fica a de sempre. Vale só ao compor (geração e aplicar
+ * estilo): projeto salvo guarda função e variante no card e não é recomposto.
+ */
+function socialRhythm(slides, { assigned, assignedVariants, familyKey, formato, artFor, presetId }) {
+  const family = SOCIAL_COMPOSERS[familyKey];
+  const functions = [...assigned];
+  const variants = [...assignedVariants];
+  const count = slides.length;
+  const keyOf = (slide, fn, variant) => {
+    const art = artFor(slide, fn, variant);
+    const patch = socialFormatPatch({ ...slide, socialArt: art }, formato);
+    return { key: socialRhythmKey({ ...slide, ...patch, socialCompositionVersion: SOCIAL_LIBRARY_VERSION }, formato), over: patch.socialArt.density === 'over' };
+  };
+  const keys = slides.map((slide, i) => (slide.visualPresetId && slide.visualPresetId !== presetId
+    ? null : keyOf(slide, functions[i], variants[i]).key));
+  const choices = (slide, i) => {
+    const fn = functions[i];
+    const photo = hasPhoto(slide);
+    const out = [];
+    const pickLen = (f) => (Array.isArray(family.pick[f]) ? family.pick[f].length : 1);
+    for (let k = 1; k < pickLen(fn); k += 1) out.push([fn, variants[i] + k]);
+    if (!photo && TEXT_FUNCTIONS.includes(fn)) {
+      for (const other of TEXT_FUNCTIONS) if (other !== fn) for (let k = 0; k < pickLen(other); k += 1) out.push([other, k]);
+      const support = chars(slide.subtitle) + chars(slide.bodyAfterImage);
+      const besideStatement = functions[i - 1] === 'statement' || functions[i + 1] === 'statement';
+      if (support <= RHYTHM_STATEMENT_MAX_SUPPORT && !besideStatement) out.push(['statement', 0]);
+    }
+    return out;
+  };
+  const alternative = (slide, i, own) => {
+    const baseOver = keyOf(slide, functions[i], variants[i]).over;
+    for (const [fn, variant] of choices(slide, i)) {
+      const alt = keyOf(slide, fn, variant);
+      if (alt.key && alt.key !== own && (baseOver || !alt.over)) return { fn, variant, key: alt.key };
+    }
+    return null;
+  };
+  // Seguinte preso à geometria que este repetiria (sem alternativa ou travado).
+  const lockedNext = (i) => {
+    const j = i + 1;
+    if (j >= count || !keys[j]) return null;
+    if (rhythmLocked(slides[j], j, count, presetId)) return keys[j];
+    return alternative(slides[j], j, keys[j]) ? null : keys[j];
+  };
+  for (let i = 1; i < count; i += 1) {
+    const own = keys[i];
+    if (!own || own !== keys[i - 1] || rhythmLocked(slides[i], i, count, presetId)) continue;
+    const third = i >= 2 && keys[i - 2] === own;
+    if (!third && lockedNext(i) !== own) continue;
+    const alt = alternative(slides[i], i, own);
+    if (!alt) continue;
+    functions[i] = alt.fn; variants[i] = alt.variant; keys[i] = alt.key;
+  }
+  return { functions, variants };
+}
+
 function composeSocialLibrary(slides, { preset, brand, formato, narrative }) {
   if (!Array.isArray(slides) || !slides.length) return slides;
   const base = brand || preset.brand || {};
@@ -730,24 +842,25 @@ function composeSocialLibrary(slides, { preset, brand, formato, narrative }) {
     const r = footerChromeReservePct(chrome, k);
     return [k, k === 'stories' && r > 0 ? r + STORIES_FOOTER_LIFT * 100 : r];
   }));
-  const functions = assignSocialFunctions(slides, { narrative });
-  const variants = rhythmVariants(functions);
+  const assigned = assignSocialFunctions(slides, { narrative });
+  const assignedVariants = rhythmVariants(assigned);
   const typo = {
     titleFont: base.titleFont || family.type?.title,
     bodyFont: base.bodyFont || family.type?.body,
     titleCase: ownType ? family.type.titleCase : (base.textTitleCase || 'normal'),
     titleLeading: ownType ? family.type.titleLeading : (base.textTitleLeading || 104),
   };
+  const artFor = (slide, fn, variant) => ({
+    family: familyKey, fn, variant, structured: normalizePresentationBlocks(slide.presentationBlocks).length > 0, typo, footer,
+    logoCorner: logoCornerFor(base, slide), logo: logoCornerFor(base, slide) ? { pos: logoCornerFor(base, slide), size: slide.logoSize ?? base.logoSize ?? SOCIAL_LOGO_SIZE_DEFAULT, ...(base.showHandle ? { drop: true } : {}) } : null, labelFont: ownType ? (family.type.label || null) : null, ownType, viral,
+    signatureOnPhoto: viral && luminance(base.titleColor) != null && luminance(base.titleColor) < 0.6,
+  });
+  const { functions, variants } = socialRhythm(slides, { assigned, assignedVariants, familyKey, formato, artFor, presetId: preset.id });
   return slides.map((slide, index) => {
     // Escolha feita card a card (estilo próprio do card) continua do usuário.
     if (slide.visualPresetId && slide.visualPresetId !== preset.id) return slide;
     const fn = functions[index];
-    const structured = normalizePresentationBlocks(slide.presentationBlocks).length > 0;
-    const art = {
-      family: familyKey, fn, variant: variants[index], structured, typo, footer,
-      logoCorner: logoCornerFor(base, slide), logo: logoCornerFor(base, slide) ? { pos: logoCornerFor(base, slide), size: slide.logoSize ?? base.logoSize ?? SOCIAL_LOGO_SIZE_DEFAULT, ...(base.showHandle ? { drop: true } : {}) } : null, labelFont: ownType ? (family.type.label || null) : null, ownType, viral,
-      signatureOnPhoto: viral && luminance(base.titleColor) != null && luminance(base.titleColor) < 0.6,
-    };
+    const art = artFor(slide, fn, variants[index]);
     const patch = socialFormatPatch({ ...slide, socialArt: art }, formato);
     const inks = socialGround(base, patch.socialArt.ground);
     const groundChanged = patch.socialArt.ground !== 'bg';

@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 import { VISUAL_PRESETS, applyVisualPreset } from '../../src/styles/visual-presets.jsx';
 import { applySocialVisualComposition } from '../../src/utils/social-visual-composition.js';
 import { SOCIAL_FAMILY_KEYS } from '../../src/utils/social-families.js';
+import { assignSocialFunctions } from '../../src/utils/social-sequence.js';
 import { VIRAL_STYLE_KEYS } from '../../src/utils/social-viral-styles.js';
 
 const deck = JSON.parse(readFileSync(new URL('../fixtures/carrossel-linha-de-base.json', import.meta.url), 'utf8'));
@@ -64,11 +65,10 @@ describe('linha de base da composição do carrossel (8 cards, 21 estilos, 3 for
     for (const estilo of ESTILOS) expect(presetDoEstilo(estilo), estilo).toBeTruthy();
   });
 
-  it('as funções saem como o deck pede em todo estilo e formato', () => {
-    for (const estilo of ESTILOS) for (const formato of FORMATOS) {
-      expect(comporDeck(estilo, formato).map((s) => s.socialFunction), `${estilo} · ${formato}`)
-        .toEqual(['cover', 'opener', 'development', 'development', 'photo', 'statement', 'list', 'closing']);
-    }
+  it('o conteúdo do deck pede as oito funções na ordem (antes do ritmo de layout)', () => {
+    const slides = deck.cards.map(({ papel: _papel, ...card }) => ({ ...card }));
+    expect(assignSocialFunctions(slides, { narrative: deck.narrativa }))
+      .toEqual(['cover', 'opener', 'development', 'development', 'photo', 'statement', 'list', 'closing']);
   });
 
   const casos = ESTILOS.flatMap((estilo) => FORMATOS.map((formato) => [estilo, formato]));
