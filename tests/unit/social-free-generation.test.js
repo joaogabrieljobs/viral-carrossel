@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { generateReviewedCarousel, validateCarouselDraft } from '../../src/utils/editorial-review.js';
+import { applyEditorialReview, generateReviewedCarousel, validateCarouselDraft } from '../../src/utils/editorial-review.js';
 import { presentationSceneQuery } from '../../src/utils/presentation-plan.js';
 
 const deckDesign = {
@@ -74,6 +74,28 @@ describe('Livre social: direção dentro do mesmo pedido editorial', () => {
     input.slides[1].eyebrow = 'A OFICINA';
     expect(validateCarouselDraft(input, { ...config, socialFree: true }).slides[1].eyebrow).toBe('A OFICINA');
     expect(validateCarouselDraft(input, config).slides[1].eyebrow).toBeUndefined();
+  });
+
+  it('não apaga a assinatura no corpo da capa ao passar pela escrita e revisão Livre', async () => {
+    const input = makeDraft();
+    input.signature = 'Como se o Carnaval não fosse suficiente.';
+    input.slides[0].bodyAfterImage = input.signature;
+    input.slides[3].bodyAfterImage = input.signature;
+    const { output, ai } = await run(input);
+    expect(ai).toHaveBeenCalledTimes(2);
+    expect(output.result.slides[0].bodyAfterImage).toBe(input.signature);
+    expect(output.result.slides[3].bodyAfterImage).toBe(input.signature);
+    expect(output.socialPlan.signature).toBe(input.signature);
+    expect(validateCarouselDraft(input, config).slides[0].bodyAfterImage).toBe('');
+  });
+
+  it('a revisão pode ajustar o corpo do segundo card Livre, mantendo a restrição do catálogo', () => {
+    const input = makeDraft();
+    input.slides[1].bodyAfterImage = 'A bancada organiza os materiais.';
+    const review = { edits: [{ slideIndex: 1, reason: 'Dar clareza ao apoio', bodyAfterImage: 'Os materiais ficam sobre a bancada.' }] };
+    const result = applyEditorialReview(input, review, { ...config, socialFree: true }, { deferQualityChecks: true });
+    expect(result.slides[1].bodyAfterImage).toBe(review.edits[0].bodyAfterImage);
+    expect(() => applyEditorialReview(input, review, config, { deferQualityChecks: true })).toThrow('Campo de revisão inválido');
   });
 
   it('a marca explícita e o peso da referência chegam ao deck e à imagem', async () => {

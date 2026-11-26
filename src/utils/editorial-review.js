@@ -205,14 +205,14 @@ export function buildPresentationLimitsBlock(config, slideCount, slideIndexes = 
   return `\nLIMITES EDITORIAIS OBRIGATÓRIOS POR SLIDE:\n${rows.join('\n')}\nmaxLines descreve o limite visual desejado. Respeite-o editorialmente; a validação automática conta apenas quebras de linha explícitas.`;
 }
 
-function bodyAllowed(index, count, presetId, densityId) {
-  if (presetId === 'apresentacao') return true;
+function bodyAllowed(index, count, presetId, densityId, socialFree = false) {
+  if (presetId === 'apresentacao' || socialFree === true) return true;
   return isTendenciaCulturaPreset(presetId)
     ? index > 0 && index < count - 1
     : isPersoHybridDensity(presetId, densityId) && index >= 2;
 }
 
-export function normalizeCarouselDraftInput(rawDraft, { count, presetId, densityId } = {}) {
+export function normalizeCarouselDraftInput(rawDraft, { count, presetId, densityId, socialFree = false } = {}) {
   let draft = rawDraft;
   if (isObject(draft) && !Array.isArray(draft.slides)) {
     const wrapper = ['carrossel', 'carousel', 'result', 'data']
@@ -222,7 +222,7 @@ export function normalizeCarouselDraftInput(rawDraft, { count, presetId, density
   }
   if (!isObject(draft) || !Array.isArray(draft.slides)) return { draft, issues: ['invalid_shape'] };
   const expected = Number.isInteger(count) && count > 0 ? count : draft.slides.length;
-  const wantsBody = presetId === 'apresentacao'
+  const wantsBody = socialFree === true || presetId === 'apresentacao'
     || isTendenciaCulturaPreset(presetId)
     || isPersoHybridDensity(presetId, densityId);
   const issues = [];
@@ -334,14 +334,14 @@ export function moveGapNotesOutOfSlides(draft) {
 }
 
 export function validateCarouselDraft(rawDraft, { count, presetId, densityId, presentationPath, nativeBlocks = true, freeDesign = false, socialFree = false, narrativeMode, allowMissingSocialTitles = false, allowLongSocialSupport = false, allowIncompleteDraft = false }) {
-  const normalized = normalizeCarouselDraftInput(rawDraft, { count, presetId, densityId });
+  const normalized = normalizeCarouselDraftInput(rawDraft, { count, presetId, densityId, socialFree });
   const draft = normalized.draft;
   if (!isObject(draft) || !Array.isArray(draft.slides)
     || normalized.issues.includes('insufficient_draft_content')
     || (!allowIncompleteDraft && normalized.issues.includes('missing_slides_padded'))) {
     throw new Error('A IA não retornou conteúdo suficiente para montar os slides. Tente gerar novamente.');
   }
-  const wantsBody = presetId === 'apresentacao'
+  const wantsBody = socialFree === true || presetId === 'apresentacao'
     || isTendenciaCulturaPreset(presetId)
     || isPersoHybridDensity(presetId, densityId);
   const pitch = presetId === 'apresentacao' && isPitchPath(presentationPath);
@@ -390,7 +390,7 @@ export function validateCarouselDraft(rawDraft, { count, presetId, densityId, pr
       }
       if (slide.speakerNotes.length > 6000) throw Object.assign(new Error('As notas ultrapassaram o limite desta apresentação.'), { code: 'presentation_notes_too_long', field: 'speakerNotes', slideIndex: index });
     }
-    if (wantsBody && !bodyAllowed(index, count, presetId, densityId)) slide.bodyAfterImage = '';
+    if (wantsBody && !bodyAllowed(index, count, presetId, densityId, socialFree)) slide.bodyAfterImage = '';
     if (!allowIncompleteDraft && ![slide.title, slide.subtitle, wantsBody ? slide.bodyAfterImage : ''].some(v => typeof v === 'string' && v.trim())) {
       throw new Error('A IA retornou um slide sem texto. Tente gerar novamente.');
     }
@@ -1009,7 +1009,7 @@ export function applyEditorialReview(draft, review, config, { deferQualityChecks
     seen.add(edit.slideIndex);
     for (const field of editableTextFields) {
       if (!hasOwn(edit, field)) continue;
-      if (typeof edit[field] !== 'string' || (field === 'bodyAfterImage' && !bodyAllowed(edit.slideIndex, slides.length, config.presetId, config.densityId))) {
+      if (typeof edit[field] !== 'string' || (field === 'bodyAfterImage' && !bodyAllowed(edit.slideIndex, slides.length, config.presetId, config.densityId, socialFree))) {
         throw new Error('Campo de revisão inválido');
       }
       slides[edit.slideIndex][field] = edit[field];
