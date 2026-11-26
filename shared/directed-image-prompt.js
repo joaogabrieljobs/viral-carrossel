@@ -21,6 +21,15 @@ const LOOK_POLICY = 'Use moodboard images only for the look (medium, palette, li
 const RULES = 'HARD RULES: No lettering, captions, logos or watermarks. Keep text, charts and interfaces in editable layers; do not fabricate screenshots, testimonials or before-and-after evidence. Depict only the requested subjects, with coherent anatomy and materials. Deliver only the image.';
 const MAP_TAIL = 'Use each named reference only for its assigned role. The scene direction below refers to these labels.';
 const VARIATION_HEADER = 'OTHER SLIDES (avoid repeating their action, setting or shot; keep shared identity):';
+// Correspondência exata com o cabeçalho privado do catálogo em visual-bible.
+// Uma futura mudança ou uma política personalizada continua integral.
+const KNOWN_SUBJECTS_HEADER = 'PROJECT SUBJECTS — whenever one of these appears in the scene it must match this description exactly, and look the same in every image of this project. These descriptions fix appearance only (face, hair, clothing, color, material, shape). Any action, pose or place written in them does not apply here: the SCENE decides action, pose, setting and which subjects appear. Do not add a subject the scene does not call for. Do not add attributes, accessories or objects that contradict these descriptions:';
+const COMPACT_SUBJECTS_HEADER = "PROJECT SUBJECTS: Match each appearing subject's described appearance and exclusions across images. The scene controls action, pose, setting and who appears. Add no unrequested subjects or conflicting attributes or objects.";
+
+function compactKnownSubjectsHeader(value) {
+  return typeof value === 'string' && value.startsWith(`${KNOWN_SUBJECTS_HEADER}\n`)
+    ? `${COMPACT_SUBJECTS_HEADER}${value.slice(KNOWN_SUBJECTS_HEADER.length)}` : value;
+}
 
 export function isDirectedImagePrompt(value) {
   return !!value && value.version === 2 && (value.kind === 'social_free' || value.kind === 'presentation_free');
@@ -136,7 +145,7 @@ export function buildDirectedImagePrompt(parts = {}, { limit = 4000 } = {}) {
   add('sceneLight', hasText(scene?.light) ? `LIGHT: ${text(scene.light)}` : '');
   const graphics = effectiveGraphics(visual, scene);
   add('graphics', graphics ? `GRAPHICS: ${graphics}` : '');
-  add('subjects', parts.subjects);
+  add('subjects', compactKnownSubjectsHeader(parts.subjects));
   if (count) add('identityAnchor', parts.identityAnchor);
   add('manualDirection', manual ? `MANUAL DIRECTION (explicit user instruction):\n${manual}` : '');
   add('slideAction', withoutDuplicateManual(parts.slideAction, manual));

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildImagePrompt, imageRouteCapabilities, planImageRequest } from '../../shared/image-prompt.js';
+import { composeSubjectsDirection } from '../../src/utils/visual-bible.js';
 
 // Dados representativos dos pedidos HTTP do head-6: a ficha e a âncora
 // ocupavam o orçamento junto de políticas repetidas, derrubando luz e cenas.
@@ -219,5 +220,50 @@ describe('Contrato de imagem dirigido v2', () => {
   it.each([undefined, false, { version: 1, kind: 'social_free' }, { version: 2, kind: 'catalog' }])('sem contrato v2 válido mantém o caminho anterior: %j', directedPrompt => {
     const legacy = { format: 'carousel', scene: 'A ceramic artist shaping a bowl in a workshop.', styleBody: 'Natural editorial photography.', referenceCount: 1, styleMoodboard: true };
     expect(buildImagePrompt({ ...legacy, directedPrompt }, { route: 'sjinn' })).toEqual(buildImagePrompt(legacy, { route: 'sjinn' }));
+  });
+});
+
+describe('Política fixa da ficha no contrato dirigido', () => {
+  const fullSubjects = composeSubjectsDirection({ entities: [{ id: 'convidada',
+    en: 'A fictional adult woman with short dark hair, wearing a terracotta shirt and dark trousers, with no branded clothing.',
+    never: 'Celebrity resemblance, costume, branded clothing, hair or outfit changes.',
+  }] });
+  const [knownHeader, ...entityLines] = fullSubjects.split('\n');
+
+  it.each(['social_free', 'presentation_free'])('compacta apenas o cabeçalho conhecido em %s para preservar espaço do núcleo', kind => {
+    const parts = partsFor(1, kind);
+    parts.subjects = fullSubjects;
+    const before = structuredClone(parts);
+    const result = planImageRequest(parts, { route: 'sjinn', limit: 3500 });
+    expect(knownHeader).toHaveLength(500);
+    expect(result.status).toBe('ready');
+    expect(result.prompt).not.toContain(knownHeader);
+    for (const line of entityLines) expect(result.prompt).toContain(line);
+    expect(result.prompt).toContain(identityAnchor);
+    expect(result.prompt).toContain(parts.directedPrompt.scene.light);
+    for (const other of parts.directedPrompt.variation) for (const key of ['action', 'setting', 'shot']) expect(result.prompt).toContain(other[key]);
+    const header = result.prompt.split('\n').find(line => line.startsWith('PROJECT SUBJECTS'));
+    expect(header.length).toBeGreaterThanOrEqual(200);
+    expect(header.length).toBeLessThanOrEqual(230);
+    expect(header).toContain('appearance and exclusions across images');
+    expect(header).toContain('scene controls action, pose, setting and who appears');
+    expect(header).toContain('no unrequested subjects or conflicting attributes or objects');
+    expect(result.diagnostics.sectionChars.subjects).toBe(header.length + 1 + entityLines.join('\n').length);
+    expect(parts).toEqual(before);
+  });
+
+  it.each(['PROJECT SUBJECTS: Preserve the distinctive woven pattern on every jacket.', `${knownHeader} Additional custom rule.`])('não compacta cabeçalho desconhecido ou alterado', header => {
+    const parts = partsFor();
+    parts.subjects = `${header}\n${entityLines.join('\n')}`;
+    const result = planImageRequest(parts, { route: 'openai', model: 'gpt-image-2' });
+    expect(result.prompt).toContain(parts.subjects);
+  });
+
+  it('mantém o cabeçalho completo no caminho sem opt-in', () => {
+    const parts = partsFor();
+    delete parts.directedPrompt;
+    parts.subjects = fullSubjects;
+    const result = planImageRequest(parts, { route: 'openai', model: 'gpt-image-2' });
+    expect(result.prompt).toContain(fullSubjects);
   });
 });
