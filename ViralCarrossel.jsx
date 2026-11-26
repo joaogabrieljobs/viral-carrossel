@@ -253,6 +253,9 @@ import {
   presentationStageAt,
 } from './src/utils/presentation-state.js';
 import { deckDesignFromBrand, freeBrandPatch, slideSkipsImageGeneration } from './src/utils/free-design.js';
+import { isFreeSocialPreset, isFreeSocialSlide, socialFreeDeckViolations, socialFreePhotoPatch } from './src/utils/social-free-design.js';
+import { socialFreeImageSlide } from './src/utils/social-free-prompt.js';
+import { preserveSocialFreeRemix } from './src/utils/social-free-remix.js';
 import { finishFreeDraft } from './src/utils/free-draft.js';
 import { freeImageGenerationSlide, reconcileFreeImageFallback, reconcileFreeImageDocument } from './src/utils/free-image-fallback.js';
 import { applyFreeSlideImageToStoredProject } from './src/utils/free-image-persistence.js';
@@ -1469,14 +1472,17 @@ export default function App() {
     const isPresentationVisual = preset?.productKind === 'apresentacao';
     // Família da biblioteca v4 muda só a forma: pacote criativo e modo
     // narrativo do projeto continuam como estavam.
-    const fromPreset = preset?.socialFamily ? null : (preset?.creativePreset || suggestCreativePresetForVisual(resolvedPresetId));
+    const freeSocial = isFreeSocialPreset(preset);
+    const fromPreset = preset?.socialFamily || freeSocial ? null : (preset?.creativePreset || suggestCreativePresetForVisual(resolvedPresetId));
     let replacedOwnVisuals = 0;
     let totalCards = 0;
     history.set((d) => {
       if (scope === 'card') return applyVisualPresetToCard(d, index, preset, visualPresets);
       totalCards = Array.isArray(d.slides) ? d.slides.length : 0;
-      replacedOwnVisuals = countSlidesWithOwnVisuals(d.slides);
-      d = clearOwnVisualsBeforePresetOnAll(d, preset);
+      if (!freeSocial) {
+        replacedOwnVisuals = countSlidesWithOwnVisuals(d.slides);
+        d = clearOwnVisualsBeforePresetOnAll(d, preset);
+      }
       if (isPresentationVisual) {
         return preserveVisualPresetContent(applyPresentationVisualPresetToDoc(d, resolvedPresetId, visualPresets, {
           initialize: d.productKind !== 'apresentacao' || !isApresentacaoPreset(d.creativePreset),
@@ -1496,6 +1502,7 @@ export default function App() {
               formato: d.fmt && d.fmt !== 'apresentacao' ? d.fmt : 'carrossel',
               overrides: getSlideOverridesForPreset(resolvedPresetId, visualPresets),
               narrative: d.quickNarrativeMode || 'editorial',
+              ...(freeSocial ? { deckDesign: d.socialDeckDesign, plan: d.socialPlan } : {}),
             }),
           };
       return preserveVisualPresetContent(fromPreset ? { ...next, creativePreset: fromPreset } : next, d);
@@ -5442,7 +5449,9 @@ export default function App() {
     // Uma escolha individual pode acrescentar foto a uma página só de texto.
     // O lote respeita photo:none; só o gesto explícito muda essa intenção.
     const explicitFreePhoto = !parentSignal && slideSkipsImageGeneration(snap);
-    const recoveredImageLayout = freeImageGenerationSlide(snap);
+    const recoveredImageLayout = isFreeSocialSlide(snap) && explicitFreePhoto
+      ? { ...snap, ...socialFreePhotoPatch(snap, { requested: true }) }
+      : freeImageGenerationSlide(snap);
     const generationSnap = queryOverride
       ? { ...recoveredImageLayout, imageQuery:queryOverride, imgMode:'dalle', ...(explicitFreePhoto ? { presentationPhotoRequested: true } : {}) }
       : { ...recoveredImageLayout, ...(explicitFreePhoto ? { presentationPhotoRequested: true } : {}) };
@@ -5487,15 +5496,16 @@ export default function App() {
         // Estilo, anexos, âncora, ficha visual, família e enquadramento seguem
         // separados por papel; a proporção acompanha a zona real da foto.
         imageDirection: composeImageDirection({
-          styleKit, slide: generationSnap, fmt, visualBible: doc.visualBible,
+          styleKit, slide: generationSnap, fmt, formatViews: doc.formatViews, visualBible: doc.visualBible,
           slideDirection: imageState.extraPrompt, anchorPlan, baseReferenceCount: baseRefs.length,
           presentationPanel: fmt === 'apresentacao' && [2, 3].includes(generationSnap.presentationCompositionVersion),
           // Spec 1.1 (referência): a referência do kit vai em toda imagem; as
           // cenas dos outros slides entram no pedido para variar a cena.
-          deckSlides: fmt === 'apresentacao' ? liveSlides : null,
+          deckSlides: fmt === 'apresentacao' || isFreeSocialSlide(generationSnap) ? liveSlides : null,
           slideIndex: liveSlides.findIndex((slide) => slide.id === slideId),
         }),
-        aspectRatio: imageAspectRatioForSlide(generationSnap, fmt),
+        aspectRatio: imageAspectRatioForSlide(isFreeSocialSlide(generationSnap)
+          ? socialFreeImageSlide(generationSnap, { fmt, formatViews: doc.formatViews }) : generationSnap, fmt),
         onPromptPlan: plan => imagePromptCutGateRef.current(plan, generationProjectId),
         usageContext: {
           projectId: generationProjectId,
@@ -5572,21 +5582,24 @@ export default function App() {
         return next;
       });
     }
-  }, [slides, fmt, imageGenerationAvailability, openaiKey, imgParams, styleKit, setSlides, setSlidesPhotoSwap, toast, activeEntry?.name, doc.visualBible, access, useOwnImageKey]);
+  }, [slides, fmt, imageGenerationAvailability, openaiKey, imgParams, styleKit, setSlides, setSlidesPhotoSwap, toast, activeEntry?.name, doc.visualBible, doc.formatViews, access, useOwnImageKey]);
 
   // Direção de arte, parte 4: arte de fundo do deck (modo livre). Uma imagem
   // abstrata da identidade, pedida uma vez (1 crédito) pelo mesmo caminho das
   // fotos e guardada como elas (IndexedDB e nuvem) nas páginas `ground: 'art'`.
   // Sem crédito, sem chave ou com falha, as páginas ficam na cor base.
   const deckArtGenRef = useRef(null);
-  deckArtGenRef.current = async ({ projectId, signal, axes, deckSlides, onSlides = null }) => {
+  deckArtGenRef.current = async ({ projectId, signal, axes, deckSlides, formato = fmt, onSlides = null }) => {
     if (!deckNeedsArt(deckSlides)) return { ok: false, reason: 'not_needed' };
     const baseRefs = await resolveImageReferences(styleKit, null, null, null);
-    const url = await generateDALLEWithRetry(DECK_ART_SCENE, openaiKey, axes, {
+    const socialArt = deckSlides.some(isFreeSocialSlide);
+    const artFormat = socialArt && ['carrossel', 'quadrado', 'stories'].includes(formato) ? formato : socialArt ? 'carrossel' : 'apresentacao';
+    const direction = composeDeckArtImageDirection({ slides: deckSlides, fmt: artFormat, formatViews: doc.formatViews, styleKit, baseReferenceCount: baseRefs.length });
+    const url = await generateDALLEWithRetry(direction.sceneBrief?.query || DECK_ART_SCENE, openaiKey, axes, {
       signal,
       refImages: baseRefs,
-      imageDirection: composeDeckArtImageDirection({ slides: deckSlides, styleKit, baseReferenceCount: baseRefs.length }),
-      aspectRatio: '16:9',
+      imageDirection: direction,
+      aspectRatio: { carrossel: '4:5', quadrado: '1:1', stories: '9:16', apresentacao: '16:9' }[artFormat],
       onPromptPlan: plan => imagePromptCutGateRef.current(plan, projectId),
       usageContext: { projectId, projectName: activeEntry?.name || '', cardId: 'deck-art' },
     });
@@ -6029,6 +6042,8 @@ export default function App() {
       effectiveVisualPreset,
       visualPresets,
     );
+    const isSocialFreeGeneration = !isPresentationGeneration && isFreeSocialPreset(effectiveVisualPresetDef);
+    const generationFormat = isPresentationGeneration ? 'apresentacao' : (fmt && fmt !== 'apresentacao' ? fmt : 'carrossel');
     const modeDef = resolveGenMode(effectiveMode);
     const brandBlock = buildBrandBlock(brand);
     const brandVoiceBlock = buildBrandVoiceBlock(brand, {
@@ -6059,7 +6074,7 @@ ${buildGenerationLanguageGuard(cp, effectiveMode)}`;
       : '';
     const apresentacaoDesignBlock = isPresentationGeneration
       ? buildPresentationDesignSystemPromptBlock(effectiveVisualPresetDef, presentationPathId, { planned: !remix })
-      : (!remix && usesSocialLibrary(effectiveVisualPresetDef)
+      : (!remix && !isSocialFreeGeneration && usesSocialLibrary(effectiveVisualPresetDef)
         ? buildSocialSequencePrompt({ family: socialFamilyFor(effectiveVisualPresetDef, brand), narrative: effectiveMode, densityId: td })
         : '');
     const presentationRoute = isPresentationGeneration
@@ -6069,7 +6084,7 @@ ${buildGenerationLanguageGuard(cp, effectiveMode)}`;
     // Modo livre (fase 2): o deck nasce do deckDesign do roteiro v3; cores e
     // fontes do kit e as escolhas do assistente substituem as propostas.
     const freeKitBrand = { ...explicitBrandColorsFromKit(styleKit), ...sanitizeCustomVisualPresetBrand(brandVisualOverrides) };
-    const freeDeckDesignFor = plan => (effectiveVisualPresetDef?.isFree ? deckDesignFromBrand(freeKitBrand, plan?.deckDesign || undefined) : null);
+    const freeDeckDesignFor = plan => (isPresentationGeneration && effectiveVisualPresetDef?.isFree ? deckDesignFromBrand(freeKitBrand, plan?.deckDesign || undefined) : null);
     // Ritmo de layout (spec 1.1): limites, composição e recuperação passam as
     // composições anteriores, para o texto ser pedido na caixa que o slide terá.
     const limitsRhythm = [];
@@ -6192,7 +6207,7 @@ ${jsonShapeLine}`;
     // do projeto, presas às referências, para refazer uma imagem depois.
     let referenceColors = [];
     let referencePaletteField = null;
-    if (isPresentationGeneration && !remix && (styleKit?.refImages?.length || 0) > 0) {
+    if ((isPresentationGeneration || isSocialFreeGeneration) && !remix && (styleKit?.refImages?.length || 0) > 0) {
       referenceColors = kitReferencePalette(styleKit);
       if (!referenceColors.length) {
         try {
@@ -6226,8 +6241,9 @@ ${jsonShapeLine}`;
       brandBlock,
       styleKitTextHint,
     ].filter(Boolean).join('\n');
-    const { result: generatedResult, reviewStatus, plan: generationPlan, incomplete: generationIncomplete = false, interruptionReason: generationInterruptionReason, writingDiagnostics: generationWritingDiagnostics = [], reviewDiagnostics: generationReviewDiagnostics = [], completedCount: generatedCount, totalCount: requestedCount, violations: editorialViolations = [], issues: editorialIssues = [], materialGaps = [], repetitionNotice = '', repetitionRemaining = [] } = await generateReviewedCarousel({
+    const { result: generatedResult, reviewStatus, plan: generationPlan, socialPlan: generationSocialPlan, incomplete: generationIncomplete = false, interruptionReason: generationInterruptionReason, writingDiagnostics: generationWritingDiagnostics = [], reviewDiagnostics: generationReviewDiagnostics = [], completedCount: generatedCount, totalCount: requestedCount, violations: editorialViolations = [], issues: editorialIssues = [], materialGaps = [], repetitionNotice = '', repetitionRemaining = [] } = await generateReviewedCarousel({
       prompt,
+      ...(isSocialFreeGeneration ? { socialFree: { formato: generationFormat, brand: freeKitBrand, styleKit, referenceColors } } : {}),
       config: {
         count: Number(count),
         presetId: cp,
@@ -6245,7 +6261,7 @@ ${jsonShapeLine}`;
         presentationTextLimits,
         presentationPlanning: isPresentationGeneration && !remix,
         // Modo livre: o roteiro v3 traz a direção de arte (deckDesign e design).
-        freeDesign: !!effectiveVisualPresetDef?.isFree,
+        freeDesign: isPresentationGeneration && !!effectiveVisualPresetDef?.isFree,
         // QA 24/11 (texto 3): refazer mantém a quantidade; card repetido não sai.
         keepCardCount: !!remix,
         nativeBlocks: !effectiveVisualPresetDef?.isCustom,
@@ -6359,7 +6375,7 @@ ${jsonShapeLine}`;
     // **…** no texto final, uma vez cada, depois da revisão.
     // Teste 6 (itens 5 e 6): no modo livre, pares de personalidade viram o
     // bloco comparison e o eyebrow vazio ganha rótulo, sem IA.
-    const result = effectiveVisualPresetDef?.isFree ? finishFreeDraft(generatedResult) : generatedResult;
+    const result = isPresentationGeneration && effectiveVisualPresetDef?.isFree ? finishFreeDraft(generatedResult) : generatedResult;
     if (reviewStatus === 'unavailable') toast('Texto gerado. A revisão automática não foi concluída; mantive a primeira versão.', 'warning', 6500);
     if (reviewStatus === 'fitted') toast('Encurtei o texto que não cabia no layout da apresentação.', 'warning', 6500);
     // MF-11: Estudo de caso sem ponto de partida no material vira lista de
@@ -6406,10 +6422,16 @@ ${jsonShapeLine}`;
     // Modo livre (docs/product/modo-livre-apresentacao.md): paleta e fontes do
     // deck. Cores do kit e escolhas do assistente substituem as do padrão; o
     // código completa o resto. A marca do projeto segue o deck.
-    const freeDeckDesign = effectiveVisualPresetDef?.isFree
+    const freeDeckDesign = isPresentationGeneration && effectiveVisualPresetDef?.isFree
       ? freeDeckDesignFor(generationPlan)
       : null;
     if (freeDeckDesign) generationBrand = { ...generationBrand, ...freeBrandPatch(freeDeckDesign) };
+    let finalSocialPlan = generationSocialPlan;
+    let socialDeckDesign = isSocialFreeGeneration ? (remix
+      ? doc.socialDeckDesign || doc.socialPlan?.deckDesign || sourceSlides.find(isFreeSocialSlide)?.socialDeckDesign
+      : generationSocialPlan?.deckDesign || result.deckDesign) : null;
+    if (isSocialFreeGeneration && remix) generationBrand = { ...brand };
+    else if (socialDeckDesign) generationBrand = { ...generationBrand, ...freeBrandPatch(socialDeckDesign) };
     if (generationBrand.logoImageId) {
       try {
         const hydratedLogo = await resolveLogoDataUrl(generationBrand, {});
@@ -6450,9 +6472,7 @@ ${jsonShapeLine}`;
         : Math.round((index * (presentationStages.length - 1)) / (nSlides - 1));
       return { ...(presentationStages[stageIndex] || {}), deliveryMode: presentationRoute?.deliveryMode, ...(raw?.presentationPlan ? { visualRole: raw.presentationPlan.visualRole, purpose: raw.presentationPlan.purpose } : {}) };
     };
-    let newSlides = remix ? mergeRemixedSlides(sourceSlides, result.slides, fetchImagesNow) : (
-      attachGenerationCanvasLayouts(
-      result.slides.map((s, i) => {
+    let newSlides = remix ? mergeRemixedSlides(sourceSlides, result.slides, fetchImagesNow) : result.slides.map((s, i) => {
       let q = textOnlyPlan ? '' : ((s.imageQuery ?? s.image_query) || '').trim();
       const sourceHosts = collectSourceHosts(
         material?.content,
@@ -6485,7 +6505,7 @@ ${jsonShapeLine}`;
       const isFullBleedSlot =
         (isTendenciaCulturaPreset(cp) && (i === 0 || i === nSlides - 1)) ||
         (isPersoHybridDensity(cp, td) && i <= 1);
-      if (!textOnlyPlan && !q && isFullBleedSlot && (title || subtitle)) {
+      if (!isSocialFreeGeneration && !textOnlyPlan && !q && isFullBleedSlot && (title || subtitle)) {
         const seed = `${title} ${subtitle}`.trim().slice(0, 120);
         q = `editorial photo illustrating: ${seed} — cinematic, documentary mood, natural lighting`;
         console.warn(`[handleGenerate] IA omitiu imageQuery do slide ${i+1} (full-bleed) — usando fallback baseado em título.`);
@@ -6508,6 +6528,26 @@ ${jsonShapeLine}`;
         ...visualSlideOverrides,
       };
 
+      if (isSocialFreeGeneration) {
+        const rawBody = typeof s.bodyAfterImage === 'string' ? s.bodyAfterImage
+          : typeof s.body_after_image === 'string' ? s.body_after_image : '';
+        return {
+          ...base,
+          bodyAfterImage: restoreSourceHosts(stripLeadingSlideCardLabel(rawBody.trim()), sourceHosts),
+          eyebrow: s.eyebrow || '',
+          scene: s.scene || null,
+          avoid: s.avoid || [],
+          design: s.design,
+          socialPresetId: 'social_free',
+          socialPlan: s.socialPlan,
+          socialDeckDesign,
+          socialFreeDesign: s.socialFreeDesign,
+          presentationBlocks: normalizePresentationBlocks(s.presentationBlocks),
+          photoRegion: 'full',
+          useCultureLayout: false,
+          overlay: 0,
+        };
+      }
       if (isApresentacaoPreset(cp)) {
         const rawBodyAfterImage = typeof s.bodyAfterImage === 'string'
           ? s.bodyAfterImage
@@ -6597,9 +6637,20 @@ ${jsonShapeLine}`;
       }
 
       return { ...base, overlay: q ? 70 : 0 };
-      }),
-      { creativePreset: cp, slideTextDensity: td },
-    ));
+      });
+    if (!remix && !isSocialFreeGeneration) {
+      newSlides = attachGenerationCanvasLayouts(newSlides, { creativePreset: cp, slideTextDensity: td });
+    }
+    if (remix && isSocialFreeGeneration) {
+      const preserved = preserveSocialFreeRemix({
+        sourceSlides, slides: newSlides, generatedSlides: result.slides,
+        socialPlan: doc.socialPlan, deckDesign: socialDeckDesign,
+        withImages: fetchImagesNow, formato: generationFormat,
+      });
+      newSlides = preserved.slides;
+      finalSocialPlan = preserved.socialPlan;
+      socialDeckDesign = preserved.socialDeckDesign;
+    }
     // Antes de compor: a composição reserva o canto da logo que o card já tem.
     if (!remix) {
       newSlides = applyGenerationLogoPolicy(newSlides, {
@@ -6618,9 +6669,10 @@ ${jsonShapeLine}`;
         formato: fmt && fmt !== 'apresentacao' ? fmt : 'carrossel',
         // O modo narrativo muda o ritmo de funções dos cards, nunca a família.
         narrative: effectiveMode,
+        ...(isSocialFreeGeneration ? { deckDesign: socialDeckDesign, plan: generationSocialPlan } : {}),
       });
     }
-    if (!remix) {
+    if (!remix && !isSocialFreeGeneration) {
       newSlides = autoAdjustOnGenerate
         ? autoAdjustSlides(newSlides, { creativePreset: cp, fmt: isPresentationGeneration ? 'apresentacao' : fmt })
         : applyFinalizeCanvasMarginsToSlides(newSlides, isPresentationGeneration ? 'apresentacao' : fmt);
@@ -6643,6 +6695,7 @@ ${jsonShapeLine}`;
     );
     newSlides = concurrentMedia.slides;
     const concurrentMediaSlideIds = concurrentMedia.protectedSlideIds;
+    const socialVisualIssues = isSocialFreeGeneration ? socialFreeDeckViolations(newSlides, { formato: generationFormat }) : [];
     checkActive();
     if (!remix) {
       lastGenerateArgsRef.current = {
@@ -6665,6 +6718,17 @@ ${jsonShapeLine}`;
           }),
       visualPreset: generationPresetId || null,
       ...(freeDeckDesign ? { presentationDeckDesign: freeDeckDesign } : {}),
+      ...(isSocialFreeGeneration ? {
+        socialPlan: finalSocialPlan,
+        socialDeckDesign,
+        socialQuality: {
+          version: 1,
+          reviewStatus,
+          reviewDiagnostics: generationReviewDiagnostics,
+          issues: socialVisualIssues,
+          checkedAt: new Date().toISOString(),
+        },
+      } : { socialPlan: null, socialDeckDesign: null, socialQuality: null }),
       // Paleta extraída da referência, guardada com o kit do projeto.
       ...(referencePaletteField ? { styleKit: { ...normalizeStyleKit(d.styleKit), referencePalette: referencePaletteField } } : {}),
       presentationDesignSystemId: isPresentationGeneration
@@ -6763,7 +6827,7 @@ ${jsonShapeLine}`;
           // Modo livre: página que o diretor deixou sem foto não pede imagem.
           .filter(x => !concurrentMediaSlideIds.has(x.slideId) && !slideSkipsImageGeneration(x.sl) && !!(x.q && String(x.q).trim()));
         // Direção de arte, parte 4: a arte de fundo conta 1 imagem a mais no lote.
-        const wantsDeckArt = isPresentationGeneration && deckNeedsArt(newSlides);
+        const wantsDeckArt = (isPresentationGeneration || isSocialFreeGeneration) && deckNeedsArt(newSlides);
         const totalImgs = slidesWithImage.length + (wantsDeckArt ? 1 : 0);
         let doneImgs = 0;
         const attemptedImageSlideIds = new Set();
@@ -6820,7 +6884,7 @@ ${jsonShapeLine}`;
                 presentationFamily: isPresentationGeneration && !effectiveVisualPresetDef?.isCustom ? (effectiveVisualPreset || '') : '',
                 // Spec 1.1 (referência): a referência do kit vai em toda imagem;
                 // as cenas dos outros slides entram no pedido para variar a cena.
-                deckSlides: isPresentationGeneration ? newSlides : null,
+                deckSlides: isPresentationGeneration || isSocialFreeGeneration ? newSlides : null,
                 slideIndex: i,
               }),
               aspectRatio: generationPlan
@@ -6896,7 +6960,7 @@ ${jsonShapeLine}`;
           setGenProgress({ phase: 'images', current: doneImgs, total: totalImgs, label: `Gerando a arte de fundo (${doneImgs + 1}/${totalImgs})…` });
           try {
             await deckArtGenRef.current({
-              projectId: generationProjectId, signal: job.signal, axes: effectiveAxes, deckSlides: newSlides,
+              projectId: generationProjectId, signal: job.signal, axes: effectiveAxes, deckSlides: newSlides, formato: generationFormat,
               onSlides: patch => setCreationPreviewSlides(prev => applyDeckArt(prev, patch)),
             });
           } catch (e) {
