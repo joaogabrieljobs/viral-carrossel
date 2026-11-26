@@ -18,6 +18,7 @@ import { buildPresentationPlanPrompt } from '../../src/utils/presentation-plan.j
 import { pdfPageImageFormat } from '../../src/hooks/useExport.js';
 import { idsDeImagemEmUso, semImagensDeRuntime } from '../../src/utils/image-store.js';
 import { wcagContrast } from '../../src/utils/wcag.js';
+import { auditPresentationLayout } from '../../src/utils/presentation-quality.js';
 
 const ARTE = JSON.parse(readFileSync(new URL('../fixtures/apoteose-direcao-arte.json', import.meta.url), 'utf8'));
 const DECK = {
@@ -106,6 +107,24 @@ describe('diretor de arte: fundo de arte nas páginas sem foto', () => {
     const art = propostos.slides.filter(s => s.presentationFreeDesign.ground === 'art');
     expect(art).toHaveLength(FREE_ART_MAX_SLIDES);
     expect(freeDeckViolations(propostos.slides).map(v => v.code)).not.toContain('free_art_limit');
+  });
+
+  it('fios e blocos da família param no lado liso (nada cruza o grafismo)', () => {
+    for (const s of arte) {
+      for (const d of s.presentationChrome.chrome.filter(item => ['rule', 'block'].includes(item.t))) expect(d.x + d.w).toBeLessThanOrEqual(FREE_ART_TEXT_MAX + 0.01);
+    }
+  });
+
+  it('personalidade em duas colunas sobre a arte: a tabela mantém 50% da largura; com apoio escrito, sem arte', () => {
+    const tabela = { type: 'comparison', headers: ['Traço', 'Sem ser'], rows: [['Brasileira', 'sem ser caricata.'], ['Sensual', 'sem ser vulgar.']] };
+    const pagina = (subtitle) => ({ ...slide(['data', 'other', false], 7, { family: 'editorial', ground: 'art', photo: 'none', block: 'comparison', emphasis: [], icons: [] }), subtitle, presentationBlocks: [tabela] });
+    const sem = livre(PAGINAS.map((p, i) => (i === 7 ? pagina('') : slide(p, i)))).slides[7];
+    expect(sem.presentationFreeDesign).toMatchObject({ ground: 'art', block: 'comparison' });
+    expect(sem.canvas.zones.evidence.w).toBeGreaterThanOrEqual(50);
+    expect(sem.canvas.zones.evidence.x + sem.canvas.zones.evidence.w).toBeLessThanOrEqual(FREE_ART_TEXT_MAX + 0.01);
+    expect(auditPresentationLayout(sem, { index: 7 }).issues).toEqual([]);
+    const com = livre(PAGINAS.map((p, i) => (i === 7 ? pagina('Um apoio escrito.') : slide(p, i)))).slides[7];
+    expect(com.presentationFreeDesign.ground).not.toBe('art');
   });
 
   it('o validador acusa mais de 3 fundos de arte', () => {

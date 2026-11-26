@@ -549,8 +549,11 @@ function candidatesFor({ slide, stage, index, count }) {
       // Arte de fundo (parte 4): só página sem foto e sem cartão atrás do texto.
       // Com bloco, só a comparação (a personalidade em duas colunas); os outros
       // blocos ficam no fundo claro ou de superfície, como antes.
+      // A tabela precisa de 50% da largura: com bloco, a arte fica para a
+      // página só com título e tabela (a tabela ocupa a coluna do apoio).
       const art = size === 'none' && !onPhoto && !hasTextPanel(layout)
-        && slideBlockTypes(slide).every(type => type === 'comparison') ? ['art'] : [];
+        && slideBlockTypes(slide).every(type => type === 'comparison')
+        && (!hasBlocks(slide) || !supportCopy(slide)) ? ['art'] : [];
       const grounds = onPhoto ? ['photo']
         : hasTextPanel(layout) ? [layout.ground]
         : hasBlocks(slide) ? ['bg', 'surface', ...art]
@@ -1234,19 +1237,31 @@ function closingReading({ zones, chrome, slide, titleSize, subSize, display, tex
  * da família decide onde elas começam), alinhado ao texto, 24 px em caixa
  * alta, na primeira cor que lê sobre a superfície do título.
  */
-function eyebrowDevice({ title, anchor = 'start', surface, inks, measure }) {
+function eyebrowDevice({ title, anchor = 'start', surface, inks, measure, devices = [] }) {
   if (!title || !(title.w > 1) || !surface) return null;
-  const needed = measuredTitleZone(title, measure).h;
+  // Altura das linhas do título, sem a folga de respiro da zona.
+  const titlePx = titlePxOf(measure.titleSize);
+  const lines = freeTextLines(String(measure.slide?.title || ''), 1920 * title.w / 100 - 24, titlePx, measure.display.family, 'display',
+    { trackingEm: (measure.display.tracking || 0) / 100, upper: measure.display.case === 'upper' });
+  const needed = Math.min(title.h, (lines * titlePx * measure.titleLeading) / 1080 * 100 + 1.5);
   const top = anchor === 'end' ? title.y + title.h - needed : anchor === 'center' ? title.y + (title.h - needed) / 2 : title.y;
+  // Fio ou barra da família que abre o título: o rótulo fica acima dele.
+  const opener = devices.filter(d => ['rule', 'block'].includes(d.t) && d.w < 99 && d.h < 3 && d.y < top + 0.5 && d.y > top - 7
+    && d.x < title.x + title.w && d.x + d.w > title.x).sort((a, b) => a.y - b.y)[0];
+  const y = opener ? opener.y - 3.4 : top - 4.2;
   return {
-    t: 'text', x: round2(title.x + TEXT_INSET), y: round2(Math.max(2, top - 4.2)), w: round2(Math.max(10, title.w - 2 * TEXT_INSET)),
-    text: '{kicker}', role: 'label', size: 24, weight: 700, tracking: 12, case: 'upper', color: readable(surface, inks),
+    t: 'text', x: round2(title.x + TEXT_INSET), y: round2(Math.max(2, y)), w: round2(Math.max(10, title.w - 2 * TEXT_INSET)),
+    // Por cima da foto cheia (texto sobre o lado reservado), como o título.
+    text: '{kicker}', role: 'label', size: 24, weight: 700, tracking: 12, case: 'upper', color: readable(surface, inks), z: 'over',
   };
 }
 
 /* Arte de fundo (parte 4) ---------------------------------------------------- */
 
 const ART_TEXT_KEYS = ['title', 'subtitle', 'evidence'];
+const supportCopy = slide => `${slide?.subtitle || ''}${slide?.bodyAfterImage || ''}`.replace(/\*\*/g, '').trim();
+/** Largura mínima do quadro de dados (auditoria de layout). */
+const EVIDENCE_MIN_W = 50;
 const ART_IMAGE_FIELDS = ['presentationArtImageId', 'presentationArtImage', 'presentationArtImageAssetId'];
 
 /**
@@ -1256,13 +1271,13 @@ const ART_IMAGE_FIELDS = ['presentationArtImageId', 'presentationArtImage', 'pre
  * 72% da largura, mantendo a mesma geometria (proporções, alinhamento e
  * ordem). O que já cabe fica igual.
  */
-export function compressForArt(composed) {
+export function compressForArt(composed, slide = {}) {
   const zones = composed?.canvas?.zones || {};
   const texts = ART_TEXT_KEYS.map(key => zones[key]).filter(z => z && z.w > 1 && z.h > 1);
   if (!texts.length) return composed;
   const left = Math.min(...texts.map(z => z.x));
   const right = Math.max(...texts.map(z => z.x + z.w));
-  if (right <= FREE_ART_TEXT_MAX) return composed;
+  if (right <= FREE_ART_TEXT_MAX) return { ...composed, presentationChrome: { ...composed.presentationChrome, chrome: clipToArtEdge(composed.presentationChrome?.chrome) } };
   const k = (FREE_ART_TEXT_MAX - left) / (right - left);
   const map = v => (v <= left ? v : round2(left + (v - left) * k));
   const span = (x, w) => { const x0 = map(x); return { x: x0, w: round2(Math.max(0, map(x + w) - x0)) }; };
@@ -1271,16 +1286,31 @@ export function compressForArt(composed) {
     const z = zones[key];
     if (z && z.w > 1 && z.h > 1) nextZones[key] = { ...z, ...span(z.x, z.w) };
   }
+  // Página só com título e tabela: a tabela ocupa também a coluna do apoio,
+  // da margem até 72%, para manter a largura de leitura do quadro.
+  const ev = nextZones.evidence;
+  const widened = !!ev && ev.w < EVIDENCE_MIN_W && !supportCopy(slide);
+  if (widened) nextZones.evidence = { ...ev, x: left, w: round2(FREE_ART_TEXT_MAX - left) };
   const chrome = (composed.presentationChrome?.chrome || []).map((d) => {
     if (!Number.isFinite(d?.x) || d.t === 'grid') return d;
     if (Number.isFinite(d.w)) return { ...d, ...span(d.x, d.w) };
     return { ...d, x: map(d.x) };
-  });
+  // O fio que separava o apoio (vazio) da tabela cruzaria a tabela alargada.
+  }).filter(d => !(widened && d.follow === 'subtitle' && crosses(d, nextZones.evidence)));
   return {
     ...composed,
     canvas: { ...composed.canvas, zones: nextZones },
-    presentationChrome: { ...composed.presentationChrome, chrome },
+    presentationChrome: { ...composed.presentationChrome, chrome: clipToArtEdge(chrome) },
   };
+}
+
+/** Fios e blocos da família param no lado liso: nada cruza o grafismo da arte. */
+function clipToArtEdge(chrome = []) {
+  return (Array.isArray(chrome) ? chrome : []).flatMap((d) => {
+    if (!['rule', 'block'].includes(d?.t) || !Number.isFinite(d.x) || !Number.isFinite(d.w)) return [d];
+    if (d.x >= FREE_ART_TEXT_MAX) return [];
+    return d.x + d.w > FREE_ART_TEXT_MAX ? [{ ...d, w: round2(FREE_ART_TEXT_MAX - d.x) }] : [d];
+  });
 }
 
 /** Imagem de arte do deck já guardada no slide ou numa página anterior. */
@@ -1348,7 +1378,7 @@ export function freePresentationCompositionOverrides(base, {
     }
   }
 
-  if (art) composed = compressForArt(composed);
+  if (art) composed = compressForArt(composed, layoutSlide);
 
   const palette = freePaletteOverrides(deck);
   // A arte é a cor base (bg) com o grafismo na borda direita: tintas e adornos do fundo claro/base.
@@ -1429,7 +1459,7 @@ export function freePresentationCompositionOverrides(base, {
     ? devices
     : [...devices, eyebrowDevice({
       title: reading?.titleZone || zones.title, anchor: layout.anchors?.title, surface: surfaceTitle,
-      inks: [palette.accent, palette.accent2, titleInk], measure: { slide, titleSize, display, titleLeading: familySpec(family).type.titleLeading || 1.05 },
+      inks: [palette.accent, palette.accent2, titleInk], measure: { slide, titleSize, display, titleLeading: familySpec(family).type.titleLeading || 1.05 }, devices,
     })].filter(Boolean);
   return {
     ...composed,

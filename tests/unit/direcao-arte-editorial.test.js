@@ -126,6 +126,14 @@ describe('render do eyebrow', () => {
       expect(label.style.fontSize).toBeGreaterThanOrEqual(24);
       const surface = s.presentationFreeTextSurfaces.title;
       expect(wcagContrast(label.style.color, surface), s.id).toBeGreaterThanOrEqual(4.5);
+      // Acima do título e por cima da foto; nenhum fio ou barra da família embaixo do rótulo.
+      const device = devices[0];
+      if (device.size === 24) {
+        expect(device.z, s.id).toBe('over');
+        expect(device.y, s.id).toBeLessThan(s.canvas.zones.title.y + s.canvas.zones.title.h);
+        const under = s.presentationChrome.chrome.filter(d => ['rule', 'block'].includes(d.t) && d.w < 99 && d.y >= device.y && d.y <= device.y + 2.4 && d.x < device.x + 15 && d.x + d.w > device.x);
+        expect(under, s.id).toEqual([]);
+      }
     }
   });
 });
