@@ -87,3 +87,57 @@ Falta uma linha de base da composição do carrossel. Ela precisa ser criada **a
 1. As melhorias que mudam a imagem ou o texto (1, 3, 5 e 6) valem **só no modo livre**. Os carrosséis de hoje continuam iguais.
 2. O modo livre do carrossel entra nos **3 formatos juntos**.
 3. O Criar rápido **continua** com o estilo sugerido pela rota. O modo livre fica no seletor de estilo.
+
+## Implementação da Frente B — 26/11/2026
+
+Este adendo registra o código implementado depois do fechamento da Frente A, a partir de `cdd3a97`. As seções anteriores são a análise e as decisões originais; a implantação não amplia aquelas decisões para os estilos existentes. Os gates finais de navegador e a inspeção das capturas ainda estavam em andamento ao registrar este adendo.
+
+### Entrada explícita e identidade do projeto
+
+`social_free` é uma opção virtual de geração, chamada **Livre: o Moont decide**, no seletor do assistente e da geração. `SOCIAL_VISUAL_PRESET_CATALOG` acrescenta essa opção sem modificar os 21 itens de `VISUAL_PRESETS`. O Criar rápido conserva a rota e o estilo sugerido anteriores. Escolher Livre preserva a assinatura da marca — logo, cabeçalho e rodapé — e não reaplica um conjunto fixo de ornamentos.
+
+O projeto continua sendo carrossel: `productKind: 'carrossel'`, formato social e plano `socialPlan`. Cada card persiste `socialFreeDesign`, `socialDeckDesign` e seu `socialPlan`, com cena, restrições, papel editorial e direção visual. Campos de blocos e arte já entendidos pelo renderer são reaproveitados, sem atribuir `presentationPresetId: 'presentation_free'`. O reconhecimento dos dois modos livres foi separado em código.
+
+Paleta e fontes são compartilhadas pelo projeto. Cores explícitas do kit ou da marca prevalecem; amostras extraídas da referência mantêm seus pesos e alimentam os normalizadores usados na apresentação. A preferência por uma base escura saturada só atua sobre uma base neutra não explícita, dentro do contrato da Frente A. Não existe paleta, casting, acabamento ou conjunto de grafismos da Apoteose aplicado como padrão a outros projetos.
+
+### Roteiro e revisão no mesmo fluxo de texto
+
+`buildSocialFreePrompt` amplia somente o pedido opt-in. A primeira resposta contém a redação e as decisões visuais; não há uma chamada adicional de planejamento. O fluxo normal continua com redação e revisão, podendo fazer reparo editorial quando os diagnósticos o exigirem. A revisão conserva a direção da imagem e do layout.
+
+O contrato pede capa de até oito palavras, chapéu sem numeração nos demais cards, contribuições distintas no miolo e CTA no fecho. A assinatura literal sustentada pelo material pode reaparecer na capa e no fecho; repetir a mesma frase em dois cards de miolo já é um problema. `bodyAfterImage` pode guardar a assinatura também na capa Livre. O acabamento e a revisão cuidam desses textos; o diretor visual não os reescreve para resolver geometria.
+
+Listas, comparação, número grande, citação e ícones exigem conteúdo real. O normalizador conserva blocos declarados e pode converter pares presentes no texto em tabela, mantendo o contexto que não virou par. Os diagnósticos da revisão e as violações visuais ficam persistidos em `socialQuality`. Os pedidos e catálogos de texto dos estilos antigos conservam seu contrato.
+
+### Diretor de composição nos três formatos
+
+`applyFreeSocialDesign` escolhe geometria entre as famílias sociais e as dez famílias de apresentação, usando as funções de um carrossel. O cálculo usa medidas de 1080 px, não uma redução do slide horizontal. As vistas de outro formato derivam do mesmo design; uma vista editada manualmente prevalece sobre essa derivação.
+
+| Formato | Medida | Faixa protegida no alto | Faixa protegida embaixo |
+|---|---|---|---|
+| Feed | 1080 × 1350 | 8,5% | 8,5% |
+| Quadrado | 1080 × 1080 | 9% | 9% |
+| Stories | 1080 × 1920 | 14% | 18% |
+
+O piso de leitura é 28 px, incluindo apoio, chapéu, blocos e assinatura da marca. O ajuste do renderer para nesse piso mesmo quando sobra um problema de densidade. O contraste mínimo é 4,5:1; no texto sobre foto, o diretor calcula proteção contra o pior fundo claro sob o véu. Destaques recebem uma tinta legível por card, preservando a paleta original do projeto. Cabeçalho e rodapé sobre foto usam uma superfície protegida.
+
+`socialFreeChromeGeometry` compartilha as posições automáticas e as reservas entre diretor e renderer. Logo, cabeçalho, handle, contador, barra e selo entram nas faixas seguras; Stories mantém também a elevação do rodapé. A reserva considera o retângulo real da marca. Nos cards quadrados mais densos, foto ou título podem ocupar a área livre ao lado dela, sem invadir o logo, reduzir a marca ou cortar conteúdo. Posições manuais permanecem sob controle do usuário.
+
+O diretor evita três geometrias iguais seguidas, registra uma troca necessária para o ritmo e conserva a família proposta quando possível. A seta aparece somente na capa. Arte pode aparecer em até três cards elegíveis, sempre sem foto; a geração compartilha um único asset de arte. Texto, CTA, logo e blocos continuam sendo camadas editáveis.
+
+O chapéu tem prioridade na reserva de texto. Um fólio ou outro ornamento textual que colidir com ele é omitido somente naquele card Livre; o conteúdo editorial permanece inteiro.
+
+### Fotos, arte, remix e persistência
+
+O lote exclui cards com `photo: 'none'`. Uma solicitação individual explícita pode preparar uma zona de foto antes de chamar a IA, sem mudar a intenção salva usada pelo lote. Upload ou retorno de imagem aplica `socialFreePhotoPatch` na transição de mídia e persiste o resultado. A hidratação dos mesmos bytes ao abrir o projeto não dispara recomposição.
+
+Em card manual, a foto utiliza uma zona existente ou um espaço livre; se não houver área disponível, pode ser inserida como fundo protegido. Zonas de texto, offsets e mídia do usuário não são apagados. Estilo próprio, canvas manual e edições por formato são reconhecidos antes de qualquer reset de estilo. A geração Livre também evita os ajustes genéricos posteriores que sobrescreveriam as zonas e escalas calculadas.
+
+Os pedidos de foto levam a cena do card, as cenas dos outros cards, a ficha visual e a âncora de pessoa já existentes. A referência de estilo fornece aparência; não autoriza copiar seu sujeito ou composição. O bloco de composição usa as zonas reais do card e o formato atual, inclusive uma vista editada. A arte usa a união das áreas de texto dos cards que a compartilham e respeita `graphics`, `finish`, iluminação e `avoid`, inclusive ausência de grafismos ou de grão.
+
+O remix de texto conserva direção, geometria, mídia, blocos e rótulos aprovados, aplicando somente os campos de redação. Com imagens solicitadas, a cena pode ser atualizada nos cards que já admitem foto. A quantidade é preservada e cards sem foto continuam fora do lote.
+
+### Evidência e limites da conferência
+
+A linha de base de composição protege os 21 estilos anteriores nos três formatos; os catálogos existentes de pedidos de texto e imagem não foram regravados. Os testes novos cobrem opt-in, plano e revisão, direção da imagem, arte, piso e contraste, mudança de formato, importação de foto, remix e chrome. A correção das faixas da marca foi reproduzida antes da implementação: oito testes falharam; o conjunto focal seguinte passou com 143 testes, além de `check:undef` e `check:props`.
+
+O E2E da Apoteose começa no assistente com uma conta vazia e recebe uma resposta de redação com plano, sem injetar um projeto composto. Confere geração, chamadas de imagem, persistência local e remota simulada, reabertura e geometria no DOM de exportação. APIs, armazenamento remoto e imagens geradas são simulados; isso prova a integração e os contratos enviados, não a qualidade artística de uma geração real da IA nem o serviço de produção. As capturas nativas e os gates completos precisam terminar antes do fechamento da Frente B.
