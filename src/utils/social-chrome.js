@@ -69,6 +69,59 @@ export function socialGround(brand = {}, ground = 'bg') {
   return { bg, ink: title, body, muted, accent };
 }
 
+/**
+ * Força do degradê social v4 sobre a foto (SlideCardInner, socialScrimGradient).
+ * `strong` é a opacidade no corpo do texto (cai a 90% no topo dele) e `base`,
+ * a do pé do card. `socialScrimMin`, gravado pela composição, é o piso que faz
+ * a tinta ler 4,5:1 no pior pixel da foto; sem ele, a conta de sempre.
+ */
+export const SOCIAL_SCRIM_MAX = 0.9;
+export function socialScrimAlphas(slide = {}) {
+  const ov = Math.max(0, Math.min(100, Number(slide.overlay) || 0)) / 100;
+  const calc = slide.socialArt?.signatureOnPhoto ? 0.86 : Math.min(0.74, Math.max(0.6, ov * 1.1));
+  const floor = Math.min(SOCIAL_SCRIM_MAX, Number(slide.socialScrimMin) || 0);
+  const strong = Math.max(calc, floor);
+  return { strong, base: Math.max(strong, Math.min(0.9, ov * 1.4)) };
+}
+
+/** Cinza que o pior pixel da foto (branco) vira sob preto com opacidade a. */
+export function scrimSurface(alpha) {
+  return mix('#FFFFFF', '#000000', Math.max(0, Math.min(1, alpha)));
+}
+
+/**
+ * Tinta que lê 4,5:1 sobre a superfície: a própria ou a menor mistura rumo a
+ * `toward` (o mesmo matiz, mais claro ou mais escuro). Mesma regra de
+ * image-composition.js (inkOver) na apresentação.
+ */
+export function inkOverSurface(surface, ink, toward = '#FFFFFF', min = 4.5) {
+  if (!hexToRgb(ink)) return ink;
+  if (contrastRatio(ink, surface) >= min) return ink;
+  for (let t = 0.05; t <= 1.0001; t += 0.05) {
+    const c = mix(ink, toward, Math.min(1, t));
+    if (contrastRatio(c, surface) >= min) return c;
+  }
+  return toward;
+}
+
+/** Menor opacidade da proteção (0–1) com que todas as tintas leem 4,5:1 no pior pixel. */
+export function minScrimAlpha(inks = [], min = 4.5) {
+  const list = inks.filter((c) => hexToRgb(c));
+  for (let a = 0; a <= 100; a += 1) {
+    const surface = scrimSurface(a / 100);
+    if (list.every((c) => contrastRatio(c, surface) >= min)) return a / 100;
+  }
+  return 1;
+}
+
+/** Tinta de um token de cor para texto sobre a foto (art.photoInks). */
+export function photoInkFor(token, photoInks = {}) {
+  if (token === 'accent') return photoInks.accent;
+  if (token === 'ink') return photoInks.title;
+  if (token === 'body' || token === 'muted') return photoInks.body;
+  return null;
+}
+
 function colorFor(token, inks) {
   if (token === 'ink') return inks.ink;
   if (token === 'body') return inks.body;
@@ -111,7 +164,10 @@ export function socialChromeElements(art, { frame, brand, tokens = {}, fonts = {
     // Dispositivo que só existe com conteúdo da pessoa (oferta, chapéu).
     if (d.requires && !String(tokens[d.requires] || '').trim()) return;
     const zIndex = d.z === 'over' ? 3 : 1;
-    const color = colorFor(d.color, inks);
+    // Texto da família direto sobre a foto (chapéu da capa em sangria): a
+    // tinta é a que a composição mediu contra a proteção, não a do papel.
+    const onPhoto = d.t === 'text' && art.textOnPhoto && art.photoInks && d.z !== 'over';
+    const color = onPhoto ? photoInkFor(d.color, art.photoInks) || colorFor(d.color, inks) : colorFor(d.color, inks);
     const opacity = d.color === 'rule' && d.opacity == null ? 0.28 : (d.opacity ?? 1);
     if (opacity === 0) return;
     if (d.t === 'rule' || d.t === 'block') {

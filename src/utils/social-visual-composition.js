@@ -7,7 +7,7 @@ import {
   toTitleSize, toSubSize, toBodySize,
 } from './social-families.js';
 import { assignSocialFunctions, rhythmVariants } from './social-sequence.js';
-import { socialGround, luminance } from './social-chrome.js';
+import { socialGround, luminance, socialChromeTokens, photoInkFor, minScrimAlpha, socialScrimAlphas, scrimSurface, inkOverSurface, contrastRatio, SOCIAL_SCRIM_MAX } from './social-chrome.js';
 import { normalizePresentationBlocks } from './presentation-quality.js';
 import { VIRAL_STYLES, PILL_ROLE_VISIBLE, pillRoleFor } from './social-viral-styles.js';
 
@@ -207,7 +207,7 @@ export function applySocialVisualCompositionV3(slides, { preset, photoRegion = '
 }
 
 /** Marcas que a composição grava no card; sem as caixas elas não significam nada. */
-export const SOCIAL_COMPOSITION_FIELDS = ['socialComposition', 'socialCompositionVersion', 'socialVisualPresetId', 'socialZoneAnchors', 'overlayMode', 'socialScrimTop', 'socialArt', 'socialFunction', 'socialFamily', 'socialPhotoTreatment', 'titleItalic', 'subtitleWeight', 'hideFooterPill', 'subtitleCase', 'subtitleItalic'];
+export const SOCIAL_COMPOSITION_FIELDS = ['socialComposition', 'socialCompositionVersion', 'socialVisualPresetId', 'socialZoneAnchors', 'overlayMode', 'socialScrimTop', 'socialScrimMin', 'socialArt', 'socialFunction', 'socialFamily', 'socialPhotoTreatment', 'titleItalic', 'subtitleWeight', 'hideFooterPill', 'subtitleCase', 'subtitleItalic'];
 
 /**
  * Troca de padrão num projeto já gerado.
@@ -537,6 +537,29 @@ function guardChrome(L, F, { footerPct = 0, logoCorner = null }) {
 }
 
 /**
+ * Piso do degradê para o texto sobre a foto ler 4,5:1 no pior pixel (branco),
+ * com a mesma conta da apresentação (sideScrim): a menor opacidade que serve
+ * a todas as tintas desenhadas sobre a foto (título, apoio e o texto da
+ * família que fica ali, como o chapéu da capa). O degradê também passa a
+ * começar acima desse texto. null quando o card não tem texto sobre a foto.
+ * `floor` só vem quando a conta de sempre não bastava.
+ */
+function photoScrimFloor(slide, art, L, chrome, { scrimAmount, textTop, scrimTop }) {
+  if (!L.onPhoto || !L.scrim) return null;
+  const tokens = socialChromeTokens({}, { slide });
+  // Texto da família sobre a foto, sem placa própria (a etiqueta da oferta tem bloco).
+  const plated = new Set(chrome.filter((d) => d.t === 'block' && d.requires).map((d) => d.requires));
+  const onPhoto = chrome.filter((d) => d.t === 'text' && d.z !== 'over' && !plated.has(d.requires)
+    && (!d.requires || String(tokens[d.requires] || '').trim()));
+  const above = onPhoto.filter((d) => d.y < textTop);
+  const top = above.length ? Math.min(textTop, ...above.map((d) => d.y)) : textTop;
+  const inks = [art.photoInks.title, art.photoInks.body, ...onPhoto.map((d) => photoInkFor(d.color, art.photoInks))].filter(Boolean);
+  const need = Math.min(SOCIAL_SCRIM_MAX, Math.ceil((minScrimAlpha(inks) / 0.9) * 100) / 100);
+  const usual = socialScrimAlphas({ overlay: scrimAmount, socialArt: { signatureOnPhoto: art.signatureOnPhoto } }).strong;
+  return { floor: need > usual + 1e-9 ? need : undefined, scrimTop: above.length ? round2(Math.max(0, top - 5)) : scrimTop };
+}
+
+/**
  * Campos de layout de um card v4 num formato. Fonte única para composição e
  * para a vista Quadrado/Stories (format-view.js). Nunca toca em texto ou foto.
  */
@@ -644,8 +667,16 @@ export function socialFormatPatch(slide, formato = 'carrossel') {
   const titleUsedPct = Math.min(fit.title.h, fit.titleUsed ?? fit.title.h);
   const textTop = titleAnchor === 'end' ? fit.title.y + fit.title.h - titleUsedPct
     : titleAnchor === 'center' ? fit.title.y + (fit.title.h - titleUsedPct) / 2 : fit.title.y;
-  const scrimTop = L.scrim && L.onPhoto ? round2(Math.max(0, textTop - 5)) : undefined;
+  let scrimTop = L.scrim && L.onPhoto ? round2(Math.max(0, textTop - 5)) : undefined;
   const socialArt = { ...art, ground: L.ground, chrome: guarded.chrome, archetype: L.archetype, density: fit.over ? 'over' : 'ok', formato: F.key, titleUsed: fit.titleUsed };
+  // Contraste sobre a foto (etapa 2 do plano do carrossel): só em card
+  // composto com as tintas medidas (art.photoInks); projeto salvo antes disso
+  // desenha como sempre, em todos os formatos.
+  const photoContrast = art.photoInks ? photoScrimFloor(slide, art, L, guarded.chrome, { scrimAmount, textTop, scrimTop }) : null;
+  if (photoContrast) {
+    scrimTop = photoContrast.scrimTop;
+    socialArt.textOnPhoto = true;
+  } else delete socialArt.textOnPhoto;
   if (hero) {
     socialArt.heroNumber = true;
     socialArt.heroTitlePx = fit.titlePx;
@@ -660,6 +691,7 @@ export function socialFormatPatch(slide, formato = 'carrossel') {
     overlay: scrimAmount,
     overlayMode: L.scrim ? 'scrim' : null,
     socialScrimTop: scrimTop,
+    ...(art.photoInks ? { socialScrimMin: photoContrast?.floor } : {}),
     titleSize: toTitleSize(fit.titlePx),
     subSize: toSubSize(fit.bodyPx),
     bodyAfterSize: toBodySize(fit.supportPx),
@@ -824,6 +856,28 @@ function socialRhythm(slides, { assigned, assignedVariants, familyKey, formato, 
   return { functions, variants };
 }
 
+/**
+ * Tintas que o card desenha sobre a foto (SlideCardInner com foto e véu): o
+ * título do estilo quando lê 3:1 no escuro, senão branco; o apoio claro. Se
+ * nem a proteção máxima faz o título do estilo ler 4,5:1 (vermelho do
+ * Cinematic), ele clareia o mínimo no mesmo matiz (`recalculated`). Cor
+ * marcada pela pessoa no card fica como está.
+ */
+function photoInksFor(slide, brand) {
+  const auto = slide.socialArt?.inks === true;
+  const own = !auto && slide.titleColor ? slide.titleColor : null;
+  const candidate = own || brand.titleColor || '#111111';
+  const shown = contrastRatio(candidate, '#111111') >= 3 ? candidate : '#FFFFFF';
+  const darkest = scrimSurface(SOCIAL_SCRIM_MAX * 0.9);
+  const title = own ? shown : inkOverSurface(darkest, shown, '#FFFFFF');
+  return {
+    title,
+    body: (!auto && slide.subtitleColor) || '#F5F5F7',
+    accent: inkOverSurface(darkest, brand.accent || candidate, '#FFFFFF'),
+    ...(title !== shown ? { recalculated: true } : {}),
+  };
+}
+
 function composeSocialLibrary(slides, { preset, brand, formato, narrative }) {
   if (!Array.isArray(slides) || !slides.length) return slides;
   const base = brand || preset.brand || {};
@@ -854,6 +908,7 @@ function composeSocialLibrary(slides, { preset, brand, formato, narrative }) {
     family: familyKey, fn, variant, structured: normalizePresentationBlocks(slide.presentationBlocks).length > 0, typo, footer,
     logoCorner: logoCornerFor(base, slide), logo: logoCornerFor(base, slide) ? { pos: logoCornerFor(base, slide), size: slide.logoSize ?? base.logoSize ?? SOCIAL_LOGO_SIZE_DEFAULT, ...(base.showHandle ? { drop: true } : {}) } : null, labelFont: ownType ? (family.type.label || null) : null, ownType, viral,
     signatureOnPhoto: viral && luminance(base.titleColor) != null && luminance(base.titleColor) < 0.6,
+    photoInks: photoInksFor(slide, base),
   });
   const { functions, variants } = socialRhythm(slides, { assigned, assignedVariants, familyKey, formato, artFor, presetId: preset.id });
   return slides.map((slide, index) => {
@@ -867,9 +922,13 @@ function composeSocialLibrary(slides, { preset, brand, formato, narrative }) {
     // Cores de chão só são da composição quando ela mesma as gravou; uma cor
     // escolhida pela pessoa no card não é apagada por um card de fundo normal.
     const prevAuto = slide.socialArt?.inks === true;
+    // Título sobre a foto que nem a proteção máxima faz ler 4,5:1: a tinta do
+    // estilo clareia o mínimo (só neste card; cor da pessoa não muda).
+    const photoTitle = !groundChanged && patch.socialArt.textOnPhoto && art.photoInks.recalculated;
     const colors = groundChanged
       ? { customBg: inks.bg, titleColor: inks.ink, subtitleColor: inks.body, textColor: inks.muted }
-      : prevAuto ? { customBg: null, titleColor: undefined, subtitleColor: undefined, textColor: undefined } : {};
+      : photoTitle ? { ...(prevAuto ? { customBg: null, subtitleColor: undefined, textColor: undefined } : {}), titleColor: art.photoInks.title }
+        : prevAuto ? { customBg: null, titleColor: undefined, subtitleColor: undefined, textColor: undefined } : {};
     const userZones = slide.canvas?.userEdited && slide.canvas?.zones;
     return {
       ...slide,
@@ -897,7 +956,7 @@ function composeSocialLibrary(slides, { preset, brand, formato, narrative }) {
         subtitleWeight: family.type.bodyWeight,
       } : {}),
       ...colors,
-      socialArt: { ...patch.socialArt, inks: groundChanged },
+      socialArt: { ...patch.socialArt, inks: groundChanged || !!photoTitle },
       socialPhotoTreatment: family.photo.filter,
       socialFunction: fn,
       socialFamily: familyKey,

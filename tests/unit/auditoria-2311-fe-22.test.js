@@ -99,7 +99,7 @@ describe('FE-22 — modelo da galeria vale em toda proporção e tira a composi�
 
   it('nenhuma marca da composição anterior sobra no card', () => {
     const marks = { socialComposition: 'v4:coverBleed', socialCompositionVersion: 4, socialVisualPresetId: 'viral_hype_dark',
-      socialZoneAnchors: { title: 'end' }, overlayMode: 'scrim', socialScrimTop: 41, socialArt: { family: 'manchete', chrome: [] },
+      socialZoneAnchors: { title: 'end' }, overlayMode: 'scrim', socialScrimTop: 41, socialScrimMin: 0.8, socialArt: { family: 'manchete', chrome: [] },
       socialFunction: 'opener', socialFamily: 'manchete', socialPhotoTreatment: 'sepia', titleItalic: true,
       subtitleWeight: 600, hideFooterPill: true, subtitleCase: 'upper', subtitleItalic: true };
     expect(Object.keys(marks).sort()).toEqual([...social.SOCIAL_COMPOSITION_FIELDS].sort());

@@ -36,7 +36,8 @@ function resumoDoCard(s) {
     tamanhos: [s.titleSize, s.subSize, s.bodyAfterSize, s.titleLeading, s.subLeading],
     alinhamento: [s.layout, s.align],
     cores: [s.customBg ?? null, s.titleColor ?? null, s.subtitleColor ?? null, s.textColor ?? null],
-    veu: [s.overlay ?? null, s.overlayMode ?? null, s.socialScrimTop ?? null, !!s.textShadow],
+    // Piso do degradê entra só quando gravado (etapa 2): cards sem ele mantêm o hash.
+    veu: [s.overlay ?? null, s.overlayMode ?? null, s.socialScrimTop ?? null, !!s.textShadow, ...(s.socialScrimMin != null ? [s.socialScrimMin] : [])],
     fontes: [art.typo?.titleFont, art.typo?.bodyFont, art.typo?.titleCase, art.typo?.titleLeading, s.titleWeight ?? null, s.titleCase ?? null, s.subtitleWeight ?? null],
     selo: [s.hideFooterPill ?? null, !!s.showSwipeCue],
   };

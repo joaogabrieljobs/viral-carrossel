@@ -54,7 +54,7 @@ const SLIDE_STYLE_OVERRIDES = [
   // SOCIAL_COMPOSITION_FIELDS). Com só quatro delas, o véu, o selo e os
   // ornamentos do estilo anterior continuavam desenhados sobre o modelo.
   'socialComposition', 'socialCompositionVersion', 'socialVisualPresetId', 'socialZoneAnchors',
-  'overlayMode', 'socialScrimTop', 'socialArt', 'socialFunction', 'socialFamily',
+  'overlayMode', 'socialScrimTop', 'socialScrimMin', 'socialArt', 'socialFunction', 'socialFamily',
   'socialPhotoTreatment', 'titleItalic', 'subtitleWeight', 'hideFooterPill',
   'subtitleCase', 'subtitleItalic',
 ];

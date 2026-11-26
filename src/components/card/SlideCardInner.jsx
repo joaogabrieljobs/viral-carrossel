@@ -8,6 +8,7 @@ import AutoFitText from '../AutoFitText.jsx';
 import PresentationBlocks from '../PresentationBlocks.jsx';
 import PresentationArtChrome from './PresentationArtChrome.jsx';
 import SocialArtChrome from './SocialArtChrome.jsx';
+import { socialScrimAlphas } from '../../utils/social-chrome.js';
 import { normalizePresentationBlocks } from '../../utils/presentation-quality.js';
 import { hydrateBrandTextColors, effectiveTitleFontFamily } from '../../utils/brand-helpers.js';
 import { SectionLabel as S } from '../ui/SectionLabel.jsx';
@@ -114,8 +115,8 @@ function subtitleTextTransform(brand) {
 function socialScrimGradient(slide) {
   const ov = Math.max(0, Math.min(100, Number(slide.overlay) || 0)) / 100;
   const t = Math.max(24, Math.min(100, 100 - slide.socialScrimTop));
-  const strong = slide.socialArt?.signatureOnPhoto ? 0.86 : Math.min(0.74, Math.max(0.6, ov * 1.1));
-  const base = Math.max(strong, Math.min(0.9, ov * 1.4));
+  // Piso gravado pela composição (socialScrimMin) para o texto ler 4,5:1 no pior pixel da foto.
+  const { strong, base } = socialScrimAlphas(slide);
   const fade = Math.min(100, t + 16);
   return `linear-gradient(to top, rgba(0,0,0,${base}) 0%, rgba(0,0,0,${strong}) ${round1(t * 0.55)}%, rgba(0,0,0,${round1(strong * 0.9 * 100) / 100}) ${round1(t)}%, transparent ${round1(fade)}%), linear-gradient(to bottom, rgba(0,0,0,${ov * 0.6}) 0%, transparent 17%)`;
 }

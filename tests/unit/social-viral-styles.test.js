@@ -3,7 +3,7 @@ import { VISUAL_PRESETS, applyVisualPreset, getSlideOverridesForPreset } from '.
 import { applySocialVisualComposition, restyleSocialSlides } from '../../src/utils/social-visual-composition.js';
 import { VIRAL_STYLES, VIRAL_STYLE_KEYS, PILL_ROLE_VISIBLE } from '../../src/utils/social-viral-styles.js';
 import { socialCardLayout, SOCIAL_FUNCTIONS } from '../../src/utils/social-families.js';
-import { socialChromeTokens, socialChromeElements, socialGround, contrastRatio } from '../../src/utils/social-chrome.js';
+import { socialChromeTokens, socialChromeElements, socialGround, contrastRatio, scrimSurface, SOCIAL_SCRIM_MAX } from '../../src/utils/social-chrome.js';
 import { slideForFormatDisplay } from '../../src/utils/format-view.js';
 import { footerChromeReservePct } from '../../src/utils/card-chrome.js';
 import { resolvePresetChrome } from '../../src/utils/preset-tokens.js';
@@ -157,6 +157,9 @@ describe('12 estilos — cor-assinatura e contraste', () => {
     const out = applySocialVisualComposition(sequencia(), { preset: preset(id), brand });
     for (const s of out) {
       if (s.customBg) expect(contrastRatio(s.customBg, s.titleColor)).toBeGreaterThanOrEqual(4.5);
+      // Título sobre a foto que nem a proteção máxima faz ler 4,5:1 (etapa 2 do
+      // plano do carrossel): a tinta do estilo clareia o mínimo só nesse card.
+      else if (s.socialArt.textOnPhoto && s.titleColor) expect(contrastRatio(s.titleColor, scrimSurface(SOCIAL_SCRIM_MAX * 0.9))).toBeGreaterThanOrEqual(4.5);
       // Card de chão normal não grava cor de título: vale a cor-assinatura do estilo.
       else expect(s.titleColor).toBeUndefined();
     }

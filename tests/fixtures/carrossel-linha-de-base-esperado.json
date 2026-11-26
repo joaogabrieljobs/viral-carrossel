@@ -1,5 +1,5 @@
 {
- "origem": "Gravado em 26/11/2026 sobre a main c11f948, antes da etapa 2. Chave: estilo|formato. Mudanças conscientes: (ritmo) o card 4 deixa de fechar trinca de layout em ficha, mood_sepia, reflexivo_cream, editorial_magazine, cinematic_hybrid, authority_black e minimal_clean e passa para a afirmação da família.",
+ "origem": "Gravado em 26/11/2026 sobre a main c11f948, antes da etapa 2. Chave: estilo|formato. Mudanças conscientes: (ritmo) o card 4 deixa de fechar trinca de layout em ficha, mood_sepia, reflexivo_cream, editorial_magazine, cinematic_hybrid, authority_black e minimal_clean e passa para a afirmação da família. (contraste) Texto sobre a foto lê 4,5:1 no pior pixel: piso do degradê na capa e na foto em sangria de cinema (0,65) e na capa de sports_editorial (0,68); em cinematic_hybrid o vermelho sobre a foto (capa, foto e fecho) clareia para #f37373 com piso 0,89.",
  "casos": {
   "revista|carrossel": {
    "hash": "dcb7d0bd3d7abd79",
@@ -338,52 +338,52 @@
    ]
   },
   "cinema|carrossel": {
-   "hash": "3e3ea3850350357a",
+   "hash": "d4ab4e68cbfeeae9",
    "sequencia": "cover:coverBleed opener:openerCenter development:devRule development:devRule photo:photoBleed statement:statementCenter list:list closing:closingBleed",
    "cards": [
-    "bd5751edb4f105e9",
+    "0994bd2186c1773b",
     "bfc797eae4f2b257",
     "5259d8100fa41e4f",
     "91cd511173df6d63",
-    "4bbc21d58b664bd8",
+    "1408f07a577e1daa",
     "6511f8c0bd85488c",
     "98ab443eea3c9a59",
     "bd3571c5608ca034"
    ]
   },
   "cinema|quadrado": {
-   "hash": "d04429fe40e0e63a",
+   "hash": "57c571cbc9a56c24",
    "sequencia": "cover:coverBleed opener:openerCenter development:devRule development:devRule photo:photoBleed statement:statementCenter list:list closing:closingBleed",
    "cards": [
-    "64b31a4f6cde29f3",
+    "db79ef407f7ffb34",
     "8bbb7eca4cd818ef",
     "9238094d6bda174c",
     "3f4308370b412f2e",
-    "faffc75c6ca2f051",
+    "9424d81d3322de4e",
     "dd13514dbaa34ccd",
     "30933eeafeb8a990",
     "a51abc4e7317d4d6"
    ]
   },
   "cinema|stories": {
-   "hash": "fd0815305853567d",
+   "hash": "db2313da347df923",
    "sequencia": "cover:coverBleed opener:openerCenter development:devRule development:devRule photo:photoBleed statement:statementCenter list:list closing:closingBleed",
    "cards": [
-    "86ebcfcb8b568995",
+    "76519e10a72bbb99",
     "471fefbd8bcec254",
     "4b38d25f66499267",
     "476514f04abbcdbc",
-    "7975705732ec1575",
+    "44afefe4b1e2714e",
     "21389212b999277d",
     "5bf7224e4f5324f6",
     "108d4d0dea754de4"
    ]
   },
   "sports_editorial|carrossel": {
-   "hash": "29be1bd71e302f8d",
+   "hash": "721a338652587191",
    "sequencia": "cover:vCoverBleed opener:vDevNumeral development:vDevNumeral development:vDevBlock photo:vPhotoTop statement:vStatement list:vList closing:vClosingBleed",
    "cards": [
-    "b2b5510129392d6d",
+    "42c205df4df04172",
     "13ee3023c664abdb",
     "8bc394c59c282d0e",
     "70b7ec04034bbaae",
@@ -394,10 +394,10 @@
    ]
   },
   "sports_editorial|quadrado": {
-   "hash": "333049fb3a804cd2",
+   "hash": "921bc6cb4975300c",
    "sequencia": "cover:vCoverBleed opener:vDevNumeral development:vDevNumeral development:vDevBlock photo:wideStack statement:vStatement list:vList closing:vClosingBleed",
    "cards": [
-    "3006596da6ccd2f5",
+    "84673f678c45d2c9",
     "77b47a5a7758f2b5",
     "1de08d537a5ff374",
     "acaeee0c1a69fe6f",
@@ -408,10 +408,10 @@
    ]
   },
   "sports_editorial|stories": {
-   "hash": "6732d5d70ae711a1",
+   "hash": "822fac4d8adcc29a",
    "sequencia": "cover:vCoverBleed opener:vDevNumeral development:vDevNumeral development:vDevBlock photo:vPhotoTop statement:vStatement list:vList closing:vClosingBleed",
    "cards": [
-    "255838c79a4ee29e",
+    "4a04b45eac8f323a",
     "04705e2239b28a8e",
     "5fc18b9d23a9ef84",
     "d8aede7092a8211a",
@@ -758,45 +758,45 @@
    ]
   },
   "cinematic_hybrid|carrossel": {
-   "hash": "8363349e086947dd",
+   "hash": "f077f418adf2685f",
    "sequencia": "cover:vCoverBleed opener:vDevBlock development:vDevBlock statement:vStatementCenter photo:vPhotoBleed statement:vStatementCenter list:vList closing:vClosingBleed",
    "cards": [
-    "79d37cd525eb0f57",
+    "6256800de153fb89",
     "929d8e86ef0ac4c9",
     "15bd99ccdcd6f06f",
     "703e7992c4a1bc7f",
-    "2e75deba190716bb",
+    "c221c07d12ecc32d",
     "83d35521fbcf66d2",
     "7414dca47b3fa194",
-    "ac1989cc947e4d99"
+    "23e6ac79b655c83d"
    ]
   },
   "cinematic_hybrid|quadrado": {
-   "hash": "f0bf6410e7ba2789",
+   "hash": "45312c27d9a6aac5",
    "sequencia": "cover:vCoverBleed opener:vDevBlock development:vDevBlock statement:vStatementCenter photo:vPhotoBleed statement:vStatementCenter list:vList closing:vClosingBleed",
    "cards": [
-    "967872a6fb1a2a09",
+    "a89950326fb02372",
     "0cc4882dd2dd2008",
     "2ef8b56ca1af5f6b",
     "4f0a7f4025c5a6d8",
-    "644e62c577b9da20",
+    "a98f1013e584bc45",
     "0a3533a1b060d84e",
     "3c2c03dd8f9f2a2c",
-    "50e4a291316a9ee1"
+    "97ae005a59f7d2b5"
    ]
   },
   "cinematic_hybrid|stories": {
-   "hash": "91de59dbe9129691",
+   "hash": "b1c7954a871bbc82",
    "sequencia": "cover:vCoverBleed opener:vDevBlock development:vDevBlock statement:vStatementCenter photo:vPhotoBleed statement:vStatementCenter list:vList closing:vClosingBleed",
    "cards": [
-    "129e3111b68c6a0a",
+    "e6efd2d6b1fadbc8",
     "f2ad4e7cab68bfa8",
     "f2a8c3032190bfcf",
     "cba0aa8567184195",
-    "d3111eb8aa594360",
+    "5febca79e766e76b",
     "cba0aa8567184195",
     "34e0b99636ec787a",
-    "2222bc9d62dfb7cf"
+    "20edcee155d46ef7"
    ]
   },
   "authority_black|carrossel": {
