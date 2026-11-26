@@ -9,6 +9,7 @@ import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 import { mockOutfitFont } from './helpers/outfit-font.js';
 import { enterEditorFromHome, selectEditorMode } from './helpers/project-entry.js';
 import { socialFreeCloud, localSocialAssets, socialRenderGeometry, socialRenderedMedia, contrastRatio, captureSocialDeck } from './helpers/social-free-harness.js';
+import { assertDirectedImageRequests, assertStyleReferencePolicy } from './helpers/directed-image-contract.js';
 
 const session = { ...SESSAO_ATIVA, tier: 'creator', imageQuota: { limit: 50, used: 0, remaining: 50 } };
 const fixture = JSON.parse(fs.readFileSync(new URL('../fixtures/apoteose-social-free-8.json', import.meta.url), 'utf8'));
@@ -295,7 +296,7 @@ for (const format of FORMATS) test(`Livre social: geração completa de oito car
     expect.soft(request.prompt, 'a descrição completa da identidade acompanha cada cena').toContain(fixture.response.visualBible.entities[0].en);
     expect.soft(request.prompt, 'as restrições da identidade continuam no pedido').toContain(fixture.response.visualBible.entities[0].never);
     expect.soft(request.prompt).toMatch(/terracotta shirt/i);
-    expect.soft(request.prompt).toContain('REFERENCE ROLES: Use moodboard images only for the look');
+    expect.soft(request.prompt).toMatch(/moodboard[\s\S]{0,45}only for the look/i);
     expect.soft(request.prompt).not.toContain('lighting and composition');
   }
   const firstPhoto = photos.find(request => request.usageContext.cardNumber === 1);
@@ -306,6 +307,13 @@ for (const format of FORMATS) test(`Livre social: geração completa de oito car
     expect.soft(request.imageList).toHaveLength(2);
   }
   expect.soft(new Set(returningPhotos.map(request => hash(request.imageList.at(-1)))).size, 'a mesma âncora é reutilizada').toBe(1);
+  await assertDirectedImageRequests({ page, testInfo, tag: `social-${format.id}-${V2 ? 'v2' : 'legado'}`,
+    requests, plans: fixture.response.slides, subjects: fixture.response.visualBible.entities,
+    expectedReferences: Object.fromEntries(fixture.expected.photoCards.map(cardNumber =>
+      [cardNumber, [`data:image/png;base64,${flyer}`, ...(cardNumber === 1 ? [] : [`data:image/webp;base64,${photo}`])]])),
+    expectedReferenceMaps: Object.fromEntries(fixture.expected.photoCards.filter(cardNumber => cardNumber !== 1)
+      .map(cardNumber => [cardNumber, [{ label: fixture.response.visualBible.entities[0].id, number: 2, role: 'identity' }]])),
+  });
   expect.soft(runtimeErrors).toEqual([]);
 
   // Geometria e legibilidade medidas na árvore real que também será exportada.
@@ -423,7 +431,7 @@ for (const format of FORMATS) test(`Livre social: geração completa de oito car
     expect(individualRequest.usageContext.cardNumber).toBe(7);
     expect(individualRequest.prompt).toContain(direction);
     expect(individualRequest.prompt).toContain(`COMPOSITION (social card 1080 × ${format.height}, ${format.ratio}`);
-    expect(individualRequest.prompt).toContain('REFERENCE ROLES: Use moodboard images only for the look');
+    assertStyleReferencePolicy(individualRequest, 'geração individual: papel das referências');
     await expect.poll(async () => (await savedEntry(page, name)).doc.slides[6].bgImageSource).toBe('ai');
     const afterIndividual = (await savedEntry(page, name)).doc;
     expect(afterIndividual.slides[6].socialFreeDesign.photo).not.toBe('none');

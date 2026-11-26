@@ -8,6 +8,7 @@ import os from 'node:os';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 import { presentationBatch } from './helpers/presentation-batches.js';
 import { enterEditorFromHome } from './helpers/project-entry.js';
+import { assertDirectedImageRequests } from './helpers/directed-image-contract.js';
 
 const fixture = JSON.parse(fs.readFileSync(new URL('../fixtures/apoteose-teste7.json', import.meta.url), 'utf8'));
 const flyer = fs.readFileSync(new URL('../fixtures/apoteose-flyer-referencia.png', import.meta.url)).toString('base64');
@@ -256,6 +257,13 @@ test(`Teste 7: geração inteira do Livre, timeout, persistência e recuperaçã
   if (directory) fs.writeFileSync(path.join(directory, 'persistido.json'), JSON.stringify({ local: saved, cloud: remote, textRepairs, imageRequests: images.map(item => ({ usageContext: item.usageContext, prompt: item.prompt })) }, null, 2));
   await testInfo.attach('reparo-textual-simulado', { body: JSON.stringify(textRepairs, null, 2), contentType: 'application/json' });
   await testInfo.attach('estado-persistido', { body: JSON.stringify({ local: designSnapshot(saved), cloud: designSnapshot(remote) }, null, 2), contentType: 'application/json' });
+
+  await assertDirectedImageRequests({ page, testInfo,
+    tag: `apresentacao-${recovery.toLowerCase()}${cleanArt ? '-sem-grafismos' : ''}-${V2 ? 'v2' : 'legado'}`,
+    requests: images, plans: fixture.presentationPlan.slides,
+    expectedReferences: Object.fromEntries(fixture.presentationPlan.slides.map((_, index) =>
+      [index + 1, [`data:image/png;base64,${flyer}`]])),
+  });
 
   expect.soft(prompts[0]).toContain('presentation-plan-v3');
   expect.soft(prompts.some(prompt => prompt.includes('PLANO EDITORIAL VALIDADO'))).toBe(true);
