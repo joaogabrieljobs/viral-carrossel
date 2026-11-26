@@ -48,6 +48,18 @@ describe('Imagem do Livre social: visual próprio e geometria real', () => {
     expect(slide).toEqual(before);
   });
 
+  it('o enquadramento acompanha a foto editada na vista, sem contradizer sua composição', () => {
+    const slide = card();
+    slide.canvas = { applied: true, zones: { photo: { x: 80, y: 0, w: 20, h: 100 }, title: { x: 8, y: 14, w: 60, h: 20 } } };
+    const formatViews = { stories: { slides: { a: { canvas: { applied: true, userEdited: true, zones: {
+      photo: { x: 0, y: 65, w: 100, h: 15 }, title: { x: 8, y: 14, w: 84, h: 20 },
+    } } } } } };
+    const parts = composeImageDirection({ slide, fmt: 'stories', formatViews });
+    expect(parts.composition).toContain('covering 100% of the card width and 15% of its height');
+    expect(parts.framing).toContain('wide, shallow band');
+    expect(parts.framing).not.toContain('tall, narrow column');
+  });
+
   it('preserva âncora e ficha visual sem pedir uma pessoa diferente da referência de identidade', () => {
     const anchorPlan = { direction: 'IDENTITY ANCHOR: keep the attached person identical.', refImages: ['data:image/png;base64,YQ=='], excludeEntityIds: ['person-1'] };
     const visualBible = { entities: [
@@ -86,6 +98,30 @@ describe('Imagem do Livre social: visual próprio e geometria real', () => {
     expect(built.prompt).toContain(anchor);
     expect(built.prompt).toContain('REFERENCE ROLES:');
     expect(built.prompt).toContain('COMPOSITION');
+    expect(built.chars).toBeLessThanOrEqual(4000);
+  });
+
+  it.each([false, true])('preserva a ficha inteira da personagem sob orçamento, com âncora %s', anchored => {
+    const first = card();
+    const richVisual = { ...visualDirection,
+      finish: 'Fine editorial film grain, subtle printed texture and realistic contemporary campaign treatment. '.repeat(3),
+      atmosphere: 'An intense urban night with warm side light and restrained cyan details. '.repeat(3),
+      graphics: 'Only the specified geometric colour interventions in the unused margins, no lettering. '.repeat(3),
+    };
+    first.socialPlan = { ...first.socialPlan, visualDirection: richVisual };
+    first.canvas = { applied: true, zones: { photo: { x: 7.5, y: 30.8, w: 85, h: 21.36 }, title: { x: 7.5, y: 14, w: 85, h: 12 } } };
+    const entity = { id: 'convidada', en: 'A fictional adult woman with short dark hair, wearing a terracotta shirt and dark trousers, with no branded clothing.', never: 'Celebrity resemblance, costume, branded clothing, hair or outfit changes.' };
+    const anchor = 'IDENTITY ANCHOR: The last attached image identifies the recurring woman. Preserve face, hair, skin tone and build. Follow the subject sheet for clothing; this scene determines action, setting and pose.';
+    const parts = composeImageDirection({ slide: first, fmt: 'quadrado', styleKit, baseReferenceCount: 1,
+      visualBible: { entities: [entity] }, ...(anchored ? { anchorPlan: { direction: anchor, refImages: ['data:image/png;base64,YQ=='] } } : {}) });
+    const built = buildImagePrompt({ scene: presentationSceneQuery(scene), ...parts,
+      otherScenes: Array.from({ length: 5 }, (_, i) => `Another moment ${i} with the recurring fictional woman, distinct action and framing at the same urban event.`),
+    }, { route: 'sjinn' });
+    expect(built.prompt).toContain(entity.en);
+    expect(built.prompt).toContain(entity.never);
+    if (anchored) expect(built.prompt).toContain(anchor);
+    expect(built.prompt).toContain('COMPOSITION');
+    expect(built.prompt).toContain('#17364B');
     expect(built.chars).toBeLessThanOrEqual(4000);
   });
 

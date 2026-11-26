@@ -352,7 +352,7 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
     const [cabecalho, ...resto] = texto.split('\n');
     return shrinkBody(`${cabecalho}\n`, resto.join('\n'), '', max);
   });
-  add('subjects', parts.subjects, 'required', keepWholeLines);
+  add('subjects', parts.subjects, socialFree ? 'fixed' : 'required', socialFree ? null : keepWholeLines);
   if (styleBody) {
     const styleHeader = visualDirection ? T.styleHeaderVisual : T.styleHeader;
     add('style', `${styleHeader}\n${styleBody}${canvas ? `\n${canvas}` : ''}`, 'required', (_texto, max) => {
@@ -395,7 +395,7 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
   //    carrega a regra de tela e fica.
   //    Bloco com redução própria (cenas dos outros slides) perde linhas
   //    inteiras antes de sair.
-  for (const key of (presentation ? OPTIONAL_DROP_ORDER : OPTIONAL_DROP_ORDER_CAROUSEL)) {
+  for (const key of (directed ? OPTIONAL_DROP_ORDER : OPTIONAL_DROP_ORDER_CAROUSEL)) {
     const excesso = tamanhoTotal(ativos) - teto;
     if (excesso <= 0) break;
     const bloco = ativos.find((item) => item.key === key && item.tier === 'optional');

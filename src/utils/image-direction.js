@@ -17,7 +17,7 @@ import { isAestheticDirection } from '../../shared/image-prompt.js';
 import { presentationSceneQuery } from './presentation-plan.js';
 import { composeVisualDirectionBlock, resolveSlideVisualDirection, resolveSocialFreeVisualDirection } from './visual-direction.js';
 import { composeCompositionBlock } from './image-composition.js';
-import { composeSocialFreeComposition, isSocialFreeSlide } from './social-free-prompt.js';
+import { composeSocialFreeComposition, isSocialFreeSlide, socialFreeImageSlide } from './social-free-prompt.js';
 
 const SLIDE_DIRECTION_MAX = 1200;
 
@@ -173,7 +173,8 @@ export function composeImageDirection({
     : livreSocial ? composeSocialFreeComposition(card, { fmt, formatViews, visualDirection: visual, shot: clean(plannedScene?.shot) }) : '';
   const sceneBrief = visual ? presentationSceneBrief(plannedScene, { shotInComposition: !!composition }) : null;
   const cena = composeSceneParts({
-    visualBible, slide: card, fmt, excludeEntityIds: anchorPlan?.excludeEntityIds || [], presentationFamily,
+    visualBible, slide: livreSocial ? socialFreeImageSlide(card, { fmt, formatViews }) : card, fmt,
+    excludeEntityIds: anchorPlan?.excludeEntityIds || [], presentationFamily,
     compositionAware: !!composition,
   });
   const avoid = apresentacao ? presentationImageAvoid(card) : livreSocial ? socialFreeImageAvoid(card) : [];
