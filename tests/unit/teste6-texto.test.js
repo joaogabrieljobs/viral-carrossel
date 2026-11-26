@@ -95,18 +95,18 @@ describe('item 6: personalidade em pares vira bloco comparison', () => {
     expect(personalityPairs('Brasileira sem ser caricata. Sofisticada sem ser pretensiosa.')).toEqual([]);
   });
 
-  it('o slide 8 ganha o bloco de duas colunas e o parágrafo encolhe', () => {
+  it('o slide 8 ganha o bloco de duas colunas com os 7 pares e o apoio sai da página', () => {
     const out = personalityComparison(slide8());
     const [block] = normalizePresentationBlocks(out.presentationBlocks);
     expect(block.type).toBe('comparison');
     expect(block.headers).toEqual(['Traço', 'Sem ser']);
     expect(block.rows[0]).toEqual(['Brasileira', 'sem ser caricata.']);
-    expect(block.rows).toHaveLength(5);
+    // Revisão do coordenador: até 7 linhas no modo livre, nenhum par no apoio.
+    expect(block.rows).toHaveLength(7);
     expect(out.presentationPlan.design.block).toBe('comparison');
-    // O que não coube na tabela (até 5 linhas) fica no apoio, mais curto que antes.
-    expect(out.subtitle).toBe('Contemporânea sem depender de tendências. Bem-humorada sem recorrer ao humor óbvio.');
-    expect(out.subtitle.length).toBeLessThan(slide8().subtitle.length / 2);
-    expect(out.bodyAfterImage).toBe(slide8().bodyAfterImage);
+    expect(out.subtitle).toBe('');
+    expect(out.bodyAfterImage).toBe('');
+    expect(out.speakerNotes).toBe(slide8().bodyAfterImage);
   });
 
   it('slide sem pares, ou que já tem bloco, volta igual', () => {

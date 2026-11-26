@@ -9,18 +9,27 @@ const stringValue = (value, max, optional = false) => {
   return clean && clean.length <= max ? clean : null;
 };
 
+/** Linhas da personalidade em pares no modo livre (o alvo do ChatGPT tem 7). */
+export const COMPARISON_PAIRS_MAX_ROWS = 7;
+
 export function normalizePresentationBlocks(raw) {
   if (!Array.isArray(raw) || raw.length !== 1) return [];
   const block = raw[0];
   if (!block || typeof block !== 'object') return [];
   if (block.type === 'comparison') {
+    // Teste 6 (26/11): a personalidade em pares do modo livre ("traço / sem
+    // ser…", variant 'pairs', montada pelo código em free-draft.js) aceita
+    // até 7 linhas. Qualquer outro quadro continua com o teto de 5.
+    const pairs = block.variant === 'pairs';
+    const maxRows = pairs ? COMPARISON_PAIRS_MAX_ROWS : 5;
     if (!Array.isArray(block.headers) || block.headers.length < 2 || block.headers.length > 4
-      || !Array.isArray(block.rows) || !block.rows.length || block.rows.length > 5) return [];
+      || !Array.isArray(block.rows) || !block.rows.length || block.rows.length > maxRows) return [];
     const headers = block.headers.map((value) => stringValue(value, 80));
     const rows = block.rows.map((row) => Array.isArray(row) && row.length === headers.length
       ? row.map((value) => stringValue(value, 240)) : null);
     if (headers.includes(null) || rows.some((row) => !row || row.includes(null))) return [];
-    return [{ type: 'comparison', headers, rows }];
+    if (pairs && (headers.length !== 2 || rows.some(row => !/^sem\s/i.test(row[1])))) return [];
+    return [{ type: 'comparison', headers, rows, ...(pairs ? { variant: 'pairs' } : {}) }];
   }
   if (block.type === 'metrics') {
     if (!Array.isArray(block.items) || !block.items.length || block.items.length > 4) return [];

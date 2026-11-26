@@ -4,8 +4,8 @@
  *
  * - item 6: a personalidade em pares ("Brasileira sem ser caricata.
  *   Sofisticada sem ser pretensiosa. ...") vira o bloco comparison de duas
- *   colunas (traço / "sem ser…"), tirado do próprio texto, e o parágrafo
- *   encolhe;
+ *   colunas (traço / "sem ser…", até 7 linhas), tirado do próprio texto, e a
+ *   página fica só com título e tabela, sobre a arte de fundo;
  * - negrito do roteiro (applyPlanEmphasisToDraft);
  * - item 5: eyebrow em todas as páginas menos a capa. O que a IA escreveu
  *   fica; vazio, o código deriva um rótulo curto pelo tema do texto (A MÚSICA,
@@ -14,11 +14,11 @@
 import { applyPlanEmphasisToDraft } from './free-design.js';
 import { normalizePresentationEyebrow } from './presentation-eyebrow.js';
 import { contentLabelLanguage } from './content-label-language.js';
+import { COMPARISON_PAIRS_MAX_ROWS } from './presentation-quality.js';
 
 /* Item 6: personalidade em pares ------------------------------------------ */
 
 export const PERSONALITY_PAIRS_MIN = 3;
-const COMPARISON_ROWS_MAX = 5;
 // "Traço sem ser/sem depender/sem recorrer/sem perder/sem cair …": o traço tem
 // 1 ou 2 palavras (Bem-humorada, Muito brasileira) e começa a frase.
 const PAIR = /^([\p{Lu}][\p{L}-]*(?:\s[\p{L}-]+)?)\s+(sem\s+(?:ser|depender|recorrer|perder|cair|virar|parecer|soar)\b[^.!?]*[.!?]?)$/u;
@@ -32,28 +32,35 @@ export function personalityPairs(text) {
 }
 
 /**
- * Slide com 3 ou mais pares no apoio e sem bloco: o bloco comparison sai do
- * texto (até 5 linhas, o teto do bloco) e o apoio fica só com o que não
- * coube na tabela e as frases que não são pares. Sem pares, volta igual.
+ * Slide com 3 ou mais pares no apoio e sem bloco: o bloco comparison de pares
+ * (variant 'pairs', até 7 linhas, só no modo livre) sai do texto. A página
+ * fica só com título e tabela, como a página 10 do alvo do ChatGPT, para a
+ * arte de fundo caber: o resto do apoio e o corpo vão para as notas do
+ * apresentador, sem se perder. Mais de 7 pares, ou sem pares: volta igual.
  */
 export function personalityComparison(slide) {
   if (!slide || typeof slide !== 'object') return slide;
-  if (Array.isArray(slide.presentationBlocks) && slide.presentationBlocks.length) return slide;
-  const pairs = personalityPairs(slide.subtitle);
-  if (!pairs.length) return slide;
-  const rows = pairs.slice(0, COMPARISON_ROWS_MAX);
-  const inTable = new Set(rows.map(([trait, rest]) => `${trait} ${rest}`));
-  const subtitle = sentencesOf(slide.subtitle).filter(sentence => {
-    const match = PAIR.exec(sentence);
-    if (!match) return true;
-    const rest = /[.!?]$/.test(match[2]) ? match[2].trim() : `${match[2].trim()}.`;
-    return !inTable.has(`${match[1].trim()} ${rest}`);
-  }).join(' ');
+  const blocks = Array.isArray(slide.presentationBlocks) ? slide.presentationBlocks : [];
+  // A IA escreveu a tabela de pares no teto dela (5) e deixou o resto no apoio:
+  // os pares do apoio entram na mesma tabela, até 7.
+  const written = blocks.length === 1 && blocks[0]?.type === 'comparison' && Array.isArray(blocks[0].rows)
+    && Array.isArray(blocks[0].headers) && blocks[0].headers.length === 2
+    && blocks[0].rows.every(row => Array.isArray(row) && row.length === 2 && /^sem\s/i.test(String(row[1] || '')));
+  if (blocks.length && !written) return slide;
+  const inText = sentencesOf(slide.subtitle).map(sentence => PAIR.exec(sentence)).filter(Boolean)
+    .map(match => [match[1].trim(), /[.!?]$/.test(match[2]) ? match[2].trim() : `${match[2].trim()}.`]);
+  const pairs = written ? (inText.length ? [...blocks[0].rows, ...inText] : []) : personalityPairs(slide.subtitle);
+  if (!pairs.length || pairs.length > COMPARISON_PAIRS_MAX_ROWS) return slide;
+  const rest = sentencesOf(slide.subtitle).filter(sentence => !PAIR.test(sentence)).join(' ');
+  const notes = [slide.speakerNotes, rest, String(slide.bodyAfterImage || '').replace(/\*\*/g, '').trim()]
+    .map(value => String(value || '').trim()).filter(Boolean).join('\n');
   const design = slide.presentationPlan?.design;
   return {
     ...slide,
-    subtitle,
-    presentationBlocks: [{ type: 'comparison', headers: ['Traço', 'Sem ser'], rows }],
+    subtitle: '',
+    bodyAfterImage: '',
+    ...(notes ? { speakerNotes: notes.slice(0, 6000) } : {}),
+    presentationBlocks: [{ type: 'comparison', variant: 'pairs', headers: ['Traço', 'Sem ser'], rows: pairs }],
     ...(design && typeof design === 'object'
       ? { presentationPlan: { ...slide.presentationPlan, design: { ...design, block: 'comparison', icons: [] } } } : {}),
   };

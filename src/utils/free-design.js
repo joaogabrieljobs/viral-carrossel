@@ -1648,6 +1648,16 @@ export function stripFreeSlideFields(slide) {
   if (!slide?.presentationFreeDesign) return slide;
   const out = { ...slide };
   for (const key of FREE_SLIDE_FIELDS) delete out[key];
+  // Tabela de pares do modo livre (até 7 linhas): no preset comum vale o
+  // teto de 5; os pares que sobram voltam ao apoio.
+  const block = Array.isArray(out.presentationBlocks) ? out.presentationBlocks[0] : null;
+  if (block?.type === 'comparison' && block.variant === 'pairs') {
+    const { variant, ...plain } = block;
+    const rows = Array.isArray(block.rows) ? block.rows : [];
+    const extra = rows.slice(5).map(row => `${row[0]} ${row[1]}`).join(' ');
+    out.presentationBlocks = [{ ...plain, rows: rows.slice(0, 5) }];
+    if (extra) out.subtitle = [extra, String(out.subtitle || '').trim()].filter(Boolean).join(' ');
+  }
   return out;
 }
 

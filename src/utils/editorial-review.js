@@ -362,7 +362,10 @@ export function validateCarouselDraft(rawDraft, { count, presetId, densityId, pr
     if (presetId === 'apresentacao' && draft.presentationPlan) {
       // Lote B (21/11): o travessão voltava dentro dos blocos ("brioche — três
       // opções"); a limpeza do texto gerado só passava por título e apoio.
-      slide.presentationBlocks = mapBlockText(normalizePresentationBlocks(s.presentationBlocks), replaceEmDashes);
+      // A marca de pares (até 7 linhas) é só do código do modo livre; a IA não a passa.
+      slide.presentationBlocks = mapBlockText(normalizePresentationBlocks(Array.isArray(s.presentationBlocks)
+        ? s.presentationBlocks.map(block => (block && typeof block === 'object' && 'variant' in block ? (({ variant, ...rest }) => rest)(block) : block))
+        : s.presentationBlocks), replaceEmDashes);
       if (!nativeBlocks && slide.presentationBlocks.length) throw Object.assign(new Error('Este padrão personalizado não permite quadros automáticos.'), { code: 'presentation_blocks_not_allowed', field: 'presentationBlocks', slideIndex: index });
       if (s.presentationBlocks != null && (!Array.isArray(s.presentationBlocks) || (s.presentationBlocks.length && !slide.presentationBlocks.length))) {
         throw Object.assign(new Error('A IA retornou uma tabela ou sequência inválida. Seu projeto foi preservado.'), { code: 'presentation_blocks_invalid', field: 'presentationBlocks', slideIndex: index });
