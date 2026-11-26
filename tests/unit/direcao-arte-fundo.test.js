@@ -194,7 +194,7 @@ describe('a imagem de arte: um pedido, um crédito, guardada para o deck', () =>
     expect(prompt).toContain(`from about ${FREE_ART_GRAPHIC_FROM}% of the frame width`);
     expect(prompt).toMatch(/COMPOSITION \(space for the slide text\): Type is laid over the left \d+% of the frame/);
     expect(prompt).toContain('#27DDE5');
-    expect(prompt).toMatch(/fine grain/);
+    expect(prompt).toContain(ARTE.visualDirection.finish);
     expect(prompt).not.toContain('OTHER SLIDES');
     // A ordem do método: direção visual → assunto → composição → … → restrições.
     expect(prompt.indexOf('VISUAL DIRECTION')).toBeLessThan(prompt.indexOf('SUBJECT AND CASTING'));

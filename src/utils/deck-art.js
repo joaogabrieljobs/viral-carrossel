@@ -7,8 +7,9 @@
  * direita. No Moont, a página sem foto ficava só com a cor sólida.
  *
  * Aqui: uma imagem abstrata por deck, sem pessoas, pedida UMA vez (1 crédito
- * de imagem) com a direção visual do deck e o bloco COMPOSITION reservando o
- * lado do texto. Ela fica guardada como as fotos (IndexedDB e nuvem) nos
+ * de imagem) com o acabamento e os grafismos da própria direção visual, sem
+ * impor a estética da Apoteose a outros projetos. O bloco COMPOSITION reserva
+ * o lado do texto. A arte fica guardada como as fotos (IndexedDB e nuvem) nos
  * slides com `ground: 'art'`; sem ela, a página fica na cor base.
  *
  * Módulo puro: sem React e sem DOM.
@@ -111,21 +112,21 @@ function artVisualDirection(slide, styleKit) {
  */
 export function composeDeckArtImageDirection({ slides = [], styleKit = null, baseReferenceCount = 0 } = {}) {
   const first = deckArtSlides(slides)[0] || (Array.isArray(slides) ? slides[0] : null) || {};
-  const vd = artVisualDirection(first, styleKit);
+  const resolved = artVisualDirection(first, styleKit);
   const deck = first.presentationDeckDesign?.palette || {};
-  const base = roleHex(vd, 'base') || visualHex(deck.bg) || '#171344';
-  const graphic = roleHex(vd, 'graphic') || visualHex(deck.accent2) || visualHex(deck.accent) || '';
-  const light = roleHex(vd, 'subject_light') || visualHex(deck.accent) || '';
-  const shadow = roleHex(vd, 'shadow') || '';
-  const accent = roleHex(vd, 'accent') || '';
+  const base = roleHex(resolved, 'base') || visualHex(deck.bg) || '#111111';
+  // Mesmo sem roteiro, o pedido é de arte abstrata: uma direção mínima
+  // impede o montador comum de reintroduzir a fotografia/grão padrão.
+  // Só compõe texto; não cria nem grava uma paleta de roteiro fictícia.
+  const vd = resolved || { palette: [{ role: 'base', hex: base }], finish: 'Clean, uniform colour field.', graphics: 'none' };
+  const hasGraphics = Boolean(vd.graphics && vd.graphics !== 'none');
   const ink = visualHex(first.titleColor) || (isLightInk(base) ? '#111111' : '#FFFFFF');
   const tone = isLightInk(ink) ? 'dark' : 'light';
-  const fluid = [light, shadow].filter(Boolean).join(' and ');
   const kit = normalizeStyleKit(styleKit);
   const refs = Math.max(0, Number(baseReferenceCount) || 0);
-  const subject = `SUBJECT AND CASTING: No people, faces, hands or bodies. An abstract identity background for this deck: about three quarters of the image is one uniform field of ${tone} paper in ${base}, with fine, even grain.`;
-  const graphics = `LIGHT, TEXTURE AND GRAPHICS OF THIS SLIDE: At the right edge, one single large organic graphic shape${graphic ? ` in ${graphic}` : ''} with a cut-paper look (rounded extensions, texture dots and open areas), running past the frame and cut by it${fluid ? `, overlapping one fluid shape in ${fluid}` : ''}${accent ? `; a small cluster of ${accent} dots near the lower right corner` : ''}. Screen-print texture, abstract graphic language, no repeating pattern, no excess elements, large areas of breathing room.`;
-  const composition = `COMPOSITION (space for the slide text): Type is laid over the left ${FREE_ART_TEXT_MAX}% of the frame, several lines of ${tone === 'dark' ? 'white' : 'dark'} type. Keep that area flat, ${tone} and calm in ${base}: uniform paper with fine grain, no shapes, dots, gradients or texture changes in it. Keep the graphics near the right edge, mostly from about ${FREE_ART_GRAPHIC_FROM}% of the frame width onward.`;
+  const subject = `SUBJECT AND CASTING: No people, faces, hands or bodies. An abstract identity background for this deck: about three quarters of the image is one uniform ${tone} field in ${base}.`;
+  const graphics = `LIGHT, TEXTURE AND GRAPHICS OF THIS SLIDE: Apply the finish, atmosphere and light/shadow roles specified in VISUAL DIRECTION to this abstract background, without a photographic subject. ${hasGraphics ? 'Use only the specified graphic language near the right edge, with large areas of breathing room; do not add other motifs or textures.' : `No graphic interventions or added motifs. Keep the whole frame uniform in ${base}.`}`;
+  const composition = `COMPOSITION (space for the slide text): Type is laid over the left ${FREE_ART_TEXT_MAX}% of the frame, several lines of ${tone === 'dark' ? 'white' : 'dark'} type. Keep that area flat, ${tone} and calm in ${base}: a uniform, low-detail surface with no shapes, dots, gradients or texture changes in it.${hasGraphics ? ` Keep the graphics near the right edge, mostly from about ${FREE_ART_GRAPHIC_FROM}% of the frame width onward.` : ' Keep the rest of the frame equally calm, with no graphic interventions.'}`;
   return {
     format: 'presentation',
     framing: '',
@@ -139,9 +140,9 @@ export function composeDeckArtImageDirection({ slides = [], styleKit = null, bas
     subjects: '',
     styleBody: [composeImgExtraPrompt(kit, '')].filter(Boolean),
     familyEnglish: '',
-    avoid: ['people, faces, hands, bodies or silhouettes', 'photographs of places or objects', 'repeating patterns or wallpaper'],
+    avoid: [vd.avoid, 'people, faces, hands, bodies or silhouettes', 'photographs of places or objects', 'unrequested decorative motifs'].filter(Boolean),
     composition,
-    ...(vd ? { visualDirection: composeVisualDirectionBlock(vd, { referenceLook: refs > 0 }) } : {}),
+    visualDirection: composeVisualDirectionBlock(vd, { referenceLook: refs > 0 }),
     sceneBrief: { query: DECK_ART_SCENE, subject, action: '', light: graphics },
   };
 }

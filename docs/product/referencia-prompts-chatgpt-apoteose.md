@@ -1,6 +1,10 @@
 # Referência: prompts de imagem da Apoteose no ChatGPT
 
-O João mandou estes prompts em 26/11/2026. Com eles, o ChatGPT gerou o deck da Apoteose que serve de alvo de qualidade para a spec `direcao-de-arte-imagens.md`. Eles estão transcritos sem mudanças de conteúdo.
+O João mandou estes materiais em 26/11/2026. O deck da Apoteose gerado no ChatGPT serve de alvo de qualidade para a spec `direcao-de-arte-imagens.md`. Este arquivo é uma síntese em português; não é a transcrição literal dos pedidos originais.
+
+O anexo `APOTEOSE_Prompts_Direcao_Visual(1).md`, conferido na mesma data, contém sete pedidos completos em inglês, dois blocos de estilo e uma direção consolidada posteriormente. Todos os pedidos originais receberam o mesmo flyer anexado. Os códigos hexadecimais abaixo são escolhas aproximadas de direção, não medições da referência nem cores oficiais da marca. A extração de paleta do aplicativo é uma fonte distinta e conserva seus próprios valores e pesos.
+
+O conceito e os fatos do projeto vêm do briefing textual. Cenário, idade, figurino e casting dessas imagens são propostas criativas, não evidências do público, do local ou do sucesso do evento. A análise da referência deve separar o que é observável, a interpretação visual e as escolhas acrescentadas à cena. A tipografia permanece editável e fora da imagem gerada.
 
 ## Prompt-base (usado com o flyer anexado)
 
@@ -75,11 +79,20 @@ Cada um vai junto do prompt-base e do flyer anexado.
 - **Espaço para texto:** os 70% à esquerda ficam escuros e calmos, para várias linhas de tipografia branca. O grafismo principal fica perto da borda direita, sobretudo a partir de cerca de 78% da largura.
 - **Acabamento:** textura de impressão e serigrafia, com linguagem gráfica brasileira abstrata, sem padrão repetitivo nem excesso de elementos e com grandes áreas de respiro.
 
+### 7. Personagem do filme (slide 13)
+
+- **Cena:** mulher brasileira de cerca de 70 anos, cabelo prateado e expressão cética e bem-humorada, sentada numa poltrona. O humor vem da expressão; a imagem não deve ser caricatural.
+- **Composição:** rosto e tronco ocupam cerca de 55% à direita. Os 43% à esquerda ficam escuros e calmos para o texto. Ela segura óculos grandes laranja à altura do peito, com mãos naturais.
+- **Figurino e luz:** blusa roxa, brincos laranja, luz principal laranja sobre a pele, sombras índigo e um pequeno grafismo ciano atrás da poltrona.
+- **Restrição:** não mostrar texto, logotipos ou marcas; não reproduzir a identidade da pessoa do flyer. Essa personagem é uma escolha conceitual derivada do briefing.
+
 ## Como reutilizar o processo
 
 A montagem do pedido segue esta ordem: referência visual anexada, direção visual comum, personagem ou assunto, ação e expressão, enquadramento e espaço para o texto, luz, textura e grafismos, formato e restrições.
 
 O que mais segura a consistência é a relação entre cor, luz e acabamento. Rosto, cena, figurino e enquadramento podem variar.
+
+A linguagem gráfica e o acabamento são definidos por projeto. Recortes orgânicos, serigrafia, grão e a paleta da Apoteose não são padrões universais do Moont. Um fundo compartilhado deve respeitar a direção efetiva, inclusive a ausência de grafismos e as exclusões de textura, sem receber instruções fixas contraditórias.
 
 Na Apoteose, essa relação foi:
 - sombras índigo;
