@@ -115,8 +115,8 @@ function cloudRoutes(cloud) {
   };
 }
 
-// A geometria, texto e fotos vêm da aplicação. Apenas o zoom da área de
-// trabalho muda, pela mesma interação Ctrl+roda disponível para a pessoa.
+// Geometria, texto e fotos vêm da aplicação. O zoom usa Ctrl+roda; a origem
+// do contêiner externo é alinhada ao pixel somente durante a captura.
 async function captureDeck(page, directory, prefix = 'slide', indexes = Array.from({ length: 10 }, (_, i) => i)) {
   if (!directory) return;
   fs.mkdirSync(directory, { recursive: true });
@@ -134,14 +134,59 @@ async function captureDeck(page, directory, prefix = 'slide', indexes = Array.fr
     clientX: bounds.x + 200, clientY: bounds.y + 200 });
   await expect.poll(() => cards.first().evaluate(node => Math.round(node.getBoundingClientRect().width))).toBe(1920);
   await page.evaluate(() => document.fonts.ready);
+  const captures = [];
   for (const i of indexes) {
     await page.getByLabel('Ir para o card', { exact: true }).selectOption(String(i));
     await cards.nth(i).scrollIntoViewIfNeeded();
     const notices = page.getByRole('button', { name: 'Fechar notificação', exact: true });
     while (await notices.count()) await notices.first().click();
     await page.mouse.move(10, 10);
-    const png = await cards.nth(i).screenshot({ path: path.join(directory, `${prefix}-${String(i + 1).padStart(2, '0')}.png`), animations: 'disabled' });
-    expect({ width: png.readUInt32BE(16), height: png.readUInt32BE(20) }, `slide ${i + 1}: captura nativa`).toEqual({ width: 1920, height: 1080 });
+    const card = cards.nth(i);
+    const measure = () => card.evaluate(node => {
+      const rect = node.getBoundingClientRect();
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height,
+        scrollX: window.scrollX, scrollY: window.scrollY };
+    });
+    const before = await measure();
+    expect(Math.abs(before.width - 1920), `slide ${i + 1}: largura DOM nativa`).toBeLessThanOrEqual(0.001);
+    expect(Math.abs(before.height - 1080), `slide ${i + 1}: altura DOM nativa`).toBeLessThanOrEqual(0.001);
+    const dx = Math.round(before.x + before.scrollX) - (before.x + before.scrollX);
+    const dy = Math.round(before.y + before.scrollY) - (before.y + before.scrollY);
+    // locator.screenshot envolve as bordas com floor/ceil. Uma origem
+    // fracionária acrescentaria 1px mesmo com DOM de exatos 1920×1080.
+    // Move-se só o viewport externo, nunca o card ou suas caixas internas.
+    const originalTranslate = await viewport.evaluate((node, { dx, dy }) => {
+      const original = { value: node.style.getPropertyValue('translate'), priority: node.style.getPropertyPriority('translate') };
+      node.style.setProperty('translate', `${dx}px ${dy}px`, 'important');
+      return original;
+    }, { dx, dy });
+    try {
+      const edgeError = bounds => {
+        const x = bounds.x + bounds.scrollX, y = bounds.y + bounds.scrollY;
+        return Math.max(...[x, y, x + bounds.width, y + bounds.height].map(value => Math.abs(value - Math.round(value))));
+      };
+      await expect.poll(async () => edgeError(await measure()), { message: `slide ${i + 1}: quatro bordas documentais inteiras` })
+        .toBeLessThanOrEqual(0.001);
+      const aligned = await measure();
+      expect(Math.abs(aligned.width - 1920)).toBeLessThanOrEqual(0.001);
+      expect(Math.abs(aligned.height - 1080)).toBeLessThanOrEqual(0.001);
+      const screen = page.viewportSize();
+      expect(aligned.x).toBeGreaterThanOrEqual(0);
+      expect(aligned.y).toBeGreaterThanOrEqual(0);
+      expect(aligned.x + aligned.width).toBeLessThanOrEqual(screen.width);
+      expect(aligned.y + aligned.height).toBeLessThanOrEqual(screen.height);
+      const png = await card.screenshot({ path: path.join(directory, `${prefix}-${String(i + 1).padStart(2, '0')}.png`), animations: 'disabled' });
+      const dimensions = { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+      captures.push({ slide: i + 1, before, aligned, normalization: { target: '#vc-cards-viewport', dx, dy, originalTranslate }, png: dimensions });
+      fs.writeFileSync(path.join(directory, 'capturas.json'), JSON.stringify(captures, null, 2));
+      expect(await measure(), `slide ${i + 1}: a captura não desloca ou redimensiona o canvas`).toEqual(aligned);
+      expect(dimensions, `slide ${i + 1}: captura nativa`).toEqual({ width: 1920, height: 1080 });
+    } finally {
+      await viewport.evaluate((node, original) => {
+        if (original.value) node.style.setProperty('translate', original.value, original.priority);
+        else node.style.removeProperty('translate');
+      }, originalTranslate);
+    }
   }
 }
 
