@@ -1,0 +1,153 @@
+/**
+ * Acabamento do texto do deck no modo livre, depois da redação e sem IA
+ * (Teste 6 da Apoteose, 26/11):
+ *
+ * - item 6: a personalidade em pares ("Brasileira sem ser caricata.
+ *   Sofisticada sem ser pretensiosa. ...") vira o bloco comparison de duas
+ *   colunas (traço / "sem ser…"), tirado do próprio texto, e o parágrafo
+ *   encolhe;
+ * - negrito do roteiro (applyPlanEmphasisToDraft);
+ * - item 5: eyebrow em todas as páginas menos a capa. O que a IA escreveu
+ *   fica; vazio, o código deriva um rótulo curto pelo tema do texto (A MÚSICA,
+ *   O PÚBLICO...) ou pela função do slide no roteiro. Nunca um fato.
+ */
+import { applyPlanEmphasisToDraft } from './free-design.js';
+import { normalizePresentationEyebrow } from './presentation-eyebrow.js';
+import { contentLabelLanguage } from './content-label-language.js';
+
+/* Item 6: personalidade em pares ------------------------------------------ */
+
+export const PERSONALITY_PAIRS_MIN = 3;
+const COMPARISON_ROWS_MAX = 5;
+// "Traço sem ser/sem depender/sem recorrer/sem perder/sem cair …": o traço tem
+// 1 ou 2 palavras (Bem-humorada, Muito brasileira) e começa a frase.
+const PAIR = /^([\p{Lu}][\p{L}-]*(?:\s[\p{L}-]+)?)\s+(sem\s+(?:ser|depender|recorrer|perder|cair|virar|parecer|soar)\b[^.!?]*[.!?]?)$/u;
+const sentencesOf = text => String(text || '').replace(/\*\*/g, '').split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
+
+/** Pares [traço, "sem ser…"] na ordem do texto; menos de 3 pares, []. */
+export function personalityPairs(text) {
+  const pairs = sentencesOf(text).map(sentence => PAIR.exec(sentence)).filter(Boolean)
+    .map(match => [match[1].trim(), /[.!?]$/.test(match[2]) ? match[2].trim() : `${match[2].trim()}.`]);
+  return pairs.length >= PERSONALITY_PAIRS_MIN ? pairs : [];
+}
+
+/**
+ * Slide com 3 ou mais pares no apoio e sem bloco: o bloco comparison sai do
+ * texto (até 5 linhas, o teto do bloco) e o apoio fica só com o que não
+ * coube na tabela e as frases que não são pares. Sem pares, volta igual.
+ */
+export function personalityComparison(slide) {
+  if (!slide || typeof slide !== 'object') return slide;
+  if (Array.isArray(slide.presentationBlocks) && slide.presentationBlocks.length) return slide;
+  const pairs = personalityPairs(slide.subtitle);
+  if (!pairs.length) return slide;
+  const rows = pairs.slice(0, COMPARISON_ROWS_MAX);
+  const inTable = new Set(rows.map(([trait, rest]) => `${trait} ${rest}`));
+  const subtitle = sentencesOf(slide.subtitle).filter(sentence => {
+    const match = PAIR.exec(sentence);
+    if (!match) return true;
+    const rest = /[.!?]$/.test(match[2]) ? match[2].trim() : `${match[2].trim()}.`;
+    return !inTable.has(`${match[1].trim()} ${rest}`);
+  }).join(' ');
+  const design = slide.presentationPlan?.design;
+  return {
+    ...slide,
+    subtitle,
+    presentationBlocks: [{ type: 'comparison', headers: ['Traço', 'Sem ser'], rows }],
+    ...(design && typeof design === 'object'
+      ? { presentationPlan: { ...slide.presentationPlan, design: { ...design, block: 'comparison', icons: [] } } } : {}),
+  };
+}
+
+/* Item 5: eyebrow ------------------------------------------------------------ */
+
+// Rótulo pela função do slide no roteiro (purpose), nos três idiomas.
+const PURPOSE_EYEBROWS = Object.freeze({
+  introduction: ['ABERTURA', 'OPENING', 'APERTURA'],
+  problem: ['O PROBLEMA', 'THE PROBLEM', 'EL PROBLEMA'],
+  context: ['CONTEXTO', 'CONTEXT', 'CONTEXTO'],
+  solution: ['A PROPOSTA', 'THE PROPOSAL', 'LA PROPUESTA'],
+  comparison: ['COMPARAÇÃO', 'COMPARISON', 'COMPARACIÓN'],
+  business_model: ['O MODELO', 'THE MODEL', 'EL MODELO'],
+  journey: ['A JORNADA', 'THE JOURNEY', 'EL RECORRIDO'],
+  process: ['O PROCESSO', 'THE PROCESS', 'EL PROCESO'],
+  evidence: ['AS EVIDÊNCIAS', 'THE EVIDENCE', 'LA EVIDENCIA'],
+  metrics: ['OS NÚMEROS', 'THE NUMBERS', 'LAS CIFRAS'],
+  market: ['O MERCADO', 'THE MARKET', 'EL MERCADO'],
+  team: ['A EQUIPE', 'THE TEAM', 'EL EQUIPO'],
+  roadmap: ['PRÓXIMOS PASSOS', 'NEXT STEPS', 'PRÓXIMOS PASOS'],
+  decision: ['A DECISÃO', 'THE DECISION', 'LA DECISIÓN'],
+  summary: ['SÍNTESE', 'SUMMARY', 'SÍNTESIS'],
+  learning: ['APRENDIZADOS', 'LEARNINGS', 'APRENDIZAJES'],
+  practice: ['NA PRÁTICA', 'IN PRACTICE', 'EN LA PRÁCTICA'],
+  case_study: ['O CASO', 'THE CASE', 'EL CASO'],
+  vision: ['A VISÃO', 'THE VISION', 'LA VISIÓN'],
+  objection: ['AS DÚVIDAS', 'THE QUESTIONS', 'LAS DUDAS'],
+  other: ['EM FOCO', 'IN FOCUS', 'EN FOCO'],
+});
+const LANG_INDEX = { 'pt-BR': 0, pt: 0, en: 1, es: 2 };
+
+// Tema que o próprio texto nomeia (português). A ordem decide o empate.
+const THEMES = Object.freeze([
+  ['A PERSONALIDADE', /\bpersonalidade\b|(?:\bsem (?:ser|depender|recorrer)\b.*){2}/],
+  ['A MÚSICA', /\b(?:musica|musical|musicais|djs?|pista|repertorio|hip-hop|funk|eletronica)\b/],
+  ['O PÚBLICO', /\b(?:publico|convidados|frequenta|frequentadores|pessoas socialmente)\b/],
+  ['O NOME', /\bo nome\b/],
+  ['O POSICIONAMENTO', /\b(?:posicionamento|consolidar|ambicao)\b/],
+  ['A COMUNICAÇÃO', /\b(?:comunicacao|linguagem|humor)\b/],
+  ['O COMPORTAMENTO', /\bcomportament/],
+  ['O UNIVERSO VISUAL', /\b(?:universo visual|identidade visual|fotografia|grafismos?)\b/],
+]);
+
+const plain = text => String(text || '').replace(/\*\*/g, '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const slideText = slide => plain([slide?.title, slide?.subtitle, slide?.bodyAfterImage,
+  ...(Array.isArray(slide?.presentationBlocks) ? slide.presentationBlocks.map(block => JSON.stringify(block)) : [])].join('\n'));
+
+/**
+ * Rótulo derivado para um slide sem eyebrow. Capa: ''. Fecho: o nome da capa
+ * (até 3 palavras), como "APOTEOSE". Os outros: o primeiro tema do texto
+ * ainda não usado no deck; sem tema livre, a função do slide.
+ */
+export function deriveFreeEyebrow(slide, { index = 0, count = 1, used = new Set(), lang = 'pt-BR', coverTitle = '' } = {}) {
+  const role = slide?.presentationPlan?.visualRole;
+  if (index === 0 || role === 'cover') return '';
+  const langIndex = LANG_INDEX[lang] ?? 0;
+  if ((role === 'closing' || index === count - 1) && count > 1) {
+    const name = normalizePresentationEyebrow(coverTitle);
+    if (name && !used.has(name)) return name;
+  }
+  if (langIndex === 0) {
+    const text = slideText(slide);
+    const theme = THEMES.find(([label, re]) => !used.has(label) && re.test(text));
+    if (theme) return theme[0];
+  }
+  const purpose = PURPOSE_EYEBROWS[slide?.presentationPlan?.purpose] || PURPOSE_EYEBROWS.other;
+  return purpose[langIndex];
+}
+
+/** Preenche o eyebrow vazio de cada página (menos a capa), sem repetir rótulo derivado. */
+export function fillFreeEyebrows(draft, { lang } = {}) {
+  if (!Array.isArray(draft?.slides) || !draft.slides.length) return draft;
+  const language = lang || contentLabelLanguage(draft.slides);
+  const used = new Set(draft.slides.map(slide => normalizePresentationEyebrow(slide?.eyebrow)).filter(Boolean));
+  const coverTitle = draft.slides[0]?.title || '';
+  let changed = false;
+  const slides = draft.slides.map((slide, index) => {
+    if (normalizePresentationEyebrow(slide?.eyebrow)) return slide;
+    const eyebrow = deriveFreeEyebrow(slide, { index, count: draft.slides.length, used, lang: language, coverTitle });
+    if (!eyebrow) return slide;
+    used.add(eyebrow);
+    changed = true;
+    return { ...slide, eyebrow };
+  });
+  return changed ? { ...draft, slides } : draft;
+}
+
+/** Acabamento do modo livre: pares em comparação, negrito do roteiro e eyebrow. */
+export function finishFreeDraft(draft) {
+  if (!Array.isArray(draft?.slides)) return draft;
+  let slides = draft.slides.map(personalityComparison);
+  const compared = slides.some((slide, index) => slide !== draft.slides[index]) ? { ...draft, slides } : draft;
+  const emphasized = applyPlanEmphasisToDraft(compared);
+  return fillFreeEyebrows(emphasized);
+}

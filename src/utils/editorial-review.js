@@ -405,6 +405,43 @@ export function validateCarouselDraft(rawDraft, { count, presetId, densityId, pr
 }
 
 /**
+ * Teste 6 da Apoteose (26/11), item 5: no modo livre a IA deixou o eyebrow
+ * vazio em todos os slides. O pedido de redação do modo livre passa a exigir
+ * o rótulo (menos na capa), com exemplo; vazio, o código deriva um rótulo
+ * (free-draft.js), sem fato novo.
+ */
+export const FREE_EYEBROW_RULE = 'MODO LIVRE — eyebrow é obrigatório em todas as páginas, menos na capa (na capa use ""): 1 a 3 palavras em CAIXA ALTA no idioma do deck que nomeiam o tema da página, como "A FESTA", "O PÚBLICO", "A MÚSICA", "O POSICIONAMENTO", "A PERSONALIDADE"; no fecho, o nome do projeto. Sem número, promessa ou fato novo; não repete o título nem outro eyebrow do deck.';
+
+/**
+ * Teste 6 da Apoteose (26/11), item 2: o slide 10 tinha o título "Como se o
+ * Carnaval não fosse suficiente" e a mesma frase na citação do bloco. Título
+ * igual (ou quase: 75% das palavras de conteúdo nos dois sentidos) a uma
+ * frase do apoio, do corpo ou de um bloco do próprio slide vai ao reparo de
+ * repetição; o que se reescreve é o título (a assinatura no bloco fica).
+ */
+export function titleEchoesSlideTextIndexes(slides) {
+  const words = text => (String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/[*_]/g, '').match(/[\p{L}\d]+(?:[.,]\d+)*/gu) || []).filter(word => word.length > 2);
+  const covers = (a, b) => a.filter(word => b.has(word)).length / a.length >= 0.75;
+  const blockTexts = block => (!block || typeof block !== 'object' ? []
+    : block.type === 'quote' ? [block.text]
+      : block.type === 'bignumber' ? [block.label]
+        : block.type === 'comparison' ? (block.rows || []).map(row => (Array.isArray(row) ? row.join(' ') : ''))
+          : Array.isArray(block.items) ? block.items.map(item => [item?.title, item?.label, item?.body].filter(Boolean).join(' ')) : []);
+  const sentences = text => String(text || '').split(/[.!?]+(?=\s|$)|\n/).map(sentence => sentence.trim()).filter(Boolean);
+  return (Array.isArray(slides) ? slides : []).flatMap((slide, index) => {
+    const title = words(slide?.title);
+    if (title.length < 2) return [];
+    const units = [
+      ...sentences(slide?.subtitle), ...sentences(slide?.bodyAfterImage),
+      ...(Array.isArray(slide?.presentationBlocks) ? slide.presentationBlocks : []).flatMap(blockTexts).flatMap(sentences),
+    ].map(words).filter(unit => unit.length >= 2);
+    const titleSet = new Set(title);
+    return units.some(unit => covers(title, new Set(unit)) && covers(unit, titleSet)) ? [index] : [];
+  });
+}
+
+/**
  * Apoio que só repete o título (lote B 21/11, Editorial Magazine: "Marta pede
  * um dia de antecedência" + "MARTA PEDE UM DIA DE ANTECEDÊNCIA PELO
  * WHATSAPP"). Três quartos das palavras de conteúdo do título reaparecem no
@@ -1506,7 +1543,7 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
       : config.presentationTextLimits,
   };
   const blockRules = config.nativeBlocks === false ? 'Neste padrão personalizado presentationBlocks deve ser []. Preserve a composição livre do usuário.' : buildPresentationBlocksPrompt({ free: config.freeDesign === true });
-  const generationPrompt = `${prompt}\nINSTRUÇÕES ATUAIS DO USUÁRIO — restrições também válidas para cada lote de redação:\n${config.userInstructions || ''}\n${buildPresentationPlanBlock(plan)}\n${blockRules}\nCONTRATO COMPLEMENTAR: em cada slide inclua presentationBlocks (ou [] quando não houver bloco), speakerNotes (complemento opcional no idioma definido, até 600 caracteres, ou "") e eyebrow (rótulo acima do título, 1 a 3 palavras em caixa alta no idioma definido, ou ""). O texto visível deve ser autossuficiente. Não coloque nomes de arquivos, rótulos de extração nem instruções ao designer no texto final. Dados, exemplos e condições permanecem fiéis às evidências. Em slides com bloco, subtitle contextualiza sem repetir suas células; bodyAfterImage fica vazio e apenas aprofundamento vai para speakerNotes.${buildPresentationLimitsBlock(plannedConfig, config.count)}`;
+  const generationPrompt = `${prompt}\nINSTRUÇÕES ATUAIS DO USUÁRIO — restrições também válidas para cada lote de redação:\n${config.userInstructions || ''}\n${buildPresentationPlanBlock(plan)}\n${blockRules}\nCONTRATO COMPLEMENTAR: em cada slide inclua presentationBlocks (ou [] quando não houver bloco), speakerNotes (complemento opcional no idioma definido, até 600 caracteres, ou "") e eyebrow (rótulo acima do título, 1 a 3 palavras em caixa alta no idioma definido, ou "").${config.freeDesign === true ? ` ${FREE_EYEBROW_RULE}` : ''} O texto visível deve ser autossuficiente. Não coloque nomes de arquivos, rótulos de extração nem instruções ao designer no texto final. Dados, exemplos e condições permanecem fiéis às evidências. Em slides com bloco, subtitle contextualiza sem repetir suas células; bodyAfterImage fica vazio e apenas aprofundamento vai para speakerNotes.${buildPresentationLimitsBlock(plannedConfig, config.count)}`;
   const written = await writePresentationBatches({ prompt: generationPrompt, plan, config: plannedConfig, textOptions, onStage, onDraft }, callAI);
   writingDiagnostics = written.diagnostics;
   const draft = written.draft;
@@ -1558,16 +1595,18 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
     // acima já conta) e última linha do apoio igual ao título do slide.
     const sentences = repeatedSentenceSlides(slides, { signatures }).filter(item => item.slideIndexes.length === 2);
     const echoes = supportEchoesTitleIndexes(slides, { lastLine: true });
+    // Teste 6 (26/11), item 2: título igual ao bloco ou ao apoio do mesmo slide.
+    const titleEchoes = titleEchoesSlideTextIndexes(slides).filter(index => !echoes.includes(index) && !titles.includes(index));
     // Teste 4 (25/11): a conta é de ocorrências além da primeira. Com "- 2",
     // a frase copiada em 3 slides valia 1 e, tirada de um, virava frase em 2
     // slides (também 1): o reparo parcial era recusado como se não melhorasse.
-    return { facts, titles, contents, steps, metrics, sentences, echoes, size: facts.reduce((sum, item) => sum + item.slideIndexes.length - 1, 0) + titles.length
-      + contents.filter(item => !titles.includes(item.slideIndex)).length + steps.length + metrics.length + sentences.length + echoes.length };
+    return { facts, titles, contents, steps, metrics, sentences, echoes, titleEchoes, size: facts.reduce((sum, item) => sum + item.slideIndexes.length - 1, 0) + titles.length
+      + contents.filter(item => !titles.includes(item.slideIndex)).length + steps.length + metrics.length + sentences.length + echoes.length + titleEchoes.length };
   };
   // Slides que a repetição envolve, para o aviso no bloco de revisão.
   const repeatedSlidesOf = repetition => [...new Set([...repetition.facts.flatMap(item => item.slideIndexes), ...repetition.titles,
     ...repetition.contents.flatMap(item => [item.duplicateOf, item.slideIndex]), ...repetition.steps.flatMap(item => [item.duplicateOf, item.slideIndex]),
-    ...repetition.metrics.flatMap(item => [item.duplicateOf, item.slideIndex]), ...repetition.sentences.flatMap(item => item.slideIndexes), ...repetition.echoes])].sort((a, b) => a - b);
+    ...repetition.metrics.flatMap(item => [item.duplicateOf, item.slideIndex]), ...repetition.sentences.flatMap(item => item.slideIndexes), ...repetition.echoes, ...repetition.titleEchoes])].sort((a, b) => a - b);
   // Teste 4: frase repetida que está no fecho fica no fecho; o reparo pede os outros slides.
   const closingIndex = draft.slides.length - 1;
   const withoutClosing = indexes => (indexes.length > 1 && indexes.includes(closingIndex) ? indexes.filter(index => index !== closingIndex) : indexes);
@@ -1577,8 +1616,12 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
     const runs = signatures.map(tokensOf).filter(run => run.length);
     const has = text => runs.some(run => containsRun(tokensOf(text), run));
     let changed = false;
+    // Teste 6, item 2: a assinatura que continua no slide (na citação do
+    // bloco, por exemplo) não volta ao título reescrito.
+    const blockText = slide => JSON.stringify(Array.isArray(slide?.presentationBlocks) ? slide.presentationBlocks : []);
     const slides = after.slides.map((slide, index) => {
       if (index !== 0 && index !== closingIndex) return slide;
+      if (has(blockText(slide)) && has(blockText(before.slides[index]))) return slide;
       const restored = Object.fromEntries(['title', 'subtitle', 'bodyAfterImage']
         .filter(field => has(before.slides[index]?.[field]) && !has(slide?.[field])).map(field => [field, before.slides[index][field]]));
       if (!Object.keys(restored).length) return slide;
@@ -1605,7 +1648,7 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
     }
     const targets = [...new Set([...repetition.facts.flatMap(item => withoutClosing(item.slideIndexes)), ...repetition.titles,
       ...repetition.contents.map(item => item.slideIndex), ...repetition.steps.map(item => item.slideIndex), ...repetition.metrics.map(item => item.slideIndex),
-      ...repetition.sentences.flatMap(item => withoutClosing(item.slideIndexes)), ...repetition.echoes])].sort((a, b) => a - b);
+      ...repetition.sentences.flatMap(item => withoutClosing(item.slideIndexes)), ...repetition.echoes, ...repetition.titleEchoes])].sort((a, b) => a - b);
     const closingNote = [...repetition.facts.map(item => item.slideIndexes), ...repetition.sentences.map(item => item.slideIndexes)]
       .some(indexes => indexes.length > 1 && indexes.includes(closingIndex))
       ? ` Quando a repetição inclui o fecho (slideIndex ${closingIndex}), a frase fica no fecho e sai dos outros slides.` : '';
@@ -1622,7 +1665,7 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
     onStage?.('repairing');
     try {
       repair = await callAI(`${buildEditorialReviewPrompt(briefing, result, plannedConfig)}
-REPARO DE REPETIÇÃO: edite somente os slides com slideIndex ${targets.join(', ')}.${repetition.facts.length ? ` Fatos que se repetem: ${repetition.facts.map(item => `"${item.fact}" nos slideIndex ${item.slideIndexes.join(', ')}`).join('; ')}. Mantenha cada fato só nos slides em que ele é o assunto; nos outros, troque por outra informação do material ou condense.` : ''}${repetition.titles.length ? ` Títulos que repetem um anterior: slideIndex ${repetition.titles.join(', ')}; reescreva com a ideia própria do slide.` : ''}${repetition.contents.length ? ` Slides que repetem outro com outras palavras: ${repetition.contents.map(item => `slideIndex ${item.slideIndex} (repete o ${item.duplicateOf})`).join('; ')}; reescreva com a contribuição própria da posição no roteiro.` : ''}${repetition.steps.map(item => ` Mesmo bloco de passos nos slideIndex ${item.duplicateOf} e ${item.slideIndex}: mantenha o bloco só no primeiro; no slideIndex ${item.slideIndex}, devolva presentationBlocks [] ou um bloco com outra informação do material.`).join('')}${repetition.metrics.map(item => ` Mesmo bloco de métricas nos slideIndex ${item.duplicateOf} e ${item.slideIndex}: mantenha o bloco só no primeiro; no slideIndex ${item.slideIndex}, devolva presentationBlocks [] ou um bloco com outra informação do material.`).join('')}${repetition.sentences.length ? ` Frase repetida em dois slides: ${repetition.sentences.map(item => `"${item.phrase}" nos slideIndex ${item.slideIndexes.join(' e ')}`).join('; ')}; mantenha a frase só no slide em que ela é o assunto e, no outro, escreva outra informação do material.` : ''}${repetition.echoes.length ? ` Apoio que termina repetindo o título do próprio slide: slideIndex ${repetition.echoes.join(', ')}; tire essa linha ou troque por uma informação nova do material.` : ''} ${closingNote}${signatureNote} Inclua presentationBlocks quando a repetição estiver no bloco. Não acrescente fatos, não mude quantidade nem ordem.`, reviewOptions);
+REPARO DE REPETIÇÃO: edite somente os slides com slideIndex ${targets.join(', ')}.${repetition.facts.length ? ` Fatos que se repetem: ${repetition.facts.map(item => `"${item.fact}" nos slideIndex ${item.slideIndexes.join(', ')}`).join('; ')}. Mantenha cada fato só nos slides em que ele é o assunto; nos outros, troque por outra informação do material ou condense.` : ''}${repetition.titles.length ? ` Títulos que repetem um anterior: slideIndex ${repetition.titles.join(', ')}; reescreva com a ideia própria do slide.` : ''}${repetition.contents.length ? ` Slides que repetem outro com outras palavras: ${repetition.contents.map(item => `slideIndex ${item.slideIndex} (repete o ${item.duplicateOf})`).join('; ')}; reescreva com a contribuição própria da posição no roteiro.` : ''}${repetition.steps.map(item => ` Mesmo bloco de passos nos slideIndex ${item.duplicateOf} e ${item.slideIndex}: mantenha o bloco só no primeiro; no slideIndex ${item.slideIndex}, devolva presentationBlocks [] ou um bloco com outra informação do material.`).join('')}${repetition.metrics.map(item => ` Mesmo bloco de métricas nos slideIndex ${item.duplicateOf} e ${item.slideIndex}: mantenha o bloco só no primeiro; no slideIndex ${item.slideIndex}, devolva presentationBlocks [] ou um bloco com outra informação do material.`).join('')}${repetition.sentences.length ? ` Frase repetida em dois slides: ${repetition.sentences.map(item => `"${item.phrase}" nos slideIndex ${item.slideIndexes.join(' e ')}`).join('; ')}; mantenha a frase só no slide em que ela é o assunto e, no outro, escreva outra informação do material.` : ''}${repetition.echoes.length ? ` Apoio que termina repetindo o título do próprio slide: slideIndex ${repetition.echoes.join(', ')}; tire essa linha ou troque por uma informação nova do material.` : ''}${repetition.titleEchoes.length ? ` Título igual ao bloco ou ao apoio do próprio slide: slideIndex ${repetition.titleEchoes.join(', ')}; reescreva só o title (curto, de autor, com a ideia própria da posição) e mantenha o bloco e o apoio como estão.` : ''} ${closingNote}${signatureNote} Inclua presentationBlocks quando a repetição estiver no bloco. Não acrescente fatos, não mude quantidade nem ordem.`, reviewOptions);
       throwIfGenerationCancelled(aiOptions?.signal);
     } catch (error) {
       if (isGenerationCancelled(error) || aiOptions?.signal?.aborted) throw error;

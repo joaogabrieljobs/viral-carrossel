@@ -174,7 +174,9 @@ describe('modo livre, fase 2: limites de texto seguem o design do roteiro', () =
     expect(source.slice(at, at + 1400)).toMatch(/deckDesign: freeDeckDesignFor\(plan\)/);
     expect(source).toMatch(/freeDesign: !!effectiveVisualPresetDef\?\.isFree/);
     expect(source).toMatch(/const freeDeckDesign = effectiveVisualPresetDef\?\.isFree\s*\?\s*freeDeckDesignFor\(generationPlan\)/);
-    expect(source).toMatch(/applyPlanEmphasisToDraft\(/);
+    // Teste 6: o negrito do roteiro vem dentro do acabamento do modo livre.
+    expect(source).toMatch(/finishFreeDraft\(generatedResult\)/);
+    expect(readFileSync(new URL('../../src/utils/free-draft.js', import.meta.url), 'utf8')).toMatch(/applyPlanEmphasisToDraft\(/);
   });
 });
 

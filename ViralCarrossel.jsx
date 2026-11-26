@@ -253,7 +253,8 @@ import {
   applyPresentationVisualPresetToSlides,
   presentationStageAt,
 } from './src/utils/presentation-state.js';
-import { applyPlanEmphasisToDraft, deckDesignFromBrand, freeBrandPatch, slideSkipsImageGeneration } from './src/utils/free-design.js';
+import { deckDesignFromBrand, freeBrandPatch, slideSkipsImageGeneration } from './src/utils/free-design.js';
+import { finishFreeDraft } from './src/utils/free-draft.js';
 import { DECK_ART_SCENE, applyDeckArt, composeDeckArtImageDirection, deckNeedsArt } from './src/utils/deck-art.js';
 import {
   normalizeStyleKit,
@@ -6334,7 +6335,9 @@ ${jsonShapeLine}`;
     checkActive();
     // Modo livre: os trechos de negrito do roteiro (design.emphasis) saem em
     // **…** no texto final, uma vez cada, depois da revisão.
-    const result = effectiveVisualPresetDef?.isFree ? applyPlanEmphasisToDraft(generatedResult) : generatedResult;
+    // Teste 6 (itens 5 e 6): no modo livre, pares de personalidade viram o
+    // bloco comparison e o eyebrow vazio ganha rótulo, sem IA.
+    const result = effectiveVisualPresetDef?.isFree ? finishFreeDraft(generatedResult) : generatedResult;
     if (reviewStatus === 'unavailable') toast('Texto gerado. A revisão automática não foi concluída; mantive a primeira versão.', 'warning', 6500);
     if (reviewStatus === 'fitted') toast('Encurtei o texto que não cabia no layout da apresentação.', 'warning', 6500);
     // MF-11: Estudo de caso sem ponto de partida no material vira lista de
