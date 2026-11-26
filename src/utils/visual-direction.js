@@ -201,16 +201,18 @@ export function composeVisualDirectionBlock(visualDirection, { referenceLook = f
   if (!visualDirection || !Array.isArray(visualDirection.palette) || !visualDirection.palette.length) return '';
   const palette = visualDirection.palette.map(item => `${ROLE_LABELS[item.role] || item.role} ${item.hex}`).join('; ');
   const graphics = visualDirection.graphics === 'none' ? 'no graphic interventions.' : visualDirection.graphics ? sentence(visualDirection.graphics) : '';
+  // Ordem de corte no aperto: as linhas de baixo saem primeiro (a frase de
+  // consistência antes das exclusões); cabeçalho e paleta nunca saem.
   return [
     'VISUAL DIRECTION (shared by every image of this deck):',
     `Palette: ${palette}.`,
-    'Consistency comes from this colour, light and finish relationship; faces, scenes, wardrobe and framing vary.',
     // A IA não vê a referência: se ela anexada mostrar outra cor, vale a dela.
     referenceLook && !['kit'].includes(visualDirection.paletteSource) ? 'If the attached style reference shows different colours, follow the reference\'s colours and keep these roles.' : '',
     visualDirection.finish ? `Finish: ${sentence(visualDirection.finish)}` : '',
     visualDirection.atmosphere ? `Atmosphere: ${sentence(visualDirection.atmosphere)}` : '',
     graphics ? `Graphics: ${graphics}` : '',
     visualDirection.avoid ? `Deck exclusions: ${sentence(visualDirection.avoid)}` : '',
+    'Colour, light and finish stay; faces, scenes, wardrobe and framing vary.',
   ].filter(Boolean).join('\n');
 }
 

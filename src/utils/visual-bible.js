@@ -125,9 +125,11 @@ export function familyDirectionEnglish({ slide = null, fmt = 'carrossel', presen
  * Partes da cena deste card, cada uma no seu bloco do pedido: enquadramento do
  * painel (I27–I30), ficha visual (I25) e família em inglês (I26).
  */
-export function composeSceneParts({ visualBible = null, slide = null, fmt = 'carrossel', excludeEntityIds = [], presentationFamily } = {}) {
+export function composeSceneParts({ visualBible = null, slide = null, fmt = 'carrossel', excludeEntityIds = [], presentationFamily, compositionAware = false } = {}) {
   return {
-    framing: `FRAMING: ${imageFramingDirection(slide || {}, fmt)}`,
+    framing: compositionAware
+      ? [imageFramingDirection(slide || {}, fmt, { overlayNote: false, base: false })].filter(Boolean).map(text => `FRAMING: ${text}`).join('')
+      : `FRAMING: ${imageFramingDirection(slide || {}, fmt)}`,
     subjects: composeSubjectsDirection(visualBible, { excludeEntityIds }),
     familyEnglish: familyDirectionEnglish({ slide, fmt, presentationFamily }),
   };

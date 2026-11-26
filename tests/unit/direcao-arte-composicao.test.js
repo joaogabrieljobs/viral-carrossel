@@ -38,7 +38,7 @@ describe('geometria texto × foto', () => {
   it('painel lateral sem texto por cima: preencher o painel com o assunto, respeitando o recorte', () => {
     const slide = manual({ photo: { x: 62, y: 15, w: 33, h: 70 }, title: { x: 5, y: 15, w: 52, h: 28 }, subtitle: { x: 5, y: 47, w: 44, h: 43 } });
     expect(photoTextGeometry(slide)).toEqual({ mode: 'panel', panelSide: 'right', width: 33, height: 70, fullBleed: false });
-    expect(composeCompositionBlock(slide, { shot: 'medium' })).toBe('COMPOSITION (layout of this slide): Shot: medium. This image fills a panel on the right of the slide (about 33% of its width, 70% of its height); the text sits beside the panel, not over the image. Fill the whole frame with the subject and the scene; no empty area for type is needed. Keep faces and key details clear of the frame edges so the panel crop keeps them. Let the subject face or open toward the left, where the text is.');
+    expect(composeCompositionBlock(slide, { shot: 'medium' })).toBe('COMPOSITION (layout of this slide): Shot: medium. This image fills a panel on the right of the slide (about 33% of its width, 70% of its height); the text sits beside it, not over it. Fill the frame with the subject and the scene, with no empty area for type; keep faces and key details clear of the edges so the crop keeps them. Let the subject face or open toward the left, where the text is.');
   });
 
   it('tela cheia com texto à esquerda: fração reservada, cor da base sob tinta clara, assunto à direita e grafismos na borda direita', () => {

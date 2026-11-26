@@ -102,7 +102,7 @@ export function composeCompositionBlock(slide, { visualDirection = null, shot = 
   const shotLine = plano ? `Shot: ${plano.replace(/[.\s]+$/, '')}. ` : '';
   if (g.mode === 'panel') {
     const size = `about ${g.width}% of its width${g.height < 95 ? `, ${g.height}% of its height` : ''}`;
-    return `COMPOSITION (layout of this slide): ${shotLine}This image fills a panel on the ${g.panelSide} of the slide (${size}); the text sits beside the panel, not over the image. Fill the whole frame with the subject and the scene; no empty area for type is needed. Keep faces and key details clear of the frame edges so the panel crop keeps them. Let the subject face or open toward the ${OPPOSITE[g.panelSide]}, where the text is.`;
+    return `COMPOSITION (layout of this slide): ${shotLine}This image fills a panel on the ${g.panelSide} of the slide (${size}); the text sits beside it, not over it. Fill the frame with the subject and the scene, with no empty area for type; keep faces and key details clear of the edges so the crop keeps them. Let the subject face or open toward the ${OPPOSITE[g.panelSide]}, where the text is.`;
   }
   const ink = visualHex(slide.titleColor);
   const tone = !ink || isLightInk(ink) ? 'dark' : 'light';

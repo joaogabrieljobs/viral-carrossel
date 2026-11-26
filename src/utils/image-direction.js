@@ -15,6 +15,8 @@ import { composeReferenceMap, normalizeSlideReferenceMention, slideReferenceDesc
 import { composeSceneParts } from './visual-bible.js';
 import { isAestheticDirection } from '../../shared/image-prompt.js';
 import { presentationSceneQuery } from './presentation-plan.js';
+import { composeVisualDirectionBlock, resolveSlideVisualDirection } from './visual-direction.js';
+import { composeCompositionBlock } from './image-composition.js';
 
 const SLIDE_DIRECTION_MAX = 1200;
 
@@ -69,6 +71,34 @@ export function presentationOtherScenes(slides, index) {
     .map((item) => item.text);
 }
 
+const clean = value => (typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().replace(/[.;,\s]+$/, '') : '');
+
+/**
+ * Direção de arte (parte 2): a cena do roteiro como briefing de foto, em três
+ * blocos na ordem do método do ChatGPT — assunto e casting (com figurino e
+ * lugar), ação e expressão, luz e grafismos do slide. O plano entra no bloco
+ * COMPOSITION quando há composição; sem ela, fica no assunto. `query` é o
+ * pedido de imagem que o roteiro gravou: se a pessoa reescreveu a imagem do
+ * slide, vale o texto dela (SCENE) e estes blocos não entram.
+ */
+export function presentationSceneBrief(scene, { shotInComposition = false } = {}) {
+  if (!scene || typeof scene !== 'object' || !clean(scene.subject)) return null;
+  const subject = [
+    clean(scene.subject),
+    clean(scene.wardrobe) ? `Wardrobe: ${clean(scene.wardrobe)}` : '',
+    clean(scene.setting) ? `Setting: ${clean(scene.setting)}` : '',
+    !shotInComposition && clean(scene.shot) ? `Shot: ${clean(scene.shot)}` : '',
+  ].filter(Boolean).join('. ');
+  const action = [clean(scene.action), clean(scene.expression) ? `expression: ${clean(scene.expression)}` : ''].filter(Boolean).join('; ');
+  const light = [clean(scene.light), clean(scene.graphics) ? `Graphics on this slide: ${clean(scene.graphics)}` : ''].filter(Boolean).join('. ');
+  return {
+    query: presentationSceneQuery(scene),
+    subject: `SUBJECT AND CASTING: ${subject}.`,
+    action: action ? `ACTION AND EXPRESSION: ${action}.` : '',
+    light: light ? `LIGHT, TEXTURE AND GRAPHICS OF THIS SLIDE: ${light}.` : '',
+  };
+}
+
 /**
  * Anexos na ordem real de envio, como `resolveImageReferences` os entrega:
  * as referências do card substituem o moodboard do projeto; a âncora de
@@ -120,12 +150,20 @@ export function composeImageDirection({
   // Instrução de ação cita os @rótulos: fica junto do mapa. Sem mapa, vira
   // bloco próprio. Em nenhum dos casos conta como estilo.
   const referenceMap = composeReferenceMap(references, estetica ? '' : direcao);
+  const apresentacao = fmt === 'apresentacao';
+  // Direção de arte (partes 1 a 3): direção visual do deck (roteiro, modo
+  // livre e kit), cena como briefing e o espaço do texto no quadro.
+  const visual = apresentacao ? resolveSlideVisualDirection({ slide: card, styleKit }) : null;
+  const plannedScene = apresentacao && card.presentationPlan?.scene && typeof card.presentationPlan.scene === 'object' ? card.presentationPlan.scene : null;
+  const composition = apresentacao ? composeCompositionBlock(card, { visualDirection: visual, shot: visual && plannedScene ? clean(plannedScene.shot) : '' }) : '';
+  const sceneBrief = visual ? presentationSceneBrief(plannedScene, { shotInComposition: !!composition }) : null;
   const cena = composeSceneParts({
     visualBible, slide: card, fmt, excludeEntityIds: anchorPlan?.excludeEntityIds || [], presentationFamily,
+    compositionAware: !!composition,
   });
-  const apresentacao = fmt === 'apresentacao';
   const avoid = apresentacao ? presentationImageAvoid(card) : [];
   const otherScenes = apresentacao ? presentationOtherScenes(deckSlides, slideIndex) : [];
+  const styleReferenceLook = apresentacao && references.some((ref) => ref.role === 'moodboard' && !ref.label);
   return {
     format: fmt === 'apresentacao' ? 'presentation' : 'carousel',
     framing: cena.framing,
@@ -133,7 +171,7 @@ export function composeImageDirection({
     styleMoodboard: references.some((ref) => ref.role === 'moodboard'),
     // Spec 1.1: na apresentação, da referência de estilo do kit (sem @rótulo)
     // sai só o visual, com ou sem estilo escrito. @rótulo continua como está.
-    styleReferenceLook: apresentacao && references.some((ref) => ref.role === 'moodboard' && !ref.label),
+    styleReferenceLook,
     referenceMap,
     identityAnchor: comAncora ? anchorPlan.direction : '',
     presentationPanel: presentationPanel === true,
@@ -145,5 +183,8 @@ export function composeImageDirection({
     familyEnglish: cena.familyEnglish,
     ...(avoid.length ? { avoid } : {}),
     ...(otherScenes.length ? { otherScenes } : {}),
+    ...(composition ? { composition } : {}),
+    ...(visual ? { visualDirection: composeVisualDirectionBlock(visual, { referenceLook: styleReferenceLook }) } : {}),
+    ...(sceneBrief ? { sceneBrief } : {}),
   };
 }

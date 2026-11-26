@@ -97,6 +97,15 @@ export const IMAGE_PROMPT_TEXT = Object.freeze({
   treatmentTail: 'Apply this treatment to the requested scene within the specified crop. Explicit project or slide style takes precedence.',
   // Spec 1.1, entrega 1 — cabeçalho do bloco AVOID (rules de imagem do briefing e avoid do slide).
   avoidHeader: 'AVOID (from the brief and this slide plan; keep these out of the image):',
+  // Direção de arte (26/11): fecho do pedido com direção visual do deck, na
+  // ordem do método do ChatGPT (formato e restrições por último).
+  // Painel com direção visual e COMPOSITION: o recorte e o texto já estão
+  // nesses blocos; do I23 fica a proibição de simular evidência.
+  presentationPanelVisual: 'PRESENTATION IMAGE PANEL: Illustrative visual only. Do not simulate product captures, charts, customer evidence, testimonials or before-and-after results.',
+  // Estilo escrito do kit com direção visual: a cor vem da paleta com papéis
+  // (o cabeçalho I19 pedia cores naturais do assunto, o que a contradiz).
+  styleHeaderVisual: 'PROJECT STYLE (written in the project kit; the VISUAL DIRECTION palette prevails for colour):',
+  restrictionsVisual: 'FORMAT AND RESTRICTIONS: Original characters only, never a real person, a celebrity or anyone from the reference images. No brands or screens with information; the slide text is added later.',
   // I31 — regras fixas da rota do agente.
   agentRules: 'Output an illustrative image for this card. Keep the subject and essential action clear in the final crop, with room around key features. Do not depict a screenshot, chart, testimonial or evidence of a real event. No lettering, captions, logos or watermarks.',
 });
@@ -198,6 +207,18 @@ function shrinkBody(head, body, tail, max) {
 }
 
 const OPTIONAL_DROP_ORDER = Object.freeze(['defaultArtDirection', 'otherScenes', 'medium', 'treatment']);
+// Direção de arte (26/11): com direção visual do deck, o pedido segue a ordem
+// do método do ChatGPT — direção visual comum, assunto e casting, ação e
+// expressão, espaço do texto (COMPOSITION), luz e grafismos do slide, e por
+// último formato e restrições. STYLE REFERENCE, OTHER SLIDES e AVOID ficam.
+const VISUAL_DIRECTION_ORDER = Object.freeze([
+  'visualDirection', 'sceneSubject', 'scene', 'sceneAction', 'composition', 'sceneLight', 'framing',
+  'subjects', 'slideAction', 'identityAnchor', 'referenceRoles', 'referenceMap', 'style', 'moodboardOnly', 'styleReference',
+  'otherScenes', 'avoid', 'presentationPanel', 'medium', 'rules', 'restrictions',
+]);
+// Último recurso, depois de tudo o que é opcional ou do usuário: os blocos
+// fixos da cena e da direção visual encurtam (a paleta e COMPOSITION nunca saem).
+const FIXED_SHRINK_ORDER = Object.freeze(['sceneLight', 'visualDirection', 'sceneAction', 'sceneSubject', 'scene']);
 const OPTIONAL_DROP_ORDER_CAROUSEL = Object.freeze(['medium', 'defaultArtDirection', 'treatment']);
 // O bloco AVOID é o último texto do usuário a ceder: só depois de estilo,
 // ficha e direção do slide, e sai inteiro só depois deles.
@@ -205,6 +226,20 @@ const REQUIRED_SHRINK_ORDER = Object.freeze(['style', 'subjects', 'slideAction',
 const REQUIRED_DROP_ORDER = Object.freeze([
   'slideAction', 'style', 'moodboardOnly', 'subjects', 'avoid', 'framing', 'presentationPanel', 'referenceMap', 'identityAnchor', 'referenceRoles',
 ]);
+
+/** Direção visual: cabeçalho e paleta ficam sempre; o resto sai em linhas inteiras, de baixo para cima. */
+function keepPaletteLines(text, max) {
+  const linhas = String(text || '').split('\n');
+  const mantidas = linhas.slice(0, 2);
+  let tamanho = mantidas.join('\n').length;
+  for (const linha of linhas.slice(2)) {
+    if (tamanho + 1 + linha.length > max) break;
+    mantidas.push(linha);
+    tamanho += 1 + linha.length;
+  }
+  return mantidas.join('\n');
+}
+const normalizarCena = (texto) => String(texto || '').replace(/\s+/g, ' ').trim().toLowerCase();
 
 /** Cenas dos outros slides: cabeçalho fixo e uma linha por cena; '' sem cenas. */
 export function composeOtherScenesBlock(scenes) {
@@ -244,7 +279,10 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
   const teto = limit > 0 ? limit : caps.promptLimit;
   const agente = route === 'mcp';
   const presentation = parts.format === 'presentation';
-  const canvas = presentation ? T.canvasPresentation : T.canvasSocial;
+  // Com COMPOSITION (direção de arte, parte 3) o espaço do texto e o recorte
+  // vêm de lá; a regra genérica de tela não entra.
+  const withComposition = presentation && !agente && presente(parts.composition);
+  const canvas = withComposition ? '' : presentation ? T.canvasPresentation : T.canvasSocial;
   const referenceCount = Math.max(0, Number(parts.referenceCount) || 0);
   const styleSegments = (Array.isArray(parts.styleBody) ? parts.styleBody : [parts.styleBody]).filter(presente).map((texto) => texto.trim());
   const styleBody = styleSegments.join('\n\n');
@@ -274,18 +312,34 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
     trimmed.push('scene');
   }
 
+  // Direção de arte (26/11): direção visual do deck, cena como briefing e o
+  // espaço do texto no quadro (COMPOSITION). Sem direção visual, o pedido é o
+  // de antes; COMPOSITION entra logo depois do enquadramento.
+  const visualDirection = presentation && !agente && presente(parts.visualDirection) ? parts.visualDirection.trim() : '';
+  const composition = presentation && !agente && presente(parts.composition) ? parts.composition.trim() : '';
+  const brief = visualDirection && parts.sceneBrief && presente(parts.sceneBrief.subject)
+    && normalizarCena(parts.sceneBrief.query) === normalizarCena(parts.scene) && !trimmed.includes('scene') ? parts.sceneBrief : null;
+
   const blocos = [];
   const add = (key, text, tier, shrink = null) => { if (presente(text)) blocos.push({ key, text, tier, shrink }); };
-  add('scene', `SCENE: ${scene}${axis ? `\n${axis}` : ''}`, 'fixed');
+  add('visualDirection', visualDirection, 'fixed', keepPaletteLines);
+  if (brief) {
+    add('sceneSubject', `${brief.subject}${axis ? `\n${axis}` : ''}`, 'fixed', cutAtBoundary);
+    add('sceneAction', brief.action, 'fixed', cutAtBoundary);
+    add('sceneLight', brief.light, 'fixed', cutAtBoundary);
+  } else {
+    add('scene', `SCENE: ${scene}${axis ? `\n${axis}` : ''}`, 'fixed', visualDirection ? cutAtBoundary : null);
+  }
   add('rules', regras, 'fixed');
   add('framing', framing, agente ? 'required' : 'fixed');
+  add('composition', composition, 'fixed');
   if (referenceCount > 0) {
     add('referenceRoles', lookOnly ? T.referenceRolesPresentation : T.referenceRoles, 'required');
     add('referenceMap', parts.referenceMap, 'required');
     add('identityAnchor', parts.identityAnchor, 'required');
   }
   // No agente, I31 já proíbe captura, gráfico e depoimento.
-  if (parts.presentationPanel && !agente) add('presentationPanel', T.presentationPanel, 'required');
+  if (parts.presentationPanel && !agente) add('presentationPanel', visualDirection && composition ? T.presentationPanelVisual : T.presentationPanel, 'required');
   add('avoid', composeAvoidBlock(parts.avoid), 'required', keepWholeLines);
   if (presentation) add('otherScenes', composeOtherScenesBlock(parts.otherScenes), 'optional', keepWholeLines);
   add('slideAction', parts.slideAction, 'required', (texto, max) => {
@@ -294,9 +348,10 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
   });
   add('subjects', parts.subjects, 'required', keepWholeLines);
   if (styleBody) {
-    add('style', `${T.styleHeader}\n${styleBody}\n${canvas}`, 'required', (_texto, max) => {
-      const head = `${T.styleHeader}\n`;
-      const tail = `\n${canvas}`;
+    const styleHeader = visualDirection ? T.styleHeaderVisual : T.styleHeader;
+    add('style', `${styleHeader}\n${styleBody}${canvas ? `\n${canvas}` : ''}`, 'required', (_texto, max) => {
+      const head = `${styleHeader}\n`;
+      const tail = canvas ? `\n${canvas}` : '';
       const [primeiro, ...demais] = styleSegments;
       if (demais.length) {
         // A bíblia do projeto cede primeiro; a direção deste slide fica inteira.
@@ -311,12 +366,18 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
     if (!lookOnly) add('moodboardOnly', T.moodboardOnly, 'required');
     add('medium', canvas, 'optional');
   } else if (!agente) {
-    add('medium', presentation ? T.mediumPresentation : T.mediumCarousel, 'optional');
+    add('medium', presentation ? (withComposition ? T.mediumPresentation.replace(`${CANVAS_PRESENTATION} `, '') : T.mediumPresentation) : T.mediumCarousel, 'optional');
   }
   add('styleReference', styleReference, 'fixed');
   // Com moodboard de estilo, a luz da família disputaria com a referência.
-  if (!styleMoodboard) add('treatment', composeFamilyTreatment(parts.familyEnglish), 'optional');
-  if (!agente && !styleBody && !styleMoodboard) add('defaultArtDirection', T.defaultArtDirection, 'optional');
+  // Com direção visual do deck, a paleta, a luz e o acabamento vêm dela: nem
+  // a luz da família nem a direção de arte padrão (dessaturada) entram.
+  if (!styleMoodboard && !visualDirection) add('treatment', composeFamilyTreatment(parts.familyEnglish), 'optional');
+  if (!agente && !styleBody && !styleMoodboard && !visualDirection) add('defaultArtDirection', T.defaultArtDirection, 'optional');
+  if (visualDirection) {
+    add('restrictions', T.restrictionsVisual, 'fixed');
+    blocos.sort((a, b) => VISUAL_DIRECTION_ORDER.indexOf(a.key) - VISUAL_DIRECTION_ORDER.indexOf(b.key));
+  }
 
   let ativos = blocos;
   const remover = (key) => { ativos = ativos.filter((bloco) => bloco.key !== key); dropped.push(key); };
@@ -349,6 +410,17 @@ export function buildImagePrompt(parts = {}, { route = 'openai', model = '', lim
   for (const key of REQUIRED_DROP_ORDER) {
     if (tamanhoTotal(ativos) <= teto) break;
     if (ativos.some((bloco) => bloco.key === key && bloco.tier === 'required')) remover(key);
+  }
+
+  // 4) Com direção visual: luz do slide, detalhes da direção visual (a paleta
+  //    fica), ação e assunto encurtam, nessa ordem. COMPOSITION nunca muda.
+  for (const key of FIXED_SHRINK_ORDER) {
+    const excesso = tamanhoTotal(ativos) - teto;
+    if (excesso <= 0) break;
+    const bloco = ativos.find((item) => item.key === key && item.shrink);
+    if (!bloco) continue;
+    const menor = bloco.shrink(bloco.text, bloco.text.length - excesso);
+    if (menor) { bloco.text = menor; trimmed.push(key); } else if (key !== 'visualDirection') remover(key);
   }
 
   const prompt = ativos.map((bloco) => bloco.text).join('\n\n');

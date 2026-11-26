@@ -569,6 +569,10 @@ function imagePromptParts(q, imgParams, direction, { aspectRatio = '4:5', withRe
     avoid: d.avoid || '',
     styleReferenceLook: d.styleReferenceLook === true,
     otherScenes: Array.isArray(d.otherScenes) ? d.otherScenes : [],
+    // Direção de arte (26/11): direção visual do deck, espaço do texto e cena como briefing.
+    composition: d.composition || '',
+    visualDirection: d.visualDirection || '',
+    sceneBrief: d.sceneBrief && typeof d.sceneBrief === 'object' ? d.sceneBrief : null,
   };
 }
 

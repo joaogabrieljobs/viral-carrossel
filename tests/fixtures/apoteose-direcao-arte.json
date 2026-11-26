@@ -27,5 +27,95 @@
     "atmosphere": "Urban, intimate, sensual and irreverent Brazilian party behaviour.",
     "graphics": "Sparse organic cut-paper shapes in electric cyan laid over the photo like printed cut-outs.",
     "avoid": "parade costumes, feathers, masks, confetti, flags, generic palm trees, festival crowds"
-  }
+  },
+  "scenes": [
+    {
+      "subject": "adult Afro-Brazilian woman in her thirties, editorial fashion close-up, large translucent sculptural glasses",
+      "wardrobe": "translucent amber glasses, small gold hoops",
+      "action": "turns her gaze to the left of the frame",
+      "expression": "presence and confidence",
+      "setting": "dark studio backdrop",
+      "light": "intense orange light on the face, deep indigo shadows, visible skin texture",
+      "graphics": "cyan organic leaf strokes on the right edge and over a small area of the cheek; a few acid green dots top right",
+      "shot": "close-up"
+    },
+    {
+      "subject": "three or four adult friends of different skin tones, softly out of focus, seen from inside a dark concrete passage",
+      "wardrobe": "one bare orange-lit shoulder close to the camera",
+      "action": "gather close as the party begins",
+      "expression": "warm, relaxed proximity",
+      "setting": "contemporary São Paulo rooftop at dusk, distant city, no recognisable landmark",
+      "light": "cyan rim light on the architecture, cobalt and magenta in the background, deep indigo dominant",
+      "graphics": "one large cyan shape partly cut at the top corner, a magenta organic form at the bottom",
+      "shot": "wide"
+    },
+    {
+      "subject": "two adult Brazilian dancers, a dark-skinned woman and a man in his thirties",
+      "wardrobe": "sculptural orange satin top; dark casual tailoring",
+      "action": "dance in a dark urban club, not looking at the camera",
+      "expression": "spontaneous joy",
+      "setting": "dark urban club, no stage, no DJ booth",
+      "light": "saturated orange and magenta long-exposure trails on fabric and gestures, sharp realistic faces",
+      "graphics": "a few cyan organic elements at the top and outer edge",
+      "shot": "medium"
+    },
+    {
+      "subject": "adult Brazilian woman DJ with short curly hair",
+      "wardrobe": "large headphones around the neck",
+      "action": "hands on the controller, anatomically natural",
+      "expression": "focused, absorbed in the music",
+      "setting": "intimate club",
+      "light": "orange side light on the face, deep magenta shadows, a thin cyan rim, amber reflections on the gear",
+      "graphics": "cyan organic shapes only at the outer edge, small acid green dots",
+      "shot": "medium close-up"
+    },
+    {
+      "subject": "five adult Brazilian friends aged 28 to 42, different skin tones and genders",
+      "wardrobe": "orange silk, a dark purple open-collar shirt, small cyan earrings",
+      "action": "laugh and lean toward each other",
+      "expression": "affinity, not posing for the camera",
+      "setting": "intimate night party in São Paulo",
+      "light": "warm direct orange flash with magenta shadows",
+      "graphics": "an irregular cyan arc behind the group at the outer edge, a few green dots",
+      "shot": "medium"
+    },
+    {
+      "subject": "abstract identity background with no people",
+      "action": "a single large cut-paper organic form overlaps a fluid orange and magenta shape",
+      "setting": "very dark indigo paper with fine grain",
+      "light": "flat printed light, screen-print texture",
+      "graphics": "one cyan cut-paper form bleeding off the outer edge, small cluster of acid green dots",
+      "shot": "detail"
+    },
+    {
+      "subject": "close detail of two adult hands, one in orange satin, one with a gold ring",
+      "action": "fingers touching mid-dance",
+      "expression": "",
+      "setting": "dark dance floor",
+      "light": "orange key light, magenta shadow",
+      "graphics": "a thin cyan line crossing the outer edge",
+      "shot": "detail"
+    },
+    {
+      "subject": "two adult friends of different genders walking on a São Paulo street at night",
+      "wardrobe": "dark tailoring, an orange scarf",
+      "action": "walk away from the party, one looks back",
+      "expression": "complicity, wanting the night to go on",
+      "setting": "empty downtown street, no legible signs",
+      "light": "orange street light on faces, indigo night",
+      "graphics": "a cyan organic stroke on the outer edge",
+      "shot": "wide"
+    },
+    null,
+    {
+      "subject": "small group of adult guests of different skin tones leaving at first light",
+      "wardrobe": "evening clothes, shoes in hand",
+      "action": "walk down a staircase, laughing",
+      "expression": "tired happiness",
+      "setting": "concrete staircase of a rooftop, early dawn",
+      "light": "first indigo-to-orange dawn light, magenta in the shadows",
+      "graphics": "a cyan cut-paper form on the outer edge",
+      "shot": "wide"
+    }
+  ]
 }

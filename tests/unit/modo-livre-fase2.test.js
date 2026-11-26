@@ -205,8 +205,12 @@ describe('modo livre, fase 2: direção de foto do deck (mood e paleta)', () => 
     for (const route of ['openai', 'sjinn']) {
       const built = buildImagePrompt({ ...direction, scene: 'crowd dancing in the street, wide' }, { route });
       expect(built.chars).toBeLessThanOrEqual(imageRouteCapabilities(route).promptLimit);
-      expect(built.dropped).not.toContain('treatment');
-      expect(built.prompt).toContain('VISUAL TREATMENT');
+      // Direção de arte (26/11, parte 1): sem visualDirection no roteiro, o
+      // modo livre a deriva do deck; o clima e a paleta do deck vão no bloco
+      // VISUAL DIRECTION (com papéis), no lugar do VISUAL TREATMENT.
+      expect(built.dropped).not.toContain('visualDirection');
+      expect(built.prompt).toContain(`Palette: base colour, the dominant field ${longo.palette.bg}`);
+      expect(built.prompt).not.toContain('VISUAL TREATMENT');
     }
   });
 });

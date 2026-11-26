@@ -88,8 +88,9 @@ export function imageAspectRatioForSlide(slide, fmt) {
  * essencial precisa ficar quando o painel corta a imagem ou há texto sobre a
  * foto. Quem monta o pedido prefixa "FRAMING: ".
  */
-export function imageFramingDirection(slide, fmt) {
-  const linhas = ['Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning.'];
+export function imageFramingDirection(slide, fmt, { overlayNote = true, base = true } = {}) {
+  // Com COMPOSITION, a regra-base (proteger o essencial no recorte) já vem de lá.
+  const linhas = base ? ['Compose for the final visible image panel. Keep its identifying features and the essential action readable after cropping. Allow deliberate detail shots. Protect faces, hands and key product features when they carry the meaning.'] : [];
   const panel = photoPanelAspect(slide, fmt);
   if (panel && !panel.fullBleed && panel.mismatch > PANEL_MISMATCH_THRESHOLD) {
     linhas.push(panel.zoneRatio < panel.generatedRatio
@@ -97,7 +98,9 @@ export function imageFramingDirection(slide, fmt) {
       : 'The panel is a wide, shallow band. Keep the essential action in the central horizontal band; the top and bottom may be cropped.');
   }
   const titulo = slide?.canvas?.zones?.title;
-  if (panel?.fullBleed && titulo && Number.isFinite(titulo.y) && titulo.y >= 35) {
+  // Com o bloco COMPOSITION (direção de arte, parte 3) o espaço do texto vem
+  // de lá, com lado e fração; esta frase genérica sai para não contradizê-lo.
+  if (overlayNote && panel?.fullBleed && titulo && Number.isFinite(titulo.y) && titulo.y >= 35) {
     linhas.push('Type overlays the lower half of this image. Keep the key face, action and product detail above that zone and leave the entire lower half visually quiet. Do not draw the type.');
   }
   return linhas.join(' ');
