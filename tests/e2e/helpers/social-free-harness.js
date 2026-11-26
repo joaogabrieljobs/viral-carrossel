@@ -3,11 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /** Conta vazia e APIs com persistência em memória; o app cria todo o projeto. */
-export function socialFreeCloud({ brand, session, useV2 = false }) {
+export function socialFreeCloud({ brand = null, session, useV2 = false }) {
   const cloud = { rows: new Map(), writes: [], assets: new Map(), chunks: new Map(), revision: 1, metaRevision: 1,
-    metadata: { brands: [brand], folders: [], activeDocId: null, activeBrandId: brand.id,
+    metadata: { brands: brand ? [brand] : [], folders: [], activeDocId: null, activeBrandId: brand?.id ?? null,
       userProfile: null, assetIds: [], onboardingDone: '1', modesIntroDone: '1' } };
-  for (const ref of brand.styleKit.refImages || []) cloud.assets.set(ref.assetId || ref.id, ref.dataUrl);
+  for (const ref of brand?.styleKit?.refImages || []) cloud.assets.set(ref.assetId || ref.id, ref.dataUrl);
   const manifest = () => ({ vcVersion: 3, customerId: session.customerId, ...cloud.metadata,
     revision: cloud.revision, updatedAt: Date.now(), docs: [...cloud.rows.values()].map(row => row.entry),
     deletedIds: [], assetIds: [...cloud.assets.keys()] });

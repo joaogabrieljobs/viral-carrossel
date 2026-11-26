@@ -50,7 +50,9 @@ async function openEmptyAccount(page, { brand = null, extra = {} } = {}) {
     return ['localhost', '127.0.0.1'].includes(url.hostname) || !/^https?:$/.test(url.protocol)
       ? route.continue() : route.abort('blockedbyclient');
   });
-  await mockApi(page, { session, extra });
+  const emptyV2Routes = V2 && !extra['/api/projects']
+    ? socialFreeCloud({ brand, session, useV2: true }).routes : {};
+  await mockApi(page, { session, extra: { ...emptyV2Routes, ...extra } });
   await mockOutfitFont(page);
   await page.addInitScript(({ brand }) => {
     if (localStorage.getItem('vc_library') === null) localStorage.setItem('vc_library', '[]');
