@@ -56,6 +56,32 @@ describe('Livre social: assinatura inteira dentro das zonas seguras', () => {
     expect(px(styleOf(html, 'data-vc-logo-visible-rect='), 'top')).toBeCloseTo(1080 * 0.045 + 1080 * 0.05);
   });
 
+  it.each(Object.keys(safe))('%s: protege o cabeçalho quando uma foto em painel cruza a posição segura real', fmt => {
+    const slide = { customBg: '#242247', bgImage: 'data:image/png;base64,PHOTO',
+      socialFreeDesign: { family: 'documental', ground: 'bg', photo: 'half' },
+      canvas: { enabled: false, applied: true, source: 'social-preset', variant: 'classic', zones: {
+        title: { x: 8, y: 45, w: 84, h: 16 }, subtitle: { x: 8, y: 64, w: 84, h: 10 },
+        photo: { x: 7.5, y: safe[fmt][0] * 100, w: 85, h: 20 },
+      } } };
+    const html = render(fmt, { slide });
+    expect(styleOf(html, 'data-vc-chrome="headerBar"')).toContain('background:#242247');
+    expect(styleOf(render(fmt, { free: false, slide: { ...slide, socialFreeDesign: undefined } }), 'data-vc-chrome="headerBar"'))
+      .not.toContain('background:#242247');
+  });
+
+  it.each(Object.keys(safe))('%s: protege a barra quando a foto cruza o rodapé elevado', fmt => {
+    const slide = { customBg: '#242247', bgImage: 'data:image/png;base64,PHOTO',
+      socialFreeDesign: { family: 'documental', ground: 'bg', photo: 'half' },
+      canvas: { enabled: false, applied: true, source: 'social-preset', variant: 'classic', zones: {
+        title: { x: 8, y: 35, w: 84, h: 16 }, subtitle: { x: 8, y: 54, w: 84, h: 10 },
+        photo: { x: 7.5, y: 67, w: 85, h: 24 },
+      } } };
+    const brand = { footerPillText: '', footerBarLeft: 'TEMA' };
+    expect(styleOf(render(fmt, { brand, slide }), 'data-vc-chrome="footerBar"')).toContain('background:#242247');
+    expect(styleOf(render(fmt, { free: false, brand, slide: { ...slide, socialFreeDesign: undefined } }), 'data-vc-chrome="footerBar"'))
+      .not.toContain('background:#242247');
+  });
+
   it.each(Object.keys(safe))('%s: o diretor reserva o mesmo chrome sem reduzir texto abaixo do piso', fmt => {
     const source = fixture.response.slides.map((slide, index) => ({ ...structuredClone(slide), id: `chrome-${index}` }));
     const plan = { deckDesign: fixture.response.deckDesign, cards: source.map((slide, index) => ({ index, design: slide.design, scene: slide.scene, eyebrow: slide.eyebrow })) };

@@ -28,7 +28,7 @@ import { groundInks, slidePaletteOverrides } from '../../utils/presentation-fami
 import { resolvePresetChrome, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
 import { localizeFixedLabel } from '../../utils/fixed-labels.js';
 import { ContentLabelLanguageContext } from '../../utils/content-label-language.js';
-import { cultureHeaderInks, footerChromeReservePx, footerGuardApplies, footerPillBottomPx, footerPillColors, photoBehindHeaderChrome, textZonesAboveFooter, STORIES_FOOTER_LIFT, socialFreeChromeGeometry } from '../../utils/card-chrome.js';
+import { cultureHeaderInks, footerChromeReservePx, footerGuardApplies, footerPillBottomPx, footerPillColors, photoBehindHeaderChrome, photoBehindChromeRect, textZonesAboveFooter, STORIES_FOOTER_LIFT, socialFreeChromeGeometry } from '../../utils/card-chrome.js';
 import { titleLetterSpacingEm } from '../../utils/title-tracking.js';
 import { photoPlaceholderRect } from '../../utils/photo-placeholder.js';
 import { cultureAccentRenderablePieces } from '../../utils/text-spans.js';
@@ -2354,7 +2354,14 @@ const SlideCardInner = React.forwardRef(({
           if (!hasHeaderBar && !hasPageBadge) return null;
           // Cor branca translúcida só quando a foto está de fato atrás do topo;
           // com a foto numa caixa mais abaixo (ou sem carregar), tom da marca.
-          const fotoAtrasDoTopo = photoBehindHeaderChrome(slide, { imgErr });
+          const safeHeader = freeChromeGeometry && !hasElementOffset(slide, 'headerBar');
+          const headerPosition = safeHeader ? {
+            top: freeChromeGeometry.headerTopPx, left: freeChromeGeometry.headerLeftPx, right: freeChromeGeometry.headerRightPx,
+          } : { top: f.h * 0.028, left: f.w * 0.05, right: hasPageBadge ? f.w * 0.16 : f.w * 0.05 };
+          const fotoAtrasDoTopo = freeChromeGeometry ? photoBehindChromeRect(slide, {
+            x: headerPosition.left / f.w * 100, y: headerPosition.top / f.h * 100,
+            w: (f.w - headerPosition.left - headerPosition.right) / f.w * 100, h: freeChromeGeometry.headerHeightPx / f.h * 100,
+          }, { imgErr, element: 'headerBar' }) : photoBehindHeaderChrome(slide, { imgErr });
           const headerColor = freeChrome ? freeChromeInk : fotoAtrasDoTopo ? 'rgba(255,255,255,0.85)' : (displayBodyInk || '#555');
           const badgeBg = freeChrome ? slideCardBg : fotoAtrasDoTopo ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.12)';
           const badgeColor = freeChrome ? freeChromeInk : fotoAtrasDoTopo ? '#fff' : (displayBodyInk || '#222');
@@ -2362,12 +2369,8 @@ const SlideCardInner = React.forwardRef(({
             <>
               {hasHeaderBar && (
                 <div data-vc-chrome="headerBar" {...mov('headerBar', {
-                  position:'absolute', top:f.h*0.028, left:f.w*0.05,
-                  right: hasPageBadge ? f.w*0.16 : f.w*0.05,
-                  ...(freeChromeGeometry && !hasElementOffset(slide, 'headerBar') ? {
-                    top: freeChromeGeometry.headerTopPx, left: freeChromeGeometry.headerLeftPx, right: freeChromeGeometry.headerRightPx,
-                    lineHeight: 1.3,
-                  } : {}),
+                  position:'absolute', ...headerPosition,
+                  ...(safeHeader ? { lineHeight: 1.3 } : {}),
                   zIndex:25,
                   display:'flex', justifyContent:'space-between', alignItems:'center',
                   gap:f.w*0.02,
@@ -2459,7 +2462,11 @@ const SlideCardInner = React.forwardRef(({
             // foto numa caixa (topo ou coluna), a barra fica sobre o papel do
             // card e branco some em padrão claro.
             const zonaFoto = (slide.canvas?.applied || slide.canvas?.enabled) ? slide.canvas?.zones?.photo : null;
-            const fotoAtrasDaBarra = !!slide.bgImage && (!zonaFoto
+            const fotoAtrasDaBarra = freeChromeGeometry ? photoBehindChromeRect(slide, {
+              x: barLeft / f.w * 100,
+              y: (f.h - (safeFooter?.barBottomPx ?? f.h * 0.038 + liftStories) - freeChromeGeometry.barHeight) / f.h * 100,
+              w: (f.w - barLeft - barRight) / f.w * 100, h: freeChromeGeometry.barHeight / f.h * 100,
+            }, { imgErr, element: 'footerBar' }) : !!slide.bgImage && (!zonaFoto
               || (zonaFoto.y + zonaFoto.h >= 95 && zonaFoto.x <= 5 && zonaFoto.x + zonaFoto.w >= 95));
             const labelColor = freeChrome ? freeChromeInk : fotoAtrasDaBarra ? 'rgba(255,255,255,0.55)' : (displayBodyInk || '#888');
             const valueColor = freeChrome ? readableInk(slideCardBg, [displayTitleInk, freeChromeInk]) : fotoAtrasDaBarra ? '#ffffff' : (displayTitleInk || '#000');

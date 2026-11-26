@@ -10,6 +10,7 @@
  */
 import { FORMATS } from './formats.js';
 import { wcagContrast } from './wcag.js';
+import { getElementOffset } from './card-elements.js';
 
 const temTexto = (valor) => !!String(valor || '').trim();
 
@@ -70,7 +71,7 @@ export function socialFreeChromeGeometry(brand = {}, f, formato = 'carrossel', s
     hasLogo && logoPos.startsWith('b') ? logoBottomPx + logoSize + gap : 0);
   return { topSafePx, bottomSafePx, topReservePx, bottomReservePx, footerReservePx,
     barBottomPx, pillBottomPx, barHeight, pillHeight,
-    headerTopPx: topSafePx, headerLeftPx: left, headerRightPx,
+    headerTopPx: topSafePx, headerLeftPx: left, headerRightPx, headerHeightPx: font(w * 0.020 * headerScale) * 1.3,
     badgeTopPx: topSafePx, badgeRightPx: right,
     handleTopPx, handleLeftPx: Math.max(left, w * (Number(brand.handleBadgeX) || 5) / 100), handleRightPx: right,
     logoTopPx: topSafePx, logoBottomPx, logoSize, logoPos, lead };
@@ -172,6 +173,20 @@ export function photoBehindHeaderChrome(slide, { imgErr = false } = {}) {
   if (!slide?.bgImage || imgErr) return false;
   const zona = (slide.canvas?.applied || slide.canvas?.enabled) ? slide.canvas?.zones?.photo : null;
   return !zona || (zona.y <= 3 && zona.y + zona.h >= 6 && zona.x <= 5 && zona.x + zona.w >= 95);
+}
+
+/** Caixa percentual efetiva do chrome Livre, incluindo deslocamentos manuais.
+ * A detecção antiga continua medindo sua faixa fixa para os estilos legados. */
+export function photoBehindChromeRect(slide, rect, { imgErr = false, element = '' } = {}) {
+  if (!slide?.bgImage || imgErr || !rect || !(rect.w > 0 && rect.h > 0)) return false;
+  const zone = (slide.canvas?.applied || slide.canvas?.enabled) ? slide.canvas?.zones?.photo : null;
+  if (!zone) return true;
+  const photoOffset = getElementOffset(slide, 'photo');
+  const chromeOffset = getElementOffset(slide, element);
+  const photo = { ...zone, x: zone.x + photoOffset.x, y: zone.y + photoOffset.y };
+  const chrome = { ...rect, x: rect.x + chromeOffset.x, y: rect.y + chromeOffset.y };
+  return Math.min(photo.x + photo.w, chrome.x + chrome.w) > Math.max(photo.x, chrome.x)
+    && Math.min(photo.y + photo.h, chrome.y + chrome.h) > Math.max(photo.y, chrome.y);
 }
 
 /**
