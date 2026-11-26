@@ -228,6 +228,21 @@ describe('Livre social: escolhas manuais e vistas gravadas têm prioridade', () 
     expect(socialFreePhotoPatch({ title: 'Legado', bgImage: 'blob:upload' })).toEqual({});
   });
 
+  it('pedido individual prepara a composição antes dos bytes, sem liberar foto none no lote', () => {
+    const saved = compose('quadrado')[1];
+    const before = structuredClone(saved);
+    const snapshot = { ...saved, ...socialFreePhotoPatch(saved, { requested: true }) };
+    expect(snapshot.socialFreeDesign.photo).not.toBe('none');
+    expect(snapshot.presentationSuppressPhoto).toBe(false);
+    expect(snapshot.canvas.zones.photo.w * snapshot.canvas.zones.photo.h).toBeGreaterThan(400);
+    expect(snapshot.socialArt.formato).toBe('quadrado');
+    expect(snapshot.socialPlan.formato).toBe('quadrado');
+    expect(saved).toEqual(before);
+    expect(socialFreePhotoPatch(saved)).toEqual({});
+    expect(slideSkipsImageGeneration(saved)).toBe(true);
+    expect(slideSkipsImageGeneration(snapshot)).toBe(false);
+  });
+
   it('upload em canvas manual revela a zona de foto escolhida sem refazer nenhum texto', () => {
     const base = compose()[1];
     const photo = { x: 74, y: 40, w: 18, h: 20 };

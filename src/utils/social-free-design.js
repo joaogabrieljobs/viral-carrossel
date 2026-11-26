@@ -388,9 +388,10 @@ export function socialFreeFormatPatch(slide, formato = 'carrossel') {
     formato, variant: art.variant || 0, context: { footer: art.footer, logo: art.logo }, index: art.index || 0, count: art.count || 1 });
 }
 
-/** Ação explícita de inserir mídia. Não é chamada na abertura do projeto. */
-export function socialFreePhotoPatch(slide) {
-  if (!isFreeSocialSlide(slide) || !hasMedia(slide) || slide.socialFreeDesign.photo !== 'none') return {};
+/** Ação explícita de inserir mídia. `requested` prepara só o snapshot do pedido
+ * individual, antes dos bytes; não altera a escolha usada pelo lote ou boot. */
+export function socialFreePhotoPatch(slide, { requested = false } = {}) {
+  if (!isFreeSocialSlide(slide) || (!hasMedia(slide) && requested !== true) || slide.socialFreeDesign.photo !== 'none') return {};
   const art = slide.socialArt || {};
   const design = { ...slide.socialFreeDesign, photo: 'half', ground: slide.socialFreeDesign.ground === 'art' ? 'bg' : slide.socialFreeDesign.ground };
   if (socialFreeSlideLocked(slide)) return manualPhotoPatch(slide, design);
