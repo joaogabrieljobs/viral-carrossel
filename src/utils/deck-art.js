@@ -99,7 +99,7 @@ export function deckArtLayer(slide) {
 const isLightInk = hex => wcagContrast(hex, '#000000') >= wcagContrast(hex, '#FFFFFF');
 const roleHex = (vd, role) => vd?.palette?.find(item => item.role === role)?.hex || '';
 
-/** Direção visual em vigor para a arte: a do roteiro alinhada ao deck, com o kit por cima. */
+/** Direção visual em vigor para a arte, alinhada à marca efetiva do deck. */
 function artVisualDirection(slide, styleKit) {
   if (isSocialFreeSlide(slide)) return resolveSocialFreeVisualDirection({ slide, styleKit })
     || (slide?.socialDeckDesign ? alignVisualDirectionWithDeck(null, slide.socialDeckDesign) : null);
@@ -142,6 +142,15 @@ export function composeDeckArtImageDirection({ slides = [], styleKit = null, bas
   return {
     format: socialFree ? 'carousel' : 'presentation',
     ...(socialFree ? { socialFree: true } : {}),
+    directedPrompt: {
+      version: 2, kind: socialFree ? 'social_free' : 'presentation_free', visual: vd,
+      scene: {
+        subject: subject.replace(/^SUBJECT AND CASTING: /, ''),
+        light: 'Apply the palette light and shadow roles to this abstract background, without a photographic subject.',
+        graphics: hasGraphics ? `${vd.graphics}. Restrict interventions ${graphicLocation}; add no other motifs or textures.` : 'none',
+      },
+      variation: [], references: Array.from({ length: refs }, () => ({ label: '', role: 'moodboard' })),
+    },
     framing: '',
     referenceCount: refs,
     styleMoodboard: refs > 0,

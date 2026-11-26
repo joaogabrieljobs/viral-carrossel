@@ -33,7 +33,7 @@ describe('Arte única do Livre social', () => {
     expect(parts.socialFree).toBe(true);
     expect(parts.composition).toContain(dimensions);
     const built = buildImagePrompt({ scene: parts.sceneBrief.query, ...parts }, { route: 'sjinn' });
-    expect(built.prompt).toContain('Graphics: no graphic interventions.');
+    expect(built.prompt).toMatch(/graphics:\s*no graphic interventions\./i);
     expect(built.prompt).toContain('Flat clean colour, no grain.');
     expect(built.prompt).not.toContain('16:9');
     expect(built.prompt).not.toContain('DEFAULT ART DIRECTION');

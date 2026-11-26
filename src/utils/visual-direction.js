@@ -201,21 +201,28 @@ export function alignVisualDirectionWithDeck(visualDirection, deck) {
 /**
  * Direção visual em vigor para a imagem do slide: a do roteiro (gravada no
  * slide por attachPresentationPlan), alinhada ao deck no modo livre e com as
- * cores do kit por cima. Sem roteiro com direção e fora do modo livre: null.
+ * cores do kit. No Livre, o deck efetivo já contém a escolha final da marca
+ * e vence uma escolha anterior do kit. Fora do Livre, mantém a precedência
+ * histórica. Sem roteiro com direção e fora do modo livre: null.
  */
 export function resolveSlideVisualDirection({ slide = null, styleKit = null } = {}) {
   const raw = slide?.presentationPlan?.visualDirection;
   let value = raw ? coerceVisualDirection(raw) : null;
   if (value && raw?.paletteSource) value.paletteSource = raw.paletteSource;
   const free = slide?.presentationPresetId === FREE_PRESET && isObject(slide?.presentationDeckDesign);
-  if (free) value = alignVisualDirectionWithDeck(value, slide.presentationDeckDesign);
+  // A paleta de um rascunho legado ainda pode conter propostas da IA fora
+  // da referência (Teste 6). Só a composição final, que materializa as
+  // tintas em presentationPaletteOverrides, governa o pedido posterior.
+  const effectiveFree = free && isObject(slide?.presentationPaletteOverrides);
+  if (free) value = alignVisualDirectionWithDeck(effectiveFree ? applyKitColors(value, styleKit) : value, slide.presentationDeckDesign);
   if (!value) return null;
   // Paleta extraída da referência e guardada no kit: vale também ao refazer
   // uma imagem depois. As cores escritas no kit continuam vencendo.
   const reference = kitReferencePalette(styleKit);
   const kitColors = kitVisualColors(styleKit);
-  if (reference.length) value = snapVisualDirectionToPalette(value, [...reference, ...kitColors.colors], { explicitBase: kitColors.base });
-  return applyKitColors(value, styleKit);
+  const deckBase = effectiveFree ? visualHex(slide.presentationDeckDesign?.palette?.bg) : null;
+  if (reference.length) value = snapVisualDirectionToPalette(value, [...reference, ...kitColors.colors, ...(deckBase ? [deckBase] : [])], { explicitBase: deckBase || kitColors.base });
+  return effectiveFree ? alignVisualDirectionWithDeck(value, slide.presentationDeckDesign) : applyKitColors(value, styleKit);
 }
 
 /** Opt-in social: a direção persistida do card e a marca efetiva do projeto. */
@@ -279,10 +286,12 @@ export function composeVisualDirectionBlock(visualDirection, { referenceLook = f
  * do slide (a base escura sob texto claro, por exemplo). Sem tinta conhecida,
  * a base.
  */
-export function reservedAreaColour(visualDirection, ink = '') {
+export function reservedAreaColour(visualDirection, ink = '', { preferBase = false } = {}) {
   const palette = Array.isArray(visualDirection?.palette) ? visualDirection.palette : [];
   if (!palette.length) return '';
   const tinta = visualHex(ink);
   if (!tinta) return (palette.find(item => item.role === 'base') || palette[0]).hex;
+  const base = palette.find(item => item.role === 'base');
+  if (preferBase && base && wcagContrast(tinta, base.hex) >= 4.5) return base.hex;
   return palette.reduce((best, item) => (wcagContrast(tinta, item.hex) > wcagContrast(tinta, best.hex) ? item : best), palette[0]).hex;
 }

@@ -82,6 +82,30 @@ export function socialFreeOtherScenes(slides, index) {
   return presentationOtherScenes((Array.isArray(slides) ? slides : []).map(slide => ({ presentationPlan: slide?.socialPlan })), index);
 }
 
+/** Diferenças fotografáveis, sem gastar o resumo repetindo o mesmo sujeito. */
+function directedSceneVariation(slides, index, social) {
+  const list = Array.isArray(slides) ? slides : [];
+  if (!Number.isInteger(index) || index < 0 || index >= list.length) return [];
+  const ownScene = (social ? list[index]?.socialPlan : list[index]?.presentationPlan)?.scene;
+  const ownKey = ['action', 'setting', 'shot'].map(key => clean(ownScene?.[key])).join('|').toLowerCase();
+  const seen = new Set([ownKey]);
+  return list.map((slide, position) => {
+    const plan = social ? slide?.socialPlan : slide?.presentationPlan;
+    const design = social ? slide?.socialFreeDesign : slide?.presentationFreeDesign;
+    const scene = plan?.scene;
+    if (position === index || design?.photo === 'none' || plan?.design?.photo === 'none' || !scene) return null;
+    const value = { index: position, action: clean(scene.action), setting: clean(scene.setting), shot: clean(scene.shot) };
+    return value.action || value.setting || value.shot ? value : null;
+  }).filter(Boolean)
+    .sort((a, b) => Math.abs(a.index - index) - Math.abs(b.index - index) || a.index - b.index)
+    .filter(value => {
+      const key = [value.action, value.setting, value.shot].join('|').toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, OTHER_SCENES_MAX);
+}
+
 const clean = value => (typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().replace(/[.;,\s]+$/, '') : '');
 
 /**
@@ -169,15 +193,20 @@ export function composeImageDirection({
   // bloco próprio. Em nenhum dos casos conta como estilo.
   const referenceMap = composeReferenceMap(references, estetica ? '' : direcao);
   const livreSocial = !apresentacao && !exitedFreeHere && (socialFree === true || isSocialFreeSlide(card));
+  const livreApresentacao = apresentacao && card.presentationPresetId === 'presentation_free';
+  const directed = livreSocial || livreApresentacao;
   // Direção de arte (partes 1 a 3): direção visual do deck (roteiro, modo
   // livre e kit), cena como briefing e o espaço do texto no quadro.
   const visual = apresentacao ? resolveSlideVisualDirection({ slide: card, styleKit })
     : livreSocial ? resolveSocialFreeVisualDirection({ slide: card, styleKit }) : null;
   const plan = apresentacao ? card.presentationPlan : livreSocial ? card.socialPlan : null;
   const plannedScene = plan?.scene && typeof plan.scene === 'object' ? plan.scene : null;
-  const composition = apresentacao ? composeCompositionBlock(card, { visualDirection: visual, shot: visual && plannedScene ? clean(plannedScene.shot) : '' })
-    : livreSocial ? composeSocialFreeComposition(card, { fmt, formatViews, visualDirection: visual, shot: clean(plannedScene?.shot) }) : '';
-  const sceneBrief = visual ? presentationSceneBrief(plannedScene, { shotInComposition: !!composition }) : null;
+  // No contrato Livre, shot pertence à cena e só entra se o pedido ainda
+  // coincide com ela. A geometria não carrega enquadramento antigo em uma
+  // imagem reescrita manualmente, nem contradiz scene.graphics: none.
+  const composition = apresentacao ? composeCompositionBlock(card, { visualDirection: visual, shot: !directed && visual && plannedScene ? clean(plannedScene.shot) : '', directed })
+    : livreSocial ? composeSocialFreeComposition(card, { fmt, formatViews, visualDirection: visual }) : '';
+  const sceneBrief = visual || directed ? presentationSceneBrief(plannedScene, { shotInComposition: !!composition }) : null;
   const cena = composeSceneParts({
     visualBible, slide: card, fmt,
     excludeEntityIds: anchorPlan?.excludeEntityIds || [], presentationFamily,
@@ -189,6 +218,12 @@ export function composeImageDirection({
   return {
     format: fmt === 'apresentacao' ? 'presentation' : 'carousel',
     ...(livreSocial ? { socialFree: true } : {}),
+    ...(directed ? { directedPrompt: {
+      version: 2, kind: livreSocial ? 'social_free' : 'presentation_free',
+      visual, scene: plannedScene ? { ...plannedScene } : null,
+      variation: directedSceneVariation(deckSlides, slideIndex, livreSocial),
+      references, manualDirection: direcao,
+    } } : {}),
     framing: cena.framing,
     referenceCount: references.length,
     styleMoodboard: references.some((ref) => ref.role === 'moodboard'),

@@ -32,9 +32,9 @@ describe('Teste 7: a arte usa a direção do projeto, sem uma estética global d
   it('graphics none e acabamento sem grão chegam ao pedido sem instruções fixas contraditórias', () => {
     const { parts, prompt, dropped, trimmed, chars } = request(visualDirection);
     expect(prompt).toContain(`Finish: ${visualDirection.finish}`);
-    expect(prompt).toContain('Graphics: no graphic interventions.');
+    expect(prompt).toMatch(/graphics:\s*no graphic interventions\./i);
     expect(prompt).toContain(`Atmosphere: ${visualDirection.atmosphere}`);
-    expect(prompt).toContain(`Deck exclusions: ${visualDirection.avoid}`);
+    expect(prompt).toContain(visualDirection.avoid);
     expect(generatedScene(parts)).not.toMatch(/fine,? (?:even )?grain|organic graphic shape|cut-paper look|Screen-print texture|fluid shape|small cluster/i);
     expect(parts.avoid).toContain(visualDirection.avoid);
     expect(prompt).toContain(`left ${FREE_ART_TEXT_MAX}% of the frame`);
@@ -50,7 +50,7 @@ describe('Teste 7: a arte usa a direção do projeto, sem uma estética global d
       graphics: 'One thin angular outline, with sharp corners and generous empty space.',
     };
     const { parts, prompt } = request(geometry);
-    expect(prompt).toContain(`Graphics: ${geometry.graphics}`);
+    expect(prompt).toContain(`GRAPHICS: ${geometry.graphics}`);
     expect(prompt).toContain('light on the subject #D5D5D5; shadows #454545');
     expect(prompt).toContain(geometry.atmosphere);
     expect(generatedScene(parts)).not.toMatch(/organic graphic shape|cut-paper look|rounded extensions|fluid shape|small cluster|Screen-print texture|fine,? (?:even )?grain/i);
@@ -67,9 +67,9 @@ describe('Teste 7: a arte usa a direção do projeto, sem uma estética global d
     };
     const { parts, prompt, dropped, trimmed } = request(organic);
     expect(prompt).toContain(`Finish: ${organic.finish}`);
-    expect(prompt).toContain(`Graphics: ${organic.graphics}`);
+    expect(prompt).toContain(`GRAPHICS: ${organic.graphics}`);
     expect(prompt).toContain(`Atmosphere: ${organic.atmosphere}`);
-    expect(prompt).toContain(`Deck exclusions: ${organic.avoid}`);
+    expect(prompt).toContain(organic.avoid);
     expect(generatedScene(parts)).not.toMatch(/rounded extensions|fluid shape|small cluster/i);
     expect({ dropped, trimmed }).toEqual({ dropped: [], trimmed: [] });
   });

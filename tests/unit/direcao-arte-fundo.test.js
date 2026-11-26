@@ -205,8 +205,9 @@ describe('a imagem de arte: um pedido, um crédito, guardada para o deck', () =>
     const direction = composeDeckArtImageDirection({ slides: doc.slides, styleKit: { refImages: [{ id: 'r1', dataUrl: 'data:image/png;base64,AAAA' }] }, baseReferenceCount: 1 });
     expect(direction).toMatchObject({ format: 'presentation', referenceCount: 1, styleMoodboard: true, styleReferenceLook: true, presentationPanel: false });
     const { prompt } = buildImagePrompt({ scene: DECK_ART_SCENE, framing: '', ...direction }, { route: 'sjinn' });
-    expect(prompt).toContain('STYLE REFERENCE');
-    expect(prompt).toContain("this slide's SUBJECT AND CASTING");
+    expect(prompt).toContain('Use moodboard images only for the look');
+    expect(prompt).toContain('never for people, objects, framing or composition');
+    expect(prompt).toContain('1: moodboard');
   });
 });
 

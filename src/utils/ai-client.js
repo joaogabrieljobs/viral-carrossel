@@ -557,6 +557,8 @@ function imagePromptParts(q, imgParams, direction, { aspectRatio = '4:5', withRe
     axisTags: buildImgParamsTagsEN(imgParams),
     format: d.format || (normalizeImageAspectRatio(aspectRatio) === '16:9' ? 'presentation' : 'carousel'),
     ...(d.socialFree === true ? { socialFree: true } : {}),
+    ...(d.directedPrompt && typeof d.directedPrompt === 'object' ? { directedPrompt: d.directedPrompt } : {}),
+    outputAspectRatio: normalizeImageAspectRatio(aspectRatio),
     framing: typeof d.framing === 'string' ? d.framing : `FRAMING: ${imageFramingDirection({}, 'carrossel')}`,
     referenceCount: anexos,
     styleMoodboard: anexos > 0 && (typeof d.styleMoodboard === 'boolean' ? d.styleMoodboard : true),
@@ -595,7 +597,13 @@ function buildGptImageFullPrompt(q, imgParams, direction, options = {}) {
 
 /** Rota sem anexos com referência exigida: erro antes de qualquer chamada. */
 function referenceIncompatibleError(plan) {
-  return Object.assign(new Error(plan.message), { code: plan.code, label: plan.label });
+  return Object.assign(new Error(plan.message), { code: plan.code, label: plan.label, ...(plan.diagnostics ? { diagnostics: plan.diagnostics } : {}) });
+}
+
+/** Um núcleo incompleto nunca vira uma chamada vazia ou silenciosamente reduzida. */
+function readyImagePrompt(plan) {
+  if (plan.status !== 'ready') throw referenceIncompatibleError(plan);
+  return plan.prompt;
 }
 
 function resolveZaiImageSize(model, aspectRatio = '4:5') {
@@ -796,14 +804,16 @@ const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => 
   // mesmo comprimento, então o texto sai daqui inteiro e dentro do limite.
   const plan = planImagePrompt(q, imgParams, options.imageDirection ?? imgExtraPrompt, {
     route: 'sjinn',
-    aspectRatio: requestedAspectRatio,
+    aspectRatio,
     referenceCount: refs.length,
   });
+  if (plan.status !== 'ready') throw referenceIncompatibleError(plan);
   // IA-02: quem chamou vê o que saiu ou encolheu antes de o crédito ser
   // reservado. `false` desiste do envio; a retentativa não insiste.
   if (typeof options.onPromptPlan === 'function') {
     const proceed = await options.onPromptPlan({
       route: 'sjinn', chars: plan.chars, limit: plan.limit, dropped: plan.dropped, trimmed: plan.trimmed,
+      ...(plan.diagnostics ? { diagnostics: plan.diagnostics } : {}),
     });
     throwIfGenerationCancelled(signal);
     if (proceed === false) {
@@ -878,9 +888,9 @@ const generateDALLE = (q, apiKey, imgParams = null, options = {}) => runAIJob(as
   if (refs.length) {
     const blobs = await Promise.all(refs.slice(0, 4).map(ref => blobFromSlideRef(ref, signal)));
     // Orçamento e capacidades do modelo efetivo, recalculados a cada fallback.
-    const promptRef = (modelName) => planImagePrompt(q, imgParams, direction, {
+    const promptRef = (modelName) => readyImagePrompt(planImagePrompt(q, imgParams, direction, {
       route: 'openai', model: modelName, aspectRatio: options.aspectRatio, referenceCount: blobs.length,
-    }).prompt;
+    }));
     throwIfGenerationCancelled(signal);
     return generateDALLEEdits(blobs, promptRef, apiKey, signal, options);
   }
@@ -901,9 +911,9 @@ const generateDALLE = (q, apiKey, imgParams = null, options = {}) => runAIJob(as
       model: model.name,
       // DALL·E 3 tem 4.000 caracteres e zero anexos: o pedido é remontado para
       // o modelo da vez; blocos opcionais saem inteiros, nada é fatiado.
-      prompt: planImagePrompt(q, imgParams, direction, {
+      prompt: readyImagePrompt(planImagePrompt(q, imgParams, direction, {
         route: 'openai', model: model.name, aspectRatio: options.aspectRatio, referenceCount: 0,
-      }).prompt,
+      })),
       n: 1,
       size: resolveOpenAIImageSize(model, options.aspectRatio),
       quality: model.quality,

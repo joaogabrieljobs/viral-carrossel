@@ -2,7 +2,7 @@
 import { FREE_BLOCKS, FREE_FONT_FAMILIES, FREE_GROUNDS, FREE_ICONS, FREE_PHOTO_SIZES } from './free-design.js';
 import { SOCIAL_FREE_FAMILY_KEYS, SOCIAL_FREE_LAYOUT_KEYS } from './social-free-design.js';
 import { slideForFormatDisplay } from './format-view.js';
-import { textOverPhoto } from './image-composition.js';
+import { photoTextBounds, textOverPhoto } from './image-composition.js';
 import { reservedAreaColour, visualHex } from './visual-direction.js';
 import { wcagContrast } from './wcag.js';
 
@@ -40,6 +40,17 @@ Identidade única: deckDesign.palette contém bg, surface, ink, muted, accent, a
 Kit escrito (direção, não fonte de novos fatos): ${trim([styleKit?.stylePrompt, styleKit?.contextMd].filter(Boolean).join('\n'), 1800)}
 visualDirection contém palette (3–6 objetos {role,hex}, roles base/subject_light/shadow/graphic/accent), finish, atmosphere, graphics e avoid. O acabamento e os grafismos são os da identidade; graphics pode ser "none". Respeite exclusões, inclusive ausência de grão ou de decoração. Não imponha recortes orgânicos, serigrafia ou luz saturada.
 Por card, inclua scene, avoid, design e eyebrow além dos campos editoriais pedidos. scene é um briefing em inglês: {subject,wardrobe,action,expression,setting,light,graphics,shot}; preserve sujeitos e âncoras de identidade existentes. Varie ação, lugar e enquadramento entre fotos. Casting é criação visual, nunca evidência factual sobre o público. A referência de estilo fornece só meio, cores, luz e textura, nunca a pessoa ou a composição.
+DECISÕES VISÍVEIS DA CENA:
+Para cada imagem, escolha uma decisão visual distintiva coerente com a função editorial do card e com o briefing. Adjetivos de qualidade não substituem decisões observáveis. Use os oito campos existentes; campos sem aplicação ficam "". Mantenha scene null quando uma foto não contribuir.
+- subject: descreva o assunto e um traço relevante; objetos e ambientes também podem conduzir a cena, com pessoas só quando fizerem parte da ideia.
+- wardrobe: descreva material, textura ou detalhe do figurino ou objeto quando relevante para a cena; não acrescente adornos só para preencher o campo.
+- action: capture um gesto físico ou instante observável; para objetos, uma interação, transformação ou estado que explique a ideia.
+- expression: descreva expressão, atitude e direção do olhar quando houver pessoas; deixe vazio quando não se aplicar.
+- setting: situe o ambiente e a relação entre primeiro plano, assunto e fundo, com detalhes sustentados pelo briefing ou claramente conceituais.
+- light: descreva fonte, direção e função da luz pela paleta efetiva, distinguindo incidência no assunto, sombra ou recorte quando úteis. Respeite o acabamento pedido, inclusive uma superfície lisa e sem grão; não imponha luz saturada ou efeitos fotográficos a uma linguagem que não os pede.
+- graphics: visualDirection.graphics: "none" proíbe acrescentar grafismos nas imagens. scene.graphics: "none" impede intervenções dentro da imagem daquela cena, mesmo quando a linguagem global permite formas. O layout é separado da foto e não autoriza desenhar seus elementos nela.
+- shot: escolha distância e ponto de vista, com profundidade, foco ou movimento quando contribuírem; sem câmera, lente ou parâmetros obrigatórios. A composição calculada pelo app define a reserva do texto, sem coordenadas inventadas no plano.
+Identidade recorrente somente quando solicitada no briefing ou na ficha, ou planejada explicitamente na sequência. Uma ficha não obriga o sujeito a aparecer em todas as imagens. Preserve suas características quando ele aparecer e varie ação, ambiente ou enquadramento conforme a função do card. Casting, ações e locais conceituais não são fatos sobre o projeto, o público ou um local real; não invente documentação, presença real ou características oficiais do público.
 design: family entre ${SOCIAL_FREE_FAMILY_KEYS.join(', ')}; layout opcional entre ${SOCIAL_FREE_LAYOUT_KEYS.join(', ')}; ground entre ${FREE_GROUNDS.join(', ')}; photo entre ${FREE_PHOTO_SIZES.join(', ')}; block entre ${FREE_BLOCKS.join(', ')} (lista usa steps); emphasis até 3 trechos literais do texto; icons até 4 nomes entre ${FREE_ICONS.join(', ')}. Sem conteúdo que sustente um bloco, use block none. Nunca crie números, citações ou pares para preencher um layout.
 Quando block não for none, escreva o conteúdo em presentationBlocks: steps {type,items:[{title,body}]}; comparison {type,headers:[...],rows:[[...]]}; quote {type,text,author}; bignumber {type,value,label,detail}; icons {type,items:[{icon,title,body}]}. O bloco substitui somente a informação que ele já mostra; o apoio deve acrescentar contexto sem repetir suas células. Não descarte ressalvas ou condições.
 photo none: scene null e imageQuery ""; nenhum pedido de foto. ground art exige photo none: a mesma arte abstrata da identidade, gerada uma vez por projeto, é reutilizada em cards sem foto. A imagem nunca contém texto, números factuais, logo ou tabelas. Texto, CTA, seta e marca são camadas editáveis.
@@ -90,8 +101,11 @@ export function composeSocialFreeComposition(slide, { fmt = 'carrossel', formatV
   }
   const ink = visualHex(shown?.titleColor) || '#FFFFFF';
   const tone = lightInk(ink) ? 'dark' : 'light';
-  const color = visualHex(shown?.overlayColor) || reservedAreaColour(visualDirection, ink);
-  const location = geometry.side === 'center' ? 'the central text area' : `the ${geometry.side} ${geometry.reserve}% of the frame`;
+  const color = visualHex(shown?.overlayColor) || reservedAreaColour(visualDirection, ink, { preferBase: true });
+  const area = photoTextBounds(zones, TEXT_ZONES);
+  const location = geometry.side === 'center' && area
+    ? `the text rectangle (x ${area.x0}–${area.x1}%, y ${area.y0}–${area.y1}% of this image)`
+    : geometry.side === 'center' ? 'the central text area' : `the ${geometry.side} ${geometry.reserve}% of the frame`;
   const subject = geometry.side === 'center' ? 'outside the central text area' : `in the ${opposite[geometry.side]} ${100 - geometry.reserve}%`;
   return `${prefix}Editable type overlays ${location}. Keep that area ${tone}, quiet${color ? ` in ${color}` : ''} and low-detail, with no faces, hands or key details. Place the subject ${subject}. Keep essential details clear of the protected top and bottom areas; do not generate lettering, CTA, arrows or a logo.`;
 }

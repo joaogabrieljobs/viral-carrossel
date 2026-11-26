@@ -132,3 +132,33 @@ A prova de navegador parte do assistente vazio e da fixture crua de roteiro e re
 Em 26/11, a suíte unitária da Frente A passou em 449 arquivos, com 9.353 casos aprovados e 6 falhas esperadas, totalizando 9.359 testes em 37,55 segundos. O resultado unitário isolado não substitui a geração completa no navegador e a inspeção das capturas. Além do Teste 7, o navegador verifica uma direção sem grafismos e sem grão: o pedido final da arte deve preservar essas decisões, sem reintroduzir os motivos fixos da Apoteose.
 
 A validação de navegador foi concluída: três cenários focais aprovados, bateria geral com 361 aprovados e 24 ignorados por configuração, e 60 cenários aprovados com Projetos V2. As 31 capturas de antes/depois/recuperação foram inspecionadas em 1920 × 1080. Isso comprova a composição e a persistência com mídia simulada; não comprova a qualidade de imagens geradas pela SJinn nem equivalência visual ao PDF-alvo. A nova geração real continua a cargo do João, após aprovação da publicação.
+
+## Adendo — integridade e qualidade dos prompts do Livre
+
+Pedido de 26/11/2026 após a conclusão local das frentes A e B: aproximar a construção dos pedidos ao método dos sete prompts originais, mantendo o GPT Image 2 como modelo. A comparação dos pedidos HTTP preservados no teste social encontrou uma divergência com a intenção acima: a redução para 4.000 caracteres descartava luz, exclusões específicas e cenas vizinhas para conservar regras repetidas. Um pedido conservava apenas um fragmento do cabeçalho de luz. Os testes anteriores provaram geração, composição e persistência com IA simulada; não verificavam a sobrevivência de todas essas decisões no pedido final.
+
+### Escopo e compatibilidade
+
+O novo montador recebe um contrato estruturado e versionado, ativado explicitamente em `presentation_free` e `social_free`. Ausência desse contrato mantém o caminho anterior. Os 21 estilos sociais fixos, seus 63 hashes, os catálogos de texto e imagem, Criar rápido, projetos abertos, textos, fotos e edições por formato permanecem protegidos pelas regressões existentes. Não há chamada extra à IA, troca de modelo, aumento de limite, migração ou mudança de créditos.
+
+### Escrever decisões visíveis
+
+O roteiro descreve cada cena pelos oito campos existentes. Define uma decisão visual distintiva coerente com a função da página: assunto, ação ou gesto, expressão e olhar, ambiente e profundidade, material do figurino quando relevante, incidência da luz e enquadramento. A direção deve ser observável na imagem; adjetivos de qualidade não substituem essas escolhas. Casting, local e ação inventados para uma imagem conceitual não viram fatos do projeto. O método não fixa a estética, as cores ou os personagens da Apoteose em outros trabalhos.
+
+### Montar sem apagar a direção
+
+O contrato reúne direção comum, cena, composição efetiva, sujeitos, anexos e diferenças de outras cenas. Os rótulos pertencem ao montador, separados dos valores. Não emitir seção vazia, fragmento de cabeçalho ou referência a um mapa ausente. Regras gerais entram uma vez; briefing bruto e repetições cedem antes de luz, paleta, composição, identidade e exclusões. Havendo outras fotos, ao menos duas diferenças úteis de ação, ambiente ou plano são reservadas quando disponíveis. Uma ficha de sujeito não obriga que ele apareça em toda imagem.
+
+A direção local de grafismos governa as intervenções dentro da imagem; `none` mantém a fotografia sem grafismos mesmo que a linguagem do layout use formas. A paleta efetiva do projeto governa as cores. Nas apresentações livres, a escolha final de cor do projeto tem a mesma precedência no slide e no pedido, inclusive sobre uma escolha anterior do kit.
+
+Essa precedência final usa a composição materializada (`presentationPaletteOverrides`), não uma proposta de paleta ainda sem composição. Rascunhos legados continuam passando pelo ajuste às cores extraídas, inclusive a regressão do Teste 6 que remove o amarelo inventado fora da referência.
+
+A composição descreve a zona real da imagem e a área efetiva do texto na vista atual. A proporção do card e a proporção de saída do provedor são conceitos separados. Direção manual e zonas editadas continuam prevalecendo conforme o contrato existente.
+
+Quando a reserva de texto ainda não tem uma cor própria, o Livre prefere a base cromática se ela já oferece contraste de 4,5:1 com a tinta. Uma `overlayColor` salva continua governando sua superfície: esta alteração do pedido não recolore nem recompõe proteções existentes. Cenas vizinhas idênticas à atual são excluídas das instruções de variação, para não pedir simultaneamente uma ação e a sua ausência.
+
+Se os dados essenciais não couberem no limite da rota, a montagem devolve um diagnóstico antes da chamada de imagem. Não envia silenciosamente uma cena sem luz ou uma identidade incompleta. A limitação de 4.000 caracteres é o teto configurado para a rota SJinn do aplicativo; não é apresentada como limite universal do modelo GPT Image 2.
+
+### Prova exigida
+
+Testes devem falhar antes da correção e depois passar. Além das unidades do contrato, o assistente executa a geração completa com IA simulada e verifica o corpo HTTP real: luz, exclusões, diversidade, ficha, anexo, geometria e orçamento. As baterias obrigatórias e os catálogos legados continuam exigidos. A comparação estética com o PDF depende de geração real autorizada; integridade do prompt não comprova, por si só, qualidade visual equivalente.

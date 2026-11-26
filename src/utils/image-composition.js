@@ -29,6 +29,20 @@ function intersect(a, b) {
   return x1 - x0 > 0.5 && y1 - y0 > 0.5 ? { x0, y0, x1, y1 } : null;
 }
 
+/** Limites do texto que efetivamente cruza a foto, no quadro da imagem. */
+export function photoTextBounds(zones = {}, keys = TEXT_KEYS) {
+  const photo = zones.photo;
+  if (!validZone(photo)) return null;
+  const parts = keys.map(key => zones[key]).filter(validZone).map(zone => intersect(zone, photo)).filter(Boolean);
+  if (!parts.length) return null;
+  return {
+    x0: round2((Math.min(...parts.map(r => r.x0)) - photo.x) / photo.w * 100),
+    x1: round2((Math.max(...parts.map(r => r.x1)) - photo.x) / photo.w * 100),
+    y0: round2((Math.min(...parts.map(r => r.y0)) - photo.y) / photo.h * 100),
+    y1: round2((Math.max(...parts.map(r => r.y1)) - photo.y) / photo.h * 100),
+  };
+}
+
 /**
  * Onde o texto fica em relação à foto, nas coordenadas do quadro da imagem
  * (0–100 dentro da zona da foto). Sem texto sobre a foto: painel. Com texto:
@@ -105,7 +119,7 @@ const isLightInk = hex => wcagContrast(hex, '#000000') >= wcagContrast(hex, '#FF
  *   respeitando o recorte, voltado para o lado do texto;
  * - sem foto: '' (nenhuma imagem é pedida).
  */
-export function composeCompositionBlock(slide, { visualDirection = null, shot = '' } = {}) {
+export function composeCompositionBlock(slide, { visualDirection = null, shot = '', directed = false } = {}) {
   const g = photoTextGeometry(slide);
   if (!g) return '';
   const plano = String(shot || '').replace(/\s+/g, ' ').trim();
@@ -116,12 +130,13 @@ export function composeCompositionBlock(slide, { visualDirection = null, shot = 
   }
   const ink = visualHex(slide.titleColor);
   const tone = !ink || isLightInk(ink) ? 'dark' : 'light';
-  const colour = slide.overlayMode === 'side' && visualHex(slide.overlayColor) ? visualHex(slide.overlayColor) : reservedAreaColour(visualDirection, ink || '#FFFFFF');
-  const where = g.side === 'center' ? 'the centre of the frame'
+  const colour = slide.overlayMode === 'side' && visualHex(slide.overlayColor) ? visualHex(slide.overlayColor) : reservedAreaColour(visualDirection, ink || '#FFFFFF', { preferBase: directed });
+  const area = directed ? photoTextBounds(slide.canvas?.zones) : null;
+  const where = g.side === 'center' ? area ? `the text rectangle (x ${area.x0}–${area.x1}%, y ${area.y0}–${area.y1}% of this image)` : 'the centre of the frame'
     : `the ${g.side} ${g.reserve}% of the frame${g.vertical ? `, mostly in its ${g.vertical} half` : ''}`;
   const subject = g.side === 'center' ? 'around that area, toward the frame edges'
     : `within the ${['left', 'right'].includes(g.side) ? OPPOSITE[g.side] : g.side === 'bottom' ? 'upper' : 'lower'} ${100 - g.reserve}%`;
-  const graphics = visualDirection?.graphics && visualDirection.graphics !== 'none' && g.side !== 'center'
+  const graphics = !directed && visualDirection?.graphics && visualDirection.graphics !== 'none' && g.side !== 'center'
     ? ` Let graphics sit near the ${OPPOSITE[g.side]} edge, away from the type.` : '';
   return `COMPOSITION (space for the slide text): ${shotLine}Type is laid over ${where}. Keep that area ${tone} and quiet${colour ? ` in ${colour}` : ''}, with low detail and no faces, hands or key details in it. Place the subject ${subject}.${graphics}`;
 }
