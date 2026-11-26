@@ -6,6 +6,7 @@
  */
 import { FREE_ART_MAX_SLIDES, FREE_PRESENTATION_PRESET_ID, freePresentationCompositionOverrides } from './free-design.js';
 import { manuallyPositioned } from './presentation-composition.js';
+import { isFreeSocialSlide, socialFreePhotoPatch } from './social-free-design.js';
 
 const GENERIC_LAYOUT_FIELDS = new Set([
   'canvas', 'layout', 'align', 'photoRegion', 'overlay', 'overlayMode', 'overlaySide', 'overlayReach', 'overlayColor',
@@ -20,6 +21,8 @@ const layoutField = key => GENERIC_LAYOUT_FIELDS.has(key)
   || (key.startsWith('presentation') && !EXCLUDED_PRESENTATION_FIELDS.has(key));
 const same = (a, b) => a === b || JSON.stringify(a) === JSON.stringify(b);
 const hasMedia = slide => !!(slide?.bgImage || slide?.bgImageId || slide?.bgImageAssetId);
+// Bytes hidratados da mesma mídia não são um gesto de inserção.
+const mediaKey = slide => slide?.bgImageId || slide?.bgImageAssetId || slide?.videoId || slide?.bgImage || null;
 const isFree = slide => slide?.presentationPresetId === FREE_PRESENTATION_PRESET_ID && !!slide?.presentationFreeDesign;
 const artFields = ['presentationArtImage', 'presentationArtImageId', 'presentationArtImageAssetId'];
 const clone = value => value === undefined ? undefined : JSON.parse(JSON.stringify(value));
@@ -101,8 +104,15 @@ export function reconcileFreeImageFallback(previous = [], slides = [], { failedS
   let artCount = slides.filter(slide => slide?.presentationFreeDesign?.ground === 'art').length;
   let changed = false;
   const result = slides.map((slide, index) => {
-    if (!isFree(slide)) return slide;
     const old = before.get(slide.id);
+    if (isFreeSocialSlide(slide)) {
+      if (!old || slide.bgImageFailed || !mediaKey(slide) || mediaKey(old) === mediaKey(slide)) return slide;
+      const patch = socialFreePhotoPatch(slide);
+      if (!Object.keys(patch).length) return slide;
+      changed = true;
+      return { ...slide, ...patch };
+    }
+    if (!isFree(slide)) return slide;
     const fallback = slide.presentationImageFallback;
     if (fallback) {
       if (!slide.bgImageFailed && hasMedia(slide)) {
