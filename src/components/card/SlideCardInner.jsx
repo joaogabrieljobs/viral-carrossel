@@ -1274,7 +1274,9 @@ const ClassicCanvasInner = React.forwardRef(({
         frame={f}
         ink={bodyInk}
         // Modo livre: números, citação e títulos dos blocos na tinta do título.
-        strongInk={slide.presentationFreeDesign ? titleInk : undefined}
+        strongInk={slide.presentationFreeDesign || slide.socialFreeDesign ? titleInk : undefined}
+        minFontPx={slide.socialFreeDesign ? 28 : 0}
+        minimumTextContrast={slide.socialFreeDesign ? 4.5 : 3}
         background={bg}
         fontFamily={bodyAfterFF}
         family={slide.presentationDesignFamily}
@@ -2219,7 +2221,7 @@ const SlideCardInner = React.forwardRef(({
   // (era hardcoded false; agora opt-in via preset visual Sports Editorial etc).
   const showCultureIdx = !!brand.showPageBadge;
   // Modo livre: o destaque é o do deck, gravado na página, não o da marca.
-  const brandAccent = (slide.presentationFreeDesign && slide.presentationPaletteOverrides?.accent) || brand.accent || '#000000';
+  const brandAccent = ((slide.presentationFreeDesign || slide.socialFreeDesign) && slide.presentationPaletteOverrides?.accent) || brand.accent || '#000000';
 
   // Página da família com fundo próprio (inverso, acento, superfície): o fundo
   // é pintado pela camada de chrome, não pela marca. A tinta do texto precisa
@@ -2238,7 +2240,7 @@ const SlideCardInner = React.forwardRef(({
   if (familyGround && !photoInk) cultureAccentCol = accentInkOnSurface(brandAccent, familyGround.bg, 4.5);
   let displayTitleInk = carouselTitleInk;
   let displayBodyInk = familyGround ? (slide.textColor || familyGround.muted || carouselBodyInk)
-    : (slide.presentationFreeDesign && slide.textColor) || carouselBodyInk;
+    : ((slide.presentationFreeDesign || slide.socialFreeDesign) && slide.textColor) || carouselBodyInk;
   if (culturePack || sandwichSkin) {
     displayTitleInk = readableInks.titleInk;
     displayBodyInk = readableInks.bodyInk;

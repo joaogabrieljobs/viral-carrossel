@@ -209,7 +209,7 @@ export function iconBadgeSize({ zoneWidthPx, columns, gapPx, unit, panelPadPx = 
   return { badge, glyph: Math.round(badge * 0.54) };
 }
 
-export default function PresentationBlocks({ blocks: raw, rect, frame, ink, strongInk, background, fontFamily, family = 'executive', accent, numericTypography, onChange, forExport = false, artDirectionVersion = 2, paletteOverrides = {}, anchor }) {
+export default function PresentationBlocks({ blocks: raw, rect, frame, ink, strongInk, background, fontFamily, family = 'executive', accent, numericTypography, onChange, forExport = false, artDirectionVersion = 2, paletteOverrides = {}, anchor, minFontPx = 0, minimumTextContrast = 3 }) {
   // Mede de novo quando as fontes terminam de carregar (a exportação espera
   // por elas; a primeira medida pode usar a fonte de reserva).
   const [, setFontsReady] = useState(0);
@@ -234,7 +234,11 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, stro
   if (!blocks.length || !rect) return null;
   const block = blocks[0];
   const unit = frame.w / (frame.h >= frame.w ? 1080 : 1920);
-  const fontSize = 26 * unit;
+  // O Livre social usa um piso próprio de leitura em 1080, sem mudar os
+  // tamanhos da apresentação ou dos carrosséis que já existem.
+  const readable = px => Math.max(px, Number(minFontPx) || 0) * unit;
+  const readableFit = px => Math.max(px, (Number(minFontPx) || 0) * unit);
+  const fontSize = readable(26);
   // Tratamento de evidência da família (fios, zebra, painel, numeração).
   const key = normalizeFamilyKey(family);
   // Reteste 22/11: números e fios dos blocos seguem o destaque da marca própria.
@@ -270,7 +274,7 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, stro
   // Blocos da fase 3: tinta forte (título do slide no modo livre) e destaque
   // medidos contra a superfície onde o bloco fica, como os outros blocos.
   const strong = evidenceDetailInk(strongInk || panelInk, detailSurface, 1).color;
-  const accentInk = accentInkOnSurface(st.accent, detailSurface, 3);
+  const accentInk = accentInkOnSurface(st.accent, detailSurface, minimumTextContrast);
   const displayFont = numericTypography?.fontFamily || familyFont(key, 'display').css || fontFamily;
   const displayWeight = numericTypography?.weight || familyFont(key, 'display').weight || 600;
   const zonePx = { w: (rect.w / 100) * frame.w, h: (rect.h / 100) * frame.h };
@@ -306,8 +310,8 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, stro
       // negação na tinta do texto, sem zebra nem fios; cabeçalho como rótulo.
       const traitInk = accentInkOnSurface(st.accent, detailSurface, 4.5);
       const pad = `${12 * unit}px ${18 * unit}px ${12 * unit}px 0`;
-      return <table aria-label="Comparação" data-vc-comparison-variant="pairs" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 28 * unit, color: panelInk, ...panelBox }}>
-        <thead><tr>{block.headers.map((value, col) => <th key={col} scope="col" style={{ textAlign: 'left', padding: `0 ${18 * unit}px ${14 * unit}px 0`, fontFamily, fontWeight: 600, fontSize: 24 * unit, letterSpacing: '0.12em', textTransform: 'uppercase', color: metricDetail.color }}>
+      return <table aria-label="Comparação" data-vc-comparison-variant="pairs" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: readable(28), color: panelInk, ...panelBox }}>
+        <thead><tr>{block.headers.map((value, col) => <th key={col} scope="col" style={{ textAlign: 'left', padding: `0 ${18 * unit}px ${14 * unit}px 0`, fontFamily, fontWeight: 600, fontSize: readable(24), letterSpacing: '0.12em', textTransform: 'uppercase', color: metricDetail.color }}>
           {cell(value, ['headers', col], `cabeçalho ${col + 1}`)}
         </th>)}</tr></thead>
         <tbody>{block.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((value, col) => <td key={col} style={{ verticalAlign: 'top', padding: pad, fontWeight: col === 0 ? 500 : 400, color: col === 0 ? traitInk : panelInk }}>
@@ -318,12 +322,12 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, stro
       ...(panel ? { backgroundColor: st.panelColor, borderRadius: st.radius * unit, overflow: 'hidden', boxShadow: st.offsetShadow ? `${10 * unit}px ${10 * unit}px 0 ${st.offsetShadow}` : 'none' } : {}) }}>
       <thead><tr>{block.headers.map((value, col) => <th key={col} scope="col" style={{ textAlign: 'left', verticalAlign: 'bottom', padding: `${14 * unit}px ${18 * unit}px`, borderBottom: `${Math.max(1, st.headerRule * unit)}px solid ${panelInk}`,
         fontFamily: headerFont.css, fontWeight: st.headerRole === 'display' ? headerFont.weight : 600, fontSynthesisWeight: 'none',
-        fontSize: (st.headerRole === 'label' ? 19 : st.headerRole === 'display' ? 30 : 23) * unit,
+        fontSize: readable(st.headerRole === 'label' ? 19 : st.headerRole === 'display' ? 30 : 23),
         textTransform: st.headerCase === 'upper' ? 'uppercase' : 'none', letterSpacing: `${st.headerTracking}em` }}>
         {cell(value, ['headers', col], `cabeçalho ${col + 1}`)}
       </th>)}</tr></thead>
       <tbody>{block.rows.map((row, rowIndex) => <tr key={rowIndex} style={{ backgroundColor: rowIndex % 2 === 0 ? st.zebra : 'transparent' }}>{row.map((value, col) => <td key={col} style={{ verticalAlign: 'top', padding: `${14 * unit}px ${18 * unit}px`, borderBottom: `${Math.max(1, unit)}px solid ${panel ? 'rgba(0,0,0,0.12)' : 'rgba(127,127,127,0.3)'}`, fontWeight: col === 0 ? 600 : 400,
-        ...(col === 0 && key === 'technical' ? { fontFamily: numberFont, fontSize: 23 * unit } : {}) }}>
+        ...(col === 0 && key === 'technical' ? { fontFamily: numberFont, fontSize: readable(23) } : {}) }}>
         {cell(value, ['rows', rowIndex, col], `linha ${rowIndex + 1}, coluna ${col + 1}`)}
       </td>)}</tr>)}</tbody>
     </table> : block.type === 'metrics' ? <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(block.items.length, frame.h > frame.w ? 2 : 4)}, minmax(0, 1fr))`, gap: 28 * unit }}>
@@ -331,32 +335,32 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, stro
         {(() => {
           const weight = numericTypography?.weight || familyFont(key, 'numeric').weight || 600;
           const fit = metricRowFit({ values: block.items.map(entry => entry.value), columnPx: metricColumnPx(block.items.length), unit, fontFamily: numberFont, weight })[index];
-          return cell(item.value, ['items', index, 'value'], `valor ${index + 1}`, { display: 'block', whiteSpace: fit.wrap ? 'normal' : 'nowrap', overflowWrap: 'normal', fontFamily: numberFont, fontSize: fit.fontSize, letterSpacing: '-0.02em', lineHeight: fit.wrap ? 1.1 : 1.18, fontWeight: weight, fontSynthesisWeight: 'none',
+          return cell(item.value, ['items', index, 'value'], `valor ${index + 1}`, { display: 'block', whiteSpace: fit.wrap ? 'normal' : 'nowrap', overflowWrap: 'normal', fontFamily: numberFont, fontSize: readableFit(fit.fontSize), letterSpacing: '-0.02em', lineHeight: fit.wrap ? 1.1 : 1.18, fontWeight: weight, fontSynthesisWeight: 'none',
             // QA livre-f2: sobre a superfície o número saía no cinza do apoio.
             // No modo livre ele usa a tinta do título, medida contra o quadro.
             ...(strongInk ? { color: strong } : {}) });
         })()}
-        {cell(item.label, ['items', index, 'label'], `indicador ${index + 1}`, { display: 'block', fontSize: 26 * unit, marginTop: 18 * unit, fontWeight: 600 })}
-        {item.detail && cell(item.detail, ['items', index, 'detail'], `condição ${index + 1}`, { display: 'block', fontSize: st.detailPx * unit, marginTop: 8 * unit, color: metricDetail.color, opacity: metricDetail.opacity })}
+        {cell(item.label, ['items', index, 'label'], `indicador ${index + 1}`, { display: 'block', fontSize: readable(26), marginTop: 18 * unit, fontWeight: 600 })}
+        {item.detail && cell(item.detail, ['items', index, 'detail'], `condição ${index + 1}`, { display: 'block', fontSize: readable(st.detailPx), marginTop: 8 * unit, color: metricDetail.color, opacity: metricDetail.opacity })}
       </div>)}
     </div> : block.type === 'quote' ? (() => {
       const fit = quoteTextFit({ text: block.text, author: block.author, widthPx: inner.w - 8 * unit, heightPx: inner.h, unit, fontFamily: displayFont, weight: displayWeight });
       return <figure style={{ margin: 0, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: justify, color: strong, ...panelBox }}>
         <span aria-hidden style={{ display: 'block', fontFamily: displayFont, fontWeight: displayWeight, fontSize: 96 * unit, lineHeight: 0.62, height: 96 * unit * 0.62, color: accentInk }}>“</span>
         <blockquote style={{ margin: 0 }}>
-          {cell(block.text, ['text'], 'citação', { display: 'block', fontFamily: displayFont, fontWeight: displayWeight, fontSynthesisWeight: 'none', fontSize: fit.fontSize, lineHeight: 1.18, letterSpacing: '-0.01em', color: strong }, { 'data-vc-quote-text': 'true' })}
+          {cell(block.text, ['text'], 'citação', { display: 'block', fontFamily: displayFont, fontWeight: displayWeight, fontSynthesisWeight: 'none', fontSize: readableFit(fit.fontSize), lineHeight: 1.18, letterSpacing: '-0.01em', color: strong }, { 'data-vc-quote-text': 'true' })}
         </blockquote>
-        {block.author && <figcaption style={{ display: 'flex', gap: 10 * unit, marginTop: 22 * unit, fontSize: 26 * unit, fontWeight: 600, color: metricDetail.color }}>
+        {block.author && <figcaption style={{ display: 'flex', gap: 10 * unit, marginTop: 22 * unit, fontSize: readable(26), fontWeight: 600, color: metricDetail.color }}>
           <span aria-hidden>—</span>
-          {cell(block.author, ['author'], 'autoria', { display: 'block', fontSize: 26 * unit, fontWeight: 600, color: metricDetail.color, opacity: metricDetail.opacity }, { 'data-vc-quote-author': 'true' })}
+          {cell(block.author, ['author'], 'autoria', { display: 'block', fontSize: readable(26), fontWeight: 600, color: metricDetail.color, opacity: metricDetail.opacity }, { 'data-vc-quote-author': 'true' })}
         </figcaption>}
       </figure>;
     })() : block.type === 'bignumber' ? (() => {
       const size = bigNumberFit({ value: block.value, widthPx: inner.w, heightPx: inner.h, unit, fontFamily: displayFont, weight: displayWeight });
       return <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: justify, color: strong, ...panelBox }}>
-        {cell(block.value, ['value'], 'número', { display: 'block', whiteSpace: 'nowrap', overflowWrap: 'normal', fontFamily: displayFont, fontWeight: displayWeight, fontSynthesisWeight: 'none', fontSize: size, lineHeight: 1.02, letterSpacing: '-0.03em', color: accentInk }, { 'data-vc-bignumber-value': 'true' })}
+        {cell(block.value, ['value'], 'número', { display: 'block', whiteSpace: 'nowrap', overflowWrap: 'normal', fontFamily: displayFont, fontWeight: displayWeight, fontSynthesisWeight: 'none', fontSize: readableFit(size), lineHeight: 1.02, letterSpacing: '-0.03em', color: accentInk }, { 'data-vc-bignumber-value': 'true' })}
         {cell(block.label, ['label'], 'rótulo do número', { display: 'block', marginTop: 18 * unit, fontSize: 36 * unit, lineHeight: 1.2, fontWeight: 600, color: strong }, { 'data-vc-bignumber-label': 'true' })}
-        {block.detail && cell(block.detail, ['detail'], 'apoio do número', { display: 'block', marginTop: 10 * unit, fontSize: Math.max(26, st.detailPx) * unit, lineHeight: 1.35, color: metricDetail.color, opacity: metricDetail.opacity }, { 'data-vc-bignumber-detail': 'true' })}
+        {block.detail && cell(block.detail, ['detail'], 'apoio do número', { display: 'block', marginTop: 10 * unit, fontSize: readable(Math.max(26, st.detailPx)), lineHeight: 1.35, color: metricDetail.color, opacity: metricDetail.opacity }, { 'data-vc-bignumber-detail': 'true' })}
       </div>;
     })() : block.type === 'icons' ? <ul style={{ margin: 0, padding: 0, listStyle: 'none', height: '100%', alignContent: anchor === 'start' ? 'start' : 'center', display: 'grid',
       gridTemplateColumns: `repeat(${iconColumns}, minmax(0, 1fr))`, gap: iconGap }}>
@@ -380,11 +384,11 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, stro
       })}
     </ul> : <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gridTemplateColumns: `repeat(${stepColumns}, minmax(0, 1fr))`, gap: 24 * unit }}>
       {block.items.map((item, index) => <li key={index} style={{ minWidth: 0, borderTop: st.metricRule ? `${Math.max(1, (st.metricRule > 4 ? 6 : 2) * unit)}px solid ${ruleColor}` : 'none', padding: panel ? `${22 * unit}px` : `${16 * unit}px 0 0`, borderRadius: st.radius * unit, backgroundColor: panel ? st.panelColor : 'transparent', color: panelInk }}>
-        {!/^[A-Z][.)]?$/.test(item.title) && <span aria-hidden style={{ display: st.stepMarker === 'pill' ? 'inline-block' : 'block', fontFamily: numberFont, fontSize: (st.stepMarker === 'pill' ? 20 : 40) * unit, lineHeight: 1, marginBottom: 14 * unit, color: st.accent,
+        {!/^[A-Z][.)]?$/.test(item.title) && <span aria-hidden style={{ display: st.stepMarker === 'pill' ? 'inline-block' : 'block', fontFamily: numberFont, fontSize: readable(st.stepMarker === 'pill' ? 20 : 40), lineHeight: 1, marginBottom: 14 * unit, color: minimumTextContrast > 3 ? accentInk : st.accent,
           fontStyle: st.stepMarker === 'roman' ? 'italic' : 'normal',
           ...(st.stepMarker === 'pill' ? { backgroundColor: st.accent, color: st.pillInk, borderRadius: 40 * unit, padding: `${8 * unit}px ${16 * unit}px` } : {}) }}>{marker(index)}</span>}
         {cell(item.title, ['items', index, 'title'], `etapa ${index + 1}`, { display: 'block', fontWeight: 600, fontSize: 28 * unit, lineHeight: 1.2 })}
-        {item.body && cell(item.body, ['items', index, 'body'], `explicação da etapa ${index + 1}`, { display: 'block', fontSize: Math.max(26, st.detailPx) * unit, marginTop: 8 * unit, color: stepBody.color, opacity: stepBody.opacity })}
+        {item.body && cell(item.body, ['items', index, 'body'], `explicação da etapa ${index + 1}`, { display: 'block', fontSize: readable(Math.max(26, st.detailPx)), marginTop: 8 * unit, color: stepBody.color, opacity: stepBody.opacity })}
       </li>)}
     </ol>}
   </div>;
