@@ -90,7 +90,7 @@ Falta uma linha de base da composição do carrossel. Ela precisa ser criada **a
 
 ## Implementação da Frente B — 26/11/2026
 
-Este adendo registra o código implementado depois do fechamento da Frente A, a partir de `cdd3a97`. As seções anteriores são a análise e as decisões originais; a implantação não amplia aquelas decisões para os estilos existentes. As 24 capturas-base de `head-5` foram inspecionadas individualmente; os gates finais da Frente B ainda estavam em andamento ao atualizar este registro.
+Este adendo registra o código implementado depois do fechamento da Frente A, a partir de `cdd3a97`. As seções anteriores são a análise e as decisões originais; a implantação não amplia aquelas decisões para os estilos existentes. A revisão inicial das 24 capturas-base de `head-5` faz parte do histórico. O fechamento dos gates e a procedência das capturas finais constam na seção final deste documento.
 
 ### Entrada explícita e identidade do projeto
 
@@ -146,6 +146,30 @@ A linha de base de composição protege os 21 estilos anteriores nos três forma
 
 A detecção do header sobre foto teve seis casos vermelhos antes da correção e 149 testes focais verdes depois. O upload em vista manual foi reproduzido nas três direções de formato, com três falhas e duas guardas já passando; após a correção, a regressão focal A+B passou em 171 testes de nove arquivos. Esses conjuntos se sobrepõem e não devem ser somados como uma suíte única.
 
-O E2E da Apoteose começa no assistente com uma conta vazia e recebe uma resposta de redação com plano, sem injetar um projeto composto. Confere geração, chamadas de imagem, persistência local e remota simulada, reabertura e geometria no DOM de exportação. As 24 capturas-base de `head-5` — oito de Feed, oito de Quadrado e oito de Stories — foram abertas em resolução nativa. A inspeção confirmou texto integral, tabela e lista completas, chapéus separados, arte visível, assinatura na capa e no fecho e rodapé dentro da faixa segura. As etapas adicionais de edição e os gates completos continuam necessários para fechar a Frente B.
+O E2E da Apoteose começa no assistente com uma conta vazia e recebe uma resposta de redação com plano, sem injetar um projeto composto. Confere geração, chamadas de imagem, persistência local e remota simulada, reabertura e geometria no DOM de exportação. As 24 capturas-base de `head-5` — oito de Feed, oito de Quadrado e oito de Stories — foram abertas em resolução nativa. A inspeção confirmou texto integral, tabela e lista completas, chapéus separados, arte visível, assinatura na capa e no fecho e rodapé dentro da faixa segura. As etapas adicionais de edição e os gates completos foram concluídos conforme o fechamento abaixo.
 
 APIs, armazenamento remoto e imagens geradas são simulados; isso prova a integração e os contratos enviados, não a qualidade artística de uma geração real da IA nem o serviço de produção. O retrato determinístico é repetido nos cards fotográficos e não foi composto para suas zonas; em Stories 1 e 3, o cabeçalho protegido atravessa partes do rosto. Essa limitação fica registrada na avaliação visual e impede tratar as capturas de teste como aprovação criativa da fotografia final.
+
+### Fechamento da validação — 26/11/2026
+
+O conjunto incorpora a main até `71403fc` pelo merge `ad83ad8`. A bateria geral e os gates unitários e estáticos foram executados em `8b9717a`. O ajuste posterior `64754bf` muda apenas o mock de conta de dois casos de interface V2; o código do aplicativo permanece idêntico. A documentação final não altera esse código.
+
+| Gate | Resultado |
+|---|---|
+| Vitest completo | 466 arquivos; 9.560 testes aprovados e 6 falhas esperadas; zero falhas inesperadas; 39,09 s |
+| `check:undef` / `check:props` | 281 arquivos e 171 componentes, sem erro |
+| Acessibilidade estática | Zero botões de ícone sem rótulo |
+| Build | Aprovado, com os avisos existentes de tamanho do bundle e imports dinâmicos |
+| Playwright geral | 367 aprovados, 24 ignorados, zero falhas, erros ou retries; 12,8 min |
+| Projetos V2: cinco arquivos obrigatórios mais os cenários A e B | 66 aprovados, zero ignorados, falhas, erros ou retries; 2,6 min |
+| Regressão suplementar B no legado após o ajuste do mock | 6 aprovados, zero falhas ou retries; 59,7 s |
+| Linha de base | 63 hashes aprovados; três fixtures de composição, imagem e texto idênticas aos bytes de `c188ac7` |
+| Conferência visual B | 31 PNGs finais nativos, sendo 24 bases e sete estados adicionais; três folhas conferidas individualmente |
+
+O primeiro gate V2 encontrou 64 aprovações e dois erros de preparação: os casos de seletor e Criar rápido não simulavam `/api/projects`, bloqueando corretamente o boot. O mock passou a fornecer uma conta vazia somente no V2 sem rota explícita. Não foram alterados timeout, seletores, asserções ou produto; a repetição integral aprovou os 66 casos. O legado foi conferido novamente nos seis cenários B.
+
+As capturas finais de Feed, Quadrado, seus extras e Remix provêm dos cenários aprovados de `head-6`. Stories e seus dois extras provêm de `stories-verde`, depois de corrigir uma expectativa do teste sobre a foto horizontal de Cinema: a área real de 1080 × 675 usa transporte 3:2. Os casos completos passaram depois, juntos, no gate geral e no V2. Os PNGs alterados foram reabertos; os idênticos foram vinculados por SHA-256 à inspeção anterior. As três folhas e os sete extras receberam também a conferência da integração.
+
+A saída do Livre para um estilo fixo preserva texto, blocos, ordem e mídia e remove as tintas automáticas herdadas do Livre, evitando texto branco sobre o creme de Revista. A edição em uma vista mantém o plano canônico e as demais vistas. O upload em uma composição manual revela a foto na zona disponível sem deslocar o texto; na captura desse caso, o recorte é estreito, como registrado na avaliação visual.
+
+O ambiente usou Chromium 137.0.7151.0 disponível no executor, pois o download do navegador solicitado pelo Playwright foi bloqueado pela rede. Dependências e configuração do repositório não foram trocadas para isso. Nenhuma IA paga foi acionada e não houve escrita no banco. O Teste 8 com IA real permanece com o João. Push na main depende de sua aprovação explícita; não há deploy manual.
