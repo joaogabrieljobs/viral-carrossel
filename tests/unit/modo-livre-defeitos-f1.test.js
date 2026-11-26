@@ -100,10 +100,12 @@ describe('fase 1 → 2: fio de acento em página de fundo de destaque, em todas 
 });
 
 describe('fase 1 → 2: faixas do Cinemático são escuras também com kit escuro', () => {
-  it('as faixas de letterbox usam a cor mais escura do deck', () => {
+  // Teste 6 (26/11), item 7: no modo livre a foto cheia ocupa o quadro
+  // inteiro e as faixas de letterbox saem. Se alguma voltar, é escura.
+  it('as faixas de letterbox saem da foto cheia; as que sobrarem usam a cor mais escura do deck', () => {
     const slides = kit();
     const faixas = slides.flatMap((s, i) => elementos(s, i).filter(e => !e.text && e.style.width === '1920px' && parseFloat(e.style.height) < 130 && e.key.startsWith('block')));
-    expect(faixas.length).toBeGreaterThan(0);
+    expect(faixas).toEqual([]);
     for (const f of faixas) expect(wcagContrast(f.style.background, '#FFFFFF'), f.style.background).toBeGreaterThan(wcagContrast(f.style.background, '#000000'));
   });
 });

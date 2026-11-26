@@ -788,13 +788,36 @@ const LARGE_CHROME_PX = 48;
  *   ou sai quando fica sobre a foto sem faixa;
  * - fio: nunca da cor do que está atrás (≥ 1,5:1).
  */
-export function freeChromeDevices(chrome, { family, ground, palette, photoZone = null }) {
+export function freeChromeDevices(chrome, { family, ground, palette, photoZone = null, deckColors = null }) {
   const color = token => (/^#/.test(String(token)) ? token : resolveChromeColor(family, ground, token, palette));
   const page = groundInks(family, ground, palette).bg;
   const darkest = [palette.inverse, palette.bg, palette.ink, palette.surface].filter(Boolean).sort((a, b) => lum(a) - lum(b))[0];
   const inks = [palette.ink, palette.inverseInk, palette.accent2, palette.muted];
-  const resolved = (Array.isArray(chrome) ? chrome : []).map(d => (
-    d.t === 'block' || d.t === 'circle' ? { ...d, color: isLetterbox(d) ? darkest : color(d.color) } : d));
+  // Teste 6, item 7: foto cheia no modo livre ocupa o quadro inteiro; as
+  // faixas de cinema (letterbox) do Cinemático saem.
+  const fullPhoto = !!photoZone && photoZone.x <= 0 && photoZone.y <= 0 && photoZone.w >= 100 && photoZone.h >= 100;
+  // Teste 6, item 4: moldura, bloco, círculo, fio e grade usam só as cores da
+  // paleta do deck. A cor de mistura da família (accent3, a moldura marrom do
+  // Cultural) vira a cor do deck mais próxima; se ela é a do fundo atrás, o
+  // adorno some.
+  const allowed = Array.isArray(deckColors) && deckColors.length ? [...new Set(deckColors.map(normalizeHex).filter(Boolean))] : null;
+  const inDeck = (c, avoid = null) => {
+    const hex = normalizeHex(c);
+    if (!allowed || !hex) return c;
+    if (allowed.includes(hex)) return hex === avoid ? null : hex;
+    const pick = nearestPaletteHex(hex, allowed);
+    return pick === avoid ? null : pick;
+  };
+  const resolved = (Array.isArray(chrome) ? chrome : []).flatMap((d) => {
+    if (isLetterbox(d) && fullPhoto) return [];
+    if (d.t === 'block' || d.t === 'circle' || d.t === 'frame') {
+      if (isLetterbox(d)) return [{ ...d, color: darkest }];
+      const c = inDeck(color(d.color), d.z === 'over' && inside(photoZone, d.x + 0.1, d.y + 0.1) ? null : page);
+      return c ? [{ ...d, color: c }] : [];
+    }
+    if (d.t === 'grid') { const c = inDeck(color(d.color), page); return c ? [{ ...d, color: c }] : []; }
+    return [d];
+  });
   const behind = (x, y, self) => {
     const block = [...resolved].reverse().find(d => d !== self && (d.t === 'block' || (d.t === 'circle' && covers({ x: d.x, y: d.y, w: d.d, h: d.d * 16 / 9 }, x, y))) && (d.t !== 'block' || covers(d, x, y)));
     if (block) return block.color;
@@ -805,6 +828,12 @@ export function freeChromeDevices(chrome, { family, ground, palette, photoZone =
     if (d.t === 'rule') {
       const bgColor = behind(d.x + 0.1, d.y, d) || page;
       const c = color(d.color);
+      if (allowed) {
+        // Fio na cor do deck mais próxima que ainda se vê (≥ 1,5:1); sem nenhuma, sai.
+        const seen = allowed.filter(hex => wcagContrast(hex, bgColor) >= 1.5);
+        if (seen.length) out.push({ ...d, color: nearestPaletteHex(normalizeHex(c) || seen[0], seen) });
+        continue;
+      }
       out.push({ ...d, color: wcagContrast(c, bgColor) >= 1.5 ? c : readable(bgColor, inks) });
     } else if (d.t === 'pill') {
       const pillBg = color(d.color);
@@ -950,6 +979,59 @@ function compactReading({ zones, chrome, slide, titleSize, subSize, display, tex
 }
 
 /**
+ * Teste 6 (26/11), item 3: na foto cheia com o texto num lado (Cinemático,
+ * slide 9) a caixa do apoio era a da família (13% da altura) e o ajuste
+ * automático encolhia apoio e corpo para ~14 px. Aqui vale o piso das outras
+ * páginas: o título encolhe para as linhas que ocupa, o apoio começa logo
+ * abaixo, na largura do título, e vai até 90% da altura; o corpo parte de
+ * 26 px (piso de 25 px no passo de 2) e cresce até 32 px enquanto couber.
+ * Se não couber, o bloco de texto sobe (até 10% do topo). Nunca diminui.
+ */
+export const FREE_PHOTO_SUPPORT_MIN_PX = 26;
+const PHOTO_TEXT_TOP = 10;
+const PHOTO_TEXT_BOTTOM = 90;
+function photoReading({ zones, chrome, slide, titleSize, subSize, display, text, kind, leading, titleLeading }) {
+  const t = zones.title;
+  const sub = zones.subtitle;
+  if (!t || !sub || !['cover', 'content', 'demo', 'closing'].includes(kind)) return null;
+  if (Math.min(t.x + t.w, sub.x + sub.w) - Math.max(t.x, sub.x) <= Math.min(t.w, sub.w) * 0.4) return null;
+  const copy = String(slide.subtitle || '').replace(/\*\*/g, '').trim();
+  const tail = String(slide.bodyAfterImage || '').replace(/\*\*/g, '').trim();
+  if (!copy && !tail) return null;
+  const titlePx = titlePxOf(titleSize);
+  const lines = freeTextLines(String(slide.title || ''), 1920 * t.w / 100 - 24, titlePx, display.family, 'display',
+    { trackingEm: (display.tracking || 0) / 100, upper: display.case === 'upper' });
+  const breathing = Math.max(20, titlePx * 0.44 + 1080 * 0.012);
+  const titleH = Math.min(t.h, Math.round(((lines * titlePx * titleLeading + breathing) / 1080) * 10000) / 100 + 0.5);
+  const x = sub.x;
+  const w = Math.abs(sub.x - t.x) < 0.5 ? Math.max(sub.w, t.w) : sub.w;
+  const bottom = Math.max(PHOTO_TEXT_BOTTOM, sub.y + sub.h);
+  const widthPx = 1920 * w / 100 - 24;
+  const copyLines = (value, px) => (text?.family ? freeTextLines(value, widthPx, px, text.family, 'text') : estimateLines(value, widthPx, px, 0.55));
+  // Altura do apoio mais o corpo (0,85 do apoio, como no desenho), em %.
+  const supportH = px => ((copy ? copyLines(copy, px) * px * leading : 0)
+    + (tail ? (copy ? 0.8 * px : 0) + copyLines(tail, px * 0.85) * px * 0.85 * leading : 0) + 14) / 1080 * 100;
+  const fits = px => titleH + STACK_GAP + supportH(px) + 0.1 <= bottom - PHOTO_TEXT_TOP;
+  const startPx = Math.max(subPxOf(subSize), FREE_PHOTO_SUPPORT_MIN_PX);
+  let px = startPx;
+  for (let next = Math.ceil(startPx / 2) * 2; next <= SUPPORT_MAX_PX && fits(next); next += 2) px = Math.max(px, next);
+  // Folga de 0,1% para o arredondamento das caixas.
+  const needed = titleH + STACK_GAP + supportH(px) + 0.1;
+  // O título fica onde a família o pôs, a não ser que o texto não caiba abaixo.
+  const titleY = Math.floor(Math.max(PHOTO_TEXT_TOP, Math.min(t.y + t.h - titleH, bottom - needed)) * 100) / 100;
+  const titleZone = { ...t, y: titleY, h: titleH };
+  const top = Math.round((titleY + titleH + STACK_GAP) * 100) / 100;
+  const zone = { ...sub, x, w, y: top, h: Math.round((bottom - top) * 100) / 100 };
+  const delta = sub.y - top;
+  return {
+    zone,
+    titleZone,
+    subSize: px === subPxOf(subSize) ? subSize : rendererSubtitleSizePercent(px),
+    chrome: chrome.map(d => (d.follow === 'subtitle' ? { ...d, y: Math.round((d.y - delta) * 100) / 100 } : d)),
+  };
+}
+
+/**
  * Cartão atrás do apoio (Modular) com texto curto (conferência da fase 2, kit,
  * página 7): o cartão da família ocupa até o pé da coluna e o texto curto
  * deixava a metade de baixo vazia. O corpo cresce até 32 px enquanto couber;
@@ -1062,12 +1144,22 @@ function panelReading({ zones, chrome, slide, titleSize, subSize, display, text,
  * sem o "§". Presets comuns não passam por aqui.
  */
 const NARRATIVE_CHROME = /CENA|TAB\.|FIG\.|NOTA|FIM\b|§/;
+// Teste 6 (26/11), item 4: o "05" em pílula do Modular. No modo livre a
+// numeração como adorno (página, seção, total) sai; o fólio do deck fica.
+const NUMERAL_ORNAMENT = /^[\s§·|/\-–—.:#]*(?:\{(?:index|section|total)\}[\s§·|/\-–—.:#]*)+$/;
 export function freeNeutralChrome(chrome) {
-  return (Array.isArray(chrome) ? chrome : []).flatMap((d) => {
+  const list = Array.isArray(chrome) ? chrome : [];
+  const numerals = list.filter(d => (d.t === 'text' || d.t === 'pill') && NUMERAL_ORNAMENT.test(String(d.text || '')));
+  // Cartão pequeno que só segurava o número sai junto (sem cartão vazio).
+  const host = d => d.t === 'block' && d.w * d.h <= 300 && numerals.some(n => {
+    const x = n.x + (n.w || 0) / 2; const y = n.y + 1;
+    return x >= d.x && x <= d.x + d.w && y >= d.y && y <= d.y + d.h;
+  });
+  return list.flatMap((d) => {
+    if (numerals.includes(d) || host(d)) return [];
     if (d.t !== 'text' && d.t !== 'pill') return [d];
     const value = String(d.text || '');
     if (d.t === 'pill' && /\{index\}/.test(value)) return [];
-    if (/^§\{section\}$/.test(value)) return [{ ...d, text: '{section}' }];
     return NARRATIVE_CHROME.test(value) ? [] : [d];
   });
 }
@@ -1422,19 +1514,6 @@ export function freePresentationCompositionOverrides(base, {
   let titleInk = readable(surfaceTitle, [inks.ink, palette.ink, palette.inverseInk]);
   const textInk = readable(surfaceText, [inks.ink, palette.ink, palette.inverseInk]);
   let mutedInk = readable(surfaceText, [inks.muted, palette.muted, palette.inverseMuted, textInk]);
-  // Texto sobre a foto num lado: proteção lateral na cor escura do deck (a da
-  // direção visual que mais contrasta com a tinta), com 4,5:1 garantido sobre
-  // o pior pixel da foto. A superfície de pior caso vale para as conferências.
-  let scrim = null;
-  if (onPhoto) {
-    const vd = resolveSlideVisualDirection({ slide: { ...slide, presentationPresetId: FREE_PRESENTATION_PRESET_ID, presentationDeckDesign: deck } });
-    scrim = sideScrim({ zones: zonesNow, inks: [titleInk, textInk], colours: [reservedAreaColour(vd, titleInk), palette.inverse, palette.bg] });
-    if (scrim) {
-      surfaceTitle = scrim.surface;
-      surfaceText = scrim.surface;
-      mutedInk = inkOver(scrim.surface, mutedInk, textInk);
-    }
-  }
   // Arte de fundo: proteção na cor base com 4,5:1 sobre o pior pixel do lado liso.
   const artProtection = art ? artScrim(palette.bg, [titleInk, textInk, mutedInk]) : null;
   if (artProtection) {
@@ -1462,11 +1541,28 @@ export function freePresentationCompositionOverrides(base, {
   // Cartão atrás do texto (Modular): o texto fica no cartão, que abraça o texto.
   const readingInput = { zones, chrome: familyChrome, slide: layoutSlide, titleSize, subSize: composed.subSize, display, text, kind,
     leading: (composed.subLeading || 150) / 100, titleLeading: familySpec(family).type.titleLeading || 1.05 };
-  const reading = onPhoto ? null
+  // Teste 6, item 3: foto cheia com texto num lado ganha o mesmo piso de
+  // leitura das outras páginas (photoReading).
+  const reading = onPhoto ? photoReading(readingInput)
     : hasBlocks(layoutSlide) ? blockReading(readingInput)
       : hasTextPanel(layout) ? panelReading(readingInput)
         : kind === 'closing' ? closingReading(readingInput) : compactReading(readingInput);
   const subSize = reading?.subSize ?? composed.subSize;
+  // Texto sobre a foto num lado: proteção lateral na cor escura do deck (a da
+  // direção visual que mais contrasta com a tinta), com 4,5:1 garantido sobre
+  // o pior pixel da foto. A superfície de pior caso vale para as conferências.
+  // Calculada depois da leitura, com as caixas finais do texto.
+  let scrim = null;
+  if (onPhoto) {
+    const vd = resolveSlideVisualDirection({ slide: { ...slide, presentationPresetId: FREE_PRESENTATION_PRESET_ID, presentationDeckDesign: deck } });
+    const readZones = reading ? { ...zonesNow, title: reading.titleZone, subtitle: reading.zone } : zonesNow;
+    scrim = sideScrim({ zones: readZones, inks: [titleInk, textInk], colours: [reservedAreaColour(vd, titleInk), palette.inverse, palette.bg] });
+    if (scrim) {
+      surfaceTitle = scrim.surface;
+      surfaceText = scrim.surface;
+      mutedInk = inkOver(scrim.surface, mutedInk, textInk);
+    }
+  }
   // Título que entrou no cartão (Modular ao lado da foto) lê contra o cartão.
   if (reading?.titlePanel) {
     surfaceTitle = resolveChromeColor(family, chromeGround, reading.titlePanel.color, palette);
@@ -1474,9 +1570,10 @@ export function freePresentationCompositionOverrides(base, {
   }
   // Sobre a arte, o adorno lê contra a superfície de pior caso do lado liso;
   // texto de adorno sobre o grafismo (borda direita) sai.
+  const deckColors = Object.values(deck.palette);
   const devices = freeChromeDevices(reading ? reading.chrome : familyChrome, art
-    ? { family, ground: chromeGround, palette: { ...palette, bg: artProtection.surface }, photoZone: { x: FREE_ART_TEXT_MAX, y: 0, w: 100 - FREE_ART_TEXT_MAX, h: 100 } }
-    : { family, ground: chromeGround, palette, photoZone });
+    ? { family, ground: chromeGround, palette: { ...palette, bg: artProtection.surface }, photoZone: { x: FREE_ART_TEXT_MAX, y: 0, w: 100 - FREE_ART_TEXT_MAX, h: 100 }, deckColors }
+    : { family, ground: chromeGround, palette, photoZone, deckColors });
   // Rótulo acima do título (eyebrow, parte 5): no modo livre toda página tem
   // lugar para ele, logo acima da primeira linha do título, na cor de destaque
   // que lê sobre o que fica atrás (4,5:1); sem rótulo no slide, nada aparece.
