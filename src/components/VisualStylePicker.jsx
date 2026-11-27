@@ -7,40 +7,41 @@ import React from 'react';
 import { Check } from 'lucide-react';
 import { renderPresetPreview } from '../styles/visual-presets.jsx';
 import { renderPresentationPresetPreview } from '../styles/presentation-presets.jsx';
+import BrandLogo from './BrandLogo.jsx';
 
 /**
- * Miniatura do modo livre ("Livre: o Moont decide"): três mini-páginas com
- * composições diferentes (foto ao lado em fundo claro, título grande em fundo
- * escuro, foto inteira com fundo de destaque), na paleta padrão do deck.
- * Só CSS: nenhuma imagem nova.
+ * Miniatura do modo livre ("Livre: o Moont decide"), igual na apresentação e
+ * no carrossel: o símbolo do Moont (BrandLogo, as três molduras em sequência)
+ * sobre a noite da marca, com o brilho Orbit e uma órbita fina — quem decide
+ * a composição de cada página é o Moont. Só SVG e CSS: nenhuma imagem nova.
  */
-const FREE_MINI = [
-  { id: 'claro-foto', bg: '#F5F2EC', ink: '#15171C', photo: { left: '56%', top: '12%', width: '36%', height: '76%' }, title: { left: '9%', top: '26%', width: '38%' } },
-  { id: 'escuro-titulo', bg: '#15171C', ink: '#F5F2EC', photo: null, title: { left: '10%', top: '22%', width: '74%' }, big: true },
-  { id: 'destaque-foto', bg: '#C2410C', ink: '#F5F2EC', photo: { left: '0%', top: '0%', width: '46%', height: '100%' }, title: { left: '54%', top: '34%', width: '36%' } },
-];
-const MINI_PHOTO = 'linear-gradient(160deg, #D9A36A 0%, #9C5B3B 55%, #3E2A24 100%)';
+const FREE_PREVIEW_SWATCHES = ['#F3F0E7', '#5B53E8', '#D7FF5A'];
+const FREE_PREVIEW_LABEL = 'Símbolo do Moont: o Moont decide a composição de cada página';
 
 function FreePresetPreview() {
   return (
-    <div data-vc-free-preview="" aria-hidden style={{
-      width: '100%', height: '100%', background: '#E7E1D6', position: 'relative', overflow: 'hidden',
+    <div data-vc-free-preview="" role="img" aria-label={FREE_PREVIEW_LABEL} style={{
+      width: '100%', height: '100%', position: 'relative', overflow: 'hidden',
+      background: 'radial-gradient(120% 95% at 50% 40%, #2B2785 0%, #16143F 46%, #090A0F 100%)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '7%',
     }}>
-      {FREE_MINI.map((mini, i) => (
-        <div key={mini.id} data-vc-free-mini={mini.id} style={{
-          position: 'absolute', width: '58%', aspectRatio: '16 / 9',
-          left: `${4 + i * 19}%`, top: `${6 + i * 22}%`,
-          background: mini.bg, borderRadius: 3, overflow: 'hidden',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
-        }}>
-          {mini.photo ? <div style={{ position: 'absolute', ...mini.photo, background: MINI_PHOTO }} /> : null}
-          <div style={{ position: 'absolute', ...mini.title, display: 'flex', flexDirection: 'column', gap: mini.big ? 4 : 3 }}>
-            <span style={{ display: 'block', height: mini.big ? 7 : 4, width: '100%', background: mini.ink, borderRadius: 1 }} />
-            <span style={{ display: 'block', height: mini.big ? 7 : 4, width: '72%', background: mini.ink, borderRadius: 1 }} />
-            <span style={{ display: 'block', height: 2, width: '56%', marginTop: 3, background: mini.ink, opacity: 0.55, borderRadius: 1 }} />
-          </div>
-        </div>
-      ))}
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 100 100" preserveAspectRatio="none"
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+        <ellipse cx="50" cy="44" rx="40" ry="26" fill="none" stroke="#5B53E8" strokeOpacity="0.55" strokeWidth="0.6" vectorEffect="non-scaling-stroke" />
+      </svg>
+      {/* Ponto Aurora sobre a órbita; fora do SVG esticado para continuar redondo. */}
+      <span aria-hidden="true" style={{
+        position: 'absolute', left: '87.6%', top: '35.1%', width: 6, height: 6, borderRadius: 9999,
+        background: '#D7FF5A', transform: 'translate(-50%, -50%)',
+      }} />
+      <BrandLogo variant="mark" alt="" data-vc-free-mark=""
+        style={{ position: 'relative', height: '42%', width: 'auto', aspectRatio: '1 / 1', color: '#F3F0E7' }} />
+      <span data-vc-free-caption="" style={{
+        position: 'relative', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600,
+        letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(243, 240, 231, 0.82)', whiteSpace: 'nowrap',
+      }}>
+        o Moont decide
+      </span>
     </div>
   );
 }
@@ -121,7 +122,8 @@ export default function VisualStylePicker({
           }
           const isActive = selected?.id === p.id;
           const isSuggested = !isActive && suggestedId === p.id;
-          const swatches = paletteSwatches(p);
+          // Livre: a paleta é decidida na geração; o cartão mostra as cores do Moont.
+          const swatches = p.isFree ? FREE_PREVIEW_SWATCHES : paletteSwatches(p);
           const previewAspect = aspectRatio || (p.productKind === 'apresentacao' ? '16 / 9' : '4 / 5');
           const isPresentationPreview = p.productKind === 'apresentacao' || previewAspect === '16 / 9';
 

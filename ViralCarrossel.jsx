@@ -287,6 +287,7 @@ import {
 } from './src/utils/free-plan.js';
 import { useLibrary } from './src/hooks/useLibrary.js';
 import { applyTemplateToDoc } from './src/utils/published-template.js';
+import { applyCustomVisualPresetTemplate, captureCustomPresetTemplate } from './src/utils/custom-preset-template.js';
 import { recordTemplateUse } from './src/lib/templates-client.js';
 import { useToasts } from './src/hooks/useToasts.js';
 import { useAiSettings } from './src/hooks/useAiSettings.js';
@@ -1486,6 +1487,13 @@ export default function App() {
     history.set((d) => {
       if (scope === 'card') return applyVisualPresetToCard(d, index, preset, visualPresets);
       totalCards = Array.isArray(d.slides) ? d.slides.length : 0;
+      // Padrão salvo com o modelo do projeto: mesmo caminho do "Usar modelo"
+      // da galeria (capa, conteúdo e fechamento). Padrão antigo segue abaixo.
+      const viaTemplate = preset.isCustom ? applyCustomVisualPresetTemplate(d, preset) : null;
+      if (viaTemplate) {
+        replacedOwnVisuals = countSlidesWithOwnVisuals(d.slides);
+        return viaTemplate;
+      }
       if (!freeSocial) {
         replacedOwnVisuals = countSlidesWithOwnVisuals(d.slides);
         d = clearOwnVisualsBeforePresetOnAll(d, preset);
@@ -3003,12 +3011,14 @@ export default function App() {
       slide: slides[activeIdx] || slides[0] || {},
       creativePreset,
       productKind: activeProductKind,
+      // Mesma captura do "Publicar como modelo": o projeto inteiro, sem conteúdo.
+      template: captureCustomPresetTemplate(doc),
     });
     setCustomVisualPresets((current) => [...current, preset]);
     setVisualPreset(preset.id);
     toast(`Padrão “${preset.label}” salvo na biblioteca visual.`, 'success', 5200);
     trackEvent('custom_visual_preset_saved', { preset: preset.id });
-  }, [activeIdx, activeProductKind, brand, creativePreset, setVisualPreset, slides, toast]);
+  }, [activeIdx, activeProductKind, brand, creativePreset, doc, setVisualPreset, slides, toast]);
   /**
    * Quadro do desktop: os cards quebram em várias linhas. Clicar na miniatura
    * só mudava o contorno — o card correspondente continuava fora da janela.

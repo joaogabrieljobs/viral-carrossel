@@ -1,5 +1,16 @@
 export const CUSTOM_VISUAL_PRESETS_KEY = 'vc_custom_visual_presets_v1';
 export const MAX_CUSTOM_VISUAL_PRESETS = 24;
+/**
+ * Modelo do projeto inteiro guardado no padrão (custom-preset-template.js).
+ * Os metadados da conta têm 512 KB para tudo; a soma dos modelos fica abaixo
+ * deste teto. Passando dele, os padrões mais antigos ficam sem modelo e
+ * voltam ao caminho antigo (um card só); os mais recentes ficam completos.
+ */
+export const CUSTOM_PRESET_TEMPLATES_MAX_BYTES = 192 * 1024;
+const CUSTOM_PRESET_TEMPLATE_MAX_BYTES = 48 * 1024;
+// Mesma lista de published-template.js (TEMPLATE_FORMATS). Repetida para não
+// criar import circular: aquele módulo importa este.
+const CUSTOM_PRESET_TEMPLATE_FORMATS = ['carrossel', 'quadrado', 'stories', 'apresentacao'];
 
 const BRAND_FIELDS = [
   'bg', 'bgAlternate', 'interleaveBg',
@@ -39,7 +50,9 @@ const SLIDE_FIELDS = [
 const CUSTOM_CANVAS_FIELDS = [
   'enabled', 'applied', 'variant', 'preserveZones', 'source',
 ];
-const CUSTOM_CANVAS_ZONE_KEYS = ['photo', 'title', 'subtitle', 'top', 'bottom'];
+// `evidence` é a caixa do bloco nativo (tabela, métricas, etapas) na
+// apresentação. Sem ela, o modelo aplicado deixava o bloco sem lugar.
+const CUSTOM_CANVAS_ZONE_KEYS = ['photo', 'title', 'subtitle', 'top', 'bottom', 'evidence'];
 
 const PRESENTATION_TYPOGRAPHY_PROFILES = [
   'cover', 'content', 'divider', 'data', 'demo', 'closing',
@@ -218,10 +231,45 @@ export function slideDefaultsForAllCards(defaults) {
   return shared;
 }
 
+function templateBytes(template) {
+  try { return new TextEncoder().encode(JSON.stringify(template)).length; } catch { return Infinity; }
+}
+
+/**
+ * Validação de forma do modelo guardado. A limpeza completa (lista permitida)
+ * acontece ao capturar e de novo ao aplicar, em published-template.js.
+ */
+function normalizePresetTemplate(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  if (value.v !== 1 || !CUSTOM_PRESET_TEMPLATE_FORMATS.includes(value.format)) return undefined;
+  if (!Array.isArray(value.slides) || value.slides.length < 1 || value.slides.length > 10) return undefined;
+  if (!value.slides.every((slide) => slide && typeof slide === 'object' && !Array.isArray(slide))) return undefined;
+  const cloned = clonePlainValue(value);
+  if (!cloned || typeof cloned.brand !== 'object' || Array.isArray(cloned.brand)) cloned.brand = {};
+  if (cloned.pool !== undefined && !Array.isArray(cloned.pool)) return undefined;
+  return templateBytes(cloned) <= CUSTOM_PRESET_TEMPLATE_MAX_BYTES ? cloned : undefined;
+}
+
+/** Do mais recente para o mais antigo, mantém modelos até o teto total. */
+function capPresetTemplates(presets) {
+  let budget = CUSTOM_PRESET_TEMPLATES_MAX_BYTES;
+  let exhausted = false;
+  const out = presets.slice();
+  for (let i = out.length - 1; i >= 0; i -= 1) {
+    if (!out[i].template) continue;
+    const bytes = templateBytes(out[i].template);
+    if (!exhausted && bytes <= budget) { budget -= bytes; continue; }
+    exhausted = true;
+    const { template: _drop, ...rest } = out[i];
+    out[i] = rest;
+  }
+  return out;
+}
+
 export function normalizeCustomVisualPresets(value) {
   if (!Array.isArray(value)) return [];
   const ids = new Set();
-  return value
+  return capPresetTemplates(value
     .filter((item) => item && typeof item === 'object' && item.isCustom === true)
     .map((item) => ({
       id: String(item.id || '').slice(0, 80),
@@ -241,9 +289,14 @@ export function normalizeCustomVisualPresets(value) {
       // fingerprint a cada leitura de presets legados e mantinha o autosave
       // permanentemente sujo. Criações novas já recebem Date.now() uma vez.
       savedAt: Number.isFinite(Number(item.savedAt)) ? Number(item.savedAt) : 0,
+      ...(() => {
+        // Padrão antigo continua sem a chave: o fingerprint não muda.
+        const template = normalizePresetTemplate(item.template);
+        return template ? { template } : {};
+      })(),
     }))
     .filter((item) => item.id && !ids.has(item.id) && ids.add(item.id))
-    .slice(-MAX_CUSTOM_VISUAL_PRESETS);
+    .slice(-MAX_CUSTOM_VISUAL_PRESETS));
 }
 
 export function readCustomVisualPresets(storage = globalThis?.localStorage) {
@@ -264,7 +317,7 @@ export function writeCustomVisualPresets(presets, storage = globalThis?.localSto
   return true;
 }
 
-export function createCustomVisualPreset({ label, brand = {}, slide = {}, creativePreset, productKind } = {}) {
+export function createCustomVisualPreset({ label, brand = {}, slide = {}, creativePreset, productKind, template } = {}) {
   const now = Date.now();
   const rand = Math.random().toString(36).slice(2, 7);
   return {
@@ -286,5 +339,9 @@ export function createCustomVisualPreset({ label, brand = {}, slide = {}, creati
       ? '16:9'
       : '4:5',
     savedAt: now,
+    // Modelo do projeto inteiro, capturado como o "Publicar como modelo"
+    // captura (custom-preset-template.js). `slideDefaults` continua para o
+    // alcance "Este card" e para a geração.
+    ...(normalizePresetTemplate(template) ? { template: normalizePresetTemplate(template) } : {}),
   };
 }

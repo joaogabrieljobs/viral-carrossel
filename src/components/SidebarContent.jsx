@@ -235,13 +235,17 @@ function UnlockGroupedElementsNotice({ onUnlock, itemLabel = 'card' }) {
 }
 
 /** Entrada da galeria de modelos publicados (Visual e Ajustes rápidos). */
+const TEMPLATE_ENTRY_BUTTON = { width: '100%', minHeight: 44, height: 'auto', padding: '8px 16px', whiteSpace: 'normal', lineHeight: 1.25, overflowWrap: 'anywhere', textAlign: 'center' };
+
 function TemplateGalleryEntry({ onOpen }) {
   return (
     <div data-vc-template-gallery-entry style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--hairline)', display: 'grid', gap: 8 }}>
       <span className="vc-label-sm">Modelos da comunidade</span>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button type="button" className="vc-btn vc-btn-ghost" style={{ flex: 1, minHeight: 44 }} onClick={() => onOpen('gallery')}>Galeria de modelos</button>
-        <button type="button" className="vc-btn vc-btn-ghost" style={{ flex: 1, minHeight: 44 }} onClick={() => onOpen('publish')}>Publicar como modelo</button>
+      {/* Um botão por linha: lado a lado, no painel estreito e na gaveta do
+          celular, "Publicar como modelo" quebrava em três linhas e vazava. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 8 }}>
+        <button type="button" className="vc-btn vc-btn-ghost" style={TEMPLATE_ENTRY_BUTTON} onClick={() => onOpen('gallery')}>Galeria de modelos</button>
+        <button type="button" className="vc-btn vc-btn-ghost" style={TEMPLATE_ENTRY_BUTTON} onClick={() => onOpen('publish')}>Publicar como modelo</button>
       </div>
     </div>
   );

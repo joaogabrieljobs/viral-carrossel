@@ -343,7 +343,7 @@ function toColorInput(value) {
     const hex = (n) => Math.max(0, Math.min(255, Number(n))).toString(16).padStart(2, '0');
     return `#${hex(rgb[1])}${hex(rgb[2])}${hex(rgb[3])}`;
   }
-  return '#6B5344';
+  return '#111111';
 }
 
 function ruleSwatches(brand) {
@@ -355,23 +355,28 @@ function ruleSwatches(brand) {
   };
   push(brand?.accent);
   push(brand?.titleColor);
-  ['#1A1410', '#FFFFFF', '#F5F0E8', '#C4A574', '#6B5344'].forEach(push);
+  // Cores da marca primeiro; depois só neutros. Qualquer outra cor vem do seletor.
+  ['#111111', '#FFFFFF', '#8C8C8C', '#D6D6D6'].forEach(push);
   return list.slice(0, 7);
 }
+
+/** Fundo neutro das miniaturas; o escuro serve aos elementos claros (para foto). */
+const PREVIEW_LIGHT = '#D6D6D6';
+const PREVIEW_DARK = '#4A4A4A';
 
 function ElementPreview({ kind }) {
   const base = {
     height: 44,
     borderRadius: 8,
-    background: 'linear-gradient(135deg, #ebe6df 0%, #d4c4b0 55%, #c4a992 100%)',
+    background: PREVIEW_LIGHT,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
     position: 'relative',
   };
-  const pill = (style, label = 'CTA ›') => (
-    <div style={base}>
+  const pill = (style, label = 'CTA ›', dark = false) => (
+    <div style={{ ...base, background: dark ? PREVIEW_DARK : PREVIEW_LIGHT }}>
       <span style={{
         padding: '5px 10px', borderRadius: 9999, fontSize: 7, fontWeight: 600,
         letterSpacing: '0.06em', ...style,
@@ -380,31 +385,31 @@ function ElementPreview({ kind }) {
       </span>
     </div>
   );
-  if (kind === 'filled') return pill({ background: '#6B5344', color: '#fff', border: '1px solid rgba(255,255,255,0.7)' });
-  if (kind === 'outline') return pill({ background: 'transparent', color: '#5D4B42', border: '1px solid #5D4B42' });
+  if (kind === 'filled') return pill({ background: '#3A3A3A', color: '#fff', border: '1px solid rgba(255,255,255,0.7)' });
+  if (kind === 'outline') return pill({ background: 'transparent', color: '#1A1A1A', border: '1px solid #1A1A1A' });
   if (kind === 'glass') {
     return pill({
-      background: 'rgba(40,32,28,0.45)', color: '#F5F0E8',
-      border: '1px solid rgba(245,240,232,0.7)', backdropFilter: 'blur(4px)',
-    });
+      background: 'rgba(24,24,24,0.45)', color: '#FFFFFF',
+      border: '1px solid rgba(255,255,255,0.7)', backdropFilter: 'blur(4px)',
+    }, 'CTA ›', true);
   }
   if (kind === 'ink') return pill({ background: '#0A0A0A', color: '#fff', border: '1px solid rgba(255,255,255,0.3)' }, 'SAIBA ›');
-  if (kind === 'cream') return pill({ background: '#F5F0E8', color: '#2C2420', border: '1px solid rgba(44,36,32,0.2)' }, 'MÉTODO ›');
-  if (kind === 'gold') return pill({ background: '#4A3A32', color: '#F7F1E6', border: '1px solid #C4A574' });
-  if (kind === 'white') return pill({ background: 'rgba(255,255,255,0.94)', color: '#1A1410', border: '1px solid #fff' }, 'COMEÇAR ›');
-  if (kind === 'outline_light') return pill({ background: 'transparent', color: '#F5F0E8', border: '1px solid rgba(245,240,232,0.9)' });
+  if (kind === 'cream') return pill({ background: '#EDEDED', color: '#1A1A1A', border: '1px solid rgba(0,0,0,0.2)' }, 'MÉTODO ›');
+  if (kind === 'gold') return pill({ background: '#2B2B2B', color: '#FFFFFF', border: '1px solid #A6A6A6' });
+  if (kind === 'white') return pill({ background: 'rgba(255,255,255,0.94)', color: '#111111', border: '1px solid #fff' }, 'COMEÇAR ›', true);
+  if (kind === 'outline_light') return pill({ background: 'transparent', color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.9)' }, 'CTA ›', true);
   if (kind === 'rule' || kind === 'rule_light' || kind === 'rule_accent' || kind === 'rule_medium' || kind === 'rule_long' || kind === 'rule_bold') {
     const lines = {
-      rule: { color: '#3A322C', width: '38%', height: 2 },
-      rule_light: { color: 'rgba(245,240,232,0.9)', width: '32%', height: 2, dark: true },
-      rule_accent: { color: '#C4A574', width: '28%', height: 3 },
-      rule_medium: { color: '#3A322C', width: '55%', height: 6 },
-      rule_long: { color: '#3A322C', width: '88%', height: 4 },
-      rule_bold: { color: '#1A1410', width: '70%', height: 10 },
+      rule: { color: '#222222', width: '38%', height: 2 },
+      rule_light: { color: 'rgba(255,255,255,0.9)', width: '32%', height: 2, dark: true },
+      rule_accent: { color: '#8C8C8C', width: '28%', height: 3, dark: true },
+      rule_medium: { color: '#222222', width: '55%', height: 6 },
+      rule_long: { color: '#222222', width: '88%', height: 4 },
+      rule_bold: { color: '#111111', width: '70%', height: 10 },
     };
     const line = lines[kind];
     return (
-      <div style={{ ...base, justifyContent: 'flex-start', paddingLeft: 12, background: line.dark ? '#2a2420' : base.background }}>
+      <div style={{ ...base, justifyContent: 'flex-start', paddingLeft: 12, background: line.dark ? PREVIEW_DARK : PREVIEW_LIGHT }}>
         <span style={{ width: line.width, height: line.height, background: line.color, borderRadius: 99 }} />
       </div>
     );
