@@ -107,6 +107,7 @@ import { kitVisualColors } from './src/utils/visual-direction.js';
 import { extractReferencePaletteFromSources, kitReferencePalette, referencePaletteKitField } from './src/utils/reference-palette.js';
 import { analyzeReferenceVisuals, resolveReferenceVisualRecordForKit } from './src/utils/reference-visual-client.js';
 import { referenceVisualRecordForKit, referenceVisualAnalysisForSavedPlan } from './src/utils/reference-visual-cache.js';
+import { readsReferenceVisuals, referenceVisualApplication, savedReferenceVisualPlan } from './src/utils/reference-visual-scope.js';
 import { presentationPlanEntryImageQuery } from './src/utils/presentation-plan.js';
 import {
   PRESENTATION_VISUAL_PRESETS,
@@ -5507,7 +5508,7 @@ export default function App() {
         // separados por papel; a proporção acompanha a zona real da foto.
         imageDirection: composeImageDirection({
           styleKit, slide: generationSnap, fmt, formatViews: resolvedSocialView ? null : doc.formatViews, visualBible: doc.visualBible,
-          referenceVisualAnalysis: referenceVisualAnalysisForSavedPlan(doc.presentationPlan, styleKit),
+          referenceVisualAnalysis: referenceVisualAnalysisForSavedPlan(savedReferenceVisualPlan(doc, fmt), styleKit),
           slideDirection: imageState.extraPrompt, anchorPlan, baseReferenceCount: baseRefs.length,
           presentationPanel: fmt === 'apresentacao' && [2, 3].includes(generationSnap.presentationCompositionVersion),
           // Spec 1.1 (referência): a referência do kit vai em toda imagem; as
@@ -5592,7 +5593,7 @@ export default function App() {
         return next;
       });
     }
-  }, [slides, fmt, imageGenerationAvailability, openaiKey, imgParams, styleKit, setSlides, setSlidesPhotoSwap, toast, activeEntry?.name, doc.visualBible, doc.formatViews, doc.presentationPlan, access, useOwnImageKey]);
+  }, [slides, fmt, imageGenerationAvailability, openaiKey, imgParams, styleKit, setSlides, setSlidesPhotoSwap, toast, activeEntry?.name, doc.visualBible, doc.formatViews, doc.presentationPlan, doc.socialPlan, access, useOwnImageKey]);
 
   // Direção de arte, parte 4: arte de fundo do deck (modo livre). Uma imagem
   // abstrata da identidade, pedida uma vez (1 crédito) pelo mesmo caminho das
@@ -5600,7 +5601,7 @@ export default function App() {
   // Sem crédito, sem chave ou com falha, as páginas ficam na cor base.
   const deckArtGenRef = useRef(null);
   deckArtGenRef.current = async ({ projectId, signal, axes, deckSlides, formato = fmt, onSlides = null,
-    referenceVisualAnalysis = referenceVisualAnalysisForSavedPlan(doc.presentationPlan, styleKit) }) => {
+    referenceVisualAnalysis = referenceVisualAnalysisForSavedPlan(savedReferenceVisualPlan(doc, formato), styleKit) }) => {
     if (!deckNeedsArt(deckSlides)) return { ok: false, reason: 'not_needed' };
     const baseRefs = await resolveImageReferences(styleKit, null, null, null);
     const socialArt = deckSlides.some(isFreeSocialSlide);
@@ -6258,21 +6259,25 @@ ${jsonShapeLine}`;
       styleKitTextHint,
     ].filter(Boolean).join('\n');
     // Teste8: a paleta mede cores; a leitura multimodal descreve o que a
-    // referência realmente mostra. Apenas novas apresentações Livre recebem
-    // esta chamada. Não há fallback silencioso para inventar acabamento.
+    // referência realmente mostra. Apresentação Livre e Livre social novos
+    // recebem esta chamada (uma por geração, cache por bytes). Remix, estilos
+    // fixos e Criar rápido não. Não há fallback silencioso para inventar acabamento.
     let referenceVisual = null;
-    if (isPresentationGeneration && effectiveVisualPresetDef?.isFree && !remix && styleKit?.refImages?.length) {
-      setGenProgress({ phase: 'text', current: 1, total: 5, label: 'Etapa 1 de 5 · Lendo a linguagem das referências visuais' });
+    if (readsReferenceVisuals({ presentation: isPresentationGeneration, presentationFree: !!effectiveVisualPresetDef?.isFree,
+      socialFree: isSocialFreeGeneration, remix: !!remix, referenceCount: styleKit?.refImages?.length || 0 })) {
+      const stepTotal = isPresentationGeneration ? 5 : 3;
+      setGenProgress({ phase: 'text', current: 1, total: stepTotal, label: `Etapa 1 de ${stepTotal} · Lendo a linguagem das referências visuais` });
       referenceVisual = await analyzeReferenceVisuals({ kit: styleKit,
         brief: [topic, material?.context, materialFactualSource, styleKit.contextMd, planningBrief].filter(Boolean).join('\n\n'),
-        application: 'Apresentação horizontal 16:9, com texto em camadas editáveis.',
+        application: referenceVisualApplication({ presentation: isPresentationGeneration, formato: generationFormat }),
         referenceColors, loadSources: resolvePlanningReferences, signal: job.signal });
       checkActive();
-      setGenProgress({ phase: 'text', current: 1, total: 5, label: 'Etapa 1 de 5 · Organizando o roteiro e as evidências' });
+      setGenProgress({ phase: 'text', current: 1, total: stepTotal, label: isPresentationGeneration ? 'Etapa 1 de 5 · Organizando o roteiro e as evidências' : 'Etapa 1 de 3 · Escrevendo o texto' });
     }
     const { result: generatedResult, reviewStatus, plan: generationPlan, socialPlan: generationSocialPlan, incomplete: generationIncomplete = false, interruptionReason: generationInterruptionReason, writingDiagnostics: generationWritingDiagnostics = [], reviewDiagnostics: generationReviewDiagnostics = [], completedCount: generatedCount, totalCount: requestedCount, violations: editorialViolations = [], issues: editorialIssues = [], materialGaps = [], repetitionNotice = '', repetitionRemaining = [] } = await generateReviewedCarousel({
       prompt,
-      ...(isSocialFreeGeneration ? { socialFree: { formato: generationFormat, brand: freeKitBrand, styleKit, referenceColors } } : {}),
+      ...(isSocialFreeGeneration ? { socialFree: { formato: generationFormat, brand: freeKitBrand, styleKit, referenceColors,
+        ...(referenceVisual ? { referenceVisualAnalysis: referenceVisual.analysis } : {}) } } : {}),
       config: {
         count: Number(count),
         presetId: cp,
@@ -6865,6 +6870,11 @@ ${jsonShapeLine}`;
     let imgFailCount = 0;
     let imgQuotaStop = false;
 
+    // A leitura desta geração. O remix social não a reaplica no lote; uma
+    // foto regenerada depois a reutiliza pelo plano salvo.
+    const generationReferenceVisualAnalysis = isSocialFreeGeneration
+      ? (remix ? null : generationSocialPlan?.referenceVisualAnalysis)
+      : generationPlan?.referenceVisualAnalysis;
     if (fetchImagesNow) {
       if (hasOpenAI) {
         const slidesWithImage = newSlides.map((sl, i) => ({
@@ -6921,7 +6931,7 @@ ${jsonShapeLine}`;
               imageDirection: composeImageDirection({
                 styleKit,
                 slide: newSlides[i],
-                referenceVisualAnalysis: generationPlan?.referenceVisualAnalysis,
+                referenceVisualAnalysis: generationReferenceVisualAnalysis,
                 fmt: isPresentationGeneration ? 'apresentacao' : (fmt && fmt !== 'apresentacao' ? fmt : 'carrossel'),
                 visualBible: isPresentationGeneration ? null : generationVisualBible,
                 anchorPlan,
@@ -7009,7 +7019,7 @@ ${jsonShapeLine}`;
           try {
             await deckArtGenRef.current({
               projectId: generationProjectId, signal: job.signal, axes: effectiveAxes, deckSlides: newSlides, formato: generationFormat,
-              referenceVisualAnalysis: generationPlan?.referenceVisualAnalysis,
+              referenceVisualAnalysis: generationReferenceVisualAnalysis,
               onSlides: patch => setCreationPreviewSlides(prev => applyDeckArt(prev, patch)),
             });
           } catch (e) {
