@@ -523,6 +523,13 @@ function OverflowScaler({
     // na fila do desktop (escala 0.333) e o scaler concluía que cabia — o
     // título voltava a ser cortado, e só fora da escala 1 (a exportação, onde
     // isto foi testado da primeira vez, tem escala 1 e passava).
+    // Texto arrastado pela pessoa (deslocamento gravado = `translate`) sai da
+    // caixa de propósito. `scrollWidth`/`scrollHeight` contam esse desvio como
+    // transbordo, e a zona inteira descia ao piso absoluto (0,28): o apoio da
+    // Apoteose virava uma linha de ~8 px. Mede com os deslocamentos zerados.
+    const moved = [...el.querySelectorAll('[style*="translate("]')];
+    const savedTransforms = moved.map((node) => node.style.transform);
+    for (const node of moved) node.style.transform = 'none';
     let filhosH = 0;
     let filhoMaisLargo = 0;
     for (const filho of el.children) {
@@ -535,6 +542,7 @@ function OverflowScaler({
     }
     const contentH = Math.max(el.scrollHeight, Math.ceil(filhosH + padV));
     const contentW = Math.max(el.scrollWidth, Math.ceil(filhoMaisLargo + padH));
+    moved.forEach((node, index) => { node.style.transform = savedTransforms[index]; });
     const overflowsVertically = clientH > 0 && contentH > clientH + 1;
     const overflowsHorizontally = clientW > 0 && contentW > clientW + 1;
     if (!overflowsVertically && !overflowsHorizontally) {

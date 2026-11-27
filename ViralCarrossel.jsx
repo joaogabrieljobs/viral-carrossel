@@ -9,6 +9,7 @@ import CardThumbnail from './src/components/card/CardThumbnail.jsx';
 import { cloudSyncFailureMessage, freePlanSaveFeedback, isModuleLoadError } from './src/utils/cloud-sync-feedback.js';
 import { CanvasNavigator, MobileScrollRail, useCanvasZoom } from './src/components/CanvasNavigator.jsx';
 import { ProjectContextBanner } from './src/components/ProjectContextBanner.jsx';
+import { HistoryButtons } from './src/components/ui/HistoryButtons.jsx';
 import { startAIJob, runAIJob, cancelAllAIGeneration, getAIGenerationCount, throwIfGenerationCancelled, isGenerationCancelled } from './src/utils/generation-control.js';
 import { buildRemixBlock, mergeRemixedSlides, validateRemixCardCount } from './src/utils/carousel-remix.js';
 import { GenerationStatus } from './src/components/GenerationStatus.jsx';
@@ -589,6 +590,8 @@ const MOBILE_BOARD_SIDE = 12;
 const MOBILE_BOARD_TOP = 8;
 const MOBILE_CARD_ACTIONS = 56;
 const MOBILE_BOARD_BOTTOM = 84;
+const LANDSCAPE_BOARD_PAD_Y = 12;
+const LANDSCAPE_CARD_ACTIONS = 56;
 const PROJECTS_V2 = import.meta.env.VITE_PROJECTS_V2 === 'true';
 
 function accountBrandsContentSnapshot(brands) {
@@ -4051,6 +4054,7 @@ export default function App() {
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState({ current:0, total:0 });
   const [vw, setVw] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const [vh, setVh] = useState(typeof window !== 'undefined' ? window.innerHeight : 768);
   const fileInputRef = useRef(null);
   const batchPhotoInputRef = useRef(null);
   const photoZoneInputRef = useRef(null);
@@ -4221,7 +4225,7 @@ export default function App() {
   }, [brand, brandRoster]);
 
   useEffect(() => {
-    const onResize = () => setVw(window.innerWidth);
+    const onResize = () => { setVw(window.innerWidth); setVh(window.innerHeight); };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
@@ -4253,15 +4257,28 @@ export default function App() {
   }, []);
 
   const isMobile = vw < 768;
+  /* Celular deitado (iPhone em paisagem: 844×390, 932×430): largura de
+     desktop e altura de ~400 px. Cabeçalho em duas linhas, faixa de
+     contexto, abas, miniaturas e zoom somavam a altura inteira e o card não
+     aparecia. Aqui as barras secundárias ficam recolhidas atrás do botão
+     "Ferramentas"; o topo vira uma linha com Gerar, Desfazer e formato. */
+  const shortLandscape = !isMobile && vh <= 500 && vw > vh;
+  const [landscapeBarsOpen, setLandscapeBarsOpen] = useState(false);
+  const landscapeCompact = shortLandscape && !landscapeBarsOpen;
   /* A assinatura tem proporção natural: as ferramentas descem antes de
      comprimir a marca ou sobrepor Salvar e Projetos. */
-  const headerTight = !isMobile && vw < 1536;
+  /* Abaixo de 1800 px o histórico (com "Desfazer" escrito, 27/11) e o
+     formato descem para a 2ª linha; em uma linha só, o lado direito
+     empurrava Salvar sobre Projetos e o nome do projeto sumia. */
+  const headerTight = !isMobile && vw < 1800 && !landscapeCompact;
+  /* Abaixo de 1536 px saem do topo o atalho Projetos e o estado de gravação. */
+  const headerNarrow = !isMobile && vw < 1536;
   /* <1000px: some o atalho "Projetos" do header (o rodapé já tem um igual). */
   const headerVeryTight = !isMobile && vw < 1000;
   const f = FORMATS[fmt] || FORMATS.carrossel;
   const [mobileBoardHeight, setMobileBoardHeight] = useState(0);
   useLayoutEffect(() => {
-    if (!isMobile) return undefined;
+    if (!isMobile && !shortLandscape) return undefined;
     const root = boardScrollRef.current;
     if (!root) return undefined;
     const measure = () => setMobileBoardHeight(root.clientHeight);
@@ -4269,7 +4286,7 @@ export default function App() {
     const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
     observer?.observe(root);
     return () => observer?.disconnect();
-  }, [isMobile, shellView, accountLibraryReady, activeDocId]);
+  }, [isMobile, shortLandscape, landscapeBarsOpen, shellView, accountLibraryReady, activeDocId]);
   const { zoom: canvasZoom, changeZoom } = useCanvasZoom(boardScrollRef, `${activeDocId}:${fmt}:${shellView}:${isMobile}:${accountLibraryReady}`);
   const previewBaseScale = useMemo(() => {
     if (isMobile) {
@@ -4289,9 +4306,14 @@ export default function App() {
     const targetWidth = fmt === 'apresentacao'
       ? Math.min(920, Math.max(320, (vw - 272 - 96) * 0.9))
       : 360;
-    const base = Math.min(targetWidth / f.w, fmt === 'apresentacao' ? 0.5 : 0.44);
+    let base = Math.min(targetWidth / f.w, fmt === 'apresentacao' ? 0.5 : 0.44);
+    // Celular deitado: o card cabe inteiro na altura livre do quadro (acima
+    // da fila de ações do card).
+    if (shortLandscape && mobileBoardHeight > 0) {
+      base = Math.min(base, Math.max(120, mobileBoardHeight - LANDSCAPE_BOARD_PAD_Y * 2 - LANDSCAPE_CARD_ACTIONS) / f.h);
+    }
     return thumbQaMode ? Math.min(base * 0.7, 0.28) : base;
-  }, [isMobile, vw, f, fmt, thumbQaMode, mobileBoardHeight]);
+  }, [isMobile, vw, f, fmt, thumbQaMode, mobileBoardHeight, shortLandscape]);
   const previewScale = previewBaseScale * canvasZoom;
 
   const slide = slides[activeIdx] ?? slides[0] ?? mkSlide(1, brand);
@@ -4378,6 +4400,28 @@ export default function App() {
     </nav>
   );
 
+  /* Celular deitado: mostra ou recolhe cabeçalho completo, contexto, abas e
+     miniaturas. Recolhido, o card ocupa a altura. */
+  const landscapeBarsToggle = (
+    <button
+      type="button"
+      onClick={() => setLandscapeBarsOpen(open => !open)}
+      aria-expanded={landscapeBarsOpen}
+      aria-label={landscapeBarsOpen ? 'Recolher ferramentas' : 'Mostrar ferramentas'}
+      title={landscapeBarsOpen ? 'Recolher ferramentas e mostrar o card' : 'Mostrar abas, miniaturas, contexto e Exportar'}
+      style={{
+        minWidth: 44, height: 44, padding: '0 12px', borderRadius: 9999, flexShrink: 0,
+        border: `1px solid ${landscapeBarsOpen ? 'var(--accent)' : 'var(--glass-border-strong, var(--border))'}`,
+        background: landscapeBarsOpen ? 'var(--accent-surface)' : 'var(--bg-card)',
+        color: 'var(--text-primary)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
+        fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600,
+      }}
+    >
+      <SlidersHorizontal size={15} aria-hidden="true" />
+      {landscapeBarsOpen ? 'Recolher' : 'Ferramentas'}
+    </button>
+  );
+
   const editorGenerateBtn = (
     <button
       type="button"
@@ -4423,7 +4467,7 @@ export default function App() {
       onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
     >
       <Sparkles size={14} color={appMode === 'criador' ? 'var(--accent)' : undefined} />
-      {isMobile ? 'Gerar' : (appMode === 'criador' ? 'Assistente IA' : 'Gerar com IA')}
+      {isMobile || landscapeCompact ? 'Gerar' : (appMode === 'criador' ? 'Assistente IA' : 'Gerar com IA')}
     </button>
   );
 
@@ -4431,70 +4475,14 @@ export default function App() {
      linhas do topo não têm folga a 360 px). Vários avisos mandam "usar
      Desfazer" e no telefone não existe atalho de teclado. */
   const mobileHistoryGroup = (
-    <div style={{ display:'flex', alignItems:'center', gap:2, flexShrink:0 }}>
-      {[
-        { label:'Desfazer', run: history.undo, enabled: history.canUndo, path: <><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7L3 9"/></> },
-        { label:'Refazer', run: history.redo, enabled: history.canRedo, path: <><path d="M21 7v6h-6"/><path d="M21 13a9 9 0 1 1-3-7l3 3"/></> },
-      ].map(({ label, run, enabled, path }) => (
-        <button
-          key={label}
-          type="button"
-          onClick={() => run()}
-          disabled={!enabled}
-          title={label}
-          aria-label={label}
-          style={{
-            width: 40, height: 40, borderRadius: 9999, border: '1px solid var(--border)', background: 'var(--bg-card)',
-            color: 'var(--text-muted)', cursor: enabled ? 'pointer' : 'not-allowed',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-            opacity: enabled ? 1 : 0.35,
-          }}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{path}</svg>
-        </button>
-      ))}
-    </div>
+    <HistoryButtons onUndo={history.undo} onRedo={history.redo} canUndo={history.canUndo} canRedo={history.canRedo} />
   );
 
   /* Histórico (desfazer/refazer) + formato de exportação. No desktop largo
      vive à direita; abaixo de 1200px desce para a 2ª linha do header. */
   const historyFormatGroup = (
     <>
-        <div style={{
-          display: 'flex', alignItems: 'center', background: 'var(--bg-card)',
-          borderRadius: 9999, padding: 3, gap: 0, border: '1px solid var(--border)', flexShrink: 0,
-        }}>
-          <button
-            type="button"
-            onClick={history.undo}
-            disabled={!history.canUndo}
-            title="Desfazer (⌘Z)"
-            aria-label="Desfazer"
-            style={{
-              width: 32, height: 30, borderRadius: 9999, border: 'none', background: 'transparent',
-              color: 'var(--text-muted)', cursor: history.canUndo ? 'pointer' : 'not-allowed',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              opacity: history.canUndo ? 1 : 0.35,
-            }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7L3 9"/></svg>
-          </button>
-          <button
-            type="button"
-            onClick={history.redo}
-            disabled={!history.canRedo}
-            title="Refazer (⌘⇧Z)"
-            aria-label="Refazer"
-            style={{
-              width: 32, height: 30, borderRadius: 9999, border: 'none', background: 'transparent',
-              color: 'var(--text-muted)', cursor: history.canRedo ? 'pointer' : 'not-allowed',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              opacity: history.canRedo ? 1 : 0.35,
-            }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7v6h-6"/><path d="M21 13a9 9 0 1 1-3-7l3 3"/></svg>
-          </button>
-        </div>
+        <HistoryButtons onUndo={history.undo} onRedo={history.redo} canUndo={history.canUndo} canRedo={history.canRedo} />
         <EditorFormatSelector fmt={fmt} setFmt={setFmt} layout="desktop" />
     </>
   );
@@ -8783,7 +8771,11 @@ Retorne APENAS JSON: ${refineAllWantsBody
              "Gerar com IA" (28px a 1440px, 87px a 1100px). */
           gridTemplateColumns: 'minmax(0, 1fr) auto auto',
           alignItems: 'center',
-          ...(headerTight ? {
+          ...(landscapeCompact ? {
+            padding: 'env(safe-area-inset-top, 0) max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px))',
+            height: `calc(56px + env(safe-area-inset-top, 0))`,
+            gap: 8,
+          } : headerTight ? {
             /* 2 linhas: histórico + formato descem, em vez de sobrepor o CTA. */
             padding: 'env(safe-area-inset-top, 0) 14px 8px',
             rowGap: 8,
@@ -8868,15 +8860,17 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   style={{
                     fontSize: 11, color: 'var(--text-muted)', letterSpacing: '-0.011em',
                     background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                    maxWidth: headerVeryTight ? 68 : (headerTight ? 96 : 160), minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    maxWidth: headerVeryTight ? 68 : (headerNarrow ? 96 : 160), minWidth: headerVeryTight ? 48 : 56, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                     textAlign: 'left',
                   }}
                   title="Clique para renomear"
                 >
                   {activeEntry.name || 'Sem título'}
                 </button>
-                {!headerTight && (
-                  <>{remoteProjectNotice ? <SavedIndicator savedAt={lastSavedAt} notice={remoteProjectNotice} onUpdate={() => { setRemoteProjectNotice(null); syncProjectLibrary('sync'); }} /> : saveIndicator}</>
+                {!headerNarrow && !landscapeCompact && (
+                  // O estado de gravação cede espaço primeiro; o nome do
+                  // projeto não some quando o lado direito cresce.
+                  <span style={{ minWidth: 0, flexShrink: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{remoteProjectNotice ? <SavedIndicator savedAt={lastSavedAt} notice={remoteProjectNotice} onUpdate={() => { setRemoteProjectNotice(null); syncProjectLibrary('sync'); }} /> : saveIndicator}</span>
                 )}
                 <button
                   type="button"
@@ -8900,7 +8894,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
               </div>
             )}
           </div>
-          {!headerTight && editorPillBtn(() => goAccount('projects'), 'Projetos', Home)}
+          {!headerNarrow && !landscapeCompact && editorPillBtn(() => goAccount('projects'), 'Projetos', Home)}
         </div>
 
         {/* Centro — Gerar com IA */}
@@ -8909,9 +8903,19 @@ Retorne APENAS JSON: ${refineAllWantsBody
         </div>
 
         {/* Direita — ferramentas + Perfil (extremo direito) */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, minWidth: 0 }}>
-          {!headerTight && historyFormatGroup}
-          {editorHeaderActions}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: landscapeCompact ? 6 : 8, minWidth: 0 }}>
+          {landscapeCompact ? (
+            <>
+              <HistoryButtons onUndo={history.undo} onRedo={history.redo} canUndo={history.canUndo} canRedo={history.canRedo} />
+              <EditorFormatSelector fmt={fmt} setFmt={setFmt} layout="mobile" touch />
+            </>
+          ) : (
+            <>
+              {!headerTight && historyFormatGroup}
+              {editorHeaderActions}
+            </>
+          )}
+          {shortLandscape && landscapeBarsToggle}
           {editorAccountNav}
         </div>
 
@@ -8931,11 +8935,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
         </div>
       )}
 
-      {!(isMobile && drawerOpen) && <ProjectContextBanner
+      {!(isMobile && drawerOpen) && !landscapeCompact && <ProjectContextBanner
         styleKit={styleKit}
         projectName={activeEntry?.name}
-        onUndo={history.undo}
-        canUndo={history.canUndo}
         compact={isMobile}
       />}
 
@@ -8943,7 +8945,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
       <div className="vc-editor-shell" style={{ flex:1, display:'flex', overflow:'hidden' }}>
 
         {/* Desktop sidebar — glass dark panel premium (Narrative OS) */}
-        {!isMobile && (
+        {!isMobile && !landscapeCompact && (
           <aside style={{
             width:272,
             borderRight:'1px solid var(--glass-border)',
@@ -8985,7 +8987,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
 
           {/* ── THUMBNAIL STRIP ── Mobile: colapsa junto com header quando
               drawer aberto. Desktop: sempre visível. */}
-          <div
+          {!landscapeCompact && <div
             data-vc-tour="thumbnails"
             style={{
             background:'var(--bg-sidebar)', borderBottom:'1px solid var(--border)',
@@ -9061,7 +9063,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
             </div>
             {isMobile && mobileHistoryGroup}
             </div>
-          </div>
+          </div>}
 
           {/* ── MAIN CANVAS AREA ── */}
           {!empty && isMobile && Math.round(canvasZoom * 100) !== 100 && (
@@ -9656,7 +9658,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
               </div>
             ) : (
               // Desktop: all slides row
-              <div style={{ padding:'28px 48px', display:'flex', gap:20, alignItems:'flex-start', minHeight:'100%', flexWrap:'wrap' }}>
+              <div style={{ padding: shortLandscape ? `${LANDSCAPE_BOARD_PAD_Y}px 24px` : '28px 48px', display:'flex', gap:20, alignItems:'flex-start', minHeight:'100%', flexWrap:'wrap' }}>
                 {imageGenerationAvailability.reason === 'plan_without_images' && (
                   <p role="status" style={{ flex: '1 0 100%', margin: 0, fontSize: 14, lineHeight: 1.45, color: 'var(--text-primary)' }}>
                     Seu plano não inclui imagens. Os cards saem com um padrão visual de texto. Faça upgrade ou use sua chave em Configurar IA.
@@ -9687,6 +9689,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       onClick={()=>setActiveIdx(i)}
                       style={{
                         position:'relative',
+                        // Celular deitado: Stories fica mais estreito que a
+                        // fila de ações; o contorno acompanha o card.
+                        ...(shortLandscape ? { width:'fit-content' } : {}),
                         cursor:'pointer', borderRadius:10, overflow:'hidden',
                         transition:'all 0.15s var(--ease-smooth)',
                         boxShadow: i===activeIdx

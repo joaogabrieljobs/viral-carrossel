@@ -1,7 +1,125 @@
 import { FORMATS } from './formats.js';
 import { normalizePresentationBlocks } from './presentation-quality.js';
-import { familyLayout, normalizeFamilyKey } from './presentation-families.js';
+import { FORMAT_SPECS, familyFont, familyLayout, familySpec, normalizeFamilyKey, rendererSubtitleSizePercent } from './presentation-families.js';
 import { familyPresentationFields } from './presentation-composition.js';
+import { freeTextLines } from './free-design.js';
+
+/** Piso de leitura do apoio e do corpo em Feed, Quadrado e Stories (px a 1080). */
+export const SOCIAL_READING_FLOOR_PX = 28;
+
+const SOCIAL_FORMAT = { carrossel: '4:5', quadrado: '1:1', stories: '9:16' };
+// Limites verticais do texto (% da altura). Stories: entre as faixas da
+// interface do Instagram (14% a 82%), como em `socialSafeArea`.
+const READING_TOP = { '4:5': 6, '1:1': 6, '9:16': 14 };
+const READING_BOTTOM = { '4:5': 94, '1:1': 94, '9:16': 82 };
+const STACK_GAP = { '4:5': 2.6, '1:1': 2.6, '9:16': 2.6 };
+// Foto menor que isto deixa de ser foto e vira faixa; sai da página.
+const MIN_PHOTO_H = { '4:5': 16, '1:1': 18, '9:16': 12 };
+
+const isBleed = (r) => r && r.x === 0 && r.y === 0 && r.w === 100 && r.h === 100;
+const spanX = (a, b) => Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+const round2 = (v) => Math.round(v * 100) / 100;
+
+/**
+ * Altura (% da página) que apoio e corpo ocupam na zona `zone` no menor
+ * tamanho que o renderer permite (piso de 28 px). Métricas da fonte da
+ * família, com o mesmo respiro (padding) que a zona desenha.
+ */
+function readingHeightPct(zone, { family, format, subPx, bodyPx, subtitle, body }) {
+  const { w, h } = FORMAT_SPECS[format];
+  const width = zone.w / 100 * w * 0.96 - 24;
+  const font = familyFont(family, 'text').family;
+  const leading = familySpec(family).type.bodyLeading;
+  const sizes = [subtitle ? subPx : null, body ? bodyPx : null].filter(Boolean);
+  if (!sizes.length) return 0;
+  const scale = Math.min(1, SOCIAL_READING_FLOOR_PX / Math.min(...sizes));
+  const block = (text, px) => freeTextLines(text, width, px * scale, font, 'text') * px * scale * leading;
+  const px = (subtitle ? block(subtitle, subPx) : 0) + (body ? block(body, bodyPx) : 0);
+  // Margem do corpo (1,8% da altura), respiro da zona (0,6% em cima e em
+  // baixo) e 4% de folga de arredondamento das linhas.
+  return (px * 1.04 + (subtitle && body ? h * 0.018 : 0) + h * 0.012 + 6) / h * 100;
+}
+
+/**
+ * Garante a leitura no piso: se a zona do apoio da família não comporta o
+ * texto a 28 px, primeiro cresce para o espaço livre abaixo; depois a página
+ * é reempilhada (foto, título e apoio na ordem da família) e a foto perde
+ * altura; sem altura mínima para a foto, ela sai. O texto nunca é cortado nem
+ * reduzido abaixo do piso. Devolve `{ layout, fits }`.
+ */
+function ensureReadingRoom(layout, reading) {
+  const format = layout.format;
+  const need = readingHeightPct(layout.subtitle, reading);
+  if (!need || layout.subtitle.h >= need) return { layout, fits: true };
+  const bottom = READING_BOTTOM[format];
+  const gap = STACK_GAP[format];
+  const sub = layout.subtitle;
+  // 1) Cresce para baixo até o próximo elemento na mesma coluna.
+  const below = [layout.photo, layout.evidence, layout.title]
+    .filter(r => r && !isBleed(r) && spanX(r, sub) > 0.5 && r.y >= sub.y + sub.h - 0.5)
+    .map(r => r.y - gap);
+  const limit = Math.min(bottom, ...below);
+  if (limit - sub.y >= need) {
+    return { layout: { ...layout, subtitle: { ...sub, h: round2(Math.max(sub.h, need)) } }, fits: true };
+  }
+  // 2) Reempilha em coluna: foto (se couber) · título · apoio, na ordem da
+  // família. 3) Sem espaço nem assim, o título (que tem o próprio ajuste)
+  // cede até 40% da altura da zona antes de o apoio ficar abaixo do piso.
+  let stacked = restackForReading(layout, reading, layout.title.h);
+  if (!stacked.fits) {
+    const deficit = stacked.need - stacked.layout.subtitle.h;
+    stacked = restackForReading(layout, reading, Math.max(layout.title.h * 0.6, layout.title.h - deficit));
+  }
+  return { layout: stacked.layout, fits: stacked.fits };
+}
+
+function restackForReading(layout, reading, titleH) {
+  const format = layout.format;
+  const bottom = READING_BOTTOM[format];
+  const gap = STACK_GAP[format];
+  const { title, subtitle: sub } = layout;
+  const x = Math.min(title.x, sub.x);
+  const width = Math.max(title.x + title.w, sub.x + sub.w) - x;
+  const column = { x, w: round2(Math.min(width, 100 - 2 * x)) };
+  const top = Math.min(READING_TOP[format], title.y, sub.y);
+  const need = readingHeightPct({ ...sub, w: column.w }, reading);
+  const photo = layout.photo && !isBleed(layout.photo) ? layout.photo : null;
+  const topBleed = !!photo && photo.x === 0 && photo.y === 0 && photo.w === 100;
+  const textH = titleH + gap + need;
+  const photoH = !photo ? 0 : topBleed
+    ? Math.min(photo.h, bottom - textH - gap)
+    : Math.min(photo.h, bottom - top - textH - gap);
+  const keepPhoto = !!photo && photoH >= MIN_PHOTO_H[format];
+  const order = [
+    ...(keepPhoto ? [['photo', photo]] : []), ['title', title], ['subtitle', sub],
+  ].sort((a, b) => a[1].y - b[1].y);
+  const next = { ...layout, photo: keepPhoto || isBleed(layout.photo) ? layout.photo : null };
+  let y = keepPhoto && topBleed ? 0 : top;
+  for (const [key] of order) {
+    if (key === 'photo') {
+      next.photo = { ...photo, y: round2(y), h: round2(photoH) };
+      y += photoH + gap;
+      if (topBleed) y = Math.max(y, top);
+    } else if (key === 'title') {
+      next.title = { ...column, y: round2(y), h: round2(titleH) };
+      y += titleH + gap;
+    } else {
+      next.subtitle = { ...column, y: round2(y), h: 0 };
+      y += need + gap;
+    }
+  }
+  // O apoio fica com toda a altura até o próximo bloco (ou o fim da área).
+  const after = order.findIndex(([key]) => key === 'subtitle') + 1;
+  const nextTop = after < order.length ? next[order[after][0]].y - gap : bottom;
+  next.subtitle = { ...next.subtitle, h: round2(Math.min(bottom - next.subtitle.y, Math.max(need, nextTop - next.subtitle.y))) };
+  // Sem quadro nesta página reempilhada; fios e blocos que cairiam sobre o
+  // texto saem (o texto nunca).
+  const texts = [next.title, next.subtitle];
+  next.evidence = null;
+  next.chrome = (layout.chrome || []).filter(c => c.w == null || c.h == null || c.y == null
+    || !texts.some(r => spanX(c, r) > 0.3 && Math.min(c.y + c.h, r.y + r.h) - Math.max(c.y, r.y) > 0.3));
+  return { layout: next, need, fits: next.subtitle.h >= need - 0.01 };
+}
 
 /**
  * Recomposição de Feed, Quadrado e Stories pela família: a página é redesenhada
@@ -17,11 +135,23 @@ export function familyCarouselAdaptation(source, fmt = 'carrossel') {
     ? source.presentationComposition : 'content';
   const structured = normalizePresentationBlocks(source.presentationBlocks).length > 0;
   const photo = !!(source.bgImage || source.bgImageId || source.bgImageAssetId) && !source.presentationSuppressPhoto;
-  const format = { carrossel: '4:5', quadrado: '1:1', stories: '9:16' }[fmt];
+  const format = SOCIAL_FORMAT[fmt];
   if (!format) return null;
-  const layout = familyLayout(family, kind, { format, photo, structured, title: source.title,
+  const designed = familyLayout(family, kind, { format, photo, structured, title: source.title,
     reading: String(source.subtitle || '').length + String(source.bodyAfterImage || '').length });
-  const { typography, ...fields } = familyPresentationFields(layout, { format });
+  const { w } = FORMAT_SPECS[format];
+  // Tamanhos já arredondados como o renderer os desenha.
+  const subPx = rendererSubtitleSizePercent(Math.max(SOCIAL_READING_FLOOR_PX, designed.bodyPx), format) / 100 * w * 0.028;
+  const bodyAfterSize = Math.ceil(Math.max(SOCIAL_READING_FLOOR_PX, designed.bodyPx * 0.86) / (w * 0.018) * 100);
+  const bodyPx = bodyAfterSize / 100 * w * 0.018;
+  // Quadro estruturado tem a própria zona; a leitura dele não passa por aqui.
+  const { layout, fits } = designed.evidence
+    ? { layout: designed, fits: true }
+    : ensureReadingRoom(designed, {
+      family, format, subPx, bodyPx,
+      subtitle: String(source.subtitle || '').trim(), body: String(source.bodyAfterImage || '').trim(),
+    });
+  const { typography, ...fields } = familyPresentationFields({ ...layout, bodyPx: subPx }, { format });
   return {
     ...source,
     ...fields,
@@ -30,7 +160,10 @@ export function familyCarouselAdaptation(source, fmt = 'carrossel') {
     formatAdaptedFrom: 'apresentacao',
     photoRegion: 'full', bgFit: 'cover', photoFraming: 'auto', bgZoom: 100, bgOpacity: 100,
     textBg: false, textInset: 0,
-    bodyAfterSize: Math.round((Math.max(24, layout.bodyPx * 0.86) / (1080 * 0.018)) * 100),
+    bodyAfterSize,
+    // O renderer não reduz o apoio abaixo de 28 px quando a zona comporta o
+    // texto nesse tamanho (`ensureReadingRoom`).
+    presentationReadingFloor: fits,
     presentationSuppressPhoto: !layout.photo,
     presentationRequiresImage: false,
     presentationGlass: null,
