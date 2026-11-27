@@ -148,7 +148,7 @@ async function next(page) {
   await flow(page).getByRole('button', { name: 'Continuar', exact: true }).click();
   await expect(page.getByRole('tab', { name: /^(Marca|Narrativa|Visual|Texto|Layout)$/ })).toHaveCount(0);
 }
-async function configure(page, { name = 'Novo trabalho guiado', count = 5, presentation = false, detailed = false, special = false, defaultIdentity = false, customPreset = false } = {}) {
+async function configure(page, { name = 'Novo trabalho guiado', count = 5, presentation = false, detailed = false, special = false, defaultIdentity = false, customPreset = false, livre = false } = {}) {
   await page.getByRole('button', { name: 'Criar um projeto', exact: true }).click();
   const wizard = flow(page);
   await expect(wizard).toBeVisible();
@@ -192,6 +192,9 @@ async function configure(page, { name = 'Novo trabalho guiado', count = 5, prese
   if (!presentation) await wizard.getByRole('radio', { name: /^Stories/ }).click();
   await next(page);
   await wizard.getByRole('radio', { name: /^Criar o texto primeiro/ }).click();
+  // 27/11: o Livre vem marcado. Estes testes cobrem o catálogo; quem quer o
+  // Livre passa livre: true.
+  if (!livre && !customPreset) await wizard.getByRole('button', { name: /^Design recomendado pelo Moont/ }).click();
   if (detailed) await wizard.getByLabel(/^Direção visual adicional/).fill('Fundo claro, fotografia editorial e títulos em azul.');
   await next(page);
   await expect(wizard.getByText(/Antes de gerar:.*2–5 min.*nenhum crédito de imagem/i)).toBeVisible();
@@ -235,8 +238,11 @@ test('design recomendado fica visível, aplica o preset e mantém a narrativa es
     const prompt = route.request().postDataJSON().payload.messages.find(m => m.role === 'user').content;
     return route.fulfill({ json: completion(prompt.startsWith('REVISÃO EDITORIAL') ? { edits: [] } : generated(5, 'Design recomendado')) });
   } });
-  const wizard = await configure(page, { name: 'Design com preset', defaultIdentity: true });
+  const wizard = await configure(page, { name: 'Design com preset', defaultIdentity: true, livre: true });
   await wizard.getByRole('button', { name: 'Alterar visual', exact: true }).click();
+  // 27/11: o Livre vem marcado; o recomendado continua a um clique.
+  await expect(wizard.getByRole('group', { name: 'Estilos para começar', exact: true }).getByRole('button', { name: /^Livre: o Moont decide/ })).toHaveAttribute('aria-pressed', 'true');
+  await wizard.getByRole('button', { name: /^Design recomendado pelo Moont/ }).click();
   await expect(wizard.getByRole('button', { name: /^Design recomendado pelo Moont/ })).toHaveAttribute('aria-pressed', 'true');
   await expect(wizard.getByRole('group', { name: 'Estilos para começar', exact: true })).toBeVisible();
   await expect(wizard.getByRole('group', { name: 'Estilos para começar', exact: true }).getByRole('button', { name: /^Ficha técnica/ })).toHaveAttribute('aria-pressed', 'true');
@@ -779,30 +785,31 @@ test('apresentação passa pelo planejamento e só abre edição após conferir 
   expect(prompts[1]).toContain('PLANO EDITORIAL VALIDADO');
 });
 
-// Relato de 18/11/2026 (iPhone): na etapa Visual, "Ajustar logo e referências"
-// leva à etapa Marca. Depois de anexar, "Continuar" seguia para a etapa 3 e a
-// pessoa tinha de refazer o caminho até a 6: "volta para páginas anteriores".
-test('atalho de logo e referências devolve à etapa de onde a pessoa saiu', async ({ page }) => {
+// Relato de 18/11/2026 (iPhone) e 27/11: logo e referências eram um atalho que
+// voltava à etapa 2 e depois avançava de novo. Agora o envio fica na própria
+// etapa Visual, com botões de ação, e a etapa não muda.
+test('logo e referências são enviadas na própria etapa Visual, sem voltar à etapa 2', async ({ page }) => {
   test.setTimeout(60_000);
   await setup(page);
   const wizard = await configure(page, { name: 'Atalho de referências' });
   const passo = wizard.locator('.vc-create-kicker');
   await wizard.getByRole('button', { name: 'Voltar', exact: true }).click();
   await expect(passo).toContainText('Passo 6 de 7');
-  await wizard.getByRole('button', { name: 'Ajustar logo e referências', exact: true }).click();
-  await expect(passo).toContainText('Passo 2 de 7');
-  await wizard.getByRole('button', { name: 'Continuar', exact: true }).click();
+  await expect(wizard.getByRole('button', { name: 'Ajustar logo e referências', exact: true })).toHaveCount(0);
+  const png = await page.evaluate(() => {
+    const canvas = document.createElement('canvas'); canvas.width = 120; canvas.height = 60;
+    const ctx = canvas.getContext('2d'); ctx.fillStyle = '#6d5ef8'; ctx.fillRect(10, 10, 100, 40);
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
+  await wizard.getByLabel('Enviar logo da marca', { exact: true }).setInputFiles({ name: 'logo-visual.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
+  await expect(wizard.getByText('logo-visual.png')).toBeVisible();
+  await expect(wizard.getByText('Trocar logo', { exact: true })).toBeVisible();
+  await wizard.getByLabel('Adicionar referências visuais', { exact: true }).setInputFiles({ name: 'ref-visual.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
+  await expect(wizard.getByRole('button', { name: 'Remover referência ref-visual.png', exact: true })).toBeVisible();
   await expect(passo).toContainText('Passo 6 de 7');
-  // Fora do atalho, Continuar volta a andar uma etapa por vez.
-  await wizard.getByRole('button', { name: 'Voltar', exact: true }).click();
-  await expect(passo).toContainText('Passo 5 de 7');
   await wizard.getByRole('button', { name: 'Continuar', exact: true }).click();
-  await expect(passo).toContainText('Passo 6 de 7');
-  // Quem chega à etapa 2 pelo caminho normal segue para a 3.
-  for (let i = 0; i < 4; i++) await wizard.getByRole('button', { name: 'Voltar', exact: true }).click();
-  await expect(passo).toContainText('Passo 2 de 7');
-  await wizard.getByRole('button', { name: 'Continuar', exact: true }).click();
-  await expect(passo).toContainText('Passo 3 de 7');
+  await expect(passo).toContainText('Passo 7 de 7');
+  await expect(wizard).toContainText('Logo incluída · 1 referências');
 });
 
 test('estrutura pronta mantém a paleta da marca quando a pessoa escolhe sua identidade', async ({ page }) => {

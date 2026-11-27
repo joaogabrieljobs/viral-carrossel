@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, Loader2, Sparkles, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ImagePlus, Loader2, Sparkles, Upload, X } from 'lucide-react';
 import BrandLogo from './BrandLogo.jsx';
 import GenerationPreview, { PresentationStructureSummary } from './GenerationPreview.jsx';
 import VisualStylePicker from './VisualStylePicker.jsx';
@@ -41,7 +41,16 @@ function navigateChoices(event) {
   choices[next].focus();
   choices[next].click();
 }
-function Option({ selected, label, desc, example, onClick, disabled }) { return <button type="button" className="vc-create-option" role="radio" aria-checked={selected} disabled={disabled} onKeyDown={navigateChoices} onClick={onClick}><strong>{label}{selected && <Check size={14} aria-hidden style={{ marginLeft:8 }}/>}</strong>{desc && <span>{desc}</span>}{example && <em>Exemplo: {example}</em>}</button>; }
+function Option({ selected, label, desc, example, onClick, disabled, featured = false }) { return <button type="button" className={`vc-create-option${featured ? ' vc-create-option--featured' : ''}`} role="radio" aria-checked={selected} disabled={disabled} onKeyDown={navigateChoices} onClick={onClick}><strong>{label}{selected && <Check size={14} aria-hidden style={{ marginLeft:8 }}/>}</strong>{desc && <span>{desc}</span>}{example && <em>Exemplo: {example}</em>}</button>; }
+
+/** Envio de logo ou referências com peso visual de ação (antes era uma linha tímida de input nativo). */
+function UploadTile({ title, hint, action, done, ariaLabel, accept, multiple = false, disabled, onChange, icon: Icon = Upload, children }) {
+  return <div className={`vc-create-upload-tile${done ? ' is-done' : ''}`}>
+    <span className="vc-create-upload-icon" aria-hidden>{done ? <Check size={20}/> : <Icon size={20}/>}</span>
+    <span className="vc-create-upload-text"><strong>{title}</strong><span>{hint}</span>{children}</span>
+    <label className={`vc-create-upload-action${disabled ? ' is-disabled' : ''}`}>{action}<input className="vc-visually-hidden-input" type="file" accept={accept} multiple={multiple} aria-label={ariaLabel} disabled={disabled} onChange={onChange}/></label>
+  </div>;
+}
 
 export default function CreateProjectFlow({
   onCreate, onCreateBlank, onCancel, onCancelGeneration, onOpenDraft, hasDraft = false,
@@ -80,6 +89,10 @@ export default function CreateProjectFlow({
   const [visualPreset, setVisualPreset] = useState('auto');
   const [cardStyle, setCardStyle] = useState('full');
   const [wantImages, setWantImages] = useState(false);
+  // Pedido do João (27/11): "Gerar texto e imagens" e o Livre já vêm marcados.
+  // Só valem enquanto a pessoa não escolheu outra coisa.
+  const [imagesTouched, setImagesTouched] = useState(false);
+  const [visualTouched, setVisualTouched] = useState(false);
   const [params, setParams] = useState({ fidelity:50, creativity:50, irreverence:50, objectivity:50 });
   const [busy, setBusy] = useState(false);
   const [generationStartedAt, setGenerationStartedAt] = useState(null);
@@ -158,13 +171,23 @@ export default function CreateProjectFlow({
     return () => window.cancelAnimationFrame(frame);
   }, [error, busy]);
   useEffect(() => {
+    if (!imagesTouched && hasOpenAI && !freePlan) setWantImages(true);
+  }, [imagesTouched, hasOpenAI, freePlan]);
+  const freePresetId = presets.find(p => p.isFree)?.id || null;
+  useEffect(() => {
+    if (visualTouched || visualPreset !== 'auto' || !freePresetId) return;
+    const preset = presets.find(p => p.id === freePresetId);
+    setVisualPreset(freePresetId);
+    setBrand(current => applyCreationVisualChoice(current, identityVisualBase.current, preset));
+  }, [visualTouched, visualPreset, freePresetId, presets]);
+  useEffect(() => {
     if (!explicitCardCount || isPresentation) return;
     setCount(current => String(current) === String(explicitCardCount) ? current : String(explicitCardCount));
   }, [explicitCardCount, isPresentation]);
   const go = next => { if (busy || pending) return; setError(''); setNotice(''); setReturnStep(null); setStep(next); setFurthest(v => Math.max(v, next)); };
   const chooseProduct = next => {
     if (next === productKind) return;
-    setProductKind(next); setFormatId(next === 'apresentacao' ? 'apresentacao' : 'carrossel');
+    setProductKind(next); setFormatId(next === 'apresentacao' ? 'apresentacao' : 'carrossel'); setVisualTouched(false);
     setBrand(current => applyCreationVisualChoice(current, identityVisualBase.current));
     setVisualPreset('auto'); setBrandVisualOverrides({ ...identityBaseOverrides.current });
     setIdentityVisualEdited(Object.keys(identityBaseOverrides.current).length > 0);
@@ -194,6 +217,7 @@ export default function CreateProjectFlow({
     } else setBrandId('__local__');
   };
   const chooseVisualPreset = id => {
+    setVisualTouched(true);
     const preset = presets.find(p => p.id === id);
     setVisualPreset(id === 'auto' ? 'auto' : preset?.id || null);
     setBrand(current => applyCreationVisualChoice(current, identityVisualBase.current, preset));
@@ -256,7 +280,7 @@ export default function CreateProjectFlow({
       const stored = await storeSlideLogo(file);
       const logo = projectLogoFromStored(stored, file.name);
       if (stored.logoImage?.startsWith('blob:')) URL.revokeObjectURL(stored.logoImage);
-      if (current()) setStyleKit(old => ({ ...old, logo, logoOnGenerate:true }));
+      if (current()) { setStyleKit(old => ({ ...old, logo, logoOnGenerate:true })); setIdentityPath(path => path === 'moont' ? 'custom' : path); }
     });
   };
   const importRefs = event => {
@@ -268,6 +292,7 @@ export default function CreateProjectFlow({
         const ref = await storeProjectReference(file);
         if (!current()) return;
         setStyleKit(old => ({ ...old, refImages:[...old.refImages, ref] }));
+        setIdentityPath(path => path === 'moont' ? 'custom' : path);
       }
     });
   };
@@ -313,15 +338,27 @@ export default function CreateProjectFlow({
     }
   };
   const reviewRow = (label, value, target) => <div key={label}><dt>{label}</dt><dd>{value}</dd><button type="button" disabled={busy || pending} onClick={() => go(target)} aria-label={`Alterar ${label.toLowerCase()}`}>Alterar</button></div>;
+  const hasLogo = !!(styleKit.logo || brand.logoImageId || brand.logo);
+  const logoAndReferences = <div className="vc-create-uploads">
+    <UploadTile title="Logo da marca" hint="PNG com fundo transparente. Opcional." icon={Upload}
+      action={hasLogo ? 'Trocar logo' : 'Enviar logo'} done={hasLogo} ariaLabel="Enviar logo da marca"
+      accept="image/png,image/jpeg,image/webp" disabled={pending} onChange={importLogo}>
+      {hasLogo && <em>{styleKit.logo?.name || 'Logo da marca salva será usada.'}</em>}
+      <label className="vc-create-upload-check"><input type="checkbox" checked={styleKit.logoOnGenerate !== false} onChange={e => setStyleKit(k => ({ ...k, logoOnGenerate:e.target.checked }))}/> Incluir a logo nos novos {item}</label>
+    </UploadTile>
+    <UploadTile title="Referências visuais" hint={`Até ${MAX_REF_IMAGES} imagens para orientar cores, luz e estilo. Opcional.`} icon={ImagePlus}
+      action={styleKit.refImages.length ? 'Adicionar mais' : 'Enviar referências'} done={styleKit.refImages.length > 0}
+      ariaLabel="Adicionar referências visuais" accept="image/*" multiple
+      disabled={pending || styleKit.refImages.length >= MAX_REF_IMAGES} onChange={importRefs}>
+      {styleKit.refImages.length > 0 && <ul className="vc-create-files">{styleKit.refImages.map(ref => <li key={ref.id || ref.imageId}><span>{ref.name}</span><button type="button" disabled={pending} aria-label={`Remover referência ${ref.name}`} onClick={() => setStyleKit(k => ({ ...k, refImages:k.refImages.filter(r => r !== ref) }))}><X size={12}/></button></li>)}</ul>}
+    </UploadTile>
+  </div>;
   const identityEditor = <div className="vc-create-stack">
     <Field label={brandId === '__new__' ? 'Nome da nova marca' : 'Nome da marca no projeto'} hint={brandId === '__new__' ? 'Dê um nome para salvar esta marca. Se não quiser salvar, escolha Somente neste projeto.' : 'Opcional. Pode ficar vazio.'}><input className="vc-input" value={brand.name || ''} onChange={e => setBrand(b => ({ ...b, name:e.target.value }))} maxLength={80} placeholder="Ex.: Clínica Janine Araújo"/></Field>
     <div className="vc-create-grid"><Field label="Para quem é o conteúdo?" hint="Opcional."><input className="vc-input" value={brand.defaultAudience || ''} onChange={e => setBrand(b => ({ ...b, defaultAudience:e.target.value }))} placeholder="Ex.: profissionais de saúde"/></Field><Field label="Como a marca deve falar?" hint="Opcional. O tom salvo é reutilizado quando disponível."><input className="vc-input" value={brand.defaultTone || ''} onChange={e => setBrand(b => ({ ...b, defaultTone:e.target.value, brandTone:null }))} placeholder="Ex.: acolhedora, clara e profissional"/></Field></div>
     <Field label="O que o Moont precisa saber sobre a marca?" hint="Opcional. Produto, diferencial, público e cuidados com a comunicação."><textarea className="vc-input" rows={4} value={styleKit.contextMd} maxLength={CONTEXT_MD_MAX} onChange={e => setStyleKit(k => ({ ...k, contextMd:e.target.value }))}/></Field>
     <details className="vc-create-details"><summary>Cores e fontes — opcional</summary>{visualPreset && visualPreset !== 'auto' && <p className="vc-create-note">Estes ajustes personalizam o preset neste projeto. Ao voltar para a identidade configurada ou trocar o tipo de projeto, as cores e fontes da identidade serão restauradas.</p>}<div className="vc-create-stack"><div className="vc-create-colors">{[{ key:'bg',label:'Cor de fundo' },{ key:'titleColor',label:'Cor dos títulos' },{ key:'textColor',label:'Cor do texto' },{ key:'accent',label:'Cor de destaque' }].map(field => <Field key={field.key} label={field.label}><input type="color" aria-label={field.label} value={/^#[0-9a-f]{6}$/i.test(brand[field.key] || '') ? brand[field.key] : '#000000'} onChange={e => editIdentityVisual(field.key === 'textColor' ? { textColor:e.target.value, subtitleColor:e.target.value } : { [field.key]:e.target.value })}/></Field>)}</div><div className="vc-create-grid"><Field label="Fonte dos títulos"><select className="vc-input" value={brand.titleFont || TITLE_FONTS[0].val} onChange={e => editIdentityVisual({ titleFont:e.target.value, customTitleFont:null })}>{!TITLE_FONTS.some(f => f.val === brand.titleFont) && brand.titleFont && <option value={brand.titleFont}>Fonte da identidade salva</option>}{TITLE_FONTS.map(f => <option key={f.val} value={f.val}>{f.name}</option>)}</select></Field><Field label="Fonte do texto"><select className="vc-input" value={brand.bodyFont || BODY_FONTS[0].val} onChange={e => editIdentityVisual({ bodyFont:e.target.value, customBodyFont:null })}>{!BODY_FONTS.some(f => f.val === brand.bodyFont) && brand.bodyFont && <option value={brand.bodyFont}>Fonte da identidade salva</option>}{BODY_FONTS.map(f => <option key={f.val} value={f.val}>{f.name}</option>)}</select></Field></div></div></details>
-    <label className="vc-create-upload">Logo da marca — opcional<input type="file" accept="image/png,image/jpeg,image/webp" aria-label="Enviar logo da marca" disabled={pending} onChange={importLogo}/><span className="vc-create-note">Use PNG com fundo transparente. {styleKit.logo?.name || (brand.logoImageId || brand.logo ? 'Logo da marca salva será usada.' : '')}</span></label>
-    <label className="vc-create-note"><input type="checkbox" checked={styleKit.logoOnGenerate !== false} onChange={e => setStyleKit(k => ({ ...k, logoOnGenerate:e.target.checked }))}/> Incluir a logo nos novos {item}</label>
-    <label className="vc-create-upload">Referências visuais — opcional<input type="file" accept="image/*" multiple aria-label="Adicionar referências visuais" disabled={pending || styleKit.refImages.length >= MAX_REF_IMAGES} onChange={importRefs}/><span className="vc-create-note">Até {MAX_REF_IMAGES} imagens para orientar a aparência. As fotos dos {item} podem ser enviadas depois, no editor.</span></label>
-    {styleKit.refImages.length > 0 && <ul className="vc-create-files">{styleKit.refImages.map(ref => <li key={ref.id || ref.imageId}><span>{ref.name}</span><button type="button" disabled={pending} aria-label={`Remover referência ${ref.name}`} onClick={() => setStyleKit(k => ({ ...k, refImages:k.refImages.filter(r => r !== ref) }))}><X size={12}/></button></li>)}</ul>}
+    {logoAndReferences}
   </div>;
   return <section className="vc-create-flow" aria-label="Criar novo projeto">
     <header className="vc-create-header"><BrandLogo height={27}/><button type="button" className="vc-btn vc-btn-ghost" disabled={busy} onClick={onCancel}><X size={15} aria-hidden/> Sair da criação</button></header>
@@ -384,11 +421,11 @@ export default function CreateProjectFlow({
         </div>
         <VisualStylePicker value={visualSelection.presetId} suggestedId={visualSelection.recommendedId} onChange={chooseVisualPreset} presets={recommendedPresets} title="Estilos para começar" aspectRatio={isPresentation ? '16 / 9' : '4 / 5'} allowGenerationOnly/>
         <details className="vc-create-details"><summary>Ver todos os estilos visuais{visualSelection.preset ? ` · ${selectedVisualLabel}` : ''}</summary><VisualStylePicker value={visualSelection.presetId} suggestedId={visualSelection.recommendedId} onChange={chooseVisualPreset} presets={presets} title={isPresentation ? 'Estilos para apresentação' : 'Estilos para redes'} aspectRatio={isPresentation ? '16 / 9' : '4 / 5'} allowGenerationOnly/></details>
-        <fieldset className="vc-create-group"><legend>Como quer começar com as imagens?</legend><div className="vc-create-grid" role="radiogroup" aria-label="Imagens do projeto"><Option label="Criar o texto primeiro" desc="Organiza o conteúdo agora. Você pode enviar fotos ou gerar imagens no editor." selected={!wantImages} onClick={() => setWantImages(false)}/><Option label="Gerar texto e imagens" desc={hasOpenAI ? 'Cria imagens junto com o conteúdo. Essa opção leva mais tempo.' : 'Configure o acesso à geração de imagens para usar esta opção.'} selected={wantImages && hasOpenAI} disabled={!hasOpenAI} onClick={() => setWantImages(true)}/></div>{!hasOpenAI && onOpenKeys && <button type="button" className="vc-btn vc-btn-ghost" onClick={onOpenKeys}>Configurar geração de imagens</button>}</fieldset>
+        <fieldset className="vc-create-group"><legend>Como quer começar com as imagens?</legend><div className="vc-create-grid" role="radiogroup" aria-label="Imagens do projeto"><Option label="Gerar texto e imagens" featured desc={hasOpenAI ? 'Cria imagens junto com o conteúdo. Essa opção leva mais tempo.' : 'Configure o acesso à geração de imagens para usar esta opção.'} selected={wantImages && hasOpenAI} disabled={!hasOpenAI} onClick={() => { setImagesTouched(true); setWantImages(true); }}/><Option label="Criar o texto primeiro" desc="Organiza o conteúdo agora. Você pode enviar fotos ou gerar imagens no editor." selected={!wantImages || !hasOpenAI} onClick={() => { setImagesTouched(true); setWantImages(false); }}/></div>{!hasOpenAI && onOpenKeys && <button type="button" className="vc-btn vc-btn-ghost" onClick={onOpenKeys}>Configurar geração de imagens</button>}</fieldset>
         {wantImages && hasOpenAI && <details className="vc-create-details"><summary>Ajustar a direção das imagens — opcional</summary><ImgParamsPanel value={params} onChange={(key, value) => setParams(p => ({ ...p, [key]:value }))}/></details>}
         <Field label="Direção visual adicional" hint="Ex.: fotografia natural, fundo claro, poucas cores e títulos elegantes."><textarea className="vc-input" rows={3} maxLength={STYLE_PROMPT_MAX} value={styleKit.stylePrompt} onChange={e => setStyleKit(k => ({ ...k, stylePrompt:e.target.value }))}/></Field>
         {!isPresentation && <details className="vc-create-details"><summary>Organização da foto e do texto — opcional</summary><div className="vc-create-grid" role="radiogroup" aria-label="Composição dos cards">{[{ id:'full', label:'Imagem no fundo', desc:'Texto sobre a imagem.' },{ id:'inset_h_top', label:'Foto no topo', desc:'Texto abaixo da foto.' },{ id:'inset_h_middle', label:'Foto no meio', desc:'Título acima e apoio abaixo.' },{ id:'inset_h_bottom', label:'Foto embaixo', desc:'Texto acima da foto.' }].map(v => <Option key={v.id} {...v} selected={cardStyle === v.id} onClick={() => setCardStyle(v.id)}/>)}</div></details>}
-        <div className="vc-create-identity-summary"><strong>Logo e referências — opcionais</strong><span>{identitySummary.logo} · {identitySummary.references} referências visuais.</span><button type="button" className="vc-btn vc-btn-ghost" onClick={() => { if (busy || pending) return; const origem = step; if (identityPath === 'moont') setIdentityPath('custom'); setIdentityAdjustmentsOpen(true); go(1); setReturnStep(origem); }}>Ajustar logo e referências</button></div>
+        <fieldset className="vc-create-group"><legend>Logo e referências</legend>{logoAndReferences}</fieldset>
       </>}
       {step === 6 && <>
         {hasMaterialOverage && <div role="alert" className="vc-create-error">{materialOverageMessage}</div>}
