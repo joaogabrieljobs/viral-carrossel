@@ -92,7 +92,11 @@ function chromeContext(slide, brand = {}) {
       geometry.lead.w / 1080 * 100, geometry.lead.h / geometry.height * 100) : null]));
   const logo = !slide.logoHidden && (slide.logoImage || slide.logoImageId || brand.logo || brand.logoImageId)
     ? { pos: slide.logoPosition || brand.logoPosition || 'tr', size: Number(slide.logoSize ?? brand.logoSize) || 150, drop: !!brand.showHandle } : null;
-  return { footer, logo, topReserve, brandLead };
+  // Faixa do texto da marca no topo, onde o renderer desenha o cabeçalho.
+  const header = Object.fromEntries(Object.entries(frames).map(([fmt, g]) => [fmt, g.textChromeBottomPx > g.topSafePx
+    ? box(g.headerLeftPx / 1080 * 100, g.topSafePx / g.height * 100, (1080 - g.headerLeftPx - Math.min(g.headerRightPx, g.handleRightPx)) / 1080 * 100,
+      (g.textChromeBottomPx - g.topSafePx) / g.height * 100) : null]));
+  return { footer, logo, topReserve, brandLead, header };
 }
 
 function usefulFrame(formato, context, slide) {
@@ -321,6 +325,13 @@ function composeSlide(slide, design, { deck, fn, formato, variant = 0, context =
           subtitle: box(F.e, F.contentTop + 22, 100 - 2 * F.e, 20) }, original, design, deck, F) : null;
     if (alternative && !alternative.over) fit = alternative;
   }
+  // Foto que começaria atrás do cabeçalho da marca começa logo abaixo dele;
+  // sem isso o renderer punha uma placa sob o texto, colada na foto.
+  const header = context.header?.[F.key];
+  if (fit.photo && header && overlaps(fit.photo, header)) {
+    const top = header.y + header.h, bottom = fit.photo.y + fit.photo.h;
+    if ((bottom - top) / 100 * F.h >= 180) fit = { ...fit, photo: box(fit.photo.x, top, fit.photo.w, bottom - top) };
+  }
   const inks = inksFor(design, deck, onPhoto);
   const display = freeFontSpec(deck.fonts.display, 'display');
   const text = freeFontSpec(deck.fonts.text, 'text');
@@ -329,6 +340,7 @@ function composeSlide(slide, design, { deck, fn, formato, variant = 0, context =
   const chrome = resolvedChrome(rawChrome, fit, F, inks, original, deck);
   const socialArt = { family: design.family, fn, variant, index, count, formato: F.key, archetype: L.archetype,
     ground: design.ground, chrome, density: fit.over ? 'over' : 'ok', footer: context.footer || {}, topReserve: context.topReserve || {}, brandLead: context.brandLead || {}, logo: context.logo || null,
+    ...(context.header ? { header: context.header } : {}),
     typo: { titleFont: display.css, bodyFont: text.css, titleLeading: Math.round(fit.titleLeading * 100), titleCase: 'normal' },
     textOnPhoto: onPhoto, photoInks: { title: inks.ink, body: inks.ink, accent: inks.accent } };
   socialArt.rhythmKey = [design.ground, L.photo ? [L.photo.x, L.photo.y, L.photo.w, L.photo.h].map(Math.round).join(':') : 'none',
@@ -417,7 +429,7 @@ export function socialFreeFormatPatch(slide, formato = 'carrossel') {
   if (!isFreeSocialSlide(slide) || socialFreeSlideLocked(slide) || !FORMATS[formato] || slide.socialArt?.formato === formato) return {};
   const art = slide.socialArt || {};
   return composeSlide(slide, slide.socialFreeDesign, { deck: normalizeDeckDesign(slide.socialDeckDesign), fn: art.fn || slide.socialFunction || 'development',
-    formato, variant: art.variant || 0, context: { footer: art.footer, logo: art.logo, topReserve: art.topReserve, brandLead: art.brandLead }, index: art.index || 0, count: art.count || 1 });
+    formato, variant: art.variant || 0, context: { footer: art.footer, logo: art.logo, topReserve: art.topReserve, brandLead: art.brandLead, header: art.header }, index: art.index || 0, count: art.count || 1 });
 }
 
 /** Ação explícita de inserir mídia. `requested` prepara só o snapshot do pedido
@@ -429,7 +441,7 @@ export function socialFreePhotoPatch(slide, { requested = false } = {}) {
   if (socialFreeSlideLocked(slide)) return manualPhotoPatch(slide, design);
   return composeSlide(slide, design, { deck: normalizeDeckDesign(slide.socialDeckDesign), fn: art.fn || slide.socialFunction || 'development',
     formato: art.formato || slide.socialPlan?.formato || 'carrossel', variant: art.variant || 0,
-    context: { footer: art.footer, logo: art.logo, topReserve: art.topReserve, brandLead: art.brandLead }, index: art.index || 0, count: art.count || 1 });
+    context: { footer: art.footer, logo: art.logo, topReserve: art.topReserve, brandLead: art.brandLead, header: art.header }, index: art.index || 0, count: art.count || 1 });
 }
 
 function manualOccupiedZones(slide, F) {

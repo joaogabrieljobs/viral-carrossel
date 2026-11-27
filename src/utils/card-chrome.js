@@ -74,7 +74,10 @@ export function socialFreeChromeGeometry(brand = {}, f, formato = 'carrossel', s
     headerTopPx: topSafePx, headerLeftPx: left, headerRightPx, headerHeightPx: font(w * 0.020 * headerScale) * 1.3,
     badgeTopPx: topSafePx, badgeRightPx: right,
     handleTopPx, handleLeftPx: Math.max(left, w * (Number(brand.handleBadgeX) || 5) / 100), handleRightPx: right,
-    logoTopPx: topSafePx, logoBottomPx, logoSize, logoPos, lead };
+    logoTopPx: topSafePx, logoBottomPx, logoSize, logoPos, lead,
+    // Base da faixa de texto do topo (cabeçalho, contador, handle) mais a
+    // folga; 0 quando a marca não tem texto no topo.
+    textChromeBottomPx: rowHeight || hasHandle ? textChromeBottomPx : 0 };
 }
 
 /** Altura em px da barra de três colunas; 0 quando nenhuma coluna tem texto. */
