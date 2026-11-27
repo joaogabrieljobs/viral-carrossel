@@ -4266,7 +4266,12 @@ export default function App() {
   const landscapeCompact = shortLandscape && !landscapeBarsOpen;
   /* A assinatura tem proporção natural: as ferramentas descem antes de
      comprimir a marca ou sobrepor Salvar e Projetos. */
-  const headerTight = !isMobile && vw < 1536 && !landscapeCompact;
+  /* Abaixo de 1800 px o histórico (com "Desfazer" escrito, 27/11) e o
+     formato descem para a 2ª linha; em uma linha só, o lado direito
+     empurrava Salvar sobre Projetos e o nome do projeto sumia. */
+  const headerTight = !isMobile && vw < 1800 && !landscapeCompact;
+  /* Abaixo de 1536 px saem do topo o atalho Projetos e o estado de gravação. */
+  const headerNarrow = !isMobile && vw < 1536;
   /* <1000px: some o atalho "Projetos" do header (o rodapé já tem um igual). */
   const headerVeryTight = !isMobile && vw < 1000;
   const f = FORMATS[fmt] || FORMATS.carrossel;
@@ -8845,15 +8850,17 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   style={{
                     fontSize: 11, color: 'var(--text-muted)', letterSpacing: '-0.011em',
                     background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                    maxWidth: headerVeryTight ? 68 : (headerTight ? 96 : 160), minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    maxWidth: headerVeryTight ? 68 : (headerNarrow ? 96 : 160), minWidth: headerVeryTight ? 48 : 56, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                     textAlign: 'left',
                   }}
                   title="Clique para renomear"
                 >
                   {activeEntry.name || 'Sem título'}
                 </button>
-                {!headerTight && !landscapeCompact && (
-                  <>{remoteProjectNotice ? <SavedIndicator savedAt={lastSavedAt} notice={remoteProjectNotice} onUpdate={() => { setRemoteProjectNotice(null); syncProjectLibrary('sync'); }} /> : saveIndicator}</>
+                {!headerNarrow && !landscapeCompact && (
+                  // O estado de gravação cede espaço primeiro; o nome do
+                  // projeto não some quando o lado direito cresce.
+                  <span style={{ minWidth: 0, flexShrink: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{remoteProjectNotice ? <SavedIndicator savedAt={lastSavedAt} notice={remoteProjectNotice} onUpdate={() => { setRemoteProjectNotice(null); syncProjectLibrary('sync'); }} /> : saveIndicator}</span>
                 )}
                 <button
                   type="button"
@@ -8877,7 +8884,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
               </div>
             )}
           </div>
-          {!headerTight && !landscapeCompact && editorPillBtn(() => goAccount('projects'), 'Projetos', Home)}
+          {!headerNarrow && !landscapeCompact && editorPillBtn(() => goAccount('projects'), 'Projetos', Home)}
         </div>
 
         {/* Centro — Gerar com IA */}

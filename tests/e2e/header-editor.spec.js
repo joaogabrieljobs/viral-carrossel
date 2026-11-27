@@ -34,16 +34,23 @@ async function paresSobrepostos(page) {
 }
 
 test.describe('Header do editor', () => {
-  for (const largura of [1440, 1280, 1100, 900, 768]) {
-    test(`nenhum controlo se sobrepõe a ${largura}px`, async ({ page }) => {
+  // 1536–1920: linha única com o "Desfazer" escrito (27/11). 932×430 e
+  // 844×390: celular deitado, topo de uma linha.
+  for (const [largura, altura] of [[1920, 900], [1800, 900], [1680, 900], [1536, 900], [1440, 900], [1280, 900], [1100, 900], [900, 900], [768, 900], [932, 430], [844, 390]]) {
+    test(`nenhum controlo se sobrepõe a ${largura}px${altura < 900 ? ` × ${altura}px` : ''}`, async ({ page }) => {
       test.setTimeout(60_000);
-      await page.setViewportSize({ width: largura, height: 900 });
+      await page.setViewportSize({ width: largura, height: altura });
       await mockApi(page, { session: SESSAO_ATIVA });
       await page.goto('/?app=1');
       await enterEditorFromHome(page);
       await page.waitForTimeout(900);
 
       expect(await paresSobrepostos(page)).toEqual([]);
+      // O nome do projeto continua no topo (sumia a 1680 px quando o lado direito crescia).
+      if (altura === 900 && largura >= 1100) {
+        const nome = await page.locator('header button[title="Clique para renomear"]').boundingBox();
+        expect(nome?.width ?? 0).toBeGreaterThanOrEqual(40);
+      }
     });
   }
 
