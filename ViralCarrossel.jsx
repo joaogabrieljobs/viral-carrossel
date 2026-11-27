@@ -105,6 +105,8 @@ import { normalizeVisualBible, visualBibleHasPerson, planPersonAnchor, pickPerso
 import { composeImageDirection } from './src/utils/image-direction.js';
 import { kitVisualColors } from './src/utils/visual-direction.js';
 import { extractReferencePaletteFromSources, kitReferencePalette, referencePaletteKitField } from './src/utils/reference-palette.js';
+import { analyzeReferenceVisuals, resolveReferenceVisualRecordForKit } from './src/utils/reference-visual-client.js';
+import { referenceVisualRecordForKit, referenceVisualAnalysisForSavedPlan } from './src/utils/reference-visual-cache.js';
 import { presentationPlanEntryImageQuery } from './src/utils/presentation-plan.js';
 import {
   PRESENTATION_VISUAL_PRESETS,
@@ -5505,6 +5507,7 @@ export default function App() {
         // separados por papel; a proporção acompanha a zona real da foto.
         imageDirection: composeImageDirection({
           styleKit, slide: generationSnap, fmt, formatViews: resolvedSocialView ? null : doc.formatViews, visualBible: doc.visualBible,
+          referenceVisualAnalysis: referenceVisualAnalysisForSavedPlan(doc.presentationPlan, styleKit),
           slideDirection: imageState.extraPrompt, anchorPlan, baseReferenceCount: baseRefs.length,
           presentationPanel: fmt === 'apresentacao' && [2, 3].includes(generationSnap.presentationCompositionVersion),
           // Spec 1.1 (referência): a referência do kit vai em toda imagem; as
@@ -5589,19 +5592,20 @@ export default function App() {
         return next;
       });
     }
-  }, [slides, fmt, imageGenerationAvailability, openaiKey, imgParams, styleKit, setSlides, setSlidesPhotoSwap, toast, activeEntry?.name, doc.visualBible, doc.formatViews, access, useOwnImageKey]);
+  }, [slides, fmt, imageGenerationAvailability, openaiKey, imgParams, styleKit, setSlides, setSlidesPhotoSwap, toast, activeEntry?.name, doc.visualBible, doc.formatViews, doc.presentationPlan, access, useOwnImageKey]);
 
   // Direção de arte, parte 4: arte de fundo do deck (modo livre). Uma imagem
   // abstrata da identidade, pedida uma vez (1 crédito) pelo mesmo caminho das
   // fotos e guardada como elas (IndexedDB e nuvem) nas páginas `ground: 'art'`.
   // Sem crédito, sem chave ou com falha, as páginas ficam na cor base.
   const deckArtGenRef = useRef(null);
-  deckArtGenRef.current = async ({ projectId, signal, axes, deckSlides, formato = fmt, onSlides = null }) => {
+  deckArtGenRef.current = async ({ projectId, signal, axes, deckSlides, formato = fmt, onSlides = null,
+    referenceVisualAnalysis = referenceVisualAnalysisForSavedPlan(doc.presentationPlan, styleKit) }) => {
     if (!deckNeedsArt(deckSlides)) return { ok: false, reason: 'not_needed' };
     const baseRefs = await resolveImageReferences(styleKit, null, null, null);
     const socialArt = deckSlides.some(isFreeSocialSlide);
     const artFormat = socialArt && ['carrossel', 'quadrado', 'stories'].includes(formato) ? formato : socialArt ? 'carrossel' : 'apresentacao';
-    const direction = composeDeckArtImageDirection({ slides: deckSlides, fmt: artFormat, formatViews: doc.formatViews, styleKit, baseReferenceCount: baseRefs.length });
+    const direction = composeDeckArtImageDirection({ slides: deckSlides, fmt: artFormat, formatViews: doc.formatViews, styleKit, baseReferenceCount: baseRefs.length, referenceVisualAnalysis });
     const url = await generateDALLEWithRetry(direction.sceneBrief?.query || DECK_ART_SCENE, openaiKey, axes, {
       signal,
       refImages: baseRefs,
@@ -6214,11 +6218,16 @@ ${jsonShapeLine}`;
     // do projeto, presas às referências, para refazer uma imagem depois.
     let referenceColors = [];
     let referencePaletteField = null;
+    let referenceSources = null;
+    const resolvePlanningReferences = async () => {
+      if (!referenceSources) referenceSources = await resolveImageReferences(styleKit, null, null, null);
+      return referenceSources;
+    };
     if ((isPresentationGeneration || isSocialFreeGeneration) && !remix && (styleKit?.refImages?.length || 0) > 0) {
       referenceColors = kitReferencePalette(styleKit);
       if (!referenceColors.length) {
         try {
-          referenceColors = await extractReferencePaletteFromSources(await resolveImageReferences(styleKit, null, null, null), { ignoreFlatBorders: true });
+          referenceColors = await extractReferencePaletteFromSources(await resolvePlanningReferences(), { ignoreFlatBorders: true });
           referencePaletteField = referencePaletteKitField(styleKit, referenceColors);
         } catch { referenceColors = []; }
       }
@@ -6248,6 +6257,19 @@ ${jsonShapeLine}`;
       brandBlock,
       styleKitTextHint,
     ].filter(Boolean).join('\n');
+    // Teste8: a paleta mede cores; a leitura multimodal descreve o que a
+    // referência realmente mostra. Apenas novas apresentações Livre recebem
+    // esta chamada. Não há fallback silencioso para inventar acabamento.
+    let referenceVisual = null;
+    if (isPresentationGeneration && effectiveVisualPresetDef?.isFree && !remix && styleKit?.refImages?.length) {
+      setGenProgress({ phase: 'text', current: 1, total: 5, label: 'Etapa 1 de 5 · Lendo a linguagem das referências visuais' });
+      referenceVisual = await analyzeReferenceVisuals({ kit: styleKit,
+        brief: [topic, material?.context, materialFactualSource, styleKit.contextMd, planningBrief].filter(Boolean).join('\n\n'),
+        application: 'Apresentação horizontal 16:9, com texto em camadas editáveis.',
+        referenceColors, loadSources: resolvePlanningReferences, signal: job.signal });
+      checkActive();
+      setGenProgress({ phase: 'text', current: 1, total: 5, label: 'Etapa 1 de 5 · Organizando o roteiro e as evidências' });
+    }
     const { result: generatedResult, reviewStatus, plan: generationPlan, socialPlan: generationSocialPlan, incomplete: generationIncomplete = false, interruptionReason: generationInterruptionReason, writingDiagnostics: generationWritingDiagnostics = [], reviewDiagnostics: generationReviewDiagnostics = [], completedCount: generatedCount, totalCount: requestedCount, violations: editorialViolations = [], issues: editorialIssues = [], materialGaps = [], repetitionNotice = '', repetitionRemaining = [] } = await generateReviewedCarousel({
       prompt,
       ...(isSocialFreeGeneration ? { socialFree: { formato: generationFormat, brand: freeKitBrand, styleKit, referenceColors } } : {}),
@@ -6279,6 +6301,7 @@ ${jsonShapeLine}`;
           kitColors: kitVisualColors(styleKit).colors,
           kitReferenceWithoutText: (styleKit?.refImages?.length || 0) > 0 && !kitVisualColors(styleKit).colors.length,
           referenceColors,
+          ...(referenceVisual ? { referenceVisualAnalysis: referenceVisual.analysis } : {}),
           sources: [{ id: 'request', title: 'Pedido atual e marca', kind: 'brief', text: planningBrief }, ...presentationSources],
         },
         presentationLimitsForPlan: (plan, draftedSlides = []) => {
@@ -6335,6 +6358,8 @@ ${jsonShapeLine}`;
             presentationPath: presentationPathId,
             visualPreset: effectiveVisualPreset,
             preserveBrandIdentity, brandVisualOverrides,
+            referenceVisual: referenceVisual?.record || null,
+            referenceVisualSourceKit: referenceVisual ? styleKit : null,
           };
         }
         // A read-only preview is separate from history and autosave, including
@@ -6713,8 +6738,19 @@ ${jsonShapeLine}`;
       };
       setHasLastGenerate(true);
     }
+    const referenceVisualCommitKit = referenceVisual ? history.getState().styleKit : null;
+    const verifiedReferenceVisual = referenceVisual ? await resolveReferenceVisualRecordForKit(
+      referenceVisual.record, styleKit, referenceVisualCommitKit, {
+        loadSources: () => resolveImageReferences(referenceVisualCommitKit, null, null, null), signal: job.signal,
+      }) : null;
+    checkActive();
     if (creationValidatedDraftRef.current?.job === job) creationValidatedDraftRef.current = null;
-    history.set(d => ({
+    history.set(d => {
+      // A nuvem pode ter canonizado os IDs enquanto a IA respondia. Só
+      // transporta a leitura quando o kit atual comprova os mesmos originais.
+      const boundReferenceVisual = verifiedReferenceVisual
+        ? referenceVisualRecordForKit(verifiedReferenceVisual, referenceVisualCommitKit, d.styleKit) : null;
+      return ({
       ...d, brand: generationBrand, slides: newSlides, mode: effectiveMode, creativePreset: cp,
       ...(isPresentationGeneration ? {} : { visualBible: generationVisualBible }),
       ...(isPresentationGeneration
@@ -6737,7 +6773,10 @@ ${jsonShapeLine}`;
         },
       } : { socialPlan: null, socialDeckDesign: null, socialQuality: null }),
       // Paleta extraída da referência, guardada com o kit do projeto.
-      ...(referencePaletteField ? { styleKit: { ...normalizeStyleKit(d.styleKit), referencePalette: referencePaletteField } } : {}),
+      ...(referencePaletteField || boundReferenceVisual ? { styleKit: { ...normalizeStyleKit(d.styleKit),
+        ...(referencePaletteField ? { referencePalette: referencePaletteField } : {}),
+        ...(boundReferenceVisual ? { referenceVisual: boundReferenceVisual } : {}),
+      } } : {}),
       presentationDesignSystemId: isPresentationGeneration
         ? (effectiveVisualPresetDef?.sourceId || null)
         : undefined,
@@ -6786,7 +6825,8 @@ ${jsonShapeLine}`;
           ? presentationPathId
           : performanceGuidance.preferredStructureId,
       },
-    }));
+      });
+    });
     setCreationPreviewSlides(newSlides);
     setCreationPreviewCompletedCount(newSlides.length);
     setCreationPreviewPhase(['needs_attention', 'unavailable'].includes(reviewStatus) ? reviewStatus : 'reviewed');
@@ -6881,6 +6921,7 @@ ${jsonShapeLine}`;
               imageDirection: composeImageDirection({
                 styleKit,
                 slide: newSlides[i],
+                referenceVisualAnalysis: generationPlan?.referenceVisualAnalysis,
                 fmt: isPresentationGeneration ? 'apresentacao' : (fmt && fmt !== 'apresentacao' ? fmt : 'carrossel'),
                 visualBible: isPresentationGeneration ? null : generationVisualBible,
                 anchorPlan,
@@ -6968,6 +7009,7 @@ ${jsonShapeLine}`;
           try {
             await deckArtGenRef.current({
               projectId: generationProjectId, signal: job.signal, axes: effectiveAxes, deckSlides: newSlides, formato: generationFormat,
+              referenceVisualAnalysis: generationPlan?.referenceVisualAnalysis,
               onSlides: patch => setCreationPreviewSlides(prev => applyDeckArt(prev, patch)),
             });
           } catch (e) {
@@ -7186,7 +7228,7 @@ ${jsonShapeLine}`;
     setAccountTab('projects');
   }, [cancelGeneration, setShellView, setAccountTab]);
 
-  const openCreationDraft = useCallback(() => {
+  const openCreationDraft = useCallback(async () => {
     const target = creationTargetRef.current;
     if (!creationSession || !target || getAIGenerationCount() > 0 || creationRequestRef.current) return;
     if (activeProjectRef.current !== target.id || readDataOwner() !== creationSession.owner
@@ -7195,6 +7237,17 @@ ${jsonShapeLine}`;
     const recover = snapshot?.cancelled && snapshot.projectId === target.id
       && snapshot.sessionId === creationSession.id && snapshot.owner === creationSession.owner
       && snapshot.draft?.slides?.length > 0 && Array.isArray(snapshot.plan?.slides);
+    const referenceKit = recover ? history.getState().styleKit : null;
+    const verifiedReferenceVisual = recover && snapshot.referenceVisual
+      ? await resolveReferenceVisualRecordForKit(snapshot.referenceVisual, snapshot.referenceVisualSourceKit, referenceKit, {
+        loadSources: () => resolveImageReferences(referenceKit, null, null, null),
+      }) : null;
+    // A leitura do arquivo é assíncrona. Uma saída da criação, troca de conta
+    // ou nova geração durante essa espera continua prevalecendo.
+    if (creationTargetRef.current !== target || creationValidatedDraftRef.current !== snapshot
+      || activeProjectRef.current !== target.id || readDataOwner() !== creationSession.owner
+      || !accountLibraryReadyRef.current || areAccountDataWritesLocked()
+      || getAIGenerationCount() > 0 || creationRequestRef.current) return;
     flushSync(() => {
       if (recover) history.set(current => {
         const route = getPresentationPath(snapshot.presentationPath);
@@ -7206,6 +7259,9 @@ ${jsonShapeLine}`;
         const recoveredDeckDesign = preset?.isFree
           ? deckDesignFromBrand({ ...explicitBrandColorsFromKit(current.styleKit), ...sanitizeCustomVisualPresetBrand(snapshot.brandVisualOverrides) }, snapshot.plan?.deckDesign || undefined)
           : null;
+        // O lote já passou pela leitura visual. Abrir o rascunho conserva esse
+        // resultado, sem aplicar uma análise a referências alteradas depois.
+        const recoveredVisual = referenceVisualRecordForKit(verifiedReferenceVisual, referenceKit, current.styleKit);
         const identity = {
           ...(snapshot.visualPreset && !snapshot.preserveBrandIdentity
             ? applyVisualPreset(current.brand, snapshot.visualPreset, visualPresets) : current.brand),
@@ -7246,6 +7302,7 @@ ${jsonShapeLine}`;
           slides: applyFinalizeCanvasMarginsToSlides(recovered, 'apresentacao'), caption: snapshot.draft.caption || '',
           quickCardCount: totalCount, presentationPath: snapshot.presentationPath, visualPreset: snapshot.visualPreset,
           ...(recoveredDeckDesign ? { presentationDeckDesign: recoveredDeckDesign } : {}),
+          ...(recoveredVisual ? { styleKit: { ...normalizeStyleKit(current.styleKit), referenceVisual: recoveredVisual } } : {}),
           presentationPlan: snapshot.plan, editorialReviewStatus: reviewStatus,
           editorialReviewIssues: incomplete ? [{ code: 'presentation_incomplete', kind: 'incomplete', slideIndex: null, completedCount, totalCount }] : [],
           presentationQuality: { version: 1, reviewStatus, incomplete, completedCount, totalCount, renderCheckStatus: 'pending' },
@@ -7266,7 +7323,7 @@ ${jsonShapeLine}`;
       const persisted = flushPersistRef.current?.();
       if (Array.isArray(persisted)) setLibrary(persisted);
     }
-  }, [creationSession, history.set, visualPresets, setAppMode, setShellView]);
+  }, [creationSession, history.set, history.getState, visualPresets, setAppMode, setShellView]);
 
   const createBlankProject = useCallback(async ({ name = '', productKind = 'carrossel' } = {}) => {
     if (!creationSession || creationRequestRef.current || getAIGenerationCount() > 0) return false;

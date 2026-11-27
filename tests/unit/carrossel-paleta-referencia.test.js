@@ -54,17 +54,21 @@ describe('paleta da referência no desenho do projeto do carrossel', () => {
     expect(projectDesignWithReferencePalette(undefined, normalizeReferencePalette([]))).toBeUndefined();
   });
 
-  it('o app extrai e guarda a paleta também no carrossel, sem tocar no roteiro da apresentação', () => {
+  it('o app extrai e guarda a paleta também no carrossel, sem misturar as paletas do planejamento', () => {
     // A extração do carrossel tem variável própria: as cores da apresentação
     // (planningContext.referenceColors) continuam só da apresentação.
     expect(app).toMatch(/let carouselReferenceColors = \[\];/);
-    expect(app).toMatch(/referenceColors,\n\s+sources: \[\{ id: 'request'/);
-    expect(app).not.toMatch(/planningContext:[\s\S]{0,600}carouselReferenceColors/);
+    const planStart = app.indexOf('planningContext:');
+    expect(planStart).toBeGreaterThan(0);
+    const planning = app.slice(planStart, app.indexOf('presentationLimitsForPlan:', planStart));
+    expect(planning).toMatch(/\n\s+referenceColors,/);
+    expect(planning).toContain("sources: [{ id: 'request'");
+    expect(planning).not.toContain('carouselReferenceColors');
     // Alimenta o projectDesign, antes das cores escritas no kit.
     const i = app.indexOf('projectDesignWithReferencePalette(result.projectDesign, carouselReferenceColors');
     expect(i).toBeGreaterThan(0);
     expect(app.indexOf('...explicitBrandColorsFromKit(styleKit),', i)).toBeGreaterThan(i);
     // Guardada no kit pelo mesmo campo da apresentação.
-    expect(app).toMatch(/referencePaletteField \? \{ styleKit: \{ \.\.\.normalizeStyleKit\(d\.styleKit\), referencePalette: referencePaletteField \} \}/);
+    expect(app).toMatch(/styleKit: \{ \.\.\.normalizeStyleKit\(d\.styleKit\),\s+\.\.\.\(referencePaletteField \? \{ referencePalette: referencePaletteField \}/);
   });
 });

@@ -386,7 +386,9 @@ describe('modo livre, fase 1: pontos de montagem do deck (ViralCarrossel.jsx)', 
     expect(source).toMatch(/const freeDeckDesign = isPresentationGeneration && effectiveVisualPresetDef\?\.isFree\s*\?\s*freeDeckDesignFor\(/);
     const montagem = trecho('const compositionOverrides = isPresentationGeneration && !effectiveVisualPresetDef?.isCustom', 900);
     expect(montagem).toMatch(/deckDesign: freeDeckDesign/);
-    const gravacao = trecho('history.set(d => ({\n      ...d, brand: generationBrand, slides: newSlides', 900);
+    // O updater pode validar metadados antes de devolver o documento. O
+    // contrato é o deck junto dos slides, não a sintaxe do retorno implícito.
+    const gravacao = trecho('...d, brand: generationBrand, slides: newSlides', 900);
     expect(gravacao).toMatch(/presentationDeckDesign: freeDeckDesign/);
   });
 

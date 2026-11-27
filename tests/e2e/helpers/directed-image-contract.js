@@ -2,6 +2,7 @@ import { expect } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { referencePolicyFacts } from './reference-policy-facts.js';
 
 // Corpo do contrato de identidade: a montagem pode mudar o cabeçalho,
 // mas não pode abreviar o papel da imagem nem confundi-lo com pose/cenário.
@@ -45,22 +46,6 @@ function orphanHeadings(prompt) {
     const letters = block.replace(/\([^)]*\)/g, '').replace(/[^\p{L}]/gu, '');
     return letters.length > 5 && letters === letters.toUpperCase();
   });
-}
-
-function referencePolicyFacts(prompt, referenceCount) {
-  const policies = String(prompt).split(/\n\s*\n/).filter(block =>
-    /\b(?:moodboard|style reference)\b/i.test(block)
-      && /\b(?:only|solely)\b[\s\S]{0,45}\b(?:look|visual|style)\b/i.test(block));
-  const roles = [...String(prompt).matchAll(/\b(\d+)\s*[:.)-]\s*(moodboard|style(?:[- ]only)?|identity)\b/gi)]
-    .map(match => ({ number: Number(match[1]), role: /^identity$/i.test(match[2]) ? 'identity' : 'style' }));
-  return {
-    policyCount: policies.length,
-    lookOnlyExcludesContent: policies.some(block =>
-      /\b(?:never|not|no|do not)\b[^.]*\b(?:people|faces|subjects)\b[^.]*\b(?:framing|composition|scene)\b/i.test(block)),
-    roles,
-    expectedRoles: Array.from({ length: referenceCount }, (_, index) =>
-      ({ number: index + 1, role: index === 0 ? 'style' : 'identity' })),
-  };
 }
 
 function referenceMapFacts(prompt, referenceCount, expectedAssignments) {

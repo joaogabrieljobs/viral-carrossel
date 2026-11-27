@@ -4,11 +4,12 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 import { presentationBatch } from './helpers/presentation-batches.js';
 import { enterEditorFromHome } from './helpers/project-entry.js';
 import { assertDirectedImageRequests } from './helpers/directed-image-contract.js';
+import { APOTEOSE_REFERENCE_VISUAL_ANALYSIS, APOTEOSE_CLEAN_BACKGROUND_REQUEST,
+  referenceVisualAnalysisReply, referenceVisualRequestFacts } from './helpers/reference-visual-analysis.js';
 
 const fixture = JSON.parse(fs.readFileSync(new URL('../fixtures/apoteose-teste7.json', import.meta.url), 'utf8'));
 const flyer = fs.readFileSync(new URL('../fixtures/apoteose-flyer-referencia.png', import.meta.url)).toString('base64');
@@ -39,10 +40,10 @@ const draft = fixture.slides.map(slide => ({
   imageQuery: slide.scene ? [slide.scene.subject, slide.scene.action, slide.scene.setting].join('. ') : '',
 }));
 
-function cloudFixture() {
+function cloudFixture(activeBrand = brand) {
   return { rows: new Map(), writes: [], assets: new Map([[REF_ID, `data:image/png;base64,${flyer}`]]), chunks: new Map(),
-    revision: 1, metaRevision: 1, metadata: { brands: [brand], folders: [], activeDocId: null,
-      activeBrandId: brand.id, userProfile: null, assetIds: [REF_ID], onboardingDone: '1', modesIntroDone: '1' } };
+    revision: 1, metaRevision: 1, metadata: { brands: [activeBrand], folders: [], activeDocId: null,
+      activeBrandId: activeBrand.id, userProfile: null, assetIds: [REF_ID], onboardingDone: '1', modesIntroDone: '1' } };
 }
 function cloudRoutes(cloud) {
   const manifest = () => ({ vcVersion: 3, customerId: session.customerId, ...cloud.metadata,
@@ -204,9 +205,19 @@ for (const scenario of [{ recovery: 'IA' }, { recovery: 'upload' }, { recovery: 
 const { recovery, cleanArt = false } = scenario;
 test(`Teste 7: geração inteira do Livre, timeout, persistência e recuperação por ${recovery}${cleanArt ? ', direção sem grafismos' : ''} (${V2 ? 'V2' : 'legado'})`, async ({ page }, testInfo) => {
   test.setTimeout(180_000);
-  const cloud = cloudFixture(), prompts = [], images = [], runtimeErrors = [], textRepairs = [];
+  const scenarioBrand = cleanArt ? { ...brand, styleKit: { ...brand.styleKit,
+    stylePrompt: [brand.styleKit.stylePrompt, APOTEOSE_CLEAN_BACKGROUND_REQUEST].filter(Boolean).join('\n') } } : brand;
+  const cloud = cloudFixture(scenarioBrand), prompts = [], images = [], visualRequests = [], runtimeErrors = [], textRepairs = [];
   let allowSlide6 = false, artBase64 = '';
-  const qaRoot = process.env.QA_PHASE && !cleanArt ? path.join(process.env.QA_OUTPUT_DIR || path.join(os.tmpdir(), 'moont-teste7'), process.env.QA_PHASE) : null;
+  // QA_OUTPUT_DIR conserva os destinos externos usados nas inspeções. Sem
+  // esse destino, QA_PHASE grava no output do próprio caso, nunca por cima
+  // de outro cenário. A rodada geral sem QA_PHASE não muda seu viewport.
+  const qaBase = process.env.QA_PHASE
+    ? process.env.QA_OUTPUT_DIR
+      ? path.join(process.env.QA_OUTPUT_DIR, process.env.QA_PHASE)
+      : testInfo.outputPath('capturas', process.env.QA_PHASE)
+    : null;
+  const qaRoot = cleanArt && qaBase ? path.join(qaBase, 'clean-art') : qaBase;
   const directory = recovery === 'IA' ? qaRoot : null;
   page.on('pageerror', error => runtimeErrors.push(error.message));
   page.on('dialog', dialog => dialog.accept());
@@ -219,7 +230,12 @@ test(`Teste 7: geração inteira do Livre, timeout, persistência e recuperaçã
   await mockApi(page, { session, extra: {
     ...cloudRoutes(cloud),
     '/api/ai/compatible': route => {
-      const prompt = route.request().postDataJSON().payload.messages.find(message => message.role === 'user').content;
+      const body = route.request().postDataJSON();
+      if (body.purpose === 'reference_visual_analysis') {
+        visualRequests.push(referenceVisualRequestFacts(body));
+        return route.fulfill({ json: completion(referenceVisualAnalysisReply({ cleanBackground: cleanArt })) });
+      }
+      const prompt = body.payload.messages.find(message => message.role === 'user').content;
       prompts.push(prompt);
       const repairIndexes = prompt.match(/\nREPARO DIRECIONADO: edite somente os slides com slideIndex ([\d, ]+)\./)?.[1]
         .split(',').map(value => Number(value.trim())) || [];
@@ -252,7 +268,7 @@ test(`Teste 7: geração inteira do Livre, timeout, persistência e recuperaçã
     localStorage.setItem('vc_brands', JSON.stringify([brand]));
     localStorage.setItem('vc_active_brand_id', JSON.stringify(brand.id));
     localStorage.setItem('vc_shell_view', JSON.stringify('project'));
-  }, { brand });
+  }, { brand: scenarioBrand });
   await page.goto('/?app=1');
   // Imagem abstrata de teste, criada localmente sem IA, sem pessoa e sem texto.
   artBase64 = await page.evaluate(() => {
@@ -299,9 +315,11 @@ test(`Teste 7: geração inteira do Livre, timeout, persistência e recuperaçã
   // Capturas vêm antes das asserções de defeito: o mesmo teste deixa prova
   // integral quando falha na main c188ac7, e quando passa após a correção.
   await captureDeck(page, directory);
-  if (directory) fs.writeFileSync(path.join(directory, 'persistido.json'), JSON.stringify({ local: saved, cloud: remote, textRepairs, imageRequests: images.map(item => ({ usageContext: item.usageContext, prompt: item.prompt })) }, null, 2));
+  if (directory) fs.writeFileSync(path.join(directory, 'persistido.json'), JSON.stringify({ local: saved, cloud: remote, textRepairs, visualRequests, imageRequests: images.map(item => ({ usageContext: item.usageContext, prompt: item.prompt })) }, null, 2));
   await testInfo.attach('reparo-textual-simulado', { body: JSON.stringify(textRepairs, null, 2), contentType: 'application/json' });
   await testInfo.attach('estado-persistido', { body: JSON.stringify({ local: designSnapshot(saved), cloud: designSnapshot(remote) }, null, 2), contentType: 'application/json' });
+  await testInfo.attach('analise-visual-simulada', { body: JSON.stringify({ requests: visualRequests,
+    response: referenceVisualAnalysisReply({ cleanBackground: cleanArt }), simulated: true }, null, 2), contentType: 'application/json' });
 
   await assertDirectedImageRequests({ page, testInfo,
     tag: `apresentacao-${recovery.toLowerCase()}${cleanArt ? '-sem-grafismos' : ''}-${V2 ? 'v2' : 'legado'}`,
@@ -311,11 +329,26 @@ test(`Teste 7: geração inteira do Livre, timeout, persistência e recuperaçã
   });
 
   expect.soft(prompts[0]).toContain('presentation-plan-v3');
+  expect.soft(visualRequests, 'uma leitura multimodal por geração').toHaveLength(1);
+  expect.soft(visualRequests[0]).toMatchObject({ provider: 'zai', operation: 'chat', purpose: 'reference_visual_analysis',
+    model: 'glm-4.6v', maxTokens: 3500, thinking: { type: 'disabled' } });
+  expect.soft(visualRequests[0]?.images, 'a leitura recebe o flyer anexado').toHaveLength(1);
+  for (const image of visualRequests[0]?.images || []) {
+    expect.soft(image.validSignature).toBe(true); expect.soft(image.bytes).toBeGreaterThan(1000);
+    expect.soft(image.chars).toBeLessThanOrEqual(360000);
+  }
+  expect.soft(prompts[0], 'a síntese derivada orienta o plano').toContain(APOTEOSE_REFERENCE_VISUAL_ANALYSIS.synthesis);
+  if (cleanArt) expect.soft(visualRequests[0]?.text, 'o pedido liso/sem grafismos vem do usuário').toContain(APOTEOSE_CLEAN_BACKGROUND_REQUEST);
+  for (const image of images.filter(item => item.usageContext?.cardId !== 'deck-art')) {
+    expect.soft(image.prompt, 'a síntese visual chega à foto ' + image.usageContext?.cardNumber).toContain(APOTEOSE_REFERENCE_VISUAL_ANALYSIS.synthesis);
+  }
   expect.soft(prompts.some(prompt => prompt.includes('PLANO EDITORIAL VALIDADO'))).toBe(true);
   expect.soft(saved.visualPreset).toBe('presentation_free');
   expect.soft(saved.styleKit.referencePalette.colors).toEqual(fixture.styleKit.referencePalette.colors);
   expect.soft(saved.presentationQuality?.renderedIssues || [], 'nenhum erro de diagramação no render final').toEqual([]);
   for (const [where, doc] of [['local', saved], ['conta', remote]]) {
+    expect.soft(doc.styleKit.referenceVisual?.analysis?.synthesis, `${where}: análise persistida`).toBe(APOTEOSE_REFERENCE_VISUAL_ANALYSIS.synthesis);
+    expect.soft(doc.presentationPlan.referenceVisualAnalysis?.synthesis, `${where}: análise ligada ao plano`).toBe(APOTEOSE_REFERENCE_VISUAL_ANALYSIS.synthesis);
     expect.soft(doc.presentationDeckDesign.palette.bg, `${where}: a base precisa ser índigo`).toBe('#2B2158');
     expect.soft(doc.presentationPlan.visualDirection.palette.find(color => color.role === 'base')?.hex, `${where}: base da direção visual`).toBe('#2B2158');
     for (let i = 1; i < 10; i++) expect.soft(doc.slides[i].eyebrow || '', `${where}: chapéu do slide ${i + 1}`).toMatch(/\S/);
@@ -354,6 +387,12 @@ test(`Teste 7: geração inteira do Livre, timeout, persistência e recuperaçã
     expect.soft(artPrompt, 'arte segue o acabamento do projeto').toContain('Smooth flat color, no grain or print texture');
     expect.soft(artPrompt, 'ausência de grafismos chega ao pedido final').toMatch(/no graphic interventions/i);
     expect.soft(artPrompt, 'não impõe a linguagem da Apoteose').not.toMatch(/one single large organic graphic shape|with fine, even grain|Screen-print texture, abstract graphic language/i);
+    expect.soft(saved.styleKit.referenceVisual.analysis.evidence.finish, 'a escolha de superfície não altera a observação do flyer').toBe(APOTEOSE_REFERENCE_VISUAL_ANALYSIS.evidence.finish);
+    expect.soft(saved.styleKit.referenceVisual.analysis.direction.background).toEqual({ finish: 'Smooth flat color, no grain or print texture.', graphics: 'none' });
+  } else {
+    const artPrompt = images.find(item => item.usageContext?.cardId === 'deck-art')?.prompt || '';
+    expect.soft(artPrompt, 'acabamento derivado no pedido da arte').toContain(APOTEOSE_REFERENCE_VISUAL_ANALYSIS.direction.background.finish);
+    expect.soft(artPrompt, 'grafismos derivados no pedido da arte').toContain(APOTEOSE_REFERENCE_VISUAL_ANALYSIS.direction.background.graphics);
   }
   expect.soft(images.filter(item => [3, 8, 10].includes(item.usageContext?.cardNumber)), 'página sem foto não solicita foto').toHaveLength(0);
   const warning = page.getByRole('region', { name: 'Imagens não geradas', exact: true });
@@ -385,6 +424,7 @@ test(`Teste 7: geração inteira do Livre, timeout, persistência e recuperaçã
     expect(recovered.slides[5][field], `recuperação preserva ${field}`).toEqual(saved.slides[5][field]);
   }
   await expect(warning).toHaveCount(0);
+  expect(visualRequests, 'reabrir e recuperar a foto reutiliza a análise persistida').toHaveLength(1);
   await expect(cards.nth(5).locator('[data-vc-photo-zone]')).toHaveCount(1);
   await page.getByRole('button', { name: 'Salvar projeto agora', exact: true }).click();
   await expect.poll(() => {
