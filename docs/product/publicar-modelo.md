@@ -121,3 +121,23 @@ Aba **Moderação** na galeria, visível para contas listadas em `moont.template
 - Testes: `tests/integration/published-templates.test.js` (conta comum recebe 404; fila, decisões e histórico; mutação sem a checagem de moderador faz o teste falhar) e `tests/e2e/publicar-modelo.spec.js`.
 
 Esta aba foi a primeira peça de administração dentro do app. O console admin geral veio depois: `docs/product/console-admin.md`.
+
+## 9. Salvar padrão = publicar modelo (2026-11-27)
+
+Relato do João: "Salvar padrão" aplicado a outro projeto não ficava igual; "Publicar como modelo" ficava.
+
+**O que o salvar perdia.** Guardava só o card ativo (`slideDefaults`) e a marca. Ao aplicar a todos os cards:
+- capa, miolo e fechamento recebiam o mesmo card (um papel só para o deck inteiro);
+- na apresentação, `applyPresentationVisualPresetToDoc` zerava por página a família (`presentationDesignFamily`), o fundo (`presentationGround`, `customBg`), o chrome, o tratamento e o raio da foto, a composição e o layout (`presentationComposition`, `presentationLayout`, posições de título e imagem), os limites de texto e o autofit, e recalculava zonas e tamanhos a partir do padrão neutro;
+- no Livre (`presentation_free`), além disso, `presentationFreeDesign`, `presentationPaletteOverrides`, as tintas por página (`titleColor`, `subtitleColor`, `textColor`), `presentationFreeTextSurfaces` e o `presentationDeckDesign` do deck;
+- no carrossel, o card ativo virava o layout, o alinhamento e os tamanhos de todos os cards.
+
+**Como ficou.** Salvar captura o mesmo modelo que o publicar (`buildTemplateContent` + `sanitizeTemplateContent`, `src/utils/custom-preset-template.js`) e o guarda no padrão (`template`). Aplicar o padrão em "Todos" usa o mesmo `applyTemplateToDoc` do "Usar modelo": capa no primeiro, fechamento no último, conteúdo no meio; o que o modelo não controla (família, fundo, paleta e blocos do destino) fica como no destino, igual ao publicar. Mesmo contrato do publicar: nada de texto, foto, logo, nome, @ ou ornamento em texto livre.
+- "Este card" e a geração com padrão personalizado continuam usando `slideDefaults` (o card ativo).
+- Padrões já salvos, sem `template`, continuam abrindo e aplicando pelo caminho antigo.
+- O modelo é guardado compactado (objetos repetidos entre cards ficam uma vez): 10 a 13 KB por deck de 10 páginas. A soma dos modelos guardados fica abaixo de 192 KB (metadados da conta: 512 KB no total); passando disso, os padrões mais antigos ficam sem modelo e voltam ao caminho antigo.
+- O recorte de zonas do modelo passou a levar `evidence` (a caixa do bloco nativo da apresentação). Vale para o publicar também: antes, o modelo aplicado deixava a tabela ou as métricas sem lugar.
+
+**Ainda fora dos dois caminhos** (publicar e salvar): família, fundo, paleta e tintas por página, `presentationDeckDesign`/`socialDeckDesign`, arte de fundo, blocos, chrome e a composição social (`socialComposition`, `socialFamily`, chapéu, selo). Levá-los exige mudar o contrato do modelo publicado (versão 2 do conteúdo e da validação no servidor).
+
+Testes: `tests/unit/custom-preset-template.test.js` (hash igual ao publicar em apresentação, Livre, carrossel e Livre social; contrato; compatibilidade; limite) e `tests/e2e/salvar-padrao-modelo.spec.js` (salvar → biblioteca → aplicar em outro projeto).
