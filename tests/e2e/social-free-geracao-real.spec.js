@@ -10,6 +10,7 @@ import { mockOutfitFont } from './helpers/outfit-font.js';
 import { enterEditorFromHome, selectEditorMode } from './helpers/project-entry.js';
 import { socialFreeCloud, localSocialAssets, socialRenderGeometry, socialRenderedMedia, contrastRatio, captureSocialDeck } from './helpers/social-free-harness.js';
 import { assertDirectedImageRequests, assertStyleReferencePolicy } from './helpers/directed-image-contract.js';
+import { APOTEOSE_REFERENCE_VISUAL_ANALYSIS, referenceVisualAnalysisReply, referenceVisualRequestFacts } from './helpers/reference-visual-analysis.js';
 
 const session = { ...SESSAO_ATIVA, tier: 'creator', imageQuota: { limit: 50, used: 0, remaining: 50 } };
 const fixture = JSON.parse(fs.readFileSync(new URL('../fixtures/apoteose-social-free-8.json', import.meta.url), 'utf8'));
@@ -70,7 +71,7 @@ async function openEmptyAccount(page, { brand = null, extra = {} } = {}) {
   return page.getByRole('region', { name: 'Criar novo projeto', exact: true });
 }
 
-async function createSocialProject(page, { name, format, draftForPrompt = () => fixture.response }) {
+async function createSocialProject(page, { name, format, draftForPrompt = () => fixture.response, visualReply = () => referenceVisualAnalysisReply(), expectDone = true }) {
   const assets = await localSocialAssets(page);
   const brand = { id: 'apoteose-social-reference', name: 'Apoteose — identidade de teste',
     logo: assets.logo, logoPosition: 'tr', logoSize: 116, logoOpacity: 100, showHandle: false,
@@ -80,13 +81,20 @@ async function createSocialProject(page, { name, format, draftForPrompt = () => 
       referencePalette: { ...fixture.styleKit.referencePalette, refIds: ['social-apoteose-flyer'] },
       refImages: [{ id: 'social-apoteose-flyer', assetId: 'social-apoteose-flyer', name: 'Flyer Apoteose', dataUrl: `data:image/png;base64,${flyer}` }] } };
   const { cloud, routes } = socialFreeCloud({ brand, session, useV2: V2 });
-  const prompts = [], requests = [], runtimeErrors = [];
+  const prompts = [], requests = [], visualRequests = [], runtimeErrors = [];
   page.on('pageerror', error => runtimeErrors.push(error.message));
   page.on('dialog', dialog => dialog.accept());
   const wizard = await openEmptyAccount(page, { brand, extra: {
     ...routes,
     '/api/ai/compatible': route => {
-      const prompt = route.request().postDataJSON().payload.messages.find(message => message.role === 'user').content;
+      const body = route.request().postDataJSON();
+      // Leitura multimodal SIMULADA do flyer: uma chamada própria, antes do
+      // roteiro social. Nenhum modelo real é acionado.
+      if (body.purpose === 'reference_visual_analysis') {
+        visualRequests.push(referenceVisualRequestFacts(body));
+        return route.fulfill({ json: completion(visualReply()) });
+      }
+      const prompt = body.payload.messages.find(message => message.role === 'user').content;
       prompts.push(prompt);
       // A primeira resposta contém texto + plano. Revisão é somente textual;
       // nenhum resultado do diretor nem geometria final entra nesta simulação.
@@ -117,10 +125,11 @@ async function createSocialProject(page, { name, format, draftForPrompt = () => 
   await wizard.getByRole('group', { name: 'Estilos para começar' }).getByRole('button', { name: /^Livre: o Moont decide/ }).click();
   await wizard.getByRole('radio', { name: /^Gerar texto e imagens/ }).click(); await next();
   await wizard.getByRole('button', { name: 'Criar e gerar 8 cards', exact: true }).click();
+  if (!expectDone) return { assets, cloud, prompts, requests, visualRequests, runtimeErrors, wizard };
   await expect(wizard).toHaveCount(0, { timeout: 70_000 });
   await expect(page.getByRole('region', { name: 'Geração em andamento' })).toHaveCount(0);
   await expect.poll(async () => (await savedEntry(page, name))?.doc?.slides?.length).toBe(8);
-  return { assets, cloud, prompts, requests, runtimeErrors };
+  return { assets, cloud, prompts, requests, visualRequests, runtimeErrors };
 }
 
 test('Livre social está disponível no seletor do assistente', async ({ page }) => {
@@ -154,7 +163,7 @@ test('Criar rápido continua sem a opção Livre social', async ({ page }) => {
 for (const format of FORMATS) test(`Livre social: geração completa de oito cards em ${format.id}, gravação e reabertura (${V2 ? 'V2' : 'legado'})`, async ({ page }, testInfo) => {
   test.setTimeout(150_000);
   const name = `Apoteose — Livre social — ${format.label}`;
-  const { assets, cloud, prompts, requests, runtimeErrors } = await createSocialProject(page, { name, format });
+  const { assets, cloud, prompts, requests, visualRequests, runtimeErrors } = await createSocialProject(page, { name, format });
   await testInfo.attach('estado-apos-assistente', { body: JSON.stringify({
     project: snapshot((await savedEntry(page, name)).doc), prompts,
     requests: requests.map(request => ({ usageContext: request.usageContext, prompt: request.prompt, aspectRatio: request.aspectRatio })),
@@ -216,6 +225,20 @@ for (const format of FORMATS) test(`Livre social: geração completa de oito car
   expect.soft(writing[0]).toContain(`1080 × ${format.height}`);
   expect.soft(writing[0]).toContain(fixture.material.content);
   expect.soft(prompts.some(prompt => prompt.startsWith('PLANEJAMENTO ESTRUTURADO'))).toBe(false);
+  // Apoteose 8 no carrossel: uma leitura multimodal por geração, antes da
+  // redação, com o anexo real e a aplicação do formato.
+  expect.soft(visualRequests, 'uma leitura visual por geração').toHaveLength(1);
+  expect.soft(visualRequests[0]).toMatchObject({ provider: 'zai', operation: 'chat', purpose: 'reference_visual_analysis',
+    model: 'glm-4.6v', maxTokens: 3500, thinking: { type: 'disabled' } });
+  expect.soft(visualRequests[0]?.text).toContain(`Carrossel social ${format.ratio}, 1080 × ${format.height}`);
+  expect.soft(visualRequests[0]?.images, 'a leitura recebe o flyer real do kit').toHaveLength(1);
+  for (const image of visualRequests[0]?.images || []) {
+    expect.soft(image.validSignature).toBe(true); expect.soft(image.chars).toBeLessThanOrEqual(360000);
+  }
+  expect.soft(writing[0], 'a evidência simulada entra no roteiro social').toContain('ANÁLISE VISUAL DOS ANEXOS');
+  expect.soft(writing[0]).toContain(APOTEOSE_REFERENCE_VISUAL_ANALYSIS.synthesis);
+  expect.soft(prompts.filter(prompt => /^(REVISÃO|REPARO)/.test(prompt)).some(prompt => prompt.includes(APOTEOSE_REFERENCE_VISUAL_ANALYSIS.synthesis)),
+    'a revisão não repete a leitura').toBe(false);
   expect.soft(prompts.some(prompt => prompt.startsWith('REVISÃO'))).toBe(true);
   for (const [where, doc] of [['local', saved], ['conta', remote]]) {
     expect.soft(doc.visualPreset, `${where}: escolha Livre preservada`).toBe('social_free');
@@ -226,6 +249,8 @@ for (const format of FORMATS) test(`Livre social: geração completa de oito car
     expect.soft(doc.brand.footerPillText, `${where}: assinatura da marca preservada`).toBe('APOTEOSE');
     expect.soft(doc.visualBible, `${where}: ficha visual preservada`).toEqual(fixture.response.visualBible);
     expect.soft(doc.socialPlan).toMatchObject({ version: 1, kind: 'social_free', formato: format.id, signature: fixture.response.signature });
+    expect.soft(doc.socialPlan.referenceVisualAnalysis?.synthesis, `${where}: leitura persistida no plano`).toBe(APOTEOSE_REFERENCE_VISUAL_ANALYSIS.synthesis);
+    expect.soft(doc.styleKit?.referenceVisual?.analysis, `${where}: leitura vinculada ao kit`).toEqual(doc.socialPlan.referenceVisualAnalysis);
     expect.soft(doc.socialPlan.cards).toHaveLength(8);
     expect.soft(doc.socialDeckDesign.palette.bg, `${where}: base da referência`).toBe(fixture.expected.base);
     expect.soft(doc.socialDeckDesign.fonts, `${where}: fontes da direção preservadas`).toEqual(fixture.response.deckDesign.fonts);
@@ -288,6 +313,9 @@ for (const format of FORMATS) test(`Livre social: geração completa de oito car
   expect.soft(requests.filter(request => request.usageContext?.cardId === 'deck-art'), 'uma geração de arte para o projeto').toHaveLength(1);
   const artRequest = requests.find(request => request.usageContext?.cardId === 'deck-art');
   expect.soft(artRequest?.prompt, 'composição da arte usa o canvas real').toContain(`COMPOSITION (shared social background 1080 × ${format.height}, ${format.ratio}`);
+  expect.soft(artRequest?.prompt, 'a arte recebe direction.background').toContain(`Surface finish: ${APOTEOSE_REFERENCE_VISUAL_ANALYSIS.direction.background.finish}`);
+  expect.soft(artRequest?.prompt).toContain('For this abstract background, moodboards supply only transferable surface finish');
+  expect.soft(artRequest?.prompt, 'a arte não recebe a síntese fotográfica').not.toContain(APOTEOSE_REFERENCE_VISUAL_ANALYSIS.synthesis);
   // O adaptador Sjinn já existente só transporta 4:5 como 2:3. O contrato de
   // composição conserva1080×1350; os outros dois formatos são exatos também na API.
   expect.soft(artRequest?.aspectRatio, 'proporção suportada pelo transporte Sjinn').toBe(format.ratio === '4:5' ? '2:3' : format.ratio);
@@ -296,7 +324,9 @@ for (const format of FORMATS) test(`Livre social: geração completa de oito car
     expect.soft(request.prompt, 'a descrição completa da identidade acompanha cada cena').toContain(fixture.response.visualBible.entities[0].en);
     expect.soft(request.prompt, 'as restrições da identidade continuam no pedido').toContain(fixture.response.visualBible.entities[0].never);
     expect.soft(request.prompt).toMatch(/terracotta shirt/i);
-    expect.soft(request.prompt).toMatch(/moodboard[\s\S]{0,45}only for the look/i);
+    expect.soft(request.prompt, 'síntese da leitura visual no pedido da foto').toContain(`Reference-derived visual direction: ${APOTEOSE_REFERENCE_VISUAL_ANALYSIS.synthesis}`);
+    expect.soft(request.prompt).toContain('Moodboards supply visual language, not the identity of the depicted person');
+    expect.soft(request.prompt).toContain(APOTEOSE_REFERENCE_VISUAL_ANALYSIS.direction.restrictions[0]);
     expect.soft(request.prompt).not.toContain('lighting and composition');
   }
   const firstPhoto = photos.find(request => request.usageContext.cardNumber === 1);
@@ -370,6 +400,31 @@ for (const format of FORMATS) test(`Livre social: geração completa de oito car
       expect.soft(overlaps, `${prefix}: fólio não atravessa o chapéu`).toBe(false);
     }
   }
+
+  // Reabrir e regenerar: a foto refeita reutiliza a leitura persistida do
+  // plano, sem nova chamada multimodal, com a composição real do formato.
+  const visualBeforeRegeneration = visualRequests.length;
+  const requestsBeforeRegeneration = requests.length;
+  await page.getByLabel('Ir para o card', { exact: true }).selectOption('0');
+  await page.getByRole('tab', { name: 'Imagem', exact: true }).click();
+  const regenerate = page.getByRole('complementary').getByRole('button', { name: 'Regenerar imagem', exact: true });
+  await regenerate.click();
+  await expect.poll(() => requests.length).toBe(requestsBeforeRegeneration + 1);
+  const regenerated = requests.at(-1);
+  expect.soft(regenerated.usageContext?.cardNumber, 'regeneração da capa').toBe(1);
+  expect.soft(regenerated.prompt, 'regenerar reutiliza a síntese').toContain(`Reference-derived visual direction: ${APOTEOSE_REFERENCE_VISUAL_ANALYSIS.synthesis}`);
+  expect.soft(regenerated.prompt).toContain(`COMPOSITION (social card 1080 × ${format.height}, ${format.ratio}`);
+  expect.soft(regenerated.prompt).toContain(fixture.response.slides[0].scene.action);
+  expect.soft(String(regenerated.prompt).length).toBeLessThanOrEqual(4000);
+  await expect(regenerate).toBeEnabled({ timeout: 30_000 });
+  expect.soft(visualRequests.length, 'regenerar não relê a referência').toBe(visualBeforeRegeneration);
+  if (process.env.QA_IMAGE_PROMPTS_DIR) fs.writeFileSync(path.join(process.env.QA_IMAGE_PROMPTS_DIR, `regeneracao-${format.id}-${V2 ? 'v2' : 'legado'}.json`),
+    JSON.stringify({ usageContext: regenerated.usageContext, aspectRatio: regenerated.aspectRatio, prompt: regenerated.prompt }, null, 2));
+  await page.getByRole('button', { name: 'Salvar projeto agora', exact: true }).click();
+  await expect.poll(() => cloud.rows.get(entry.id)?.entry?.doc?.socialPlan?.referenceVisualAnalysis?.synthesis, { timeout: 30_000 })
+    .toBe(APOTEOSE_REFERENCE_VISUAL_ANALYSIS.synthesis);
+  await expect.poll(() => cloud.rows.get(entry.id)?.entry?.doc?.styleKit?.referenceVisual?.analysis?.synthesis, { timeout: 30_000 })
+    .toBe(APOTEOSE_REFERENCE_VISUAL_ANALYSIS.synthesis);
 
   if (format.id === 'carrossel') {
     // As oito capturas base já foram feitas. Estas ações adicionais comprovam
@@ -787,4 +842,18 @@ test(`Livre social: Remix só texto mantém plano, identidade e mídia (${V2 ? '
   await expect.poll(async () => snapshot((await savedEntry(page, name)).doc)).toEqual(afterSnapshot);
   await expect(cards.first()).toContainText(proposed.slides[0].title);
   expect.soft(await socialRenderedMedia(page)).toEqual(beforeMedia);
+});
+
+test(`Livre social: leitura incompleta da referência interrompe antes do roteiro e das imagens (${V2 ? 'V2' : 'legado'})`, async ({ page }) => {
+  test.setTimeout(90_000);
+  const format = FORMATS[0];
+  const { prompts, requests, visualRequests } = await createSocialProject(page, {
+    name: 'Apoteose — leitura incompleta', format, expectDone: false,
+    // Resposta simulada sem evidência: o app não pode completar a leitura.
+    visualReply: () => ({ schemaVersion: 1, evidence: {}, direction: {}, synthesis: '' }),
+  });
+  await expect.poll(() => visualRequests.length).toBe(1);
+  await expect(page.getByText(/A leitura da referência não trouxe uma direção visual completa/).first()).toBeVisible({ timeout: 30_000 });
+  expect(prompts, 'nenhum roteiro escrito sem a leitura').toEqual([]);
+  expect(requests, 'nenhuma imagem pedida sem a leitura').toEqual([]);
 });
