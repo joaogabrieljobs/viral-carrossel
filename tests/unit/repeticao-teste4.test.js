@@ -58,7 +58,7 @@ const repetitionFix = { edits: [
 describe('Teste 4: o plano validado é o do deck real', () => {
   it('o editor leva a repetição que sobrou ao bloco de revisão, fora do status', () => {
     const source = readFileSync(new URL('../../ViralCarrossel.jsx', import.meta.url), 'utf8');
-    expect(source).toContain("repetitionNotice = '', repetitionRemaining = [] } = await generateReviewedCarousel(");
+    expect(source).toContain("repetitionNotice = '', repetitionRemaining = [], closingCtaNotice = '' } = await generateReviewedCarousel(");
     expect(source).toContain("editorialReviewIssues: [...(reviewStatus === 'needs_attention' ? (editorialViolations.length ? editorialViolations : editorialIssues) : []), ...repetitionRemaining].map(");
   });
 

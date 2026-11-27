@@ -1267,6 +1267,9 @@ function keepSocialFreeSignatures(before, after, signatures) {
   return { ...after, slides };
 }
 
+const SOCIAL_FREE_CLOSING_CTA = 'social_free_closing_cta';
+const SOCIAL_FREE_CLOSING_CTA_NOTICE = 'O último card ficou sem chamada para ação, porque o material não traz uma. Se quiser, acrescente uma no editor.';
+
 export function auditSocialFreeTextContract(slides) {
   const list = Array.isArray(slides) ? slides : [];
   if (!list.length) return [];
@@ -1277,7 +1280,7 @@ export function auditSocialFreeTextContract(slides) {
   const closing = plainWords(['title', 'subtitle', 'bodyAfterImage'].map(key => list.at(-1)?.[key] || '').join(' '));
   const action = /\b(?:participe|comente|compartilhe|salve|saiba|descubra|conheca|veja|leia|acompanhe|acesse|escolha|fale|envie|inscreva|siga|reserve|garanta|experimente|venha|vem|vamos|join|save|follow|learn|share|comment|visit|read|discover|conoce|comparte|guarda|visita|unete|sigue)\b/u;
   if (list.length > 1 && !action.test(closing) && !/\?\s*$/.test(closing)) {
-    issues.push({ kind: 'social_free', code: 'social_free_closing_cta', slideIndex: list.length - 1, field: 'subtitle' });
+    issues.push({ kind: 'social_free', code: SOCIAL_FREE_CLOSING_CTA, slideIndex: list.length - 1, field: 'subtitle' });
   }
   return issues;
 }
@@ -1415,8 +1418,16 @@ Mantenha a frase no card em que ela é assunto; quando inclui o fecho, preserve-
   }
   reviewDiagnostics.push(diagnostic);
   throwIfGenerationCancelled(textOptions.signal);
-  const finished = finishSocialReview(candidate, status, violations);
-  return { ...finished, ...socialPlanAfterReview(finished.result, socialPlan), reviewDiagnostics };
+  // Caso Apoteose (27/11): fecho sem chamada para ação é estilo, não fato nem
+  // tamanho. O reparo acima já tentou; o que sobrar vira aviso no editor e não
+  // segura as imagens (needs_attention fica para fato, limite e repetição).
+  const closingCta = violations.some(issue => issue.code === SOCIAL_FREE_CLOSING_CTA);
+  const blocking = violations.filter(issue => issue.code !== SOCIAL_FREE_CLOSING_CTA);
+  const finished = finishSocialReview(candidate, status, blocking);
+  return {
+    ...finished, ...socialPlanAfterReview(finished.result, socialPlan), reviewDiagnostics,
+    ...(closingCta ? { closingCtaNotice: SOCIAL_FREE_CLOSING_CTA_NOTICE } : {}),
+  };
 }
 
 async function reviewSocialDraft({ prompt, draft, config, textOptions, onStage }, callAI) {

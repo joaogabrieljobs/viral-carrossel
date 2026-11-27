@@ -160,7 +160,7 @@ describe('QA 24/11 texto 1: a geração manda a lacuna para o aviso de material'
   it('o editor junta as lacunas ao aviso de material do projeto', () => {
     const source = readFileSync(new URL('../../ViralCarrossel.jsx', import.meta.url), 'utf8');
     // RT24 (texto 1): o aviso de repetição entra na mesma lista.
-    expect(source).toMatch(/materialNotice: \[pathMaterialNotice, materialGapNotice\(materialGaps\), repetitionNotice\]\.filter\(Boolean\)\.join\(' '\)/);
+    expect(source).toMatch(/materialNotice: \[pathMaterialNotice, materialGapNotice\(materialGaps\), repetitionNotice, closingCtaNotice\]\.filter\(Boolean\)\.join\(' '\)/);
   });
 });
 

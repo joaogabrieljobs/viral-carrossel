@@ -139,7 +139,7 @@ describe('RT24 texto 1: a apresentação real repara ou avisa', () => {
 
   it('o editor junta o aviso de repetição ao aviso sobre o material', () => {
     const source = readFileSync(new URL('../../ViralCarrossel.jsx', import.meta.url), 'utf8');
-    expect(source).toMatch(/materialNotice: \[pathMaterialNotice, materialGapNotice\(materialGaps\), repetitionNotice\]\.filter\(Boolean\)\.join\(' '\)/);
+    expect(source).toMatch(/materialNotice: \[pathMaterialNotice, materialGapNotice\(materialGaps\), repetitionNotice, closingCtaNotice\]\.filter\(Boolean\)\.join\(' '\)/);
   });
 });
 

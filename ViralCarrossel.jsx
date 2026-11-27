@@ -6272,7 +6272,7 @@ ${jsonShapeLine}`;
       checkActive();
       setGenProgress({ phase: 'text', current: 1, total: stepTotal, label: isPresentationGeneration ? 'Etapa 1 de 5 · Organizando o roteiro e as evidências' : 'Etapa 1 de 3 · Escrevendo o texto' });
     }
-    const { result: generatedResult, reviewStatus, plan: generationPlan, socialPlan: generationSocialPlan, incomplete: generationIncomplete = false, interruptionReason: generationInterruptionReason, writingDiagnostics: generationWritingDiagnostics = [], reviewDiagnostics: generationReviewDiagnostics = [], completedCount: generatedCount, totalCount: requestedCount, violations: editorialViolations = [], issues: editorialIssues = [], materialGaps = [], repetitionNotice = '', repetitionRemaining = [] } = await generateReviewedCarousel({
+    const { result: generatedResult, reviewStatus, plan: generationPlan, socialPlan: generationSocialPlan, incomplete: generationIncomplete = false, interruptionReason: generationInterruptionReason, writingDiagnostics: generationWritingDiagnostics = [], reviewDiagnostics: generationReviewDiagnostics = [], completedCount: generatedCount, totalCount: requestedCount, violations: editorialViolations = [], issues: editorialIssues = [], materialGaps = [], repetitionNotice = '', repetitionRemaining = [], closingCtaNotice = '' } = await generateReviewedCarousel({
       prompt,
       ...(isSocialFreeGeneration ? { socialFree: { formato: generationFormat, brand: freeKitBrand, styleKit, referenceColors,
         ...(referenceVisual ? { referenceVisualAnalysis: referenceVisual.analysis } : {}) } } : {}),
@@ -6792,7 +6792,7 @@ ${jsonShapeLine}`;
       // MF-11 / reteste 22/11: aviso de modo sem base no material, fixo no projeto.
       // QA 24/11 (texto 1): a lacuna do briefing fica aqui, fora do slide.
       // RT24 (texto 1): o slide que ainda repete outro é avisado no mesmo lugar.
-      materialNotice: [pathMaterialNotice, materialGapNotice(materialGaps), repetitionNotice].filter(Boolean).join(' '), presentationMaterialNotice: undefined,
+      materialNotice: [pathMaterialNotice, materialGapNotice(materialGaps), repetitionNotice, closingCtaNotice].filter(Boolean).join(' '), presentationMaterialNotice: undefined,
       // Teste 4 (25/11): repetição que o reparo não resolveu entra no bloco de
       // revisão com os slides, sem mudar o status (não vira rascunho).
       editorialReviewIssues: [...(reviewStatus === 'needs_attention' ? (editorialViolations.length ? editorialViolations : editorialIssues) : []), ...repetitionRemaining].map(issue => ({
