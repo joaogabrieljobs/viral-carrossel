@@ -2312,7 +2312,11 @@ const SlideCardInner = React.forwardRef(({
     photoInk ? '#f5f5f7' : readableInks.subtitleInk,
     3,
   );
-  displayBodyInk = inkIfReadable(displayBodyInk, inkSurface, bodyFallback, 3);
+  // O corpo também pode ter sido composto em branco para uma foto pendente.
+  // O fallback da marca não basta quando ele é igualmente claro no fundo real.
+  displayBodyInk = composedForPhoto
+    ? savedInk(displayBodyInk, readableInks.bodyInk)
+    : inkIfReadable(displayBodyInk, inkSurface, bodyFallback, 3);
 
   /**
    * Assinatura da marca (barra editorial no topo, contador N/M, barra do rodapé
