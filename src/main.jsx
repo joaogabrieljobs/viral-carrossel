@@ -2,12 +2,14 @@ import React, { lazy, Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
 import { shouldShowOnboardingLanding } from './utils/landing-gate.js';
 import BootScreen from './components/BootScreen.jsx';
+import { isModuleLoadError } from './utils/cloud-sync-feedback.js';
 
 const CHUNK_RELOAD_KEY = 'vc_chunk_reload';
 
+// Safari diz "'text/html' is not a valid JavaScript MIME type" quando um
+// arquivo da versão anterior some na troca de deploy: também é versão antiga.
 function isStaleChunkError(err) {
-  const msg = String(err?.message || err || '');
-  return /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|ChunkLoadError|dynamically imported module/i.test(msg);
+  return isModuleLoadError(err);
 }
 
 function reloadPage() {

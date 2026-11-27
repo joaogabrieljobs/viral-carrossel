@@ -8,6 +8,7 @@ describe('cloud save feedback after a deployment', () => {
     'error loading dynamically imported module',
     'ChunkLoadError: Loading chunk failed',
     'Unable to preload CSS for /assets/old.css',
+    "'text/html' is not a valid JavaScript MIME type for module script 'https://moont.ai/assets/LandingFirst-C70yZLkC.js'.",
   ])('recognizes module loading failure: %s', (message) => {
     expect(isModuleLoadError(new Error(message))).toBe(true);
     const feedback = cloudSyncFailureMessage(new Error(message), { localSaved: true });
@@ -25,6 +26,13 @@ describe('cloud save feedback after a deployment', () => {
       expect(feedback).toContain('backup do projeto antes de recarregar');
       expect(feedback).not.toContain('preservada neste navegador');
     }
+  });
+
+  it('main.jsx recarrega sozinho com o mesmo detector, inclusive no erro de MIME do Safari', async () => {
+    const { readFileSync } = await import('node:fs');
+    const source = readFileSync(new URL('../../src/main.jsx', import.meta.url), 'utf8');
+    expect(source).toContain("import { isModuleLoadError } from './utils/cloud-sync-feedback.js'");
+    expect(source).toMatch(/function isStaleChunkError\(err\) \{\s*return isModuleLoadError\(err\)/);
   });
 
   it('keeps network and account conflict failures distinct from deployment errors', () => {

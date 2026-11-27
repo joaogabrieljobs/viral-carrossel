@@ -3,7 +3,7 @@ import { storageErrorMessage } from './storage-error-message.js';
 /** A stale lazy module must never trigger an editor reload before data is safe. */
 export function isModuleLoadError(error) {
   const message = String(error?.message || error || '');
-  return /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|ChunkLoadError|Unable to preload CSS/i.test(message);
+  return /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|ChunkLoadError|Unable to preload CSS|dynamically imported module|is not a valid JavaScript MIME type/i.test(message);
 }
 
 export function cloudSyncFailureMessage(error, { localSaved = false, cloudSaved = false, legacy = false } = {}) {
