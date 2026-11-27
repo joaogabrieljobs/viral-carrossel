@@ -66,7 +66,7 @@ Reabrir o projeto e regenerar uma foto reutiliza a leitura persistida correspond
 
 ## Compatibilidade
 
-A ativação da leitura está restrita à nova geração de apresentação Livre com anexo. O remix, os carrosséis, os presets fixos e o Criar rápido seguem seus contratos existentes. Abrir um projeto salvo não recompõe suas páginas. A validação de blocos só preserva foto no novo caso explícito Livre; o comportamento dos estilos fixos permanece protegido.
+A ativação da leitura está restrita à nova geração de apresentação Livre com anexo e, desde 27/11, à nova geração Livre social do carrossel com anexo (adendo abaixo). O remix, os carrosséis de estilo fixo, os presets fixos e o Criar rápido seguem seus contratos existentes. Abrir um projeto salvo não recompõe suas páginas. A validação de blocos só preserva foto no novo caso explícito Livre; o comportamento dos estilos fixos permanece protegido.
 
 Os catálogos de composição, texto e imagem não devem ser atualizados para acomodar uma regressão. A tabela mantém 28px nas células e 24px nos cabeçalhos; as mudanças de escala acontecem ao compor o Livre, não ao renderizar indistintamente documentos antigos.
 
@@ -125,3 +125,17 @@ A próxima geração real deve usar o mesmo material e o mesmo flyer para permit
 O ramo de entrega é `codex/apoteose8-regression-fixes`, descendente de `7cc11069ee16f1ecc853047ab54728b35fe4ed31`. O bundle incremental permite importar o ramo sem mudar o checkout atual. Antes de publicar, conferir o bundle e se a main remota ainda é ancestral do ramo; o envio deve ser fast-forward, sem `--force`. Mudanças locais no checkout não precisam ser descartadas para importar ou enviar o ramo.
 
 Push na main depende da aprovação explícita para este envio, conforme o handoff fornecido pelo João. A publicação automática só pode ser considerada concluída após conferir os três jobs do CI e a Vercel apontando para o mesmo commit. Não há deploy manual, escrita no banco, geração paga ou leitura de segredos nesta entrega.
+
+## Adendo — Livre social do carrossel (27/11/2026)
+
+A mesma leitura passou a valer para o carrossel no modo **Livre: o Moont decide** (`social_free`), nos formatos Feed 4:5, Quadrado 1:1 e Stories 9:16. O ramo é `claude/livre-social-referencia`, a partir de `389b7af`.
+
+- **Quando lê:** nova geração Livre social com anexo no kit (`readsReferenceVisuals`, `src/utils/reference-visual-scope.js`). Uma chamada `glm-4.6v` via `/api/ai/compatible`, com o mesmo contrato, transporte, limites, cache por SHA dos bytes e erros. A aplicação enviada descreve o formato real (por exemplo, `Carrossel social 9:16, 1080 × 1920`); trocar o formato muda o contexto do cache e pede outra leitura. Remix, estilos fixos e Criar rápido não leem.
+- **Roteiro:** a análise validada entra como dados no contrato `buildSocialFreePrompt`, na mesma redação do roteiro social; a revisão não a repete. Sem leitura válida, o contrato social fica byte a byte igual ao anterior.
+- **Plano:** `normalizeSocialFreePlan` guarda a análise normalizada em `doc.socialPlan.referenceVisualAnalysis` (não em cada card). O kit guarda o registro com os hashes, como na apresentação.
+- **Foto:** síntese + cena + composição pelas zonas reais do card no formato (`COMPOSITION (social card 1080 × H, razão…)`), política de referência analisada e restrições da leitura no AVOID. Como na apresentação, `visualDirection.finish`, `atmosphere` e `avoid` do roteiro saem do pedido quando há leitura; as exclusões de cada card permanecem.
+- **Arte:** `direction.background` (superfície e grafismos), sem a síntese fotográfica, com a composição da arte compartilhada do formato.
+- **Reabrir e regenerar:** `referenceVisualAnalysisForSavedPlan(doc.socialPlan, kit)` reutiliza a leitura persistida, sem nova chamada.
+- **Erro:** leitura incompleta ou ilegível interrompe antes do roteiro e das imagens.
+
+O Livre social não tem recuperação de lote cancelado como a apresentação; esse caminho não foi criado aqui. Os catálogos `image-prompt-catalogo-final.json` e `prompts-carrossel-catalogo-2211.json` e a linha de base de composição do carrossel ficaram idênticos.

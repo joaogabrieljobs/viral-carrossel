@@ -173,3 +173,7 @@ As capturas finais de Feed, Quadrado, seus extras e Remix provêm dos cenários 
 A saída do Livre para um estilo fixo preserva texto, blocos, ordem e mídia e remove as tintas automáticas herdadas do Livre, evitando texto branco sobre o creme de Revista. A edição em uma vista mantém o plano canônico e as demais vistas. O upload em uma composição manual revela a foto na zona disponível sem deslocar o texto; na captura desse caso, o recorte é estreito, como registrado na avaliação visual.
 
 O ambiente usou Chromium 137.0.7151.0 disponível no executor, pois o download do navegador solicitado pelo Playwright foi bloqueado pela rede. Dependências e configuração do repositório não foram trocadas para isso. Nenhuma IA paga foi acionada e não houve escrita no banco. O Teste 8 com IA real permanece com o João. Push na main depende de sua aprovação explícita; não há deploy manual.
+
+## Adendo — leitura visual da referência no Livre (27/11/2026)
+
+O Livre social passou a ler a referência anexada antes do roteiro, como a apresentação Livre da Apoteose 8: uma leitura por geração, usada no roteiro, nas fotos (síntese, cena e composição do formato) e na arte de fundo (`direction.background`), reaproveitada ao reabrir e regenerar. Estilos fixos, Criar rápido e remix não mudam. Detalhes em [Apoteose 8: referência visual](../engineering/apoteose8-referencia-visual.md#adendo--livre-social-do-carrossel-27112026).
