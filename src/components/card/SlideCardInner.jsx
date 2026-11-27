@@ -53,8 +53,26 @@ function socialReadingPx(slide, frame, pixels) {
 /** A redução cabe no menor texto da zona sem atravessar28px a1080. */
 function socialReadingScaleFloor(slide, frame, sizes, fallback) {
   if (!slide.socialFreeDesign) return fallback;
+  return readingScaleFloor(frame, sizes);
+}
+
+function readingScaleFloor(frame, sizes) {
   const valid = sizes.filter(size => Number.isFinite(size) && size > 0);
   return valid.length ? Math.min(1, (frame.w * 28 / 1080) / Math.min(...valid)) : 1;
+}
+
+/**
+ * Apoio de apresentação vista em Feed, Quadrado ou Stories: a adaptação
+ * (`familyCarouselAdaptation`) só marca `presentationReadingFloor` quando a
+ * zona comporta o texto a 28 px. Sem esse piso, qualquer transbordo medido
+ * levava o apoio ao piso absoluto (0,28): uma linha de ~6 px no iPhone.
+ */
+function presentationReadingScaleFloor(slide, frame, sizes, fallback) {
+  if (slide.socialFreeDesign) return readingScaleFloor(frame, sizes);
+  if (slide.presentationReadingFloor === true && slide.formatAdaptedFrom === 'apresentacao') {
+    return readingScaleFloor(frame, sizes);
+  }
+  return fallback;
 }
 
 /**
@@ -1179,11 +1197,12 @@ const ClassicCanvasInner = React.forwardRef(({
           resolvedSubtitleItalic,
           slide.presentationAutofit?.minScale,
         ]}
-        minScale={socialReadingScaleFloor(slide, f, [
+        minScale={presentationReadingScaleFloor(slide, f, [
           slide.subtitle && brand.subtitleVisible !== false ? f.w * 0.028 * resolvedSubtitleSize / 100 : null,
           supportingText ? f.w * 0.018 * bodyAfterSizePercent(slide, brand) / 100 : null,
         ], presentationAutofitSoftFloor(slide, 0.62))}
-        strictMinScale={!!slide.socialFreeDesign || strictPresentationAutofit(slide)}
+        strictMinScale={!!slide.socialFreeDesign || (slide.presentationReadingFloor === true && slide.formatAdaptedFrom === 'apresentacao')
+          || strictPresentationAutofit(slide)}
         hardMinScale={presentationMode ? 0.45 : 0.62}
         flagOverflowAtLowestFloor={!presentationMode}
       >
@@ -4328,6 +4347,7 @@ export {
   presentationTypographyToken,
   presentationAutofitSoftFloor,
   socialReadingScaleFloor,
+  presentationReadingScaleFloor,
   strictPresentationAutofit,
   presentationTitleSizePercent,
   presentationTitleLeadingPercent,
