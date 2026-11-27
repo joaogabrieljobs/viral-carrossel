@@ -92,7 +92,7 @@ describe('GA4 só com consentimento', () => {
     expect(t.scripts()).toHaveLength(0);
   });
 
-  it('já aceito, carrega sem aviso, nega anúncios e manda um page_view', () => {
+  it('já aceito, carrega sem aviso, nega anúncios e não duplica o page_view', () => {
     const t = montar({ escolha: 'granted' });
     expect(t.avisos()).toHaveLength(0);
     expect(t.scripts()).toHaveLength(1);
@@ -103,7 +103,8 @@ describe('GA4 só com consentimento', () => {
     const config = camada.find((c) => c[0] === 'config');
     expect(config[1]).toBe(ID);
     expect(config[2].send_page_view).toBe(false);
-    expect(camada.filter((c) => c[0] === 'event' && c[1] === 'page_view')).toHaveLength(1);
+    // A tag do Google manda o page_view sozinha; um manual contaria em dobro.
+    expect(camada.filter((c) => c[0] === 'event' && c[1] === 'page_view')).toHaveLength(0);
   });
 
   it('envia só origem, caminho e utm_*', () => {
@@ -112,9 +113,11 @@ describe('GA4 só com consentimento', () => {
       href: 'https://moont.ai/?app=1&utm_source=x&session_id=segredo#t',
       referrer: 'https://exemplo.com/a?token=segredo',
     });
-    const config = t.camada().find((c) => c[0] === 'config')[2];
-    expect(config.page_location).toBe('https://moont.ai/?utm_source=x');
-    expect(config.page_referrer).toBe('https://exemplo.com/a');
+    // `set` antes do `js`: sem isso o envio automático da tag leva o endereço inteiro.
+    expect(t.camada().map((c) => c[0]).slice(0, 4)).toEqual(['consent', 'set', 'js', 'config']);
+    const global = t.camada()[1][1];
+    expect(global.page_location).toBe('https://moont.ai/?utm_source=x');
+    expect(global.page_referrer).toBe('https://exemplo.com/a');
     expect(JSON.stringify(t.camada())).not.toContain('segredo');
   });
 
