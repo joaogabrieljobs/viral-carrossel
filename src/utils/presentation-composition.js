@@ -296,11 +296,13 @@ export function plannedPresentationTextLimits(kind, slide = {}, deliveryMode = '
 }
 
 /** Aplica direção por função sem alterar conteúdo, imagens, cor ou família tipográfica. */
-export function contentAwarePresentationOverrides(base, slide = {}, kind = 'content', { pitch = false, deliveryMode = 'hybrid' } = {}) {
+export function contentAwarePresentationOverrides(base, slide = {}, kind = 'content', { pitch = false, deliveryMode = 'hybrid', layoutOverride } = {}) {
   const structured = hasBlocks(slide);
-  const visual = hasVisual(slide) && !structured;
   const family = presentationDesignFamily(base);
-  const layout = contentAwarePresentationLayout(kind, slide, family);
+  const layout = layoutOverride || contentAwarePresentationLayout(kind, slide, family);
+  // O Livre pode reservar uma foto ao lado de um bloco; os presets antigos
+  // continuam usando a exclusividade original entre foto e dados.
+  const visual = hasVisual(slide) && (!structured || !!layoutOverride?.photo);
   const zones = {
     title: layout.title, subtitle: layout.subtitle, photo: layout.photo || inactivePhoto(),
     ...(layout.evidence ? { evidence: layout.evidence } : {}),

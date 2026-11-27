@@ -10,6 +10,7 @@ import { readTypedText } from '../utils/inline-edit-text.js';
 import { accentInkOnSurface } from '../utils/brand-visuals.js';
 import { wcagContrast } from '../utils/wcag.js';
 import { PRESENTATION_ICON_NAMES } from '../utils/presentation-icons.js';
+import { COMPARISON_PAIRS_TYPE } from '../utils/comparison-pairs-layout.js';
 
 /** Bloco de ícones (fase 3): a lista fechada de 26 nomes, desenhados como SVG inline. */
 const ICON_COMPONENTS = Object.freeze({
@@ -309,9 +310,10 @@ export default function PresentationBlocks({ blocks: raw, rect, frame, ink, stro
       // "traço / sem ser…". Traço na cor de destaque (4,5:1 sobre a superfície),
       // negação na tinta do texto, sem zebra nem fios; cabeçalho como rótulo.
       const traitInk = accentInkOnSurface(st.accent, detailSurface, 4.5);
-      const pad = `${12 * unit}px ${18 * unit}px ${12 * unit}px 0`;
-      return <table aria-label="Comparação" data-vc-comparison-variant="pairs" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: readable(28), color: panelInk, ...panelBox }}>
-        <thead><tr>{block.headers.map((value, col) => <th key={col} scope="col" style={{ textAlign: 'left', padding: `0 ${18 * unit}px ${14 * unit}px 0`, fontFamily, fontWeight: 600, fontSize: readable(24), letterSpacing: '0.12em', textTransform: 'uppercase', color: metricDetail.color }}>
+      const pairType = COMPARISON_PAIRS_TYPE;
+      const pad = `${pairType.rowPadding * unit}px ${pairType.columnPadding * unit}px ${pairType.rowPadding * unit}px 0`;
+      return <table aria-label="Comparação" data-vc-comparison-variant="pairs" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: readable(pairType.bodyPx), color: panelInk, ...panelBox }}>
+        <thead><tr>{block.headers.map((value, col) => <th key={col} scope="col" style={{ textAlign: 'left', padding: `0 ${pairType.columnPadding * unit}px ${pairType.headerPadding * unit}px 0`, fontFamily, fontWeight: 600, fontSize: readable(pairType.headerPx), letterSpacing: '0.12em', textTransform: 'uppercase', color: metricDetail.color }}>
           {cell(value, ['headers', col], `cabeçalho ${col + 1}`)}
         </th>)}</tr></thead>
         <tbody>{block.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((value, col) => <td key={col} style={{ verticalAlign: 'top', padding: pad, fontWeight: col === 0 ? 500 : 400, color: col === 0 ? traitInk : panelInk }}>

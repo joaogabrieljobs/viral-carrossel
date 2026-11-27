@@ -121,10 +121,10 @@ export function cleanPitchSlide(slide) {
 }
 
 /** Espaço de leitura compatível com os mesmos limites enviados ao modelo. */
-export function pitchCompositionOverrides(base, slide, kind) {
+export function pitchCompositionOverrides(base, slide, kind, { layoutOverride } = {}) {
   return contentAwarePresentationOverrides({
     ...base,
     presentationContentMode: 'pitch',
     presentationTextLimits: pitchTextLimits(kind),
-  }, slide, kind, { pitch: true });
+  }, slide, kind, { pitch: true, layoutOverride });
 }

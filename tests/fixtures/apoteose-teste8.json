@@ -1,0 +1,5108 @@
+{
+  "_origem": "Leitura direta de moont.account_projects no Supabase conectado, em transações BEGIN READ ONLY; ... COMMIT;. Nenhuma IA ou composição do aplicativo foi executada para produzir esta fixture.",
+  "_observacoes": [
+    "Snapshot atual salvo depois da geração: 9 slides no documento, mas presentationPlan conserva o roteiro original de 10. Não interpretar a contagem atual como prova de geração incompleta.",
+    "O slide y7t6krn, índice 6 no diagnóstico renderizado (sétima página original), não está mais em doc.slides. O plano de personalidade permanece no índice 7 e formatViews.apresentacao conserva apenas um offset de subtitle desse ID; o canvas/texto final apagado não está disponível neste snapshot.",
+    "presentationQuality conserva render-overflow, renderCheckStatus needs_attention e renderRepairStatus unavailable para esse slide ausente. A data desse diagnóstico precede updatedAt do snapshot.",
+    "O material original contém os sete pares da personalidade. O keyMessage da página 7 do roteiro resume apenas quatro; não foi fabricada uma resposta de redação nem um canvas para a página removida.",
+    "Quatro slides atuais têm bgImageAssetId, bgImageSource ai e bgImageFailed false. Os cinco atuais restantes têm photo none e suppress true. Não há presentationImageFallback em qualquer slide atual.",
+    "O plano pede foto small para a página musical (índice4), mas sua composição salva tem photo none, query vazia e nenhum asset. O plano pede half para o público (índice5), salvo como small, e full para o fecho (índice10), salvo como half.",
+    "bgImage, presentationArtImage e refImage em runtime foram omitidos; mediaObservation registra sua presença e a presença de IDs no banco. Os IDs de ativos foram preservados para correlação, mas nenhum byte de imagem ou URL privada foi incluído.",
+    "owner, campos de compartilhamento, identificadores pessoais da marca, links e dados de autenticação não foram extraídos. Metadados de referências excluem nomes de arquivo e bytes/URLs. imageQuery é o briefing salvo; não é o corpo HTTP final enviado ao provedor.",
+    "Offsets manuais em formatViews e fontes/tamanhos atuais da marca foram preservados sem normalização. Eles podem refletir edição posterior à geração."
+  ],
+  "metadata": {
+    "projectId": "ghr80v0",
+    "projectName": "Apoteose 8",
+    "version": 20,
+    "updatedAt": 1795741497209,
+    "updatedAtUtc": "2026-11-27T01:04:57.209Z",
+    "createdAt": 1795740354650,
+    "readAtUtc": "2026-11-27T01:14:25.758Z",
+    "transactionReadOnly": true,
+    "sourceTable": "moont.account_projects",
+    "savedSlideCount": 9,
+    "plannedSlideCount": 10
+  },
+  "doc": {
+    "__v": 1,
+    "fmt": "apresentacao",
+    "mode": "editorial",
+    "brand": {
+      "bg": "#2A2158",
+      "name": "",
+      "niche": "",
+      "accent": "#F14126",
+      "bodyFont": "\"Inter Tight\", sans-serif",
+      "logoSize": 260,
+      "brandTone": null,
+      "signature": "",
+      "textColor": "#FFFFFF",
+      "titleFont": "\"Syne\", Arial, sans-serif",
+      "bodyWeight": 400,
+      "showHandle": false,
+      "titleColor": "#FFFFFF",
+      "bgAlternate": "#f5f5f7",
+      "defaultTone": "",
+      "logoOpacity": 90,
+      "positioning": "",
+      "textSubSize": 59.52,
+      "handleBadgeX": 5,
+      "handleBadgeY": 4,
+      "interleaveBg": false,
+      "logoPosition": "tr",
+      "showSwipeCue": true,
+      "subtitleCase": "normal",
+      "subtitleFont": "\"Inter Tight\", sans-serif",
+      "showPageBadge": true,
+      "subtitleColor": "#FFFFFF",
+      "textTitleCase": "normal",
+      "textTitleSize": 39.68,
+      "useBrandVoice": true,
+      "customBodyFont": null,
+      "footerBarScale": 100,
+      "pageBadgeScale": 100,
+      "subtitleWeight": 400,
+      "textSubLeading": 130,
+      "customTitleFont": null,
+      "defaultAudience": "",
+      "footerPillScale": 100,
+      "subtitleVisible": true,
+      "textBodyLeading": 145,
+      "textSubTracking": 0.6,
+      "textTitleWeight": 700,
+      "handleAvatarPosX": 50,
+      "handleAvatarPosY": 50,
+      "handleAvatarZoom": 100,
+      "textBodyTracking": 0,
+      "textTitleLeading": 110,
+      "cultureHeaderLeft": "",
+      "cultureHeaderYear": "",
+      "textBodyAfterSize": 81.02,
+      "textTitleTracking": 0.6,
+      "cultureHeaderScale": 100,
+      "handleAvatarRotate": 0,
+      "visualIdentityLocked": true
+    },
+    "slides": [
+      {
+        "id": "62nhp1j",
+        "bgX": 50,
+        "bgY": 50,
+        "num": 1,
+        "align": "left",
+        "bgFit": "cover",
+        "title": "**Apoteose**",
+        "bgZoom": 100,
+        "canvas": {
+          "zones": {
+            "photo": {
+              "h": 100,
+              "w": 100,
+              "x": 0,
+              "y": 0
+            },
+            "title": {
+              "h": 18.66,
+              "w": 60,
+              "x": 6,
+              "y": 55.85
+            },
+            "subtitle": {
+              "h": 11.99,
+              "w": 60,
+              "x": 6,
+              "y": 78.01
+            }
+          },
+          "source": "presentation-preset",
+          "applied": true,
+          "enabled": false,
+          "variant": "classic",
+          "preserveZones": true
+        },
+        "layout": "tl",
+        "textBg": false,
+        "caption": "",
+        "eyebrow": "",
+        "imgMode": "dalle",
+        "overlay": 64,
+        "subSize": 59.6,
+        "bgMirror": false,
+        "customBg": "#FFFFFF",
+        "edgePeek": false,
+        "logoSize": 80,
+        "overlays": [],
+        "subtitle": "O **esquenta de Carnaval** que nasce em São Paulo.",
+        "bgImageId": "img_q1nnvhtajfoj",
+        "bgOpacity": 100,
+        "bgPattern": "none",
+        "textColor": "#FDFDFD",
+        "textInset": 0,
+        "titleCase": "normal",
+        "titleSize": 80,
+        "videoMime": null,
+        "bodyWeight": 400,
+        "imageQuery": "abstract celebration energy, no people, glowing color streaks rising through deep purple atmosphere, light and color burst upward like anticipation building, dark urban environment with vibrant color reflections, first plane glowing streaks, deep purple background, warm red and cyan light cutting through deep purple darkness from below, bold geometric streaks of color intersecting the scene, wide, deep perspective looking upward",
+        "refImageId": null,
+        "showHandle": true,
+        "subLeading": 150,
+        "textShadow": false,
+        "titleColor": "#FFFFFF",
+        "bodyLeading": 150,
+        "composition": "",
+        "cultureTone": "",
+        "overlayMode": "side",
+        "overlaySide": "left",
+        "photoRegion": "full",
+        "subTracking": 0.6,
+        "titleWeight": 700,
+        "bgImageError": null,
+        "bodyTracking": 0,
+        "logoPosition": "tl",
+        "overlayColor": "#2A2158",
+        "overlayReach": 68,
+        "photoFraming": "auto",
+        "showSwipeCue": false,
+        "titleLeading": 98,
+        "bgImageFailed": false,
+        "bgImageSource": "ai",
+        "bodyAfterSize": 180,
+        "imagePosition": "right-evidence",
+        "subtitleColor": "#FFFFFF",
+        "textBgOpacity": 55,
+        "titlePosition": "top-left",
+        "titleTracking": 0.6,
+        "bgImageAssetId": "original_bc92086c847e95fad4eb96a55a96b413ddfab2743e57d518fb1abb98b62923c4",
+        "bodyAfterImage": "Como se o Carnaval não fosse suficiente.",
+        "elementOffsets": {},
+        "imgExtraPrompt": "",
+        "imageReferences": null,
+        "refImageAssetId": null,
+        "elementsUnlocked": true,
+        "mediaObservation": {
+          "hasBgImageId": true,
+          "hasArtImageId": false,
+          "hasRefImageId": false,
+          "hasBgImageValue": false,
+          "hasArtImageValue": false,
+          "hasRefImageValue": false,
+          "hasBgImageAssetId": true,
+          "hasArtImageAssetId": false,
+          "hasRefImageAssetId": false
+        },
+        "presentationPlan": {
+          "avoid": "literal carnival costumes, feathers, confetti, people in costume",
+          "index": 1,
+          "scene": {
+            "shot": "wide, deep perspective looking upward",
+            "light": "warm red and cyan light cutting through deep purple darkness from below",
+            "action": "light and color burst upward like anticipation building",
+            "setting": "dark urban environment with vibrant color reflections, first plane glowing streaks, deep purple background",
+            "subject": "abstract celebration energy, no people, glowing color streaks rising through deep purple atmosphere",
+            "graphics": "bold geometric streaks of color intersecting the scene"
+          },
+          "design": {
+            "block": "none",
+            "icons": [],
+            "photo": "full",
+            "family": "cinematic",
+            "ground": "photo",
+            "emphasis": [
+              "Apoteose",
+              "esquenta de Carnaval"
+            ]
+          },
+          "purpose": "introduction",
+          "question": "O que é a Apoteose?",
+          "sourceIds": [
+            "source-base"
+          ],
+          "imageRules": [
+            "Evitar clichês visuais do Carnaval: fantasias, plumas e confetes como representação literal",
+            "Não impor fotografia sóbria; o projeto pede estética publicitária contemporânea, cultura urbana e moda"
+          ],
+          "keyMessage": "Capa: Apoteose — o esquenta de Carnaval que nasce em São Paulo como celebração contemporânea antes da festa oficial.",
+          "visualRole": "cover",
+          "evidenceIds": [
+            "e1",
+            "e13"
+          ],
+          "promptVersion": "presentation-plan-v3",
+          "schemaVersion": 3,
+          "evidenceStatus": [
+            "fact"
+          ],
+          "visualDirection": {
+            "avoid": "Carnival clichés: feathers, sequins, confetti, literal costumes, samba stereotypes, traditional carnival imagery, grain texture, sober muted photography.",
+            "finish": "Smooth digital finish, no grain, high-contrast color blocks, editorial polish with clean gradients between deep purple and warm reds.",
+            "palette": [
+              {
+                "hex": "#2A2158",
+                "role": "base"
+              },
+              {
+                "hex": "#F14126",
+                "role": "subject_light"
+              },
+              {
+                "hex": "#9C2459",
+                "role": "shadow"
+              },
+              {
+                "hex": "#2AB5D7",
+                "role": "graphic"
+              },
+              {
+                "hex": "#C33940",
+                "role": "accent"
+              }
+            ],
+            "graphics": "Bold geometric color blocks and typographic interventions inspired by Brazilian graphic design, no literal carnival motifs.",
+            "atmosphere": "Electric pre-Carnaval energy where urban nightlife meets Brazilian cultural intensity in a sophisticated, contemporary visual language.",
+            "paletteSource": "reference"
+          }
+        },
+        "useCultureLayout": false,
+        "presentationGlass": null,
+        "socialZoneAnchors": {
+          "title": "end",
+          "subtitle": "start"
+        },
+        "presentationBlocks": [],
+        "presentationChrome": {
+          "fonts": {
+            "text": {
+              "css": "\"Inter Tight\", sans-serif",
+              "family": "Inter Tight",
+              "weight": 400,
+              "tracking": -0.4
+            },
+            "display": {
+              "css": "\"Syne\", Arial, sans-serif",
+              "family": "Syne",
+              "weight": 700,
+              "tracking": -2.6,
+              "widthFactor": 0.64
+            }
+          },
+          "chrome": [
+            {
+              "t": "text",
+              "w": 58.75,
+              "x": 6.63,
+              "y": 57.1,
+              "z": "over",
+              "case": "upper",
+              "role": "label",
+              "size": 24,
+              "text": "{kicker}",
+              "color": "#FFFFFF",
+              "weight": 700,
+              "tracking": 12
+            }
+          ],
+          "family": "cinematic",
+          "format": "16:9",
+          "ground": "bg"
+        },
+        "presentationGround": "bg",
+        "presentationLayout": {
+          "visualRole": "cover",
+          "imagePosition": "right-evidence",
+          "titlePosition": "top-left",
+          "imageTreatment": "right-evidence",
+          "evidencePosition": null
+        },
+        "presentationAutofit": {
+          "mode": "shrink-then-split",
+          "enabled": true,
+          "minScale": 0.85,
+          "rewriteTitle": true,
+          "preventOrphans": true,
+          "splitOnOverflow": true
+        },
+        "presentationStageId": null,
+        "presentationPresetId": "presentation_free",
+        "presentationPatternId": "presentation_free",
+        "presentationDeckDesign": {
+          "mood": "Vibrant editorial nightlife photography with deep purple shadows, warm red highlights, and clean high-contrast urban energy.",
+          "fonts": {
+            "text": "Inter Tight",
+            "display": "Syne"
+          },
+          "palette": {
+            "bg": "#2A2158",
+            "ink": "#FFFFFF",
+            "muted": "#FFFFFF",
+            "accent": "#F14126",
+            "accent2": "#C33940",
+            "inverse": "#FFFFFF",
+            "surface": "#9C2459",
+            "inverseInk": "#2A2158"
+          }
+        },
+        "presentationFreeDesign": {
+          "block": "none",
+          "icons": [],
+          "photo": "full",
+          "family": "cinematic",
+          "ground": "photo",
+          "emphasis": [
+            "Apoteose",
+            "esquenta de Carnaval"
+          ]
+        },
+        "presentationStageLabel": "CAPA",
+        "presentationTextLimits": {
+          "body": {
+            "maxChars": 40,
+            "maxLines": 1
+          },
+          "title": {
+            "maxChars": 90,
+            "maxLines": 3
+          },
+          "subtitle": {
+            "maxChars": 95,
+            "maxLines": 1
+          },
+          "wordsPerSlide": 110
+        },
+        "presentationVisualRole": "cover",
+        "procedureLabelEmphasis": false,
+        "presentationArchetypeId": "cover",
+        "presentationComposition": "cover",
+        "presentationPhotoRadius": 0,
+        "presentationDesignFamily": "cinematic",
+        "presentationCompositionId": "presentation_executive_minimal:cover",
+        "presentationRequiresImage": false,
+        "presentationSuppressPhoto": false,
+        "presentationBodyTypography": {
+          "weight": 400,
+          "tracking": 0.6,
+          "fontFamily": "\"Inter\", sans-serif",
+          "leadingPercent": 145
+        },
+        "presentationPatternVersion": null,
+        "presentationPhotoTreatment": "saturate(0.94) contrast(1.03)",
+        "presentationQualityVersion": 1,
+        "presentationEvidenceFallback": true,
+        "presentationFreeTextSurfaces": {
+          "title": "#777194",
+          "subtitle": "#777194"
+        },
+        "presentationPaletteOverrides": {
+          "bg": "#2A2158",
+          "ink": "#FFFFFF",
+          "rule": "#8A85A3",
+          "muted": "#FFFFFF",
+          "accent": "#F14126",
+          "accent2": "#C33940",
+          "accent3": "#56284D",
+          "inverse": "#FFFFFF",
+          "surface": "#9C2459",
+          "inverseInk": "#2A2158",
+          "inverseMuted": "#665F87"
+        },
+        "presentationNumericTypography": {
+          "weight": 700,
+          "fontFamily": "\"Syne\", Arial, sans-serif"
+        },
+        "presentationCompositionVersion": 3,
+        "presentationArtDirectionVersion": 2,
+        "presentationTitleSizeByComposition": {
+          "data": 39.68,
+          "demo": 39.68,
+          "cover": 59.52,
+          "closing": 39.68,
+          "content": 39.68,
+          "divider": 39.68
+        },
+        "presentationTypographyByComposition": {
+          "data": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "caption",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 40.92,
+              "leadingPercent": 135
+            }
+          },
+          "demo": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "body",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 52.08,
+              "leadingPercent": 145
+            }
+          },
+          "cover": {
+            "title": {
+              "case": "normal",
+              "role": "display",
+              "italic": false,
+              "weight": 700,
+              "tracking": 0.4,
+              "fontFamily": "\"Syne\", Arial, sans-serif",
+              "sizePercent": 80,
+              "leadingPercent": 98
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "subtitle",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 59.6,
+              "leadingPercent": 150
+            }
+          },
+          "closing": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "caption",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 40.92,
+              "leadingPercent": 135
+            }
+          },
+          "content": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "body",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 52.08,
+              "leadingPercent": 145
+            }
+          },
+          "divider": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "kpi",
+              "italic": false,
+              "weight": 600,
+              "tracking": -1.4,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 178.57,
+              "leadingPercent": 100
+            }
+          }
+        },
+        "presentationTitleLeadingByComposition": {
+          "data": 110,
+          "demo": 110,
+          "cover": 105,
+          "closing": 110,
+          "content": 110,
+          "divider": 110
+        }
+      },
+      {
+        "id": "s2xawrf",
+        "bgX": 50,
+        "bgY": 50,
+        "num": 2,
+        "align": "left",
+        "bgFit": "cover",
+        "title": "O brasileiro não espera a festa chegar",
+        "bgZoom": 100,
+        "canvas": {
+          "zones": {
+            "photo": {
+              "h": 1,
+              "w": 1,
+              "x": 96,
+              "y": 94
+            },
+            "title": {
+              "h": 13.81,
+              "w": 92,
+              "x": 4,
+              "y": 13
+            },
+            "subtitle": {
+              "h": 60.69,
+              "w": 72,
+              "x": 4,
+              "y": 30.31
+            }
+          },
+          "source": "presentation-preset",
+          "applied": true,
+          "enabled": false,
+          "variant": "classic",
+          "preserveZones": true
+        },
+        "layout": "bl",
+        "textBg": false,
+        "caption": "É nesse território de exagero, irreverência e prazer de estar entre amigos que a Apoteose constrói sua identidade.\n\nO comportamento brasileiro de antecipar a festa é o fundamento da Apoteose. A festa não cria esse impulso — ela o canaliza. O esquenta já existe culturalmente; a Apoteose propõe uma versão contemporânea e curada desse ritual, ocupando o intervalo entre o Réveillon e o Carnaval oficial com identidade própria.",
+        "eyebrow": "O CONTEXTO",
+        "imgMode": "dalle",
+        "overlay": 0,
+        "subSize": 59.6,
+        "bgMirror": false,
+        "customBg": "#2A2158",
+        "edgePeek": false,
+        "logoSize": 80,
+        "overlays": [],
+        "subtitle": "Mal termina o Réveillon, já começa a expectativa pelo Carnaval. E, como se o Carnaval não fosse suficiente, ainda existe o esquenta. O brasileiro **antecipa**, **inventa** e **reinventa** motivos para celebrar, transforma qualquer ocasião em festa.",
+        "bgImageId": null,
+        "bgOpacity": 100,
+        "bgPattern": "none",
+        "textColor": "#FFFFFF",
+        "textInset": 0,
+        "titleCase": "normal",
+        "titleSize": 51,
+        "videoMime": null,
+        "bodyWeight": 400,
+        "imageQuery": "",
+        "refImageId": null,
+        "showHandle": true,
+        "subLeading": 142,
+        "textShadow": false,
+        "titleColor": "#FFFFFF",
+        "bodyLeading": 142,
+        "composition": "",
+        "cultureTone": "",
+        "photoRegion": "full",
+        "subTracking": 0.6,
+        "titleWeight": 700,
+        "bodyTracking": 0,
+        "logoPosition": "tl",
+        "photoFraming": "auto",
+        "showSwipeCue": false,
+        "titleLeading": 115,
+        "bodyAfterSize": 180,
+        "imagePosition": "none",
+        "subtitleColor": "#FFFFFF",
+        "textBgOpacity": 55,
+        "titlePosition": "top-left",
+        "titleTracking": 0.6,
+        "bodyAfterImage": "O nome remete ao ápice, à celebração, à intensidade e à liberdade.",
+        "elementOffsets": {},
+        "imgExtraPrompt": "",
+        "imageReferences": null,
+        "refImageAssetId": null,
+        "elementsUnlocked": true,
+        "mediaObservation": {
+          "hasBgImageId": false,
+          "hasArtImageId": false,
+          "hasRefImageId": false,
+          "hasBgImageValue": false,
+          "hasArtImageValue": false,
+          "hasRefImageValue": false,
+          "hasBgImageAssetId": false,
+          "hasArtImageAssetId": false,
+          "hasRefImageAssetId": false
+        },
+        "presentationPlan": {
+          "avoid": "",
+          "index": 2,
+          "scene": null,
+          "design": {
+            "block": "none",
+            "icons": [],
+            "photo": "none",
+            "family": "typographic",
+            "ground": "accent",
+            "emphasis": [
+              "antecipa",
+              "inventa",
+              "reinventa"
+            ]
+          },
+          "purpose": "context",
+          "question": "Por que a Apoteose existe?",
+          "sourceIds": [
+            "source-base"
+          ],
+          "imageRules": [
+            "Evitar clichês visuais do Carnaval: fantasias, plumas e confetes como representação literal",
+            "Não impor fotografia sóbria; o projeto pede estética publicitária contemporânea, cultura urbana e moda"
+          ],
+          "keyMessage": "Contexto: O brasileiro não espera o Carnaval chegar para começar a festejar — antecipa, inventa e reinventa motivos para celebrar.",
+          "visualRole": "content",
+          "evidenceIds": [
+            "e4"
+          ],
+          "promptVersion": "presentation-plan-v3",
+          "schemaVersion": 3,
+          "evidenceStatus": [
+            "fact"
+          ],
+          "visualDirection": {
+            "avoid": "Carnival clichés: feathers, sequins, confetti, literal costumes, samba stereotypes, traditional carnival imagery, grain texture, sober muted photography.",
+            "finish": "Smooth digital finish, no grain, high-contrast color blocks, editorial polish with clean gradients between deep purple and warm reds.",
+            "palette": [
+              {
+                "hex": "#2A2158",
+                "role": "base"
+              },
+              {
+                "hex": "#F14126",
+                "role": "subject_light"
+              },
+              {
+                "hex": "#9C2459",
+                "role": "shadow"
+              },
+              {
+                "hex": "#2AB5D7",
+                "role": "graphic"
+              },
+              {
+                "hex": "#C33940",
+                "role": "accent"
+              }
+            ],
+            "graphics": "Bold geometric color blocks and typographic interventions inspired by Brazilian graphic design, no literal carnival motifs.",
+            "atmosphere": "Electric pre-Carnaval energy where urban nightlife meets Brazilian cultural intensity in a sophisticated, contemporary visual language.",
+            "paletteSource": "reference"
+          }
+        },
+        "useCultureLayout": false,
+        "presentationGlass": null,
+        "socialZoneAnchors": {
+          "title": "start",
+          "subtitle": "start"
+        },
+        "presentationBlocks": [],
+        "presentationChrome": {
+          "fonts": {
+            "text": {
+              "css": "\"Inter Tight\", sans-serif",
+              "family": "Inter Tight",
+              "weight": 400,
+              "tracking": -0.4
+            },
+            "display": {
+              "css": "\"Syne\", Arial, sans-serif",
+              "family": "Syne",
+              "weight": 700,
+              "tracking": -2.6,
+              "widthFactor": 0.64
+            }
+          },
+          "chrome": [
+            {
+              "t": "text",
+              "w": 90.75,
+              "x": 4.63,
+              "y": 8.8,
+              "z": "over",
+              "case": "upper",
+              "role": "label",
+              "size": 24,
+              "text": "{kicker}",
+              "color": "#FFFFFF",
+              "weight": 700,
+              "tracking": 12
+            }
+          ],
+          "family": "typographic",
+          "format": "16:9",
+          "ground": "bg"
+        },
+        "presentationGround": "bg",
+        "presentationLayout": {
+          "visualRole": "content",
+          "imagePosition": "none",
+          "titlePosition": "top-left",
+          "imageTreatment": "right-evidence",
+          "evidencePosition": null
+        },
+        "presentationAutofit": {
+          "mode": "shrink-then-split",
+          "enabled": true,
+          "minScale": 0.85,
+          "rewriteTitle": true,
+          "preventOrphans": true,
+          "splitOnOverflow": true
+        },
+        "presentationStageId": null,
+        "presentationPresetId": "presentation_free",
+        "presentationPatternId": "presentation_free",
+        "presentationDeckDesign": {
+          "mood": "Vibrant editorial nightlife photography with deep purple shadows, warm red highlights, and clean high-contrast urban energy.",
+          "fonts": {
+            "text": "Inter Tight",
+            "display": "Syne"
+          },
+          "palette": {
+            "bg": "#2A2158",
+            "ink": "#FFFFFF",
+            "muted": "#FFFFFF",
+            "accent": "#F14126",
+            "accent2": "#C33940",
+            "inverse": "#FFFFFF",
+            "surface": "#9C2459",
+            "inverseInk": "#2A2158"
+          }
+        },
+        "presentationFreeDesign": {
+          "block": "none",
+          "icons": [],
+          "photo": "none",
+          "family": "typographic",
+          "ground": "bg",
+          "emphasis": [
+            "antecipa",
+            "inventa",
+            "reinventa"
+          ]
+        },
+        "presentationStageLabel": "CAPA",
+        "presentationTextLimits": {
+          "body": {
+            "maxChars": 180,
+            "maxLines": 4
+          },
+          "title": {
+            "maxChars": 90,
+            "maxLines": 2
+          },
+          "subtitle": {
+            "maxChars": 360,
+            "maxLines": 9
+          },
+          "wordsPerSlide": 110
+        },
+        "presentationVisualRole": "content",
+        "procedureLabelEmphasis": false,
+        "presentationArchetypeId": "image-split",
+        "presentationComposition": "content",
+        "presentationPhotoRadius": 0,
+        "presentationDesignFamily": "typographic",
+        "presentationCompositionId": "presentation_executive_minimal:content",
+        "presentationRequiresImage": false,
+        "presentationSuppressPhoto": true,
+        "presentationBodyTypography": {
+          "weight": 400,
+          "tracking": 0.6,
+          "fontFamily": "\"Inter\", sans-serif",
+          "leadingPercent": 145
+        },
+        "presentationPatternVersion": null,
+        "presentationPhotoTreatment": "saturate(0.94) contrast(1.03)",
+        "presentationQualityVersion": 1,
+        "presentationEvidenceFallback": null,
+        "presentationFreeTextSurfaces": {
+          "title": "#2A2158",
+          "subtitle": "#2A2158"
+        },
+        "presentationPaletteOverrides": {
+          "bg": "#2A2158",
+          "ink": "#FFFFFF",
+          "rule": "#8A85A3",
+          "muted": "#FFFFFF",
+          "accent": "#F14126",
+          "accent2": "#C33940",
+          "accent3": "#56284D",
+          "inverse": "#FFFFFF",
+          "surface": "#9C2459",
+          "inverseInk": "#2A2158",
+          "inverseMuted": "#665F87"
+        },
+        "presentationNumericTypography": {
+          "weight": 700,
+          "fontFamily": "\"Syne\", Arial, sans-serif"
+        },
+        "presentationCompositionVersion": 3,
+        "presentationArtDirectionVersion": 2,
+        "presentationTitleSizeByComposition": {
+          "data": 39.68,
+          "demo": 39.68,
+          "cover": 59.52,
+          "closing": 39.68,
+          "content": 39.68,
+          "divider": 39.68
+        },
+        "presentationTypographyByComposition": {
+          "data": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "caption",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 40.92,
+              "leadingPercent": 135
+            }
+          },
+          "demo": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "body",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 52.08,
+              "leadingPercent": 145
+            }
+          },
+          "cover": {
+            "title": {
+              "case": "normal",
+              "role": "display",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 59.52,
+              "leadingPercent": 105
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "subtitle",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 59.52,
+              "leadingPercent": 130
+            }
+          },
+          "closing": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "caption",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 40.92,
+              "leadingPercent": 135
+            }
+          },
+          "content": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 700,
+              "tracking": 0.4,
+              "fontFamily": "\"Syne\", Arial, sans-serif",
+              "sizePercent": 51,
+              "leadingPercent": 115
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "body",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 59.6,
+              "leadingPercent": 142
+            }
+          },
+          "divider": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "kpi",
+              "italic": false,
+              "weight": 600,
+              "tracking": -1.4,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 178.57,
+              "leadingPercent": 100
+            }
+          }
+        },
+        "presentationTitleLeadingByComposition": {
+          "data": 110,
+          "demo": 110,
+          "cover": 105,
+          "closing": 110,
+          "content": 110,
+          "divider": 110
+        }
+      },
+      {
+        "id": "60cbk1v",
+        "bgX": 50,
+        "bgY": 50,
+        "num": 3,
+        "align": "left",
+        "bgFit": "cover",
+        "title": "Carnaval como comportamento, não como estética",
+        "bgZoom": 100,
+        "canvas": {
+          "zones": {
+            "photo": {
+              "h": 70,
+              "w": 33,
+              "x": 62,
+              "y": 15
+            },
+            "title": {
+              "h": 14.09,
+              "w": 52,
+              "x": 5,
+              "y": 15
+            },
+            "subtitle": {
+              "h": 57.41,
+              "w": 44,
+              "x": 5,
+              "y": 32.59
+            }
+          },
+          "source": "presentation-preset",
+          "applied": true,
+          "enabled": false,
+          "variant": "classic",
+          "preserveZones": true
+        },
+        "layout": "tl",
+        "textBg": false,
+        "caption": "A Apoteose propõe uma leitura contemporânea do Carnaval: o que importa é o comportamento, a energia e a liberdade — não os símbolos visuais tradicionais. Isso abre espaço para uma direção artística autoral, que transita entre cultura urbana, moda e fotografia editorial, evitando clichês visuais e mantendo a essência popular da celebração.",
+        "eyebrow": "O CONCEITO",
+        "imgMode": "dalle",
+        "overlay": 0,
+        "subSize": 59.6,
+        "bgMirror": false,
+        "customBg": "#2A2158",
+        "edgePeek": false,
+        "logoSize": 80,
+        "overlays": [],
+        "subtitle": "Uma **interpretação contemporânea** da cultura carnavalesca, **sem estética tradicional**, sem fantasias, plumas e confetes.",
+        "bgImageId": "img_8m5ilkpxkovg",
+        "bgOpacity": 100,
+        "bgPattern": "none",
+        "textColor": "#FFFFFF",
+        "textInset": 0,
+        "titleCase": "normal",
+        "titleSize": 34,
+        "videoMime": null,
+        "bodyWeight": 400,
+        "imageQuery": "modern urban party atmosphere with neon color reflections on architectural surfaces, no people visible, color light projections mapping across concrete walls creating dynamic patterns, contemporary urban courtyard at night, geometric architecture, first plane textured wall with light, deep background, cyan and red projected light sweeping across surfaces from multiple angles, geometric light projections forming abstract patterns on walls, medium, eye-level, shallow depth",
+        "refImageId": null,
+        "showHandle": true,
+        "subLeading": 148,
+        "textShadow": false,
+        "titleColor": "#FFFFFF",
+        "bodyLeading": 148,
+        "composition": "",
+        "cultureTone": "",
+        "photoRegion": "full",
+        "subTracking": 0.6,
+        "titleWeight": 700,
+        "bgImageError": null,
+        "bodyTracking": 0,
+        "logoPosition": "tl",
+        "photoFraming": "auto",
+        "showSwipeCue": false,
+        "titleLeading": 100,
+        "bgImageFailed": false,
+        "bgImageSource": "ai",
+        "bodyAfterSize": 180,
+        "imagePosition": "right-evidence",
+        "subtitleColor": "#FFFFFF",
+        "textBgOpacity": 55,
+        "titlePosition": "top-left",
+        "titleTracking": 0.6,
+        "bgImageAssetId": "original_chunks_c60e91beaf9c3c6579662fd07afe067e9b2248d1c739aa211a56e79de2d10564",
+        "bodyAfterImage": "O estado de espírito da festa sem a representação literal.",
+        "elementOffsets": {},
+        "imgExtraPrompt": "",
+        "imageReferences": null,
+        "refImageAssetId": null,
+        "elementsUnlocked": true,
+        "mediaObservation": {
+          "hasBgImageId": true,
+          "hasArtImageId": false,
+          "hasRefImageId": false,
+          "hasBgImageValue": false,
+          "hasArtImageValue": false,
+          "hasRefImageValue": false,
+          "hasBgImageAssetId": true,
+          "hasArtImageAssetId": false,
+          "hasRefImageAssetId": false
+        },
+        "presentationPlan": {
+          "avoid": "traditional carnival aesthetics, feathers, sequins, samba imagery, literal costumes",
+          "index": 3,
+          "scene": {
+            "shot": "medium, eye-level, shallow depth",
+            "light": "cyan and red projected light sweeping across surfaces from multiple angles",
+            "action": "color light projections mapping across concrete walls creating dynamic patterns",
+            "setting": "contemporary urban courtyard at night, geometric architecture, first plane textured wall with light, deep background",
+            "subject": "modern urban party atmosphere with neon color reflections on architectural surfaces, no people visible",
+            "graphics": "geometric light projections forming abstract patterns on walls"
+          },
+          "design": {
+            "block": "none",
+            "icons": [],
+            "photo": "half",
+            "family": "editorial",
+            "ground": "bg",
+            "emphasis": [
+              "interpretação contemporânea",
+              "sem estética tradicional"
+            ]
+          },
+          "purpose": "solution",
+          "question": "O que propõe a Apoteose?",
+          "sourceIds": [
+            "source-base"
+          ],
+          "imageRules": [
+            "Evitar clichês visuais do Carnaval: fantasias, plumas e confetes como representação literal",
+            "Não impor fotografia sóbria; o projeto pede estética publicitária contemporânea, cultura urbana e moda"
+          ],
+          "keyMessage": "Conceito: Uma interpretação contemporânea da cultura carnavalesca brasileira, sem reproduzir a estética tradicional do Carnaval.",
+          "visualRole": "content",
+          "evidenceIds": [
+            "e3",
+            "e10"
+          ],
+          "promptVersion": "presentation-plan-v3",
+          "schemaVersion": 3,
+          "evidenceStatus": [
+            "fact"
+          ],
+          "visualDirection": {
+            "avoid": "Carnival clichés: feathers, sequins, confetti, literal costumes, samba stereotypes, traditional carnival imagery, grain texture, sober muted photography.",
+            "finish": "Smooth digital finish, no grain, high-contrast color blocks, editorial polish with clean gradients between deep purple and warm reds.",
+            "palette": [
+              {
+                "hex": "#2A2158",
+                "role": "base"
+              },
+              {
+                "hex": "#F14126",
+                "role": "subject_light"
+              },
+              {
+                "hex": "#9C2459",
+                "role": "shadow"
+              },
+              {
+                "hex": "#2AB5D7",
+                "role": "graphic"
+              },
+              {
+                "hex": "#C33940",
+                "role": "accent"
+              }
+            ],
+            "graphics": "Bold geometric color blocks and typographic interventions inspired by Brazilian graphic design, no literal carnival motifs.",
+            "atmosphere": "Electric pre-Carnaval energy where urban nightlife meets Brazilian cultural intensity in a sophisticated, contemporary visual language.",
+            "paletteSource": "reference"
+          }
+        },
+        "useCultureLayout": false,
+        "presentationGlass": null,
+        "socialZoneAnchors": {
+          "title": "start",
+          "subtitle": "start"
+        },
+        "presentationBlocks": [],
+        "presentationChrome": {
+          "fonts": {
+            "text": {
+              "css": "\"Inter Tight\", sans-serif",
+              "family": "Inter Tight",
+              "weight": 400,
+              "tracking": -0.4
+            },
+            "display": {
+              "css": "\"Syne\", Arial, sans-serif",
+              "family": "Syne",
+              "weight": 700,
+              "tracking": -2.6,
+              "widthFactor": 0.64
+            }
+          },
+          "chrome": [
+            {
+              "h": 0.1,
+              "t": "rule",
+              "w": 90,
+              "x": 5,
+              "y": 10.4,
+              "color": "#FFFFFF"
+            },
+            {
+              "t": "text",
+              "w": 60,
+              "x": 5,
+              "y": 6.4,
+              "role": "label",
+              "size": 22,
+              "text": "{kicker}",
+              "color": "#FFFFFF",
+              "italic": true
+            },
+            {
+              "t": "text",
+              "w": 33,
+              "x": 62,
+              "y": 87,
+              "role": "label",
+              "size": 22,
+              "text": "{caption}",
+              "color": "#FFFFFF",
+              "italic": true
+            }
+          ],
+          "family": "editorial",
+          "format": "16:9",
+          "ground": "bg"
+        },
+        "presentationGround": "bg",
+        "presentationLayout": {
+          "visualRole": "content",
+          "imagePosition": "right-evidence",
+          "titlePosition": "top-left",
+          "imageTreatment": "right-evidence",
+          "evidencePosition": null
+        },
+        "presentationAutofit": {
+          "mode": "shrink-then-split",
+          "enabled": true,
+          "minScale": 0.85,
+          "rewriteTitle": true,
+          "preventOrphans": true,
+          "splitOnOverflow": true
+        },
+        "presentationStageId": null,
+        "presentationPresetId": "presentation_free",
+        "presentationPatternId": "presentation_free",
+        "presentationDeckDesign": {
+          "mood": "Vibrant editorial nightlife photography with deep purple shadows, warm red highlights, and clean high-contrast urban energy.",
+          "fonts": {
+            "text": "Inter Tight",
+            "display": "Syne"
+          },
+          "palette": {
+            "bg": "#2A2158",
+            "ink": "#FFFFFF",
+            "muted": "#FFFFFF",
+            "accent": "#F14126",
+            "accent2": "#C33940",
+            "inverse": "#FFFFFF",
+            "surface": "#9C2459",
+            "inverseInk": "#2A2158"
+          }
+        },
+        "presentationFreeDesign": {
+          "block": "none",
+          "icons": [],
+          "photo": "half",
+          "family": "editorial",
+          "ground": "bg",
+          "emphasis": [
+            "interpretação contemporânea",
+            "sem estética tradicional"
+          ]
+        },
+        "presentationStageLabel": "CONTEXTO OU MAPA",
+        "presentationTextLimits": {
+          "body": {
+            "maxChars": 90,
+            "maxLines": 3
+          },
+          "title": {
+            "maxChars": 90,
+            "maxLines": 2
+          },
+          "subtitle": {
+            "maxChars": 180,
+            "maxLines": 6
+          },
+          "wordsPerSlide": 110
+        },
+        "presentationVisualRole": "content",
+        "procedureLabelEmphasis": false,
+        "presentationArchetypeId": "image-split",
+        "presentationComposition": "content",
+        "presentationPhotoRadius": 0,
+        "presentationDesignFamily": "editorial",
+        "presentationCompositionId": "presentation_executive_minimal:content",
+        "presentationRequiresImage": false,
+        "presentationSuppressPhoto": false,
+        "presentationBodyTypography": {
+          "weight": 400,
+          "tracking": 0.6,
+          "fontFamily": "\"Inter\", sans-serif",
+          "leadingPercent": 145
+        },
+        "presentationPatternVersion": null,
+        "presentationPhotoTreatment": "saturate(0.94) contrast(1.03)",
+        "presentationQualityVersion": 1,
+        "presentationEvidenceFallback": null,
+        "presentationFreeTextSurfaces": {
+          "title": "#2A2158",
+          "subtitle": "#2A2158"
+        },
+        "presentationPaletteOverrides": {
+          "bg": "#2A2158",
+          "ink": "#FFFFFF",
+          "rule": "#8A85A3",
+          "muted": "#FFFFFF",
+          "accent": "#F14126",
+          "accent2": "#C33940",
+          "accent3": "#56284D",
+          "inverse": "#FFFFFF",
+          "surface": "#9C2459",
+          "inverseInk": "#2A2158",
+          "inverseMuted": "#665F87"
+        },
+        "presentationNumericTypography": {
+          "weight": 700,
+          "fontFamily": "\"Syne\", Arial, sans-serif"
+        },
+        "presentationCompositionVersion": 3,
+        "presentationArtDirectionVersion": 2,
+        "presentationTitleSizeByComposition": {
+          "data": 39.68,
+          "demo": 39.68,
+          "cover": 59.52,
+          "closing": 39.68,
+          "content": 39.68,
+          "divider": 39.68
+        },
+        "presentationTypographyByComposition": {
+          "data": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "caption",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 40.92,
+              "leadingPercent": 135
+            }
+          },
+          "demo": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "body",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 52.08,
+              "leadingPercent": 145
+            }
+          },
+          "cover": {
+            "title": {
+              "case": "normal",
+              "role": "display",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 59.52,
+              "leadingPercent": 105
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "subtitle",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 59.52,
+              "leadingPercent": 130
+            }
+          },
+          "closing": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "caption",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 40.92,
+              "leadingPercent": 135
+            }
+          },
+          "content": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 700,
+              "tracking": 0.4,
+              "fontFamily": "\"Syne\", Arial, sans-serif",
+              "sizePercent": 34,
+              "leadingPercent": 100
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "body",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 59.6,
+              "leadingPercent": 148
+            }
+          },
+          "divider": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "kpi",
+              "italic": false,
+              "weight": 600,
+              "tracking": -1.4,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 178.57,
+              "leadingPercent": 100
+            }
+          }
+        },
+        "presentationTitleLeadingByComposition": {
+          "data": 110,
+          "demo": 110,
+          "cover": 105,
+          "closing": 110,
+          "content": 110,
+          "divider": 110
+        }
+      },
+      {
+        "id": "kol1hgf",
+        "bgX": 50,
+        "bgY": 50,
+        "num": 4,
+        "align": "left",
+        "bgFit": "cover",
+        "title": "Som brasileiro, **sem fronteiras**",
+        "bgZoom": 100,
+        "canvas": {
+          "zones": {
+            "photo": {
+              "h": 1,
+              "w": 1,
+              "x": 96,
+              "y": 94
+            },
+            "title": {
+              "h": 16.4,
+              "w": 62,
+              "x": 4,
+              "y": 10
+            },
+            "evidence": {
+              "h": 57.8,
+              "w": 92,
+              "x": 4,
+              "y": 34.2
+            },
+            "subtitle": {
+              "h": 18,
+              "w": 26,
+              "x": 70,
+              "y": 12
+            }
+          },
+          "source": "presentation-preset",
+          "applied": true,
+          "enabled": false,
+          "variant": "classic",
+          "preserveZones": true
+        },
+        "layout": "tl",
+        "textBg": false,
+        "caption": "O resultado reflete um **Brasil contemporâneo**, urbano e plural, com essência popular e sofisticação cultural.\n\nA curadoria musical é um pilar da identidade da Apoteose. A ausência de fronteiras rígidas entre gêneros permite que os DJs construam jornadas que transitam do popular ao sofisticado, espelhando a pluralidade do público e o caráter contemporâneo da festa.\n\nDJs transitam entre universos musicais sem rigidez de gênero.",
+        "eyebrow": "A MÚSICA",
+        "imgMode": "dalle",
+        "overlay": 0,
+        "subSize": 46.6,
+        "bgMirror": false,
+        "customBg": "#9C2459",
+        "edgePeek": false,
+        "logoSize": 80,
+        "overlays": [],
+        "subtitle": "A curadoria mistura brasilidades, hip-hop, funk, eletrônica, remixes e clássicos nacionais numa programação conduzida por DJs.",
+        "bgImageId": null,
+        "bgOpacity": 100,
+        "bgPattern": "none",
+        "textColor": "#FFFFFF",
+        "textInset": 0,
+        "titleCase": "normal",
+        "titleSize": 35,
+        "videoMime": null,
+        "bodyWeight": 400,
+        "imageQuery": "",
+        "refImageId": null,
+        "showHandle": true,
+        "subLeading": 150,
+        "textShadow": false,
+        "titleColor": "#FFFFFF",
+        "bodyLeading": 150,
+        "composition": "",
+        "cultureTone": "",
+        "photoRegion": "full",
+        "subTracking": 0.6,
+        "titleWeight": 700,
+        "bodyTracking": 0,
+        "logoPosition": "tl",
+        "photoFraming": "auto",
+        "showSwipeCue": false,
+        "titleLeading": 106,
+        "bodyAfterSize": 180,
+        "imagePosition": "none",
+        "subtitleColor": "#FFFFFF",
+        "textBgOpacity": 55,
+        "titlePosition": "top-left",
+        "titleTracking": 0.6,
+        "bodyAfterImage": "",
+        "elementOffsets": {},
+        "imgExtraPrompt": "",
+        "imageReferences": null,
+        "refImageAssetId": null,
+        "elementsUnlocked": true,
+        "mediaObservation": {
+          "hasBgImageId": false,
+          "hasArtImageId": false,
+          "hasRefImageId": false,
+          "hasBgImageValue": false,
+          "hasArtImageValue": false,
+          "hasRefImageValue": false,
+          "hasBgImageAssetId": false,
+          "hasArtImageAssetId": false,
+          "hasRefImageAssetId": false
+        },
+        "presentationPlan": {
+          "avoid": "crowded dancefloor, people dancing, literal carnival music elements",
+          "index": 4,
+          "scene": {
+            "shot": "close-up, shallow depth of field, slightly overhead angle",
+            "light": "cyan and red accent light from sides illuminating equipment edges",
+            "action": "vinyl record spinning on turntable with subtle vibration, mixer faders mid-position",
+            "setting": "dark DJ booth surface, first plane turntable detail, blurred background with color reflections",
+            "subject": "DJ turntable setup glowing under colored light, vinyl records and mixer visible, no person",
+            "graphics": "none"
+          },
+          "design": {
+            "block": "icons",
+            "icons": [
+              "music",
+              "zap"
+            ],
+            "photo": "small",
+            "family": "modular",
+            "ground": "surface",
+            "emphasis": [
+              "sem fronteiras",
+              "Brasil contemporâneo"
+            ]
+          },
+          "purpose": "other",
+          "question": "Como soa a Apoteose?",
+          "sourceIds": [
+            "source-base"
+          ],
+          "imageRules": [
+            "Evitar clichês visuais do Carnaval: fantasias, plumas e confetes como representação literal",
+            "Não impor fotografia sóbria; o projeto pede estética publicitária contemporânea, cultura urbana e moda"
+          ],
+          "keyMessage": "Música: Curadoria brasileira sem fronteiras — hip-hop, funk, eletrônica, remixes e clássicos nacionais conduzidos por DJs.",
+          "visualRole": "content",
+          "evidenceIds": [
+            "e5",
+            "e6"
+          ],
+          "promptVersion": "presentation-plan-v3",
+          "schemaVersion": 3,
+          "evidenceStatus": [
+            "fact"
+          ],
+          "visualDirection": {
+            "avoid": "Carnival clichés: feathers, sequins, confetti, literal costumes, samba stereotypes, traditional carnival imagery, grain texture, sober muted photography.",
+            "finish": "Smooth digital finish, no grain, high-contrast color blocks, editorial polish with clean gradients between deep purple and warm reds.",
+            "palette": [
+              {
+                "hex": "#2A2158",
+                "role": "base"
+              },
+              {
+                "hex": "#F14126",
+                "role": "subject_light"
+              },
+              {
+                "hex": "#9C2459",
+                "role": "shadow"
+              },
+              {
+                "hex": "#2AB5D7",
+                "role": "graphic"
+              },
+              {
+                "hex": "#C33940",
+                "role": "accent"
+              }
+            ],
+            "graphics": "Bold geometric color blocks and typographic interventions inspired by Brazilian graphic design, no literal carnival motifs.",
+            "atmosphere": "Electric pre-Carnaval energy where urban nightlife meets Brazilian cultural intensity in a sophisticated, contemporary visual language.",
+            "paletteSource": "reference"
+          }
+        },
+        "useCultureLayout": false,
+        "presentationGlass": null,
+        "socialZoneAnchors": {
+          "title": "start",
+          "subtitle": "start"
+        },
+        "presentationBlocks": [
+          {
+            "type": "icons",
+            "items": [
+              {
+                "body": "Remixes e releituras de clássicos nacionais",
+                "icon": "music",
+                "title": "Brasilidades"
+              },
+              {
+                "body": "Hip-hop, funk e eletrônica sem rigidez de gênero",
+                "icon": "zap",
+                "title": "Sem fronteiras"
+              }
+            ]
+          }
+        ],
+        "presentationChrome": {
+          "fonts": {
+            "text": {
+              "css": "\"Inter Tight\", sans-serif",
+              "family": "Inter Tight",
+              "weight": 400,
+              "tracking": -0.4
+            },
+            "display": {
+              "css": "\"Syne\", Arial, sans-serif",
+              "family": "Syne",
+              "weight": 700,
+              "tracking": -2.6,
+              "widthFactor": 0.64
+            }
+          },
+          "chrome": [
+            {
+              "t": "text",
+              "w": 60.75,
+              "x": 4.63,
+              "y": 5.8,
+              "z": "over",
+              "case": "upper",
+              "role": "label",
+              "size": 24,
+              "text": "{kicker}",
+              "color": "#FFFFFF",
+              "weight": 700,
+              "tracking": 12
+            }
+          ],
+          "family": "modular",
+          "format": "16:9",
+          "ground": "surface"
+        },
+        "presentationGround": "surface",
+        "presentationLayout": {
+          "visualRole": "content",
+          "imagePosition": "none",
+          "titlePosition": "top-left",
+          "imageTreatment": "right-evidence",
+          "evidencePosition": "family-evidence"
+        },
+        "presentationAutofit": {
+          "mode": "shrink-then-split",
+          "enabled": true,
+          "minScale": 0.85,
+          "rewriteTitle": true,
+          "preventOrphans": true,
+          "splitOnOverflow": true
+        },
+        "presentationStageId": null,
+        "presentationPresetId": "presentation_free",
+        "presentationPatternId": "presentation_free",
+        "presentationDeckDesign": {
+          "mood": "Vibrant editorial nightlife photography with deep purple shadows, warm red highlights, and clean high-contrast urban energy.",
+          "fonts": {
+            "text": "Inter Tight",
+            "display": "Syne"
+          },
+          "palette": {
+            "bg": "#2A2158",
+            "ink": "#FFFFFF",
+            "muted": "#FFFFFF",
+            "accent": "#F14126",
+            "accent2": "#C33940",
+            "inverse": "#FFFFFF",
+            "surface": "#9C2459",
+            "inverseInk": "#2A2158"
+          }
+        },
+        "presentationFreeDesign": {
+          "block": "icons",
+          "icons": [
+            "music",
+            "zap"
+          ],
+          "photo": "none",
+          "family": "modular",
+          "ground": "surface",
+          "emphasis": [
+            "sem fronteiras"
+          ]
+        },
+        "presentationStageLabel": "CONTEXTO OU MAPA",
+        "presentationTextLimits": {
+          "body": {
+            "maxChars": 0,
+            "maxLines": 0
+          },
+          "title": {
+            "maxChars": 90,
+            "maxLines": 2
+          },
+          "subtitle": {
+            "maxChars": 180,
+            "maxLines": 3
+          },
+          "wordsPerSlide": 110
+        },
+        "presentationVisualRole": "content",
+        "procedureLabelEmphasis": false,
+        "presentationArchetypeId": "chart-takeaway",
+        "presentationComposition": "data",
+        "presentationPhotoRadius": 28,
+        "presentationDesignFamily": "modular",
+        "presentationCompositionId": "presentation_executive_minimal:data",
+        "presentationRequiresImage": false,
+        "presentationSuppressPhoto": true,
+        "presentationBodyTypography": {
+          "weight": 400,
+          "tracking": 0.6,
+          "fontFamily": "\"Inter\", sans-serif",
+          "leadingPercent": 145
+        },
+        "presentationPatternVersion": null,
+        "presentationPhotoTreatment": "saturate(0.94) contrast(1.03)",
+        "presentationQualityVersion": 1,
+        "presentationEvidenceFallback": true,
+        "presentationFreeTextSurfaces": {
+          "title": "#9C2459",
+          "subtitle": "#9C2459"
+        },
+        "presentationPaletteOverrides": {
+          "bg": "#2A2158",
+          "ink": "#FFFFFF",
+          "rule": "#8A85A3",
+          "muted": "#FFFFFF",
+          "accent": "#F14126",
+          "accent2": "#C33940",
+          "accent3": "#56284D",
+          "inverse": "#FFFFFF",
+          "surface": "#9C2459",
+          "inverseInk": "#2A2158",
+          "inverseMuted": "#665F87"
+        },
+        "presentationNumericTypography": {
+          "weight": 700,
+          "fontFamily": "\"Syne\", Arial, sans-serif"
+        },
+        "presentationCompositionVersion": 3,
+        "presentationArtDirectionVersion": 2,
+        "presentationTitleSizeByComposition": {
+          "data": 39.68,
+          "demo": 39.68,
+          "cover": 59.52,
+          "closing": 39.68,
+          "content": 39.68,
+          "divider": 39.68
+        },
+        "presentationTypographyByComposition": {
+          "data": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 700,
+              "tracking": 0.4,
+              "fontFamily": "\"Syne\", Arial, sans-serif",
+              "sizePercent": 35,
+              "leadingPercent": 106
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "caption",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 46.6,
+              "leadingPercent": 150
+            }
+          },
+          "demo": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "body",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 52.08,
+              "leadingPercent": 145
+            }
+          },
+          "cover": {
+            "title": {
+              "case": "normal",
+              "role": "display",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 59.52,
+              "leadingPercent": 105
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "subtitle",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 59.52,
+              "leadingPercent": 130
+            }
+          },
+          "closing": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "caption",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 40.92,
+              "leadingPercent": 135
+            }
+          },
+          "content": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "body",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 52.08,
+              "leadingPercent": 145
+            }
+          },
+          "divider": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "kpi",
+              "italic": false,
+              "weight": 600,
+              "tracking": -1.4,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 178.57,
+              "leadingPercent": 100
+            }
+          }
+        },
+        "presentationTitleLeadingByComposition": {
+          "data": 110,
+          "demo": 110,
+          "cover": 105,
+          "closing": 110,
+          "content": 110,
+          "divider": 110
+        }
+      },
+      {
+        "id": "tir6v45",
+        "bgX": 50,
+        "bgY": 50,
+        "num": 5,
+        "align": "left",
+        "bgFit": "cover",
+        "title": "**Formadores de opinião**, acesso **exclusivo**",
+        "bgZoom": 100,
+        "canvas": {
+          "zones": {
+            "photo": {
+              "h": 50,
+              "w": 26,
+              "x": 69,
+              "y": 40
+            },
+            "title": {
+              "h": 23,
+              "w": 90,
+              "x": 5,
+              "y": 13
+            },
+            "subtitle": {
+              "h": 49,
+              "w": 55,
+              "x": 5,
+              "y": 42
+            }
+          },
+          "source": "presentation-preset",
+          "applied": true,
+          "enabled": false,
+          "variant": "classic",
+          "preserveZones": true
+        },
+        "layout": "bl",
+        "textBg": false,
+        "caption": "O público da Apoteose não é definido por faixa etária, mas por comportamento: pessoas que circulam nos mesmos ambientes e compartilham referências culturais. A curadoria de público por convite é o que mantém a coesão social da festa e protege a experiência.",
+        "eyebrow": "O PÚBLICO",
+        "imgMode": "dalle",
+        "overlay": 0,
+        "subSize": 55.9,
+        "bgMirror": false,
+        "customBg": "#2A2158",
+        "edgePeek": false,
+        "logoSize": 80,
+        "overlays": [],
+        "subtitle": "Pessoas socialmente ativas, conectadas a moda, entretenimento e cultura. Frequentam festas, festivais e destinos desejados, valorizando a experiência e os encontros. O acesso por convite privilegia a curadoria de público e fortalece o caráter social da festa.",
+        "bgImageId": "img_n2kz8ap8lyw1",
+        "bgOpacity": 100,
+        "bgPattern": "none",
+        "textColor": "#FFFFFF",
+        "textInset": 0,
+        "titleCase": "normal",
+        "titleSize": null,
+        "videoMime": null,
+        "bodyWeight": 400,
+        "imageQuery": "group of stylish young adults in urban nightlife setting, diverse, adult, walking through a lit corridor, contemporary fashion-forward urban outfits, bold accessories, no costumes, walking confidently through illuminated corridor toward camera, engaged in conversation, confident relaxed smiles, looking ahead and at each other, modern architectural corridor with colored light washes, first plane group mid-stride, deep corridor background, warm red key light from front, cyan rim light from sides, none, medium-wide, eye-level, moderate depth",
+        "refImageId": null,
+        "showHandle": true,
+        "subLeading": 150,
+        "textShadow": false,
+        "titleColor": "#FFFFFF",
+        "bodyLeading": 150,
+        "composition": "",
+        "cultureTone": "",
+        "photoRegion": "full",
+        "subTracking": 0.6,
+        "titleWeight": 700,
+        "bgImageError": null,
+        "bodyTracking": 0,
+        "logoPosition": "tl",
+        "photoFraming": "auto",
+        "showSwipeCue": false,
+        "titleLeading": 102,
+        "bgImageFailed": false,
+        "bgImageSource": "ai",
+        "bodyAfterSize": 180,
+        "imagePosition": "right-evidence",
+        "subtitleColor": "#FFFFFF",
+        "textBgOpacity": 55,
+        "titlePosition": "top-left",
+        "titleTracking": 0.6,
+        "bgImageAssetId": "original_chunks_91638da55d2e53090afb40b364ebbcff22422f7edee6f4f3ab2a9a7ce41bb704",
+        "bodyAfterImage": "A exclusividade faz parte do posicionamento, não do discurso.",
+        "elementOffsets": {},
+        "imgExtraPrompt": "",
+        "imageReferences": null,
+        "refImageAssetId": null,
+        "elementsUnlocked": true,
+        "mediaObservation": {
+          "hasBgImageId": true,
+          "hasArtImageId": false,
+          "hasRefImageId": false,
+          "hasBgImageValue": false,
+          "hasArtImageValue": false,
+          "hasRefImageValue": false,
+          "hasBgImageAssetId": true,
+          "hasArtImageAssetId": false,
+          "hasRefImageAssetId": false
+        },
+        "presentationPlan": {
+          "avoid": "carnival costumes, feathers, sequins, exaggerated party behavior, stereotypes",
+          "index": 5,
+          "scene": {
+            "shot": "medium-wide, eye-level, moderate depth",
+            "light": "warm red key light from front, cyan rim light from sides",
+            "action": "walking confidently through illuminated corridor toward camera, engaged in conversation",
+            "setting": "modern architectural corridor with colored light washes, first plane group mid-stride, deep corridor background",
+            "subject": "group of stylish young adults in urban nightlife setting, diverse, adult, walking through a lit corridor",
+            "graphics": "none",
+            "wardrobe": "contemporary fashion-forward urban outfits, bold accessories, no costumes",
+            "expression": "confident relaxed smiles, looking ahead and at each other"
+          },
+          "design": {
+            "block": "none",
+            "icons": [],
+            "photo": "half",
+            "family": "photo",
+            "ground": "bg",
+            "emphasis": [
+              "formadores de opinião",
+              "acesso exclusivo"
+            ]
+          },
+          "purpose": "market",
+          "question": "Para quem é a Apoteose?",
+          "sourceIds": [
+            "source-base"
+          ],
+          "imageRules": [
+            "Evitar clichês visuais do Carnaval: fantasias, plumas e confetes como representação literal",
+            "Não impor fotografia sóbria; o projeto pede estética publicitária contemporânea, cultura urbana e moda"
+          ],
+          "keyMessage": "Público: Socialmente ativos, formadores de opinião conectados a moda, entretenimento e cultura — acesso exclusivo por convite.",
+          "visualRole": "content",
+          "evidenceIds": [
+            "e7",
+            "e8"
+          ],
+          "promptVersion": "presentation-plan-v3",
+          "schemaVersion": 3,
+          "evidenceStatus": [
+            "fact"
+          ],
+          "visualDirection": {
+            "avoid": "Carnival clichés: feathers, sequins, confetti, literal costumes, samba stereotypes, traditional carnival imagery, grain texture, sober muted photography.",
+            "finish": "Smooth digital finish, no grain, high-contrast color blocks, editorial polish with clean gradients between deep purple and warm reds.",
+            "palette": [
+              {
+                "hex": "#2A2158",
+                "role": "base"
+              },
+              {
+                "hex": "#F14126",
+                "role": "subject_light"
+              },
+              {
+                "hex": "#9C2459",
+                "role": "shadow"
+              },
+              {
+                "hex": "#2AB5D7",
+                "role": "graphic"
+              },
+              {
+                "hex": "#C33940",
+                "role": "accent"
+              }
+            ],
+            "graphics": "Bold geometric color blocks and typographic interventions inspired by Brazilian graphic design, no literal carnival motifs.",
+            "atmosphere": "Electric pre-Carnaval energy where urban nightlife meets Brazilian cultural intensity in a sophisticated, contemporary visual language.",
+            "paletteSource": "reference"
+          }
+        },
+        "useCultureLayout": false,
+        "presentationGlass": null,
+        "socialZoneAnchors": {
+          "title": "start",
+          "subtitle": "start"
+        },
+        "presentationBlocks": [],
+        "presentationChrome": {
+          "fonts": {
+            "text": {
+              "css": "\"Inter Tight\", sans-serif",
+              "family": "Inter Tight",
+              "weight": 400,
+              "tracking": -0.4
+            },
+            "display": {
+              "css": "\"Syne\", Arial, sans-serif",
+              "family": "Syne",
+              "weight": 700,
+              "tracking": -2.6,
+              "widthFactor": 0.64
+            }
+          },
+          "chrome": [
+            {
+              "t": "text",
+              "w": 88.75,
+              "x": 5.63,
+              "y": 8.8,
+              "z": "over",
+              "case": "upper",
+              "role": "label",
+              "size": 24,
+              "text": "{kicker}",
+              "color": "#FFFFFF",
+              "weight": 700,
+              "tracking": 12
+            }
+          ],
+          "family": "photo",
+          "format": "16:9",
+          "ground": "bg"
+        },
+        "presentationGround": "bg",
+        "presentationLayout": {
+          "visualRole": "data",
+          "imagePosition": "right-evidence",
+          "titlePosition": "top-left",
+          "imageTreatment": "right-evidence",
+          "evidencePosition": null
+        },
+        "presentationAutofit": {
+          "mode": "shrink-then-split",
+          "enabled": true,
+          "minScale": 0.85,
+          "rewriteTitle": true,
+          "preventOrphans": true,
+          "splitOnOverflow": true
+        },
+        "presentationStageId": null,
+        "presentationPresetId": "presentation_free",
+        "presentationPatternId": "presentation_free",
+        "presentationDeckDesign": {
+          "mood": "Vibrant editorial nightlife photography with deep purple shadows, warm red highlights, and clean high-contrast urban energy.",
+          "fonts": {
+            "text": "Inter Tight",
+            "display": "Syne"
+          },
+          "palette": {
+            "bg": "#2A2158",
+            "ink": "#FFFFFF",
+            "muted": "#FFFFFF",
+            "accent": "#F14126",
+            "accent2": "#C33940",
+            "inverse": "#FFFFFF",
+            "surface": "#9C2459",
+            "inverseInk": "#2A2158"
+          }
+        },
+        "presentationFreeDesign": {
+          "block": "none",
+          "icons": [],
+          "photo": "small",
+          "family": "photo",
+          "ground": "bg",
+          "emphasis": [
+            "Formadores de opinião"
+          ]
+        },
+        "presentationStageLabel": "CORPO",
+        "presentationTextLimits": {
+          "body": {
+            "maxChars": 140,
+            "maxLines": 4
+          },
+          "title": {
+            "maxChars": 90,
+            "maxLines": 2
+          },
+          "subtitle": {
+            "maxChars": 320,
+            "maxLines": 9
+          },
+          "wordsPerSlide": 110
+        },
+        "presentationVisualRole": "data",
+        "procedureLabelEmphasis": false,
+        "presentationArchetypeId": "chart-takeaway",
+        "presentationComposition": "data",
+        "presentationPhotoRadius": 0,
+        "presentationDesignFamily": "photo",
+        "presentationCompositionId": "presentation_executive_minimal:data",
+        "presentationRequiresImage": false,
+        "presentationSuppressPhoto": false,
+        "presentationBodyTypography": {
+          "weight": 400,
+          "tracking": 0.6,
+          "fontFamily": "\"Inter\", sans-serif",
+          "leadingPercent": 145
+        },
+        "presentationPatternVersion": null,
+        "presentationPhotoTreatment": "saturate(0.94) contrast(1.03)",
+        "presentationQualityVersion": 1,
+        "presentationEvidenceFallback": true,
+        "presentationFreeTextSurfaces": {
+          "title": "#2A2158",
+          "subtitle": "#2A2158"
+        },
+        "presentationPaletteOverrides": {
+          "bg": "#2A2158",
+          "ink": "#FFFFFF",
+          "rule": "#8A85A3",
+          "muted": "#FFFFFF",
+          "accent": "#F14126",
+          "accent2": "#C33940",
+          "accent3": "#56284D",
+          "inverse": "#FFFFFF",
+          "surface": "#9C2459",
+          "inverseInk": "#2A2158",
+          "inverseMuted": "#665F87"
+        },
+        "presentationNumericTypography": {
+          "weight": 700,
+          "fontFamily": "\"Syne\", Arial, sans-serif"
+        },
+        "presentationCompositionVersion": 3,
+        "presentationArtDirectionVersion": 2,
+        "presentationTitleSizeByComposition": {
+          "data": 39.68,
+          "demo": 39.68,
+          "cover": 59.52,
+          "closing": 39.68,
+          "content": 39.68,
+          "divider": 39.68
+        },
+        "presentationTypographyByComposition": {
+          "data": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 700,
+              "tracking": 0.4,
+              "fontFamily": "\"Syne\", Arial, sans-serif",
+              "sizePercent": null,
+              "leadingPercent": 102
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "caption",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 55.9,
+              "leadingPercent": 150
+            }
+          },
+          "demo": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "body",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 52.08,
+              "leadingPercent": 145
+            }
+          },
+          "cover": {
+            "title": {
+              "case": "normal",
+              "role": "display",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 59.52,
+              "leadingPercent": 105
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "subtitle",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 59.52,
+              "leadingPercent": 130
+            }
+          },
+          "closing": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "caption",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 40.92,
+              "leadingPercent": 135
+            }
+          },
+          "content": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "body",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 52.08,
+              "leadingPercent": 145
+            }
+          },
+          "divider": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "kpi",
+              "italic": false,
+              "weight": 600,
+              "tracking": -1.4,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 178.57,
+              "leadingPercent": 100
+            }
+          }
+        },
+        "presentationTitleLeadingByComposition": {
+          "data": 110,
+          "demo": 110,
+          "cover": 105,
+          "closing": 110,
+          "content": 110,
+          "divider": 110
+        }
+      },
+      {
+        "id": "re902l8",
+        "bgX": 50,
+        "bgY": 50,
+        "num": 6,
+        "align": "left",
+        "bgFit": "cover",
+        "title": "**Inteligente**, **irreverente**, **bem-humorada**",
+        "bgZoom": 100,
+        "canvas": {
+          "zones": {
+            "photo": {
+              "h": 1,
+              "w": 1,
+              "x": 96,
+              "y": 94
+            },
+            "title": {
+              "h": 19.26,
+              "w": 56,
+              "x": 4,
+              "y": 9
+            },
+            "subtitle": {
+              "h": 58.24,
+              "w": 40,
+              "x": 38,
+              "y": 31.76
+            }
+          },
+          "source": "presentation-preset",
+          "applied": true,
+          "enabled": false,
+          "variant": "classic",
+          "preserveZones": true
+        },
+        "layout": "tl",
+        "textBg": false,
+        "caption": "A comunicação evita o humor óbvio e a provocação gratuita. O tom nasce da observação de situações cotidianas, contradições sociais e personagens inusitados das festas brasileiras. A marca não precisa dizer que é desejada; a direção artística e a curadoria comunicam isso indiretamente.",
+        "eyebrow": "A COMUNICAÇÃO",
+        "imgMode": "dalle",
+        "overlay": 0,
+        "subSize": 59.6,
+        "bgMirror": false,
+        "customBg": "#FFFFFF",
+        "edgePeek": false,
+        "logoSize": 80,
+        "overlays": [],
+        "subtitle": "A marca não anuncia que é exclusiva ou sofisticada, deixa que isso se perceba pela qualidade da comunicação, pela direção artística e pelas pessoas que participam.",
+        "bgImageId": null,
+        "bgOpacity": 100,
+        "bgPattern": "none",
+        "textColor": "#665F87",
+        "textInset": 0,
+        "titleCase": "normal",
+        "titleSize": 49,
+        "videoMime": null,
+        "bodyWeight": 400,
+        "imageQuery": "",
+        "refImageId": null,
+        "showHandle": true,
+        "subLeading": 140,
+        "textShadow": false,
+        "titleColor": "#2A2158",
+        "bodyLeading": 140,
+        "composition": "",
+        "cultureTone": "",
+        "photoRegion": "full",
+        "subTracking": 0.6,
+        "titleWeight": 700,
+        "bodyTracking": 0,
+        "logoPosition": "tl",
+        "photoFraming": "auto",
+        "showSwipeCue": false,
+        "titleLeading": 98,
+        "bodyAfterSize": 180,
+        "imagePosition": "none",
+        "subtitleColor": "#2A2158",
+        "textBgOpacity": 55,
+        "titlePosition": "top-left",
+        "titleTracking": 0.6,
+        "bodyAfterImage": "O humor nasce da observação do comportamento e dos exageros brasileiros.",
+        "elementOffsets": {},
+        "imgExtraPrompt": "",
+        "imageReferences": null,
+        "refImageAssetId": null,
+        "elementsUnlocked": true,
+        "mediaObservation": {
+          "hasBgImageId": false,
+          "hasArtImageId": false,
+          "hasRefImageId": false,
+          "hasBgImageValue": false,
+          "hasArtImageValue": false,
+          "hasRefImageValue": false,
+          "hasBgImageAssetId": false,
+          "hasArtImageAssetId": false,
+          "hasRefImageAssetId": false
+        },
+        "presentationPlan": {
+          "avoid": "",
+          "index": 6,
+          "scene": null,
+          "design": {
+            "block": "none",
+            "icons": [],
+            "photo": "none",
+            "family": "swiss",
+            "ground": "inverse",
+            "emphasis": [
+              "inteligente",
+              "irreverente",
+              "bem-humorada"
+            ]
+          },
+          "purpose": "other",
+          "question": "Como a Apoteose se comunica?",
+          "sourceIds": [
+            "source-base"
+          ],
+          "imageRules": [
+            "Evitar clichês visuais do Carnaval: fantasias, plumas e confetes como representação literal",
+            "Não impor fotografia sóbria; o projeto pede estética publicitária contemporânea, cultura urbana e moda"
+          ],
+          "keyMessage": "Comunicação: Inteligente, provocativa, irreverente e bem-humorada — qualidades percebidas, não anunciadas.",
+          "visualRole": "content",
+          "evidenceIds": [
+            "e11"
+          ],
+          "promptVersion": "presentation-plan-v3",
+          "schemaVersion": 3,
+          "evidenceStatus": [
+            "fact"
+          ],
+          "visualDirection": {
+            "avoid": "Carnival clichés: feathers, sequins, confetti, literal costumes, samba stereotypes, traditional carnival imagery, grain texture, sober muted photography.",
+            "finish": "Smooth digital finish, no grain, high-contrast color blocks, editorial polish with clean gradients between deep purple and warm reds.",
+            "palette": [
+              {
+                "hex": "#2A2158",
+                "role": "base"
+              },
+              {
+                "hex": "#F14126",
+                "role": "subject_light"
+              },
+              {
+                "hex": "#9C2459",
+                "role": "shadow"
+              },
+              {
+                "hex": "#2AB5D7",
+                "role": "graphic"
+              },
+              {
+                "hex": "#C33940",
+                "role": "accent"
+              }
+            ],
+            "graphics": "Bold geometric color blocks and typographic interventions inspired by Brazilian graphic design, no literal carnival motifs.",
+            "atmosphere": "Electric pre-Carnaval energy where urban nightlife meets Brazilian cultural intensity in a sophisticated, contemporary visual language.",
+            "paletteSource": "reference"
+          }
+        },
+        "useCultureLayout": false,
+        "presentationGlass": null,
+        "socialZoneAnchors": {
+          "title": "start",
+          "subtitle": "start"
+        },
+        "presentationBlocks": [],
+        "presentationChrome": {
+          "fonts": {
+            "text": {
+              "css": "\"Inter Tight\", sans-serif",
+              "family": "Inter Tight",
+              "weight": 400,
+              "tracking": -0.4
+            },
+            "display": {
+              "css": "\"Syne\", Arial, sans-serif",
+              "family": "Syne",
+              "weight": 700,
+              "tracking": -2.6,
+              "widthFactor": 0.64
+            }
+          },
+          "chrome": [
+            {
+              "t": "grid",
+              "cols": 12,
+              "color": "#2A2158",
+              "margin": 4,
+              "opacity": 0.55
+            },
+            {
+              "t": "text",
+              "w": 54.75,
+              "x": 4.63,
+              "y": 4.8,
+              "z": "over",
+              "case": "upper",
+              "role": "label",
+              "size": 24,
+              "text": "{kicker}",
+              "color": "#C33940",
+              "weight": 700,
+              "tracking": 12
+            }
+          ],
+          "family": "swiss",
+          "format": "16:9",
+          "ground": "inverse"
+        },
+        "presentationGround": "inverse",
+        "presentationLayout": {
+          "visualRole": "content",
+          "imagePosition": "none",
+          "titlePosition": "top-left",
+          "imageTreatment": "right-evidence",
+          "evidencePosition": null
+        },
+        "presentationAutofit": {
+          "mode": "shrink-then-split",
+          "enabled": true,
+          "minScale": 0.85,
+          "rewriteTitle": true,
+          "preventOrphans": true,
+          "splitOnOverflow": true
+        },
+        "presentationStageId": null,
+        "presentationPresetId": "presentation_free",
+        "presentationPatternId": "presentation_free",
+        "presentationDeckDesign": {
+          "mood": "Vibrant editorial nightlife photography with deep purple shadows, warm red highlights, and clean high-contrast urban energy.",
+          "fonts": {
+            "text": "Inter Tight",
+            "display": "Syne"
+          },
+          "palette": {
+            "bg": "#2A2158",
+            "ink": "#FFFFFF",
+            "muted": "#FFFFFF",
+            "accent": "#F14126",
+            "accent2": "#C33940",
+            "inverse": "#FFFFFF",
+            "surface": "#9C2459",
+            "inverseInk": "#2A2158"
+          }
+        },
+        "presentationFreeDesign": {
+          "block": "none",
+          "icons": [],
+          "photo": "none",
+          "family": "swiss",
+          "ground": "inverse",
+          "emphasis": [
+            "Inteligente",
+            "irreverente",
+            "bem-humorada"
+          ]
+        },
+        "presentationStageLabel": "CORPO",
+        "presentationTextLimits": {
+          "body": {
+            "maxChars": 90,
+            "maxLines": 3
+          },
+          "title": {
+            "maxChars": 90,
+            "maxLines": 2
+          },
+          "subtitle": {
+            "maxChars": 180,
+            "maxLines": 6
+          },
+          "wordsPerSlide": 110
+        },
+        "presentationVisualRole": "content",
+        "procedureLabelEmphasis": false,
+        "presentationArchetypeId": "image-split",
+        "presentationComposition": "content",
+        "presentationPhotoRadius": 0,
+        "presentationDesignFamily": "swiss",
+        "presentationCompositionId": "presentation_executive_minimal:content",
+        "presentationRequiresImage": false,
+        "presentationSuppressPhoto": true,
+        "presentationBodyTypography": {
+          "weight": 400,
+          "tracking": 0.6,
+          "fontFamily": "\"Inter\", sans-serif",
+          "leadingPercent": 145
+        },
+        "presentationPatternVersion": null,
+        "presentationPhotoTreatment": "saturate(0.94) contrast(1.03)",
+        "presentationQualityVersion": 1,
+        "presentationEvidenceFallback": null,
+        "presentationFreeTextSurfaces": {
+          "title": "#FFFFFF",
+          "subtitle": "#FFFFFF"
+        },
+        "presentationPaletteOverrides": {
+          "bg": "#2A2158",
+          "ink": "#FFFFFF",
+          "rule": "#8A85A3",
+          "muted": "#FFFFFF",
+          "accent": "#F14126",
+          "accent2": "#C33940",
+          "accent3": "#56284D",
+          "inverse": "#FFFFFF",
+          "surface": "#9C2459",
+          "inverseInk": "#2A2158",
+          "inverseMuted": "#665F87"
+        },
+        "presentationNumericTypography": {
+          "weight": 700,
+          "fontFamily": "\"Syne\", Arial, sans-serif"
+        },
+        "presentationCompositionVersion": 3,
+        "presentationArtDirectionVersion": 2,
+        "presentationTitleSizeByComposition": {
+          "data": 39.68,
+          "demo": 39.68,
+          "cover": 59.52,
+          "closing": 39.68,
+          "content": 39.68,
+          "divider": 39.68
+        },
+        "presentationTypographyByComposition": {
+          "data": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "caption",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 40.92,
+              "leadingPercent": 135
+            }
+          },
+          "demo": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "body",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 52.08,
+              "leadingPercent": 145
+            }
+          },
+          "cover": {
+            "title": {
+              "case": "normal",
+              "role": "display",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 59.52,
+              "leadingPercent": 105
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "subtitle",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 59.52,
+              "leadingPercent": 130
+            }
+          },
+          "closing": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "caption",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 40.92,
+              "leadingPercent": 135
+            }
+          },
+          "content": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 700,
+              "tracking": 0.4,
+              "fontFamily": "\"Syne\", Arial, sans-serif",
+              "sizePercent": 49,
+              "leadingPercent": 98
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "body",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 59.6,
+              "leadingPercent": 140
+            }
+          },
+          "divider": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "kpi",
+              "italic": false,
+              "weight": 600,
+              "tracking": -1.4,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 178.57,
+              "leadingPercent": 100
+            }
+          }
+        },
+        "presentationTitleLeadingByComposition": {
+          "data": 110,
+          "demo": 110,
+          "cover": 105,
+          "closing": 110,
+          "content": 110,
+          "divider": 110
+        }
+      },
+      {
+        "id": "4x2gw06",
+        "bgX": 50,
+        "bgY": 50,
+        "num": 7,
+        "align": "left",
+        "bgFit": "cover",
+        "title": "Pretende ser o **esquenta de Carnaval** de **São Paulo**",
+        "bgZoom": 100,
+        "canvas": {
+          "zones": {
+            "photo": {
+              "h": 1,
+              "w": 1,
+              "x": 96,
+              "y": 94
+            },
+            "title": {
+              "h": 50,
+              "w": 37.5,
+              "x": 6,
+              "y": 14
+            },
+            "subtitle": {
+              "h": 56,
+              "w": 25.5,
+              "x": 46.5,
+              "y": 28
+            }
+          },
+          "source": "presentation-preset",
+          "applied": true,
+          "enabled": false,
+          "variant": "classic",
+          "preserveZones": true
+        },
+        "layout": "tl",
+        "textBg": false,
+        "caption": "O posicionamento combina ambição clara — ser o esquenta mais badalado — com identidade própria. A festa não depende apenas da data: a expectativa gerada antes do evento já faz parte da proposta.",
+        "eyebrow": "O POSICIONAMENTO",
+        "imgMode": "dalle",
+        "overlay": 0,
+        "subSize": 52.1,
+        "bgMirror": false,
+        "customBg": "#2A2158",
+        "edgePeek": false,
+        "logoSize": 80,
+        "overlays": [],
+        "subtitle": "A Apoteose pretende se consolidar como o esquenta de Carnaval mais badalado da cidade. Uma festa com identidade própria, capaz de gerar desejo, conversas e expectativa antes mesmo de acontecer.",
+        "bgImageId": null,
+        "bgOpacity": 100,
+        "bgPattern": "none",
+        "textColor": "#FFFFFF",
+        "textInset": 0,
+        "titleCase": "normal",
+        "titleSize": 56,
+        "videoMime": null,
+        "bodyWeight": 400,
+        "imageQuery": "",
+        "refImageId": null,
+        "showHandle": true,
+        "subLeading": 145,
+        "textShadow": false,
+        "titleColor": "#FFFFFF",
+        "bodyLeading": 145,
+        "composition": "",
+        "cultureTone": "",
+        "photoRegion": "full",
+        "subTracking": 0.6,
+        "titleWeight": 700,
+        "bodyTracking": 0,
+        "logoPosition": "tl",
+        "photoFraming": "auto",
+        "showSwipeCue": false,
+        "titleLeading": 98,
+        "bodyAfterSize": 180,
+        "imagePosition": "none",
+        "subtitleColor": "#FFFFFF",
+        "textBgOpacity": 55,
+        "titlePosition": "top-left",
+        "titleTracking": 0.6,
+        "bodyAfterImage": "Posicionamento como destino pré-Carnaval com identidade própria.",
+        "elementOffsets": {},
+        "imgExtraPrompt": "",
+        "imageReferences": null,
+        "refImageAssetId": null,
+        "elementsUnlocked": true,
+        "mediaObservation": {
+          "hasBgImageId": false,
+          "hasArtImageId": true,
+          "hasRefImageId": false,
+          "hasBgImageValue": false,
+          "hasArtImageValue": false,
+          "hasRefImageValue": false,
+          "hasBgImageAssetId": false,
+          "hasArtImageAssetId": true,
+          "hasRefImageAssetId": false
+        },
+        "presentationPlan": {
+          "avoid": "carnival floats, street parade imagery, confetti, literal carnival elements",
+          "index": 8,
+          "scene": {
+            "shot": "wide, high angle, deep depth of field",
+            "light": "city ambient light with warm red and cyan color grading across the scene",
+            "action": "city lights pulsing with warm and cool color temperature shifts across buildings",
+            "setting": "elevated urban viewpoint overlooking São Paulo skyline, first plane rooftop edge, deep cityscape background",
+            "subject": "city skyline of São Paulo at night seen from elevated angle, Avenida Paulista silhouette, no people",
+            "graphics": "subtle geometric overlay framing the skyline"
+          },
+          "design": {
+            "block": "none",
+            "icons": [],
+            "photo": "none",
+            "family": "cultural",
+            "ground": "art",
+            "emphasis": [
+              "esquenta de Carnaval",
+              "São Paulo"
+            ]
+          },
+          "purpose": "vision",
+          "question": "Como a Apoteose se vê no cenário paulistano?",
+          "sourceIds": [
+            "source-base"
+          ],
+          "imageRules": [
+            "Evitar clichês visuais do Carnaval: fantasias, plumas e confetes como representação literal",
+            "Não impor fotografia sóbria; o projeto pede estética publicitária contemporânea, cultura urbana e moda"
+          ],
+          "keyMessage": "Posicionamento: Pretende se consolidar como o esquenta de Carnaval mais badalado de São Paulo, com identidade própria.",
+          "visualRole": "content",
+          "evidenceIds": [
+            "e12"
+          ],
+          "promptVersion": "presentation-plan-v3",
+          "schemaVersion": 3,
+          "evidenceStatus": [
+            "fact"
+          ],
+          "visualDirection": {
+            "avoid": "Carnival clichés: feathers, sequins, confetti, literal costumes, samba stereotypes, traditional carnival imagery, grain texture, sober muted photography.",
+            "finish": "Smooth digital finish, no grain, high-contrast color blocks, editorial polish with clean gradients between deep purple and warm reds.",
+            "palette": [
+              {
+                "hex": "#2A2158",
+                "role": "base"
+              },
+              {
+                "hex": "#F14126",
+                "role": "subject_light"
+              },
+              {
+                "hex": "#9C2459",
+                "role": "shadow"
+              },
+              {
+                "hex": "#2AB5D7",
+                "role": "graphic"
+              },
+              {
+                "hex": "#C33940",
+                "role": "accent"
+              }
+            ],
+            "graphics": "Bold geometric color blocks and typographic interventions inspired by Brazilian graphic design, no literal carnival motifs.",
+            "atmosphere": "Electric pre-Carnaval energy where urban nightlife meets Brazilian cultural intensity in a sophisticated, contemporary visual language.",
+            "paletteSource": "reference"
+          }
+        },
+        "useCultureLayout": false,
+        "presentationGlass": null,
+        "socialZoneAnchors": {
+          "title": "start",
+          "subtitle": "start"
+        },
+        "presentationBlocks": [],
+        "presentationChrome": {
+          "fonts": {
+            "text": {
+              "css": "\"Inter Tight\", sans-serif",
+              "family": "Inter Tight",
+              "weight": 400,
+              "tracking": -0.4
+            },
+            "display": {
+              "css": "\"Syne\", Arial, sans-serif",
+              "family": "Syne",
+              "weight": 700,
+              "tracking": -2.6,
+              "widthFactor": 0.64
+            }
+          },
+          "chrome": [
+            {
+              "h": 64,
+              "t": "block",
+              "w": 0.6,
+              "x": 43.5,
+              "y": 24,
+              "color": "#C33940"
+            },
+            {
+              "d": 10,
+              "t": "circle",
+              "x": 66,
+              "y": 6,
+              "color": "#F14126"
+            },
+            {
+              "t": "text",
+              "w": 36.25,
+              "x": 6.63,
+              "y": 9.8,
+              "z": "over",
+              "case": "upper",
+              "role": "label",
+              "size": 24,
+              "text": "{kicker}",
+              "color": "#FFFFFF",
+              "weight": 700,
+              "tracking": 12
+            }
+          ],
+          "family": "cultural",
+          "format": "16:9",
+          "ground": "bg"
+        },
+        "presentationGround": "bg",
+        "presentationLayout": {
+          "visualRole": "content",
+          "imagePosition": "none",
+          "titlePosition": "top-left",
+          "imageTreatment": "right-evidence",
+          "evidencePosition": null
+        },
+        "presentationAutofit": {
+          "mode": "shrink-then-split",
+          "enabled": true,
+          "minScale": 0.85,
+          "rewriteTitle": true,
+          "preventOrphans": true,
+          "splitOnOverflow": true
+        },
+        "presentationStageId": null,
+        "presentationArtScrim": {
+          "side": "left",
+          "color": "#2A2158",
+          "reach": 76,
+          "opacity": 64
+        },
+        "presentationPresetId": "presentation_free",
+        "presentationPatternId": "presentation_free",
+        "presentationArtImageId": "img_tfam6amdohnf",
+        "presentationDeckDesign": {
+          "mood": "Vibrant editorial nightlife photography with deep purple shadows, warm red highlights, and clean high-contrast urban energy.",
+          "fonts": {
+            "text": "Inter Tight",
+            "display": "Syne"
+          },
+          "palette": {
+            "bg": "#2A2158",
+            "ink": "#FFFFFF",
+            "muted": "#FFFFFF",
+            "accent": "#F14126",
+            "accent2": "#C33940",
+            "inverse": "#FFFFFF",
+            "surface": "#9C2459",
+            "inverseInk": "#2A2158"
+          }
+        },
+        "presentationFreeDesign": {
+          "block": "none",
+          "icons": [],
+          "photo": "none",
+          "family": "cultural",
+          "ground": "art",
+          "emphasis": [
+            "esquenta de Carnaval",
+            "São Paulo"
+          ]
+        },
+        "presentationStageLabel": "SÍNTESE",
+        "presentationTextLimits": {
+          "body": {
+            "maxChars": 180,
+            "maxLines": 4
+          },
+          "title": {
+            "maxChars": 90,
+            "maxLines": 2
+          },
+          "subtitle": {
+            "maxChars": 360,
+            "maxLines": 9
+          },
+          "wordsPerSlide": 110
+        },
+        "presentationVisualRole": "content",
+        "procedureLabelEmphasis": false,
+        "presentationArchetypeId": "image-split",
+        "presentationComposition": "content",
+        "presentationPhotoRadius": 0,
+        "presentationDesignFamily": "cultural",
+        "presentationCompositionId": "presentation_executive_minimal:content",
+        "presentationRequiresImage": false,
+        "presentationSuppressPhoto": true,
+        "presentationBodyTypography": {
+          "weight": 400,
+          "tracking": 0.6,
+          "fontFamily": "\"Inter\", sans-serif",
+          "leadingPercent": 145
+        },
+        "presentationPatternVersion": null,
+        "presentationPhotoTreatment": "saturate(0.94) contrast(1.03)",
+        "presentationQualityVersion": 1,
+        "presentationArtImageAssetId": "original_3f39adfdd804f1b6b3017c516c28ec9f13f7b98cdd83769be1e5c5e75201b173",
+        "presentationEvidenceFallback": null,
+        "presentationFreeTextSurfaces": {
+          "title": "#777194",
+          "subtitle": "#777194"
+        },
+        "presentationPaletteOverrides": {
+          "bg": "#2A2158",
+          "ink": "#FFFFFF",
+          "rule": "#8A85A3",
+          "muted": "#FFFFFF",
+          "accent": "#F14126",
+          "accent2": "#C33940",
+          "accent3": "#56284D",
+          "inverse": "#FFFFFF",
+          "surface": "#9C2459",
+          "inverseInk": "#2A2158",
+          "inverseMuted": "#665F87"
+        },
+        "presentationNumericTypography": {
+          "weight": 700,
+          "fontFamily": "\"Syne\", Arial, sans-serif"
+        },
+        "presentationCompositionVersion": 3,
+        "presentationArtDirectionVersion": 2,
+        "presentationTitleSizeByComposition": {
+          "data": 39.68,
+          "demo": 39.68,
+          "cover": 59.52,
+          "closing": 39.68,
+          "content": 39.68,
+          "divider": 39.68
+        },
+        "presentationTypographyByComposition": {
+          "data": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "caption",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 40.92,
+              "leadingPercent": 135
+            }
+          },
+          "demo": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "body",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 52.08,
+              "leadingPercent": 145
+            }
+          },
+          "cover": {
+            "title": {
+              "case": "normal",
+              "role": "display",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 59.52,
+              "leadingPercent": 105
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "subtitle",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 59.52,
+              "leadingPercent": 130
+            }
+          },
+          "closing": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "caption",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 40.92,
+              "leadingPercent": 135
+            }
+          },
+          "content": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 700,
+              "tracking": 0.4,
+              "fontFamily": "\"Syne\", Arial, sans-serif",
+              "sizePercent": 56,
+              "leadingPercent": 98
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "body",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 52.1,
+              "leadingPercent": 145
+            }
+          },
+          "divider": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "kpi",
+              "italic": false,
+              "weight": 600,
+              "tracking": -1.4,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 178.57,
+              "leadingPercent": 100
+            }
+          }
+        },
+        "presentationTitleLeadingByComposition": {
+          "data": 110,
+          "demo": 110,
+          "cover": 105,
+          "closing": 110,
+          "content": 110,
+          "divider": 110
+        }
+      },
+      {
+        "id": "78vb7m5",
+        "bgX": 50,
+        "bgY": 50,
+        "num": 8,
+        "align": "left",
+        "bgFit": "cover",
+        "title": "A festa do intervalo",
+        "bgZoom": 100,
+        "canvas": {
+          "zones": {
+            "photo": {
+              "h": 1,
+              "w": 1,
+              "x": 96,
+              "y": 94
+            },
+            "title": {
+              "h": 8.99,
+              "w": 52,
+              "x": 9,
+              "y": 13
+            },
+            "evidence": {
+              "h": 47.42,
+              "w": 51,
+              "x": 40,
+              "y": 38.58
+            },
+            "subtitle": {
+              "h": 47.42,
+              "w": 26,
+              "x": 9,
+              "y": 38.58
+            }
+          },
+          "source": "presentation-preset",
+          "applied": true,
+          "enabled": false,
+          "variant": "classic",
+          "preserveZones": true
+        },
+        "layout": "tl",
+        "textBg": false,
+        "caption": "O conceito central sintetiza o território comportamental da marca: o brasileiro antecipa, prolonga e reinventa a festa. A Apoteose ocupa esse intervalo de forma autoral.",
+        "eyebrow": "APOTEOSE",
+        "imgMode": "dalle",
+        "overlay": 0,
+        "subSize": 48.4,
+        "bgMirror": false,
+        "customBg": "#9C2459",
+        "edgePeek": false,
+        "logoSize": 80,
+        "overlays": [],
+        "subtitle": "A festa existe no intervalo entre a promessa de se comportar e a absoluta falta de intenção de cumpri-la.",
+        "bgImageId": null,
+        "bgOpacity": 100,
+        "bgPattern": "none",
+        "textColor": "#FFFFFF",
+        "textInset": 0,
+        "titleCase": "normal",
+        "titleSize": 33,
+        "videoMime": null,
+        "bodyWeight": 400,
+        "imageQuery": "",
+        "refImageId": null,
+        "showHandle": true,
+        "subLeading": 160,
+        "textShadow": false,
+        "titleColor": "#FFFFFF",
+        "bodyLeading": 160,
+        "composition": "",
+        "cultureTone": "",
+        "photoRegion": "full",
+        "subTracking": 0.6,
+        "titleWeight": 700,
+        "bodyTracking": 0,
+        "logoPosition": "tl",
+        "photoFraming": "auto",
+        "showSwipeCue": false,
+        "titleLeading": 104,
+        "bodyAfterSize": 180,
+        "imagePosition": "none",
+        "subtitleColor": "#FFFFFF",
+        "textBgOpacity": 55,
+        "titlePosition": "top-left",
+        "titleTracking": 0.6,
+        "bodyAfterImage": "",
+        "elementOffsets": {},
+        "imgExtraPrompt": "",
+        "imageReferences": null,
+        "refImageAssetId": null,
+        "elementsUnlocked": true,
+        "mediaObservation": {
+          "hasBgImageId": false,
+          "hasArtImageId": false,
+          "hasRefImageId": false,
+          "hasBgImageValue": false,
+          "hasArtImageValue": false,
+          "hasRefImageValue": false,
+          "hasBgImageAssetId": false,
+          "hasArtImageAssetId": false,
+          "hasRefImageAssetId": false
+        },
+        "presentationPlan": {
+          "avoid": "",
+          "index": 9,
+          "scene": null,
+          "design": {
+            "block": "quote",
+            "icons": [],
+            "photo": "none",
+            "family": "luxury",
+            "ground": "accent",
+            "emphasis": [
+              "Como se o Carnaval não fosse suficiente"
+            ]
+          },
+          "purpose": "summary",
+          "question": "O que define a Apoteose em uma frase?",
+          "sourceIds": [
+            "source-base"
+          ],
+          "imageRules": [
+            "Evitar clichês visuais do Carnaval: fantasias, plumas e confetes como representação literal",
+            "Não impor fotografia sóbria; o projeto pede estética publicitária contemporânea, cultura urbana e moda"
+          ],
+          "keyMessage": "Síntese: Como se o Carnaval não fosse suficiente — a festa que existe no intervalo entre a promessa de se comportar e a falta de intenção de cumpri-la.",
+          "visualRole": "content",
+          "evidenceIds": [
+            "e13"
+          ],
+          "promptVersion": "presentation-plan-v3",
+          "schemaVersion": 3,
+          "evidenceStatus": [
+            "fact"
+          ],
+          "visualDirection": {
+            "avoid": "Carnival clichés: feathers, sequins, confetti, literal costumes, samba stereotypes, traditional carnival imagery, grain texture, sober muted photography.",
+            "finish": "Smooth digital finish, no grain, high-contrast color blocks, editorial polish with clean gradients between deep purple and warm reds.",
+            "palette": [
+              {
+                "hex": "#2A2158",
+                "role": "base"
+              },
+              {
+                "hex": "#F14126",
+                "role": "subject_light"
+              },
+              {
+                "hex": "#9C2459",
+                "role": "shadow"
+              },
+              {
+                "hex": "#2AB5D7",
+                "role": "graphic"
+              },
+              {
+                "hex": "#C33940",
+                "role": "accent"
+              }
+            ],
+            "graphics": "Bold geometric color blocks and typographic interventions inspired by Brazilian graphic design, no literal carnival motifs.",
+            "atmosphere": "Electric pre-Carnaval energy where urban nightlife meets Brazilian cultural intensity in a sophisticated, contemporary visual language.",
+            "paletteSource": "reference"
+          }
+        },
+        "useCultureLayout": false,
+        "presentationGlass": null,
+        "socialZoneAnchors": {
+          "title": "start",
+          "subtitle": "start"
+        },
+        "presentationBlocks": [
+          {
+            "text": "Como se o Carnaval não fosse suficiente.",
+            "type": "quote",
+            "author": ""
+          }
+        ],
+        "presentationChrome": {
+          "fonts": {
+            "text": {
+              "css": "\"Inter Tight\", sans-serif",
+              "family": "Inter Tight",
+              "weight": 400,
+              "tracking": -0.4
+            },
+            "display": {
+              "css": "\"Syne\", Arial, sans-serif",
+              "family": "Syne",
+              "weight": 700,
+              "tracking": -2.6,
+              "widthFactor": 0.64
+            }
+          },
+          "chrome": [
+            {
+              "h": 0.08,
+              "t": "rule",
+              "w": 6,
+              "x": 9,
+              "y": 10,
+              "color": "#F14126"
+            },
+            {
+              "t": "text",
+              "w": 50.75,
+              "x": 9.63,
+              "y": 6.6,
+              "z": "over",
+              "case": "upper",
+              "role": "label",
+              "size": 24,
+              "text": "{kicker}",
+              "color": "#FFFFFF",
+              "weight": 700,
+              "tracking": 12
+            }
+          ],
+          "family": "luxury",
+          "format": "16:9",
+          "ground": "surface"
+        },
+        "presentationGround": "surface",
+        "presentationLayout": {
+          "visualRole": "content",
+          "imagePosition": "none",
+          "titlePosition": "top-left",
+          "imageTreatment": "right-evidence",
+          "evidencePosition": "family-evidence"
+        },
+        "presentationAutofit": {
+          "mode": "shrink-then-split",
+          "enabled": true,
+          "minScale": 0.85,
+          "rewriteTitle": true,
+          "preventOrphans": true,
+          "splitOnOverflow": true
+        },
+        "presentationStageId": null,
+        "presentationPresetId": "presentation_free",
+        "presentationPatternId": "presentation_free",
+        "presentationDeckDesign": {
+          "mood": "Vibrant editorial nightlife photography with deep purple shadows, warm red highlights, and clean high-contrast urban energy.",
+          "fonts": {
+            "text": "Inter Tight",
+            "display": "Syne"
+          },
+          "palette": {
+            "bg": "#2A2158",
+            "ink": "#FFFFFF",
+            "muted": "#FFFFFF",
+            "accent": "#F14126",
+            "accent2": "#C33940",
+            "inverse": "#FFFFFF",
+            "surface": "#9C2459",
+            "inverseInk": "#2A2158"
+          }
+        },
+        "presentationFreeDesign": {
+          "block": "quote",
+          "icons": [],
+          "photo": "none",
+          "family": "luxury",
+          "ground": "surface",
+          "emphasis": []
+        },
+        "presentationStageLabel": "FECHO",
+        "presentationTextLimits": {
+          "body": {
+            "maxChars": 0,
+            "maxLines": 0
+          },
+          "title": {
+            "maxChars": 90,
+            "maxLines": 2
+          },
+          "subtitle": {
+            "maxChars": 180,
+            "maxLines": 3
+          },
+          "wordsPerSlide": 110
+        },
+        "presentationVisualRole": "content",
+        "procedureLabelEmphasis": false,
+        "presentationArchetypeId": "chart-takeaway",
+        "presentationBlockAnchor": "start",
+        "presentationComposition": "data",
+        "presentationPhotoRadius": 0,
+        "presentationDesignFamily": "luxury",
+        "presentationCompositionId": "presentation_executive_minimal:data",
+        "presentationRequiresImage": false,
+        "presentationSuppressPhoto": true,
+        "presentationBodyTypography": {
+          "weight": 400,
+          "tracking": 0.6,
+          "fontFamily": "\"Inter\", sans-serif",
+          "leadingPercent": 145
+        },
+        "presentationPatternVersion": null,
+        "presentationPhotoTreatment": "saturate(0.94) contrast(1.03)",
+        "presentationQualityVersion": 1,
+        "presentationEvidenceFallback": true,
+        "presentationFreeTextSurfaces": {
+          "title": "#9C2459",
+          "subtitle": "#9C2459"
+        },
+        "presentationPaletteOverrides": {
+          "bg": "#2A2158",
+          "ink": "#FFFFFF",
+          "rule": "#8A85A3",
+          "muted": "#FFFFFF",
+          "accent": "#F14126",
+          "accent2": "#C33940",
+          "accent3": "#56284D",
+          "inverse": "#FFFFFF",
+          "surface": "#9C2459",
+          "inverseInk": "#2A2158",
+          "inverseMuted": "#665F87"
+        },
+        "presentationNumericTypography": {
+          "weight": 700,
+          "fontFamily": "\"Syne\", Arial, sans-serif"
+        },
+        "presentationCompositionVersion": 3,
+        "presentationArtDirectionVersion": 2,
+        "presentationTitleSizeByComposition": {
+          "data": 39.68,
+          "demo": 39.68,
+          "cover": 59.52,
+          "closing": 39.68,
+          "content": 39.68,
+          "divider": 39.68
+        },
+        "presentationTypographyByComposition": {
+          "data": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 700,
+              "tracking": 0.4,
+              "fontFamily": "\"Syne\", Arial, sans-serif",
+              "sizePercent": 33,
+              "leadingPercent": 104
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "caption",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 48.4,
+              "leadingPercent": 160
+            }
+          },
+          "demo": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "body",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 52.08,
+              "leadingPercent": 145
+            }
+          },
+          "cover": {
+            "title": {
+              "case": "normal",
+              "role": "display",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 59.52,
+              "leadingPercent": 105
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "subtitle",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 59.52,
+              "leadingPercent": 130
+            }
+          },
+          "closing": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "caption",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 40.92,
+              "leadingPercent": 135
+            }
+          },
+          "content": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "body",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 52.08,
+              "leadingPercent": 145
+            }
+          },
+          "divider": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "kpi",
+              "italic": false,
+              "weight": 600,
+              "tracking": -1.4,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 178.57,
+              "leadingPercent": 100
+            }
+          }
+        },
+        "presentationTitleLeadingByComposition": {
+          "data": 110,
+          "demo": 110,
+          "cover": 105,
+          "closing": 110,
+          "content": 110,
+          "divider": 110
+        }
+      },
+      {
+        "id": "dmiw8hs",
+        "bgX": 50,
+        "bgY": 50,
+        "num": 9,
+        "align": "left",
+        "bgFit": "cover",
+        "title": "**Apoteose**",
+        "bgZoom": 100,
+        "canvas": {
+          "zones": {
+            "photo": {
+              "h": 100,
+              "w": 56,
+              "x": 0,
+              "y": 0
+            },
+            "title": {
+              "h": 13.8,
+              "w": 32,
+              "x": 62,
+              "y": 24
+            },
+            "subtitle": {
+              "h": 45.50370370370371,
+              "w": 32,
+              "x": 62,
+              "y": 41.49629629629629
+            }
+          },
+          "source": "presentation-preset",
+          "applied": true,
+          "enabled": false,
+          "variant": "classic",
+          "preserveZones": true
+        },
+        "layout": "tl",
+        "textBg": false,
+        "caption": "O conceito, o público, a curadoria musical e a identidade visual estão definidos. A decisão pendente é a aprovação para avançar com a operação. Data, local e lineup de DJs dependem dessa aprovação e não estão confirmados.",
+        "eyebrow": "APOTEOSE",
+        "imgMode": "dalle",
+        "overlay": 0,
+        "subSize": 52.1,
+        "bgMirror": false,
+        "customBg": "#F14126",
+        "edgePeek": false,
+        "logoSize": 80,
+        "overlays": [],
+        "subtitle": "A festa chega para ocupar o intervalo pré-Carnaval de São Paulo. **Data**, **local** e **lineup** são definições pendentes de aprovação.",
+        "bgImageId": "img_qe7hqnmdn8j4",
+        "bgOpacity": 100,
+        "bgPattern": "none",
+        "textColor": "#000000",
+        "textInset": 0,
+        "titleCase": "normal",
+        "titleSize": 42,
+        "videoMime": null,
+        "bodyWeight": 400,
+        "imageQuery": "abstract glowing aperture opening in deep purple darkness, warm light radiating outward, no people, circular light formation expanding outward like a portal opening, dark void with radiating color, first plane glowing ring, deep dark background, warm red and cyan light radiating from center outward, concentric geometric rings expanding from center, centered, straight-on, symmetrical",
+        "refImageId": null,
+        "showHandle": true,
+        "subLeading": 150,
+        "textShadow": false,
+        "titleColor": "#000000",
+        "bodyLeading": 150,
+        "composition": "",
+        "cultureTone": "",
+        "photoRegion": "full",
+        "subTracking": 0.6,
+        "titleWeight": 700,
+        "bgImageError": null,
+        "bodyTracking": 0,
+        "logoPosition": "tl",
+        "photoFraming": "auto",
+        "showSwipeCue": false,
+        "titleLeading": 98,
+        "bgImageFailed": false,
+        "bgImageSource": "ai",
+        "bodyAfterSize": 180,
+        "imagePosition": "left-evidence",
+        "subtitleColor": "#000000",
+        "textBgOpacity": 55,
+        "titlePosition": "top-left",
+        "titleTracking": 0.6,
+        "bgImageAssetId": "original_3a61e765ebcfb9844c515fa5981bc59725f90bd37382505c7c66f138711bb205",
+        "bodyAfterImage": "Próximo passo: confirmar data, local e lineup.",
+        "elementOffsets": {},
+        "imgExtraPrompt": "",
+        "imageReferences": null,
+        "refImageAssetId": null,
+        "elementsUnlocked": true,
+        "mediaObservation": {
+          "hasBgImageId": true,
+          "hasArtImageId": false,
+          "hasRefImageId": false,
+          "hasBgImageValue": false,
+          "hasArtImageValue": false,
+          "hasRefImageValue": false,
+          "hasBgImageAssetId": true,
+          "hasArtImageAssetId": false,
+          "hasRefImageAssetId": false
+        },
+        "presentationPlan": {
+          "avoid": "people, costumes, confetti, literal carnival elements, text",
+          "index": 10,
+          "scene": {
+            "shot": "centered, straight-on, symmetrical",
+            "light": "warm red and cyan light radiating from center outward",
+            "action": "circular light formation expanding outward like a portal opening",
+            "setting": "dark void with radiating color, first plane glowing ring, deep dark background",
+            "subject": "abstract glowing aperture opening in deep purple darkness, warm light radiating outward, no people",
+            "graphics": "concentric geometric rings expanding from center"
+          },
+          "design": {
+            "block": "none",
+            "icons": [],
+            "photo": "full",
+            "family": "cinematic",
+            "ground": "photo",
+            "emphasis": [
+              "Apoteose"
+            ]
+          },
+          "purpose": "decision",
+          "question": "Qual é o próximo passo?",
+          "sourceIds": [
+            "source-base"
+          ],
+          "imageRules": [
+            "Evitar clichês visuais do Carnaval: fantasias, plumas e confetes como representação literal",
+            "Não impor fotografia sóbria; o projeto pede estética publicitária contemporânea, cultura urbana e moda"
+          ],
+          "keyMessage": "Fecho: A Apoteose chega para ocupar o intervalo pré-Carnaval — se aprovada, o próximo passo é confirmar data, local e lineup.",
+          "visualRole": "closing",
+          "evidenceIds": [
+            "e1"
+          ],
+          "promptVersion": "presentation-plan-v3",
+          "schemaVersion": 3,
+          "evidenceStatus": [
+            "fact"
+          ],
+          "visualDirection": {
+            "avoid": "Carnival clichés: feathers, sequins, confetti, literal costumes, samba stereotypes, traditional carnival imagery, grain texture, sober muted photography.",
+            "finish": "Smooth digital finish, no grain, high-contrast color blocks, editorial polish with clean gradients between deep purple and warm reds.",
+            "palette": [
+              {
+                "hex": "#2A2158",
+                "role": "base"
+              },
+              {
+                "hex": "#F14126",
+                "role": "subject_light"
+              },
+              {
+                "hex": "#9C2459",
+                "role": "shadow"
+              },
+              {
+                "hex": "#2AB5D7",
+                "role": "graphic"
+              },
+              {
+                "hex": "#C33940",
+                "role": "accent"
+              }
+            ],
+            "graphics": "Bold geometric color blocks and typographic interventions inspired by Brazilian graphic design, no literal carnival motifs.",
+            "atmosphere": "Electric pre-Carnaval energy where urban nightlife meets Brazilian cultural intensity in a sophisticated, contemporary visual language.",
+            "paletteSource": "reference"
+          }
+        },
+        "useCultureLayout": false,
+        "presentationGlass": null,
+        "socialZoneAnchors": {
+          "title": "start",
+          "subtitle": "start"
+        },
+        "presentationBlocks": [],
+        "presentationChrome": {
+          "fonts": {
+            "text": {
+              "css": "\"Inter Tight\", sans-serif",
+              "family": "Inter Tight",
+              "weight": 400,
+              "tracking": -0.4
+            },
+            "display": {
+              "css": "\"Syne\", Arial, sans-serif",
+              "family": "Syne",
+              "weight": 700,
+              "tracking": -2.6,
+              "widthFactor": 0.64
+            }
+          },
+          "chrome": [
+            {
+              "t": "text",
+              "w": 30.75,
+              "x": 62.63,
+              "y": 19.8,
+              "z": "over",
+              "case": "upper",
+              "role": "label",
+              "size": 24,
+              "text": "{kicker}",
+              "color": "#000000",
+              "weight": 700,
+              "tracking": 12
+            }
+          ],
+          "family": "cinematic",
+          "format": "16:9",
+          "ground": "accent"
+        },
+        "presentationGround": "accent",
+        "presentationLayout": {
+          "visualRole": "closing",
+          "imagePosition": "left-evidence",
+          "titlePosition": "top-left",
+          "imageTreatment": "right-evidence",
+          "evidencePosition": null
+        },
+        "presentationAutofit": {
+          "mode": "shrink-then-split",
+          "enabled": true,
+          "minScale": 0.85,
+          "rewriteTitle": true,
+          "preventOrphans": true,
+          "splitOnOverflow": true
+        },
+        "presentationStageId": null,
+        "presentationPresetId": "presentation_free",
+        "presentationPatternId": "presentation_free",
+        "presentationDeckDesign": {
+          "mood": "Vibrant editorial nightlife photography with deep purple shadows, warm red highlights, and clean high-contrast urban energy.",
+          "fonts": {
+            "text": "Inter Tight",
+            "display": "Syne"
+          },
+          "palette": {
+            "bg": "#2A2158",
+            "ink": "#FFFFFF",
+            "muted": "#FFFFFF",
+            "accent": "#F14126",
+            "accent2": "#C33940",
+            "inverse": "#FFFFFF",
+            "surface": "#9C2459",
+            "inverseInk": "#2A2158"
+          }
+        },
+        "presentationFreeDesign": {
+          "block": "none",
+          "icons": [],
+          "photo": "half",
+          "family": "cinematic",
+          "ground": "accent",
+          "emphasis": [
+            "Apoteose"
+          ]
+        },
+        "presentationStageLabel": "FECHO",
+        "presentationTextLimits": {
+          "body": {
+            "maxChars": 90,
+            "maxLines": 3
+          },
+          "title": {
+            "maxChars": 90,
+            "maxLines": 3
+          },
+          "subtitle": {
+            "maxChars": 180,
+            "maxLines": 6
+          },
+          "wordsPerSlide": 110
+        },
+        "presentationVisualRole": "closing",
+        "procedureLabelEmphasis": false,
+        "presentationArchetypeId": "closing",
+        "presentationComposition": "closing",
+        "presentationPhotoRadius": 0,
+        "presentationDesignFamily": "cinematic",
+        "presentationCompositionId": "presentation_executive_minimal:closing",
+        "presentationRequiresImage": false,
+        "presentationSuppressPhoto": false,
+        "presentationBodyTypography": {
+          "weight": 400,
+          "tracking": 0.6,
+          "fontFamily": "\"Inter\", sans-serif",
+          "leadingPercent": 145
+        },
+        "presentationPatternVersion": null,
+        "presentationPhotoTreatment": "saturate(0.94) contrast(1.03)",
+        "presentationQualityVersion": 1,
+        "presentationEvidenceFallback": true,
+        "presentationFreeTextSurfaces": {
+          "title": "#F14126",
+          "subtitle": "#F14126"
+        },
+        "presentationPaletteOverrides": {
+          "bg": "#2A2158",
+          "ink": "#FFFFFF",
+          "rule": "#8A85A3",
+          "muted": "#FFFFFF",
+          "accent": "#F14126",
+          "accent2": "#C33940",
+          "accent3": "#56284D",
+          "inverse": "#FFFFFF",
+          "surface": "#9C2459",
+          "inverseInk": "#2A2158",
+          "inverseMuted": "#665F87"
+        },
+        "presentationNumericTypography": {
+          "weight": 700,
+          "fontFamily": "\"Syne\", Arial, sans-serif"
+        },
+        "presentationCompositionVersion": 3,
+        "presentationArtDirectionVersion": 2,
+        "presentationTitleSizeByComposition": {
+          "data": 39.68,
+          "demo": 39.68,
+          "cover": 59.52,
+          "closing": 39.68,
+          "content": 39.68,
+          "divider": 39.68
+        },
+        "presentationTypographyByComposition": {
+          "data": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "caption",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 40.92,
+              "leadingPercent": 135
+            }
+          },
+          "demo": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "body",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 52.08,
+              "leadingPercent": 145
+            }
+          },
+          "cover": {
+            "title": {
+              "case": "normal",
+              "role": "display",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 59.52,
+              "leadingPercent": 105
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "subtitle",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 59.52,
+              "leadingPercent": 130
+            }
+          },
+          "closing": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 700,
+              "tracking": 0.4,
+              "fontFamily": "\"Syne\", Arial, sans-serif",
+              "sizePercent": 42,
+              "leadingPercent": 98
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "caption",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 52.1,
+              "leadingPercent": 150
+            }
+          },
+          "content": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "body",
+              "italic": false,
+              "weight": 400,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter\", sans-serif",
+              "sizePercent": 52.08,
+              "leadingPercent": 145
+            }
+          },
+          "divider": {
+            "title": {
+              "case": "normal",
+              "role": "h1",
+              "italic": false,
+              "weight": 600,
+              "tracking": 0.6,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 39.68,
+              "leadingPercent": 110
+            },
+            "subtitle": {
+              "case": "normal",
+              "role": "kpi",
+              "italic": false,
+              "weight": 600,
+              "tracking": -1.4,
+              "fontFamily": "\"Inter Tight\", sans-serif",
+              "sizePercent": 178.57,
+              "leadingPercent": 100
+            }
+          }
+        },
+        "presentationTitleLeadingByComposition": {
+          "data": 110,
+          "demo": 110,
+          "cover": 105,
+          "closing": 110,
+          "content": 110,
+          "divider": 110
+        }
+      }
+    ],
+    "caption": "Apoteose é o esquenta de Carnaval que nasce em São Paulo como celebração contemporânea antes da festa oficial. O brasileiro antecipa, inventa e reinventa motivos para celebrar — e a Apoteose canaliza esse impulso em uma experiência autoral, sem reproduzir a estética tradicional do Carnaval. Decisão pendente: confirmar data, local e lineup.",
+    "material": {
+      "content": "APOTEOSE — Conceito e posicionamento**\n\nA Apoteose é uma festa que nasce com a proposta de ocupar um espaço relevante no calendário pré-Carnaval de São Paulo. Um encontro exclusivo para convidados, que reúne pessoas conectadas à música, à moda, à arte, à cultura contemporânea e à vida noturna.\n\nMais do que antecipar o Carnaval, a Apoteose propõe uma interpretação contemporânea da cultura carnavalesca brasileira, sem necessariamente reproduzir sua estética tradicional. A festa combina a espontaneidade do Carnaval com o comportamento urbano, a diversidade musical e a atmosfera das festas mais desejadas da cidade.\n\n**Conceito**\n\nO nome Apoteose remete ao ápice, à celebração, à intensidade e à liberdade. A festa parte do comportamento do brasileiro, que transforma qualquer ocasião em motivo para celebrar. Mal termina o Réveillon, já começa a expectativa pelo Carnaval. E, como se o Carnaval não fosse suficiente, ainda existe o esquenta.\n\nÉ nesse território comportamental que a Apoteose constrói sua identidade: o exagero, a irreverência, o prazer de estar entre amigos e a nossa capacidade de inventar motivos para festejar.\n\n**Identidade musical**\n\nA curadoria musical é essencialmente brasileira, mas sem fronteiras rígidas entre gêneros. Brasilidades, hip-hop, funk, música eletrônica, remixes e releituras de clássicos nacionais compõem uma programação conduzida por DJs que transitam entre diferentes universos musicais.\n\nA música deve refletir um Brasil contemporâneo, urbano, plural e culturalmente sofisticado, sem perder sua essência popular.\n\n**Público**\n\nA Apoteose é direcionada a um público socialmente ativo, formador de opinião, conectado às tendências de comportamento, moda, entretenimento e cultura. Pessoas que frequentam festas, festivais, restaurantes e destinos desejados, e que valorizam tanto a experiência quanto os encontros que acontecem em torno dela.\n\nO acesso exclusivo para convidados faz parte do posicionamento da festa, privilegiando a curadoria de público e fortalecendo seu caráter social.\n\n**Universo visual**\n\nA identidade da Apoteose deve explorar a cultura brasileira de maneira autoral, evitando os clichês visuais do Carnaval. A direção artística pode transitar entre referências tropicais, cultura urbana, fotografia editorial, moda, sensualidade, elementos gráficos brasileiros e uma estética publicitária contemporânea.\n\nO Carnaval aparece mais como comportamento e estado de espírito do que como uma representação literal de fantasias, plumas e confetes.\n\n**Linguagem e comunicação**\n\nA comunicação da Apoteose deve ser inteligente, provocativa, irreverente e bem-humorada. O humor nasce da observação do comportamento humano, das contradições sociais e dos exageros que fazem parte da cultura das festas brasileiras.\n\nA marca não precisa anunciar constantemente que é exclusiva, sofisticada ou desejada. Essas características devem ser percebidas pela qualidade de sua comunicação, pela direção artística, pela curadoria musical e pelas pessoas que fazem parte dela.\n\nOs conteúdos podem explorar situações cotidianas, personagens inusitados, humor geracional, sátiras comportamentais, filmes publicitários, referências à cultura popular e narrativas que despertem identificação.\n\n**Personalidade da marca**\n\n- Brasileira, sem ser caricata.\n- Sofisticada, sem ser pretensiosa.\n- Exclusiva, sem ser arrogante.\n- Sensual, sem ser vulgar.\n- Irreverente, sem ser infantil.\n- Contemporânea, sem depender de tendências.\n- Bem-humorada, sem recorrer ao humor óbvio.\n\n**Posicionamento**\n\nA Apoteose pretende se consolidar como o esquenta de Carnaval mais badalado de São Paulo. Uma festa com identidade própria, capaz de gerar desejo, conversas e expectativa antes mesmo de acontecer.\n\n**Território criativo**\n\nO brasileiro não espera o Carnaval chegar para começar o Carnaval. Ele antecipa, prolonga, inventa e reinventa a festa. A Apoteose existe justamente nesse intervalo entre a promessa de se comportar e a absoluta falta de intenção de cumpri-la.\n\n**Conceito central de campanha:**\n\n*Como se o Carnaval não fosse suficiente.*",
+      "context": "",
+      "sources": "",
+      "refProfileId": null
+    },
+    "styleKit": {
+      "contextMd": "",
+      "stylePrompt": "Crie uma apresentaçao sobre a festa apoteose. use essa imagem do flyer como referencia para criar as imagens. use esse estilo de paleta e visual. ",
+      "logoOnGenerate": true,
+      "referencePalette": {
+        "colors": [
+          {
+            "hex": "#2A2158",
+            "weight": 0.448
+          },
+          {
+            "hex": "#2AB5D7",
+            "weight": 0.089
+          },
+          {
+            "hex": "#C33940",
+            "weight": 0.082
+          },
+          {
+            "hex": "#9C2459",
+            "weight": 0.079
+          },
+          {
+            "hex": "#F14126",
+            "weight": 0.05
+          },
+          {
+            "hex": "#21CD21",
+            "weight": 0.008
+          }
+        ],
+        "refIds": [
+          "img_jeh9cuuhf5pm"
+        ]
+      }
+    },
+    "imgParams": {
+      "fidelity": 50,
+      "creativity": 50,
+      "irreverence": 50,
+      "objectivity": 50
+    },
+    "socialPlan": null,
+    "formatViews": {
+      "apresentacao": {
+        "brand": {},
+        "slides": {
+          "4x2gw06": {
+            "elementOffsets": {
+              "title": {
+                "x": -0.5271513238916405,
+                "y": 2.216912377144742
+              },
+              "subtitle": {
+                "x": 5.88698466057149,
+                "y": 37.19327216352143
+              },
+              "bodyAfterImage": {
+                "x": 28.571246603260864,
+                "y": 24.87847222222222
+              }
+            }
+          },
+          "y7t6krn": {
+            "elementOffsets": {
+              "subtitle": {
+                "x": 5.4322169272506695,
+                "y": -2.236159945820731
+              }
+            }
+          }
+        }
+      }
+    },
+    "productKind": "apresentacao",
+    "captionScope": "publication",
+    "visualPreset": "presentation_free",
+    "socialQuality": null,
+    "creativePreset": "apresentacao",
+    "materialNotice": "",
+    "quickCardCount": 10,
+    "cardVisualStyle": "full",
+    "contentObjective": "auto",
+    "editorialContext": {
+      "niche": "",
+      "topic": "Apresentação da festa Apoteose",
+      "generatedAt": "2026-11-27T00:47:38.139Z",
+      "suggestedStructureId": "auto"
+    },
+    "presentationPath": "auto",
+    "presentationPlan": {
+      "gaps": [
+        "Data, local e horário da festa não informados",
+        "Lineup de DJs e programação detalhada não fornecidos",
+        "Informações de ingressos ou convites não disponíveis",
+        "Parceiros, patrocinadores ou apoios não informados"
+      ],
+      "rules": [
+        {
+          "id": "r1",
+          "level": "avoid",
+          "target": "image",
+          "instruction": "Evitar clichês visuais do Carnaval: fantasias, plumas e confetes como representação literal"
+        },
+        {
+          "id": "r2",
+          "level": "avoid",
+          "target": "image",
+          "instruction": "Não impor fotografia sóbria; o projeto pede estética publicitária contemporânea, cultura urbana e moda"
+        }
+      ],
+      "slides": [
+        {
+          "avoid": "literal carnival costumes, feathers, confetti, people in costume",
+          "index": 1,
+          "scene": {
+            "shot": "wide, deep perspective looking upward",
+            "light": "warm red and cyan light cutting through deep purple darkness from below",
+            "action": "light and color burst upward like anticipation building",
+            "setting": "dark urban environment with vibrant color reflections, first plane glowing streaks, deep purple background",
+            "subject": "abstract celebration energy, no people, glowing color streaks rising through deep purple atmosphere",
+            "graphics": "bold geometric streaks of color intersecting the scene"
+          },
+          "design": {
+            "block": "none",
+            "icons": [],
+            "photo": "full",
+            "family": "cinematic",
+            "ground": "photo",
+            "emphasis": [
+              "Apoteose",
+              "esquenta de Carnaval"
+            ]
+          },
+          "purpose": "introduction",
+          "question": "O que é a Apoteose?",
+          "keyMessage": "Capa: Apoteose — o esquenta de Carnaval que nasce em São Paulo como celebração contemporânea antes da festa oficial.",
+          "visualRole": "cover",
+          "evidenceIds": [
+            "e1",
+            "e13"
+          ]
+        },
+        {
+          "avoid": "",
+          "index": 2,
+          "scene": null,
+          "design": {
+            "block": "none",
+            "icons": [],
+            "photo": "none",
+            "family": "typographic",
+            "ground": "accent",
+            "emphasis": [
+              "antecipa",
+              "inventa",
+              "reinventa"
+            ]
+          },
+          "purpose": "context",
+          "question": "Por que a Apoteose existe?",
+          "keyMessage": "Contexto: O brasileiro não espera o Carnaval chegar para começar a festejar — antecipa, inventa e reinventa motivos para celebrar.",
+          "visualRole": "content",
+          "evidenceIds": [
+            "e4"
+          ]
+        },
+        {
+          "avoid": "traditional carnival aesthetics, feathers, sequins, samba imagery, literal costumes",
+          "index": 3,
+          "scene": {
+            "shot": "medium, eye-level, shallow depth",
+            "light": "cyan and red projected light sweeping across surfaces from multiple angles",
+            "action": "color light projections mapping across concrete walls creating dynamic patterns",
+            "setting": "contemporary urban courtyard at night, geometric architecture, first plane textured wall with light, deep background",
+            "subject": "modern urban party atmosphere with neon color reflections on architectural surfaces, no people visible",
+            "graphics": "geometric light projections forming abstract patterns on walls"
+          },
+          "design": {
+            "block": "none",
+            "icons": [],
+            "photo": "half",
+            "family": "editorial",
+            "ground": "bg",
+            "emphasis": [
+              "interpretação contemporânea",
+              "sem estética tradicional"
+            ]
+          },
+          "purpose": "solution",
+          "question": "O que propõe a Apoteose?",
+          "keyMessage": "Conceito: Uma interpretação contemporânea da cultura carnavalesca brasileira, sem reproduzir a estética tradicional do Carnaval.",
+          "visualRole": "content",
+          "evidenceIds": [
+            "e3",
+            "e10"
+          ]
+        },
+        {
+          "avoid": "crowded dancefloor, people dancing, literal carnival music elements",
+          "index": 4,
+          "scene": {
+            "shot": "close-up, shallow depth of field, slightly overhead angle",
+            "light": "cyan and red accent light from sides illuminating equipment edges",
+            "action": "vinyl record spinning on turntable with subtle vibration, mixer faders mid-position",
+            "setting": "dark DJ booth surface, first plane turntable detail, blurred background with color reflections",
+            "subject": "DJ turntable setup glowing under colored light, vinyl records and mixer visible, no person",
+            "graphics": "none"
+          },
+          "design": {
+            "block": "icons",
+            "icons": [
+              "music",
+              "zap"
+            ],
+            "photo": "small",
+            "family": "modular",
+            "ground": "surface",
+            "emphasis": [
+              "sem fronteiras",
+              "Brasil contemporâneo"
+            ]
+          },
+          "purpose": "other",
+          "question": "Como soa a Apoteose?",
+          "keyMessage": "Música: Curadoria brasileira sem fronteiras — hip-hop, funk, eletrônica, remixes e clássicos nacionais conduzidos por DJs.",
+          "visualRole": "content",
+          "evidenceIds": [
+            "e5",
+            "e6"
+          ]
+        },
+        {
+          "avoid": "carnival costumes, feathers, sequins, exaggerated party behavior, stereotypes",
+          "index": 5,
+          "scene": {
+            "shot": "medium-wide, eye-level, moderate depth",
+            "light": "warm red key light from front, cyan rim light from sides",
+            "action": "walking confidently through illuminated corridor toward camera, engaged in conversation",
+            "setting": "modern architectural corridor with colored light washes, first plane group mid-stride, deep corridor background",
+            "subject": "group of stylish young adults in urban nightlife setting, diverse, adult, walking through a lit corridor",
+            "graphics": "none",
+            "wardrobe": "contemporary fashion-forward urban outfits, bold accessories, no costumes",
+            "expression": "confident relaxed smiles, looking ahead and at each other"
+          },
+          "design": {
+            "block": "none",
+            "icons": [],
+            "photo": "half",
+            "family": "photo",
+            "ground": "bg",
+            "emphasis": [
+              "formadores de opinião",
+              "acesso exclusivo"
+            ]
+          },
+          "purpose": "market",
+          "question": "Para quem é a Apoteose?",
+          "keyMessage": "Público: Socialmente ativos, formadores de opinião conectados a moda, entretenimento e cultura — acesso exclusivo por convite.",
+          "visualRole": "content",
+          "evidenceIds": [
+            "e7",
+            "e8"
+          ]
+        },
+        {
+          "avoid": "",
+          "index": 6,
+          "scene": null,
+          "design": {
+            "block": "none",
+            "icons": [],
+            "photo": "none",
+            "family": "swiss",
+            "ground": "inverse",
+            "emphasis": [
+              "inteligente",
+              "irreverente",
+              "bem-humorada"
+            ]
+          },
+          "purpose": "other",
+          "question": "Como a Apoteose se comunica?",
+          "keyMessage": "Comunicação: Inteligente, provocativa, irreverente e bem-humorada — qualidades percebidas, não anunciadas.",
+          "visualRole": "content",
+          "evidenceIds": [
+            "e11"
+          ]
+        },
+        {
+          "avoid": "",
+          "index": 7,
+          "scene": null,
+          "design": {
+            "block": "comparison",
+            "icons": [],
+            "photo": "none",
+            "family": "executive",
+            "ground": "bg",
+            "emphasis": []
+          },
+          "purpose": "other",
+          "question": "Qual é a personalidade da marca?",
+          "keyMessage": "Personalidade: Brasileira sem ser caricata, sofisticada sem ser pretensiosa, exclusiva sem ser arrogante, sensual sem ser vulgar.",
+          "visualRole": "content",
+          "evidenceIds": []
+        },
+        {
+          "avoid": "carnival floats, street parade imagery, confetti, literal carnival elements",
+          "index": 8,
+          "scene": {
+            "shot": "wide, high angle, deep depth of field",
+            "light": "city ambient light with warm red and cyan color grading across the scene",
+            "action": "city lights pulsing with warm and cool color temperature shifts across buildings",
+            "setting": "elevated urban viewpoint overlooking São Paulo skyline, first plane rooftop edge, deep cityscape background",
+            "subject": "city skyline of São Paulo at night seen from elevated angle, Avenida Paulista silhouette, no people",
+            "graphics": "subtle geometric overlay framing the skyline"
+          },
+          "design": {
+            "block": "none",
+            "icons": [],
+            "photo": "none",
+            "family": "cultural",
+            "ground": "art",
+            "emphasis": [
+              "esquenta de Carnaval",
+              "São Paulo"
+            ]
+          },
+          "purpose": "vision",
+          "question": "Como a Apoteose se vê no cenário paulistano?",
+          "keyMessage": "Posicionamento: Pretende se consolidar como o esquenta de Carnaval mais badalado de São Paulo, com identidade própria.",
+          "visualRole": "content",
+          "evidenceIds": [
+            "e12"
+          ]
+        },
+        {
+          "avoid": "",
+          "index": 9,
+          "scene": null,
+          "design": {
+            "block": "quote",
+            "icons": [],
+            "photo": "none",
+            "family": "luxury",
+            "ground": "accent",
+            "emphasis": [
+              "Como se o Carnaval não fosse suficiente"
+            ]
+          },
+          "purpose": "summary",
+          "question": "O que define a Apoteose em uma frase?",
+          "keyMessage": "Síntese: Como se o Carnaval não fosse suficiente — a festa que existe no intervalo entre a promessa de se comportar e a falta de intenção de cumpri-la.",
+          "visualRole": "content",
+          "evidenceIds": [
+            "e13"
+          ]
+        },
+        {
+          "avoid": "people, costumes, confetti, literal carnival elements, text",
+          "index": 10,
+          "scene": {
+            "shot": "centered, straight-on, symmetrical",
+            "light": "warm red and cyan light radiating from center outward",
+            "action": "circular light formation expanding outward like a portal opening",
+            "setting": "dark void with radiating color, first plane glowing ring, deep dark background",
+            "subject": "abstract glowing aperture opening in deep purple darkness, warm light radiating outward, no people",
+            "graphics": "concentric geometric rings expanding from center"
+          },
+          "design": {
+            "block": "none",
+            "icons": [],
+            "photo": "full",
+            "family": "cinematic",
+            "ground": "photo",
+            "emphasis": [
+              "Apoteose"
+            ]
+          },
+          "purpose": "decision",
+          "question": "Qual é o próximo passo?",
+          "keyMessage": "Fecho: A Apoteose chega para ocupar o intervalo pré-Carnaval — se aprovada, o próximo passo é confirmar data, local e lineup.",
+          "visualRole": "closing",
+          "evidenceIds": [
+            "e1"
+          ]
+        }
+      ],
+      "thesis": "Apoteose é o esquenta de Carnaval que transforma o comportamento brasileiro de antecipar a festa em uma experiência contemporânea, plural e exclusiva.",
+      "audience": "Convidados sociais, formadores de opinião, conectados a moda, cultura, entretenimento e vida noturna em São Paulo.",
+      "evidence": [
+        {
+          "id": "e1",
+          "claim": "Apoteose é uma festa pré-Carnaval em São Paulo",
+          "quote": "A Apoteose é uma festa que nasce com a proposta de ocupar um espaço relevante no calendário pré-Carnaval de São Paulo.",
+          "status": "fact",
+          "sourceId": "source-base"
+        },
+        {
+          "id": "e2",
+          "claim": "Festa exclusiva para convidados conectados a cultura e vida noturna",
+          "quote": "Um encontro exclusivo para convidados, que reúne pessoas conectadas à música, à moda, à arte, à cultura contemporânea e à vida noturna.",
+          "status": "fact",
+          "sourceId": "source-base"
+        },
+        {
+          "id": "e3",
+          "claim": "Interpretação contemporânea do Carnaval sem estética tradicional",
+          "quote": "propõe uma interpretação contemporânea da cultura carnavalesca brasileira, sem necessariamente reproduzir sua estética tradicional.",
+          "status": "fact",
+          "sourceId": "source-base"
+        },
+        {
+          "id": "e4",
+          "claim": "Nome remete a ápice, celebração, intensidade e liberdade",
+          "quote": "O nome Apoteose remete ao ápice, à celebração, à intensidade e à liberdade.",
+          "status": "fact",
+          "sourceId": "source-base"
+        },
+        {
+          "id": "e5",
+          "claim": "Curadoria musical brasileira plural com vários gêneros",
+          "quote": "Brasilidades, hip-hop, funk, música eletrônica, remixes e releituras de clássicos nacionais compõem uma programação conduzida por DJs",
+          "status": "fact",
+          "sourceId": "source-base"
+        },
+        {
+          "id": "e6",
+          "claim": "Música reflete Brasil contemporâneo, urbano e plural",
+          "quote": "A música deve refletir um Brasil contemporâneo, urbano, plural e culturalmente sofisticado, sem perder sua essência popular.",
+          "status": "fact",
+          "sourceId": "source-base"
+        },
+        {
+          "id": "e7",
+          "claim": "Público formador de opinião conectado a tendências",
+          "quote": "formador de opinião, conectado às tendências de comportamento, moda, entretenimento e cultura.",
+          "status": "fact",
+          "sourceId": "source-base"
+        },
+        {
+          "id": "e8",
+          "claim": "Acesso exclusivo por convite privilegia curadoria de público",
+          "quote": "O acesso exclusivo para convidados faz parte do posicionamento da festa, privilegiando a curadoria de público",
+          "status": "fact",
+          "sourceId": "source-base"
+        },
+        {
+          "id": "e9",
+          "claim": "Identidade visual autoral sem clichês de Carnaval",
+          "quote": "A identidade da Apoteose deve explorar a cultura brasileira de maneira autoral, evitando os clichês visuais do Carnaval.",
+          "status": "fact",
+          "sourceId": "source-base"
+        },
+        {
+          "id": "e10",
+          "claim": "Carnaval como comportamento, não representação literal",
+          "quote": "O Carnaval aparece mais como comportamento e estado de espírito do que como uma representação literal de fantasias, plumas e confetes.",
+          "status": "fact",
+          "sourceId": "source-base"
+        },
+        {
+          "id": "e11",
+          "claim": "Comunicação inteligente, provocativa e bem-humorada",
+          "quote": "A comunicação da Apoteose deve ser inteligente, provocativa, irreverente e bem-humorada.",
+          "status": "fact",
+          "sourceId": "source-base"
+        },
+        {
+          "id": "e12",
+          "claim": "Pretende ser o esquenta de Carnaval mais badalado de SP",
+          "quote": "A Apoteose pretende se consolidar como o esquenta de Carnaval mais badalado de São Paulo.",
+          "status": "fact",
+          "sourceId": "source-base"
+        },
+        {
+          "id": "e13",
+          "claim": "Conceito central de campanha",
+          "quote": "Como se o Carnaval não fosse suficiente.",
+          "status": "fact",
+          "sourceId": "source-base"
+        }
+      ],
+      "objective": "Apresentar a festa Apoteose como o esquenta pré-Carnaval de São Paulo, revelando conceito, público, música e identidade visual.",
+      "signature": "Como se o Carnaval não fosse suficiente.",
+      "deckDesign": {
+        "mood": "Vibrant editorial nightlife photography with deep purple shadows, warm red highlights, and clean high-contrast urban energy.",
+        "fonts": {
+          "text": "Inter Tight",
+          "display": "Syne"
+        },
+        "palette": {
+          "bg": "#2A2158",
+          "ink": "#FFFFFF",
+          "muted": "#FFFFFF",
+          "accent": "#F14126",
+          "accent2": "#C33940",
+          "inverse": "#FFFFFF",
+          "surface": "#9C2459",
+          "inverseInk": "#2A2158"
+        }
+      },
+      "promptVersion": "presentation-plan-v3",
+      "schemaVersion": 3,
+      "visualDirection": {
+        "avoid": "Carnival clichés: feathers, sequins, confetti, literal costumes, samba stereotypes, traditional carnival imagery, grain texture, sober muted photography.",
+        "finish": "Smooth digital finish, no grain, high-contrast color blocks, editorial polish with clean gradients between deep purple and warm reds.",
+        "palette": [
+          {
+            "hex": "#2A2158",
+            "role": "base"
+          },
+          {
+            "hex": "#F14126",
+            "role": "subject_light"
+          },
+          {
+            "hex": "#9C2459",
+            "role": "shadow"
+          },
+          {
+            "hex": "#2AB5D7",
+            "role": "graphic"
+          },
+          {
+            "hex": "#C33940",
+            "role": "accent"
+          }
+        ],
+        "graphics": "Bold geometric color blocks and typographic interventions inspired by Brazilian graphic design, no literal carnival motifs.",
+        "atmosphere": "Electric pre-Carnaval energy where urban nightlife meets Brazilian cultural intensity in a sophisticated, contemporary visual language.",
+        "paletteSource": "reference"
+      }
+    },
+    "quickPromptDraft": "Apresentação da festa Apoteose",
+    "slideTextDensity": "1_1",
+    "socialDeckDesign": null,
+    "imageAuditFindings": [],
+    "quickNarrativeMode": "editorial",
+    "presentationQuality": {
+      "issues": [],
+      "repairs": [],
+      "version": 1,
+      "checkedAt": "2026-11-27T00:47:38.139Z",
+      "reviewStatus": "repaired",
+      "renderedIssues": [
+        {
+          "code": "render-overflow",
+          "message": "O texto ou quadro de dados excede a área disponível. Amplie a área ou revise o conteúdo.",
+          "slideId": "y7t6krn",
+          "severity": "error",
+          "slideIndex": 6
+        }
+      ],
+      "renderCheckedAt": "2026-11-27T00:52:38.892Z",
+      "renderCheckStatus": "needs_attention",
+      "reviewDiagnostics": [
+        {
+          "attempt": 1,
+          "outcome": "over_limits"
+        },
+        {
+          "stage": "repetition",
+          "outcome": "repetition_repaired",
+          "targets": [
+            8
+          ],
+          "sizeAfter": 0,
+          "sizeBefore": 1
+        }
+      ],
+      "renderRepairStatus": "unavailable",
+      "writingDiagnostics": [
+        {
+          "to": 3,
+          "from": 1,
+          "stage": "writing",
+          "attempt": 1,
+          "outcome": "validated",
+          "response": {
+            "model": "glm-4.7",
+            "provider": "zai",
+            "maxTokens": 8192,
+            "totalTokens": 15452,
+            "finishReason": "stop",
+            "promptTokens": 14810,
+            "reasoningTokens": 0,
+            "completionTokens": 642
+          }
+        },
+        {
+          "to": 6,
+          "from": 4,
+          "stage": "writing",
+          "attempt": 1,
+          "outcome": "validated",
+          "response": {
+            "model": "glm-4.7",
+            "provider": "zai",
+            "maxTokens": 8192,
+            "totalTokens": 15565,
+            "finishReason": "stop",
+            "promptTokens": 14876,
+            "reasoningTokens": 0,
+            "completionTokens": 689
+          }
+        },
+        {
+          "to": 9,
+          "from": 7,
+          "issue": {
+            "code": "presentation_blocks_invalid",
+            "path": "slides[0].presentationBlocks",
+            "slideIndex": 6
+          },
+          "stage": "writing",
+          "attempt": 1,
+          "outcome": "failed",
+          "response": {
+            "model": "glm-4.7",
+            "provider": "zai",
+            "maxTokens": 8192,
+            "totalTokens": 15516,
+            "finishReason": "stop",
+            "promptTokens": 14785,
+            "reasoningTokens": 0,
+            "completionTokens": 731
+          }
+        },
+        {
+          "to": 9,
+          "from": 7,
+          "stage": "writing",
+          "attempt": 2,
+          "outcome": "validated",
+          "response": {
+            "model": "glm-4.7",
+            "provider": "zai",
+            "maxTokens": 8192,
+            "totalTokens": 15607,
+            "finishReason": "stop",
+            "promptTokens": 14922,
+            "reasoningTokens": 0,
+            "completionTokens": 685
+          }
+        },
+        {
+          "to": 10,
+          "from": 10,
+          "stage": "writing",
+          "attempt": 1,
+          "outcome": "validated",
+          "response": {
+            "model": "glm-4.7",
+            "provider": "zai",
+            "maxTokens": 8192,
+            "totalTokens": 14921,
+            "finishReason": "stop",
+            "promptTokens": 14580,
+            "reasoningTokens": 0,
+            "completionTokens": 341
+          }
+        }
+      ],
+      "movedToNotesSlideIds": []
+    },
+    "autoAdjustOnGenerate": true,
+    "quickGenerationScope": "text_images",
+    "brandMediaObservation": {
+      "hasLogo": false,
+      "hasAvatar": false,
+      "hasHandle": false,
+      "hasLogoImageId": false
+    },
+    "editorialReviewIssues": [],
+    "editorialReviewStatus": "repaired",
+    "presentationDeckDesign": {
+      "mood": "Vibrant editorial nightlife photography with deep purple shadows, warm red highlights, and clean high-contrast urban energy.",
+      "fonts": {
+        "text": "Inter Tight",
+        "display": "Syne"
+      },
+      "palette": {
+        "bg": "#2A2158",
+        "ink": "#FFFFFF",
+        "muted": "#FFFFFF",
+        "accent": "#F14126",
+        "accent2": "#C33940",
+        "inverse": "#FFFFFF",
+        "surface": "#9C2459",
+        "inverseInk": "#2A2158"
+      }
+    },
+    "styleKitReferenceMetadata": [
+      {
+        "id": "img_jeh9cuuhf5pm",
+        "assetId": "original_3ed8346302b06522d8262ed11cc509ce10e336f6809fdccbc4a80cf3e6f39371"
+      }
+    ],
+    "presentationDesignSystemId": null,
+    "presentationMaterialNotice": "",
+    "presentationDesignSystemVersion": null
+  }
+}

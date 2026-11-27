@@ -15,7 +15,7 @@
  * Módulo puro: sem React e sem DOM.
  */
 import {
-  FAMILY_KEYS, FREE_PRESENTATION_PRESET_ID, PRESENTATION_FAMILIES, familySpec, groundInks,
+  FAMILY_KEYS, FREE_PRESENTATION_PRESET_ID, PRESENTATION_FAMILIES, familyEvidenceStyle, familySpec, groundInks,
   normalizeFamilyKey,
 } from './presentation-families.js';
 import {
@@ -33,6 +33,8 @@ import { FREE_FONT_ADVANCES, FREE_FONT_CHARSET } from './free-font-metrics.js';
 import { inkOver, mirrorChrome, mirrorTextZones, sideScrim, textOverPhoto } from './image-composition.js';
 import { reservedAreaColour, resolveSlideVisualDirection } from './visual-direction.js';
 import { nearestPaletteHex, preferredReferenceBaseHex } from './reference-palette.js';
+import { comparisonVariant } from './presentation-quality.js';
+import { comparisonPairsHeight } from './comparison-pairs-layout.js';
 
 export { FREE_PRESENTATION_PRESET_ID };
 export { freeNeutralChrome };
@@ -478,6 +480,43 @@ export const FREE_PHOTO_TREATMENT = 'saturate(0.94) contrast(1.03)';
 const ALTERNATIVE_KINDS = ['content', 'demo', 'divider'];
 const DIVIDER_COPY_MAX = 180;
 const shortCopy = slide => `${slide?.subtitle || ''}${slide?.bodyAfterImage || ''}`.replace(/\*\*/g, '').trim().length <= DIVIDER_COPY_MAX;
+
+/**
+ * Ajustes locais do Livre: a heurística antiga de 300 caracteres não mede a
+ * fonte do deck e diminuía uma foto half para 13% mesmo com leitura viável.
+ * A foto planejada conserva a geometria da família quando o conteúdo cabe.
+ * Ícones do Modular dividem sua faixa de evidência com uma foto pequena.
+ */
+function freePresentationLayout(kind, slide, family, deckDesign) {
+  let layout = contentAwarePresentationLayout(kind, slide, family);
+  const proposed = proposedSlideDesign(slide);
+  if (!hasVisual(slide)) return layout;
+  if (layout.longReading && ['half', 'full'].includes(proposed?.photo)) {
+    const original = contentAwarePresentationLayout(kind, { ...slide, subtitle: '', bodyAfterImage: '' }, family);
+    const font = freeFontSpec(normalizeDeckDesign(deckDesign || slide.presentationDeckDesign).fonts.text, 'text');
+    const sub = original.subtitle;
+    const needed = sub && supportHeightPct(slide, sub.w, 32, font, familySpec(family).type.bodyLeading || 1.5) + 1.5;
+    if (original.photo && sub && needed <= sub.h) layout = original;
+  }
+  if (family === 'modular' && kind === 'data' && slideBlockTypes(slide).includes('icons')
+    && layout.evidence?.w >= 80 && layout.evidence.h >= 40) {
+    const ev = layout.evidence;
+    const photoWidth = 24;
+    const gap = 6;
+    const font = freeFontSpec(normalizeDeckDesign(deckDesign || slide.presentationDeckDesign).fonts.text, 'text');
+    const sub = layout.subtitle;
+    const support = supportHeightPct(slide, sub.w, 32, font, familySpec(family).type.bodyLeading || 1.5) + 2;
+    const top = Math.max(ev.y, sub.y + support + STACK_GAP);
+    const height = ev.y + ev.h - top;
+    if (height >= 40) layout = { ...layout,
+      subtitle: { ...sub, h: Math.max(sub.h, support) },
+      evidence: { ...ev, y: round2(top), h: round2(height), w: ev.w - photoWidth - gap },
+      photo: { x: ev.x + ev.w - photoWidth, y: round2(top), w: photoWidth, h: round2(height) },
+    };
+  }
+  return layout;
+}
+
 /** Função de página fixa (capa, fecho, bloco nativo) ou null quando o diretor pode alternar. */
 function fixedKind(slide, index, count) {
   if (hasBlocks(slide)) return 'data';
@@ -490,7 +529,7 @@ function fixedKind(slide, index, count) {
  * Função de página que desenha a foto pedida na família. Se a família não tem
  * a geometria pedida, fica a mais próxima que ela tem: nunca um layout novo.
  */
-export function resolveFreeKind({ family, photo, slide = {}, stage = {}, index = 0, count = 1 }) {
+export function resolveFreeKind({ family, photo, slide = {}, stage = {}, index = 0, count = 1, deckDesign }) {
   const role = resolvePresentationCompositionKind({ slide, stage, index, count });
   const fixed = fixedKind(slide, index, count);
   if (fixed) return fixed;
@@ -500,7 +539,7 @@ export function resolveFreeKind({ family, photo, slide = {}, stage = {}, index =
   let best = kinds[0];
   let bestDistance = Infinity;
   for (const kind of kinds) {
-    const size = photoSizeOfLayout(contentAwarePresentationLayout(kind, slide, family));
+    const size = photoSizeOfLayout(freePresentationLayout(kind, slide, family, deckDesign));
     const distance = Math.abs((PHOTO_RANK[size] ?? 0) - want);
     if (distance < bestDistance) { best = kind; bestDistance = distance; }
     if (!distance) break;
@@ -543,7 +582,7 @@ function familyOrder(deckDesign) {
 }
 
 /** Candidatos (família × foto × fundo) que as famílias já sabem desenhar para esta página. */
-function candidatesFor({ slide, stage, index, count }) {
+function candidatesFor({ slide, stage, index, count, deckDesign }) {
   const visual = hasVisual(slide);
   const out = [];
   for (const family of FAMILY_KEYS) {
@@ -556,7 +595,7 @@ function candidatesFor({ slide, stage, index, count }) {
     const tries = [];
     for (const photo of visual ? ['full', 'half', 'small', 'none'] : ['none']) {
       const layoutSlide = photo === 'none' ? withoutVisual(slide) : slide;
-      tries.push([resolveFreeKind({ family, photo, slide: layoutSlide, stage, index, count }), layoutSlide]);
+      tries.push([resolveFreeKind({ family, photo, slide: layoutSlide, stage, index, count, deckDesign }), layoutSlide]);
     }
     if (visual && !fixedKind(slide, index, count)) {
       // Divisor tem caixa de apoio curta: só para página de texto curto.
@@ -567,7 +606,7 @@ function candidatesFor({ slide, stage, index, count }) {
       tries.push(['divider', slide]);
     }
     for (const [kind, layoutSlide] of tries) {
-      const layout = contentAwarePresentationLayout(kind, layoutSlide, family);
+      const layout = freePresentationLayout(kind, layoutSlide, family, deckDesign);
       const size = photoSizeOfLayout(layout);
       if (seen.has(`${kind}|${size}`)) continue;
       seen.add(`${kind}|${size}`);
@@ -713,7 +752,7 @@ function directFreeSlide({ slide = {}, stage = {}, index = 0, count = 1, previou
   const role = resolvePresentationCompositionKind({ slide, stage, index, count });
   const proposal = proposedSlideDesign(slide);
   const visual = hasVisual(slide);
-  const candidates = candidatesFor({ slide, stage, index, count });
+  const candidates = candidatesFor({ slide, stage, index, count, deckDesign });
   const rhythmic = candidates.filter(c => !(
     (last && before && last.geometry === c.geometry && before.geometry === c.geometry)
     || (last && last.family === c.family && last.kind === c.kind)));
@@ -728,6 +767,13 @@ function directFreeSlide({ slide = {}, stage = {}, index = 0, count = 1, previou
   // dela, usa a geometria mais próxima do restante da proposta.
   if (proposal) {
     const requested = allowed.filter(c => c.family === proposal.family);
+    if (requested.length) allowed = requested;
+  }
+  // A foto solicitada não vira um detalhe apenas para variar o deck.
+  // As restrições de ritmo já foram aplicadas; dentro da família, a escala
+  // pedida é vinculante quando existe uma geometria que acomoda o conteúdo.
+  if (visual && proposal?.photo && proposal.photo !== 'none') {
+    const requested = allowed.filter(c => c.photo === proposal.photo);
     if (requested.length) allowed = requested;
   }
   // Foto cheia com texto no espaço reservado, quando a família escolhida
@@ -886,7 +932,7 @@ export function freeChromeDevices(chrome, { family, ground, palette, photoZone =
 export const FREE_TITLE_MAX_PX = Object.freeze({ cover: 176, divider: 176, other: 128 });
 const titlePxOf = size => size * 1920 * 0.084 / 100;
 const subPxOf = size => size * 1920 * 0.028 / 100;
-const SUPPORT_MAX_PX = 32;
+const SUPPORT_MAX_PX = 40;
 const STACK_GAP = 3.5;
 
 /* Largura medida (fase 3) ---------------------------------------------------- */
@@ -963,7 +1009,7 @@ function estimateLines(value, widthPx, px, widthFactor) {
  * abaixo do título (mesma coluna, fora da foto e sem bloco), o apoio sobe para
  * perto do título (os adornos que o seguem sobem junto), a coluna desce até o
  * fim da área de leitura ao lado da foto e o corpo cresce em passos de 2 px até
- * 32 px enquanto o texto estimado couber. Nunca diminui.
+ * 40 px enquanto o texto medido couber. Nunca diminui.
  */
 function compactReading({ zones, chrome, slide, titleSize, subSize, display, text, kind, leading, titleLeading }) {
   const t = zones.title;
@@ -1008,7 +1054,7 @@ function compactReading({ zones, chrome, slide, titleSize, subSize, display, tex
  * automático encolhia apoio e corpo para ~14 px. Aqui vale o piso das outras
  * páginas: o título encolhe para as linhas que ocupa, o apoio começa logo
  * abaixo, na largura do título, e vai até 90% da altura; o corpo parte de
- * 26 px (piso de 25 px no passo de 2) e cresce até 32 px enquanto couber.
+ * 26 px (piso de 25 px no passo de 2) e cresce até 40 px enquanto couber.
  * Se não couber, o bloco de texto sobe (até 10% do topo). Nunca diminui.
  */
 export const FREE_PHOTO_SUPPORT_MIN_PX = 26;
@@ -1242,11 +1288,43 @@ function blockHeightPct(block, ev, heightPct, { display, text }) {
  * - citação e número grande com o título na coluna (Suíço): título no alto,
  *   bloco e apoio terminam na linha de baixo da coluna (âncora `end`).
  */
-function blockReading({ zones, chrome, slide, titleSize, subSize, display, text, kind, leading, titleLeading }) {
+function comparisonReading({ zones, chrome, slide, titleSize, subSize, display, text, leading, titleLeading, family }) {
+  const block = slide.presentationBlocks?.[0];
+  const ev = zones.evidence, t = zones.title, sub = zones.subtitle;
+  if (!ev || !t || !sub || comparisonVariant(block) !== 'pairs') return null;
+  const needed = (comparisonPairsHeight(block, {
+    widthPx: ev.w * 19.2, panel: familyEvidenceStyle(family).panel,
+    lines: (value, width, px, header) => freeTextLines(value, width, px, text.family, 'text', { trackingEm: header ? 0.12 : 0 }),
+  }) + 6) / 10.8;
+  if (needed <= ev.h) return null;
+  const horizontalOverlap = (a, b) => Math.min(a.x + a.w, b.x + b.w) > Math.max(a.x, b.x);
+  const titleZone = measuredTitleZone(t, { slide, titleSize, display, titleLeading });
+  const hasCopy = !!supportCopy(slide);
+  const stacked = sub.y > t.y && horizontalOverlap(sub, t);
+  const subY = stacked ? Math.min(sub.y, titleZone.y + titleZone.h + STACK_GAP) : sub.y;
+  const subH = hasCopy ? supportHeightPct(slide, sub.w, subPxOf(subSize), text, leading) + 1.5 : 0;
+  const barrier = Math.max(2,
+    horizontalOverlap(ev, titleZone) ? titleZone.y + titleZone.h + STACK_GAP : 0,
+    hasCopy && horizontalOverlap(ev, sub) ? subY + subH + STACK_GAP : 0);
+  const bottom = Math.min(90, Math.max(ev.y + ev.h, barrier + needed));
+  const top = Math.max(barrier, Math.min(ev.y, bottom - needed));
+  // Se nem a área segura inteira basta, o diagnóstico continua visível.
+  // Nunca corta pares, diminui a fonte ou invade o título para esconder isso.
+  if (bottom - top < needed) return null;
+  const evidence = { ...ev, y: round2(top), h: round2(bottom - top) };
+  const zone = { ...sub, y: subY,
+    h: horizontalOverlap(ev, sub) ? Math.max(1, evidence.y - STACK_GAP - subY) : sub.h };
+  return { titleZone, zone, evidence, chrome: chrome.filter(d => !crosses(d, evidence)) };
+}
+
+function blockReading({ zones, chrome, slide, titleSize, subSize, display, text, kind, leading, titleLeading, family }) {
   const t = zones.title;
   const sub = zones.subtitle;
   const ev = zones.evidence;
   const block = (Array.isArray(slide.presentationBlocks) ? slide.presentationBlocks : [])[0];
+  if (kind === 'data' && block?.type === 'comparison') return comparisonReading({
+    zones, chrome, slide, titleSize, subSize, display, text, leading, titleLeading, family,
+  });
   if (kind !== 'data' || !t || !sub || !ev || !['quote', 'bignumber', 'icons'].includes(block?.type)) return null;
   if (!(ev.x >= sub.x + sub.w - 0.5)) return null;
   const column = ev.y <= t.y + 1;
@@ -1308,6 +1386,22 @@ function blockReading({ zones, chrome, slide, titleSize, subSize, display, text,
   return { titleZone, zone: { ...sub, y: rowTop, h }, evidence: { ...ev, y: rowTop, h }, chrome: moved, anchor: 'start' };
 }
 
+/** Mais leitura no espaço já reservado, só ao compor explicitamente o Livre. */
+function fullerFreeReading({ zones, slide, subSize, text, leading, preserveSize = false }) {
+  const zone = zones.subtitle;
+  if (!zone || !supportCopy(slide)) return { subSize };
+  const start = subPxOf(subSize);
+  const height = px => supportHeightPct(slide, zone.w, px, text, leading) + 1.5;
+  let px = start;
+  if (!preserveSize) for (let next = Math.ceil(start / 2) * 2; next <= SUPPORT_MAX_PX && height(next) <= zone.h; next += 2) px = Math.max(px, next);
+  return {
+    subSize: px > start ? rendererSubtitleSizePercent(px) : subSize,
+    // A vista 16:9 converte este campo vindo da escala Feed por 0,45.
+    // Mantém a linha complementar proporcional ao apoio que foi medido.
+    ...(slide.bodyAfterImage ? { bodyAfterSize: Math.ceil((px * 0.85) / (1920 * 0.018) * 100 / 0.45) } : {}),
+  };
+}
+
 /**
  * Fecho com título e apoio na mesma coluna (revisão da folha livre-f3, fecho
  * do Cultural): a zona do título tinha 40% da altura para um título de 2
@@ -1323,13 +1417,18 @@ function closingReading({ zones, chrome, slide, titleSize, subSize, display, tex
   const titleZone = measuredTitleZone(t, { slide, titleSize, display, titleLeading });
   if (t.h - titleZone.h < 3) return null;
   const gap = 1.5;
-  const subH = supportHeightPct(slide, sub.w, subPxOf(subSize), text, leading);
-  const stack = titleZone.h + gap + subH;
+  let px = subPxOf(subSize);
+  const supportH = value => supportHeightPct(slide, sub.w, value, text, leading);
+  const initialStack = titleZone.h + gap + supportH(px);
   // Com foto ao lado, o par fica no meio da foto; sem foto, no meio da coluna.
-  const photo = zones.photo && zones.photo.w > 1 && zones.photo.h >= stack
+  const photo = zones.photo && zones.photo.w > 1 && zones.photo.h >= initialStack
     && Math.min(t.x + t.w, zones.photo.x + zones.photo.w) - Math.max(t.x, zones.photo.x) <= 0 ? zones.photo : null;
   const spanTop = photo ? photo.y : t.y;
   const spanBottom = photo ? photo.y + photo.h : sub.y + sub.h;
+  for (let next = Math.ceil(px / 2) * 2; next <= SUPPORT_MAX_PX
+    && titleZone.h + gap + supportH(next) + 4 <= spanBottom - spanTop; next += 2) px = Math.max(px, next);
+  const subH = supportH(px);
+  const stack = titleZone.h + gap + subH;
   const y = round2(spanTop + Math.max(0, (spanBottom - spanTop - stack) / 2));
   const subY = round2(y + titleZone.h + gap);
   if (subY >= sub.y - 1) return null;
@@ -1337,6 +1436,7 @@ function closingReading({ zones, chrome, slide, titleSize, subSize, display, tex
   return {
     titleZone: { ...titleZone, y },
     zone: { ...sub, y: subY, h: round2(Math.max(subH + 2, sub.y + sub.h - subY)) },
+    subSize: px > subPxOf(subSize) ? rendererSubtitleSizePercent(px) : subSize,
     chrome: chrome.map(d => (d.follow === 'subtitle' ? { ...d, y: round2(d.y + subY - sub.y) }
       : anchoredAbove(d, t) ? { ...d, y: round2(d.y + shift) } : d)),
   };
@@ -1471,8 +1571,8 @@ export function freePresentationCompositionOverrides(base, {
   const visual = hasVisual(slide);
   const layoutSlide = directed.photo === 'none' || !visual ? withoutVisual(slide) : slide;
   const family = directed.family;
-  const kind = chosenKind || resolveFreeKind({ family, photo: directed.photo, slide: layoutSlide, stage, index, count });
-  const layout = contentAwarePresentationLayout(kind, layoutSlide, family);
+  const kind = chosenKind || resolveFreeKind({ family, photo: directed.photo, slide: layoutSlide, stage, index, count, deckDesign: deck });
+  const layout = freePresentationLayout(kind, layoutSlide, family, deck);
   const photo = visual ? photoSizeOfLayout(layout) : 'none';
   const onPhoto = photo !== 'none' && textOnPhoto(layout);
   const ground = onPhoto ? 'photo' : (directed.ground === 'photo' ? layout.ground : directed.ground);
@@ -1485,8 +1585,8 @@ export function freePresentationCompositionOverrides(base, {
   const freeBase = { ...base, presentationPresetId: FREE_PRESENTATION_PRESET_ID, presentationFreeDesign: design };
   delete freeBase.presentationFreeDesignOverride;
   let composed = stage?.contentMode === 'pitch'
-    ? pitchCompositionOverrides(freeBase, layoutSlide, kind)
-    : contentAwarePresentationOverrides(freeBase, layoutSlide, kind, { deliveryMode: stage?.deliveryMode });
+    ? pitchCompositionOverrides(freeBase, layoutSlide, kind, { layoutOverride: layout })
+    : contentAwarePresentationOverrides(freeBase, layoutSlide, kind, { deliveryMode: stage?.deliveryMode, layoutOverride: layout });
   // Foto cheia com texto num lado (direção de arte, parte 3): o lado do texto
   // alterna entre as páginas assim. O lado direito é o espelho da geometria
   // da família; nenhuma zona nova.
@@ -1536,9 +1636,15 @@ export function freePresentationCompositionOverrides(base, {
   const scale = Math.min(1, (fam.widthFactor || 0.55) / (display.widthFactor || 0.55));
   const zones = composed.canvas?.zones || {};
   // Coluna comprimida para o lado liso da arte: o título passa pelo mesmo ajuste.
+  const initialTitleSize = Number.isFinite(composed.titleSize)
+    ? composed.titleSize : Math.max(32, rendererTitleSizePercent(layout.titlePx));
+  const measuredTitleFits = zones.title && freeTextLines(slide.title, zones.title.w * 19.2 - 24,
+    titlePxOf(initialTitleSize), display.family, 'display', { trackingEm: (display.tracking || 0) / 100, upper: display.case === 'upper' })
+    * titlePxOf(initialTitleSize) * (familySpec(family).type.titleLeading || 1.05) + 14 <= zones.title.h * 10.8;
   const fittedSize = (scale < 1 || art) && zones.title
-    ? fittedTitleSize(Math.round(composed.titleSize * scale), slide.title, zones.title, display.css)
-    : composed.titleSize;
+    ? measuredTitleFits ? initialTitleSize
+      : fittedTitleSize(Math.max(32, Math.round(initialTitleSize * scale)), slide.title, zones.title, display.css)
+    : initialTitleSize;
   const titleCap = rendererTitleSizePercent(FREE_TITLE_MAX_PX[kind] || FREE_TITLE_MAX_PX.other);
   const titleSize = Math.min(fittedSize, titleCap);
   const typographyAll = composed.presentationTypographyByComposition || {};
@@ -1548,14 +1654,17 @@ export function freePresentationCompositionOverrides(base, {
   const familyChrome = freeNeutralChrome(composed.presentationChrome?.chrome || []);
   // Cartão atrás do texto (Modular): o texto fica no cartão, que abraça o texto.
   const readingInput = { zones, chrome: familyChrome, slide: layoutSlide, titleSize, subSize: composed.subSize, display, text, kind,
-    leading: (composed.subLeading || 150) / 100, titleLeading: familySpec(family).type.titleLeading || 1.05 };
+    leading: (composed.subLeading || 150) / 100, titleLeading: familySpec(family).type.titleLeading || 1.05, family };
   // Teste 6, item 3: foto cheia com texto num lado ganha o mesmo piso de
   // leitura das outras páginas (photoReading).
   const reading = onPhoto ? photoReading(readingInput)
     : hasBlocks(layoutSlide) ? blockReading(readingInput)
       : hasTextPanel(layout) ? panelReading(readingInput)
         : kind === 'closing' ? closingReading(readingInput) : compactReading(readingInput);
-  const subSize = reading?.subSize ?? composed.subSize;
+  const finalZones = reading ? { ...zones, title: reading.titleZone, subtitle: reading.zone, ...(reading.evidence ? { evidence: reading.evidence } : {}) } : zones;
+  const readableSupport = fullerFreeReading({ zones: finalZones, slide: layoutSlide, subSize: reading?.subSize ?? composed.subSize, text, leading: readingInput.leading,
+    preserveSize: kind === 'closing' && !!reading });
+  const subSize = readableSupport.subSize;
   // Texto sobre a foto num lado: proteção lateral na cor escura do deck (a da
   // direção visual que mais contrasta com a tinta), com 4,5:1 garantido sobre
   // o pior pixel da foto. A superfície de pior caso vale para as conferências.
@@ -1610,6 +1719,7 @@ export function freePresentationCompositionOverrides(base, {
     // Âncora da citação e do número grande na zona de dados (início ou fim).
     presentationBlockAnchor: reading?.anchor || undefined,
     subSize,
+    ...(readableSupport.bodyAfterSize ? { bodyAfterSize: readableSupport.bodyAfterSize } : {}),
     presentationNumericTypography: { fontFamily: display.css, weight: display.weight },
     customBg: inks.bg,
     titleColor: titleInk,
