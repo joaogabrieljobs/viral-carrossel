@@ -103,7 +103,8 @@ test('Livre no assistente: roteiro v3, páginas variadas, salva e reabre igual',
   const estilos = wizard.getByRole('group', { name: 'Estilos para começar' });
   const cartoes = estilos.getByRole('button');
   await expect(cartoes.first()).toHaveAccessibleName(/^Livre: o Moont decide\./);
-  await expect(cartoes.first().locator('[data-vc-free-mini]')).toHaveCount(3);
+  await expect(cartoes.first().getByRole('img', { name: /^Símbolo do Moont/ })).toBeVisible();
+  await expect(cartoes.first().locator('svg[data-vc-free-mark]')).toBeVisible();
   await cartoes.first().click();
   await expect(cartoes.first()).toHaveAttribute('aria-pressed', 'true');
   await wizard.getByRole('radio', { name: /^Criar o texto primeiro/ }).click();

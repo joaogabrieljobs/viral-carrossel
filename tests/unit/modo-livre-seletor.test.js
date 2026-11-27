@@ -8,7 +8,7 @@ import VisualStylePicker from '../../src/components/VisualStylePicker.jsx';
 import {
   FREE_PRESENTATION_VISUAL_PRESET, PRESENTATION_VISUAL_PRESETS, PRESENTATION_VISUAL_PRESET_CATALOG,
 } from '../../src/styles/presentation-presets.jsx';
-import { VISUAL_PRESETS } from '../../src/styles/visual-presets.jsx';
+import { SOCIAL_VISUAL_PRESET_CATALOG, VISUAL_PRESETS } from '../../src/styles/visual-presets.jsx';
 
 const render = props => renderToStaticMarkup(React.createElement(VisualStylePicker, { onChange: () => {}, ...props }));
 const rotulos = html => [...html.matchAll(/<button[^>]*aria-label="([^"]+)"/g)].map(m => m[1]);
@@ -22,15 +22,28 @@ describe('modo livre, fase 2: cartão Livre no seletor', () => {
     expect(labels.slice(1).map(l => l.split('. ')[0])).toEqual(PRESENTATION_VISUAL_PRESETS.map(p => p.label));
   });
 
-  it('miniatura com 3 mini-layouts diferentes e descrição de uma linha', () => {
+  it('miniatura com o símbolo do Moont sobre as cores da marca e descrição de uma linha', () => {
     const html = render({ presets: deck, value: null, aspectRatio: '16 / 9' });
     const card = html.slice(html.indexOf('<button'), html.indexOf('</button>') + 9);
     expect(card).toContain('data-vc-free-preview');
-    expect((card.match(/data-vc-free-mini=/g) || []).length).toBe(3);
-    expect(new Set([...card.matchAll(/data-vc-free-mini="([^"]+)"/g)].map(m => m[1])).size).toBe(3);
+    expect(card).toMatch(/data-vc-free-preview="" role="img" aria-label="Símbolo do Moont: o Moont decide a composição de cada página"/);
+    // O símbolo é o mesmo componente do cabeçalho (três molduras em sequência).
+    expect(card).toMatch(/<svg[^>]*data-vc-free-mark=""[^>]*viewBox="0 0 64 64"/);
+    expect((card.match(/<rect /g) || []).length).toBe(3);
+    expect(card).toContain('#5B53E8');
+    expect(card).toContain('#D7FF5A');
+    expect(card).not.toContain('data-vc-free-mini');
     expect(card).toContain('data-vc-free-desc');
     expect(card).toContain(FREE_PRESENTATION_VISUAL_PRESET.desc);
     expect(FREE_PRESENTATION_VISUAL_PRESET.desc.length).toBeLessThanOrEqual(80);
+  });
+
+  it('carrossel: o Livre social usa a mesma miniatura', () => {
+    const social = SOCIAL_VISUAL_PRESET_CATALOG.filter(p => p.productKind !== 'apresentacao');
+    const pick = h => { const c = h.slice(h.indexOf('<button'), h.indexOf('</button>') + 9); return c.slice(c.indexOf('<div data-vc-free-preview'), c.indexOf('data-vc-free-caption')); };
+    const html = render({ presets: social, value: null, aspectRatio: '4 / 5', allowGenerationOnly: true });
+    expect(rotulos(html)[0]).toMatch(/^Livre: o Moont decide\./);
+    expect(pick(html)).toBe(pick(render({ presets: deck, value: null, aspectRatio: '16 / 9' })));
   });
 
   it('escolhido, o resumo mostra o nome do Livre, não "padrão legado"', () => {
