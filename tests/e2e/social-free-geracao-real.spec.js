@@ -392,6 +392,23 @@ for (const format of FORMATS) test(`Livre social: geração completa de oito car
       expect.soft(box.y, `${prefix}: ${kind} dentro do topo seguro`).toBeGreaterThanOrEqual(format.height * safe.top / 100 - 1);
       expect.soft(box.bottom, `${prefix}: ${kind} dentro da base segura`).toBeLessThanOrEqual(format.height * (1 - safe.bottom / 100) + 1);
     }
+    // Defeitos das capturas de 27/11: grade atrás do texto, quadro do apoio
+    // dentro da lista e placa do cabeçalho sobre a foto.
+    const crosses = (a, b) => Math.min(a.right, b.right) - Math.max(a.x, b.x) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.y, b.y) > 1;
+    for (const device of rendered.devices) {
+      if (device.key.startsWith('grid-')) for (const text of rendered.text) for (const box of text.boxes) {
+        expect.soft(crosses(device, box), `${prefix}: linha da grade × ${text.text.slice(0, 30)}`).toBe(false);
+      }
+      if (device.key.startsWith('frame-')) {
+        for (const block of rendered.blocks) expect.soft(crosses(device, block), `${prefix}: quadro × lista/tabela`).toBe(false);
+        for (const box of rendered.text.filter(text => text.zone === 'title').flatMap(text => text.boxes)) {
+          expect.soft(crosses(device, box), `${prefix}: quadro × título`).toBe(false);
+        }
+      }
+    }
+    for (const header of rendered.headers) for (const photo of rendered.photoRects) {
+      expect.soft(crosses(header, photo), `${prefix}: cabeçalho fora da foto`).toBe(false);
+    }
     const eyebrowBoxes = rendered.text.filter(text => i > 0 && plain(text.text) === fixture.response.slides[i].eyebrow).flatMap(text => text.boxes);
     const folioBoxes = rendered.text.filter(text => text.device && /^\d{1,2}(?:\s*\/\s*\d{1,2})?$/.test(text.text)).flatMap(text => text.boxes);
     for (const eyebrow of eyebrowBoxes) for (const folio of folioBoxes) {
@@ -632,6 +649,12 @@ for (const format of FORMATS) test(`Livre social: geração completa de oito car
     expect.soft(fixedFeed.filter((_, index) => index !== 5), 'estilo individual preserva a renderização dos outros sete cards')
       .toEqual(feedBefore.filter((_, index) => index !== 5));
     expect.soft(fixedFeed[5], 'a nova família muda a geometria efetivamente desenhada').not.toEqual(feedBefore[5]);
+    // "CENA 06" separado do título no lugar em que o card o desenha.
+    const sceneLabel = fixedFeed[5].text.filter(text => /^CENA\s/.test(text.text)).flatMap(text => text.boxes);
+    const sceneTitle = fixedFeed[5].text.filter(text => text.zone === 'title').flatMap(text => text.boxes);
+    expect.soft(sceneLabel, 'rótulo da cena desenhado').toHaveLength(1);
+    for (const label of sceneLabel) expect.soft(label.bottom + 8, 'rótulo da cena termina 8 px antes do título')
+      .toBeLessThanOrEqual(Math.min(...sceneTitle.map(box => box.y)) + 0.5);
     const requestCount = requests.length;
     const direction = 'Keep the recurring fictional woman convidada in a terracotta shirt, meeting friends at a contemporary São Paulo party entrance, with a quiet background.';
     await page.getByRole('tab', { name: 'Imagem', exact: true }).click();

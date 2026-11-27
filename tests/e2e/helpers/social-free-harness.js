@@ -153,6 +153,11 @@ export async function socialRenderGeometry(page) {
         return { x, y, w: width * scale, h: height * scale, right: x + width * scale, bottom: y + height * scale };
       }),
       headers: [...root.querySelectorAll('[data-vc-chrome="headerBar"]')].map(node => rect(node.getBoundingClientRect())),
+      // Linhas da grade e quadros da família; blocos nativos (lista, tabela).
+      devices: [...root.querySelectorAll('[data-vc-art-device^="grid-"], [data-vc-art-device^="frame-"]')]
+        .filter(node => getComputedStyle(node).display !== 'none')
+        .map(node => ({ key: node.getAttribute('data-vc-art-device'), ...rect(node.getBoundingClientRect()) })),
+      blocks: [...root.querySelectorAll('[data-vc-presentation-block]')].map(node => rect(node.getBoundingClientRect())),
       footer: [...root.querySelectorAll('[data-vc-chrome="pill"], [data-vc-chrome="footerBar"]')].map(node => rect(node.getBoundingClientRect())),
       // O cue do renderer é uma seta de duas bordas dentro de um círculo,
       // sem texto/glifo que possa mudar por idioma ou fonte.
