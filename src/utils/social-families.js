@@ -475,7 +475,15 @@ function devicesFor(familyKey, fn, L, F, { photo, index }) {
       break;
     case 'ficha':
       out.push(text(F.e, top, 70, fn === 'cover' ? '§{n} · {marca?}' : `§{n} · ${FICHA_LABEL[fn] || ''}`, { size: 25, color: 'accent', role: 'label', tracking: 4 }));
-      if (!L.onPhoto && L.hasSub && ['opener', 'development', 'list'].includes(fn)) out.push({ t: 'frame', x: S.x - 3, y: S.y - 2, w: S.w + 6, h: Math.min(S.h, L.subUsed ?? S.h) + 4, color: 'rule' });
+      if (!L.onPhoto && L.hasSub && ['opener', 'development', 'list'].includes(fn)) {
+        // O quadro fica entre o título e a lista, com 8 px de folga de cada
+        // lado: a moldura de 2% não pode entrar na lista nem subir ao título.
+        const gap = F.py(8); const B = titleBox(L);
+        let y = S.y - 2; let h = Math.min(S.h, L.subUsed ?? S.h) + 4;
+        if (y < B.y + B.h + gap) { h -= B.y + B.h + gap - y; y = B.y + B.h + gap; }
+        if (L.evidence && y + h > L.evidence.y - gap) h = L.evidence.y - gap - y;
+        if (h > F.py(24)) out.push({ t: 'frame', x: S.x - 3, y, w: S.w + 6, h, color: 'rule' });
+      }
       if (P) out.push({ t: 'frame', x: P.x, y: P.y, w: P.w, h: P.h, color: 'accent', z: 'over', opacity: 0.9 });
       break;
     case 'minimal':
