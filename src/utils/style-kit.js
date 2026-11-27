@@ -7,6 +7,7 @@
 
 import { canAutoApplyExplicitCardScript, parseExplicitCardScript } from './structured-card-script.js';
 import { normalizeReferencePalette } from './reference-palette.js';
+import { normalizeReferenceVisualRecord } from './reference-visual-cache.js';
 
 const STYLE_PROMPT_MAX = 4000;
 const CONTEXT_MD_MAX = 48000;
@@ -59,6 +60,7 @@ function normalizeStyleKit(raw) {
     // Paleta extraída das referências pelo código (Teste 6, item 1), presa
     // aos IDs das referências de onde saiu; forma inválida não é guardada.
     ...(referencePaletteOf(src.referencePalette) ? { referencePalette: referencePaletteOf(src.referencePalette) } : {}),
+    ...(normalizeReferenceVisualRecord(src.referenceVisual) ? { referenceVisual: normalizeReferenceVisualRecord(src.referenceVisual) } : {}),
     refImages: refs
       .filter((r) => r && typeof r === 'object' && (asString(r.imageId) || asString(r.assetId)
         || asString(r.dataUrl).startsWith('data:image/')))

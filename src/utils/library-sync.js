@@ -11,6 +11,7 @@ import {
 import { exportBrandLogo, exportSlideLogo, importBrandLogo, importSlideLogo } from './slide-logo.js';
 import { importSlideReference } from './slide-reference.js';
 import { migrateProjectReferences } from './style-kit-storage.js';
+import { rebindReferenceVisualRecord } from './reference-visual-cache.js';
 import { USER_PROFILE_KEY } from './user-profile.js';
 import { CLOUD_IMAGE_PART_CHARS, CLOUD_IMAGE_MAX_CHARS, originalImageAssetId, isOriginalImageAsset, imageContentType } from './cloud-image-assets.js';
 import { hasConfirmedOriginalUpload, rememberConfirmedOriginalUpload } from './cloud-upload-receipts.js';
@@ -250,13 +251,19 @@ async function packStyleKitForCloud(styleKit, assets) {
       logoAssetId = await collectAsset(url, assets);
     } catch { /* */ }
   }
-  return stripRuntime({
+  const packedKit = {
     ...kit,
     refImages: refs,
     logo: kit?.logo
       ? { name: kit.logo.name, assetId: logoAssetId || kit.logo.assetId || undefined }
       : kit?.logo,
-  });
+  };
+  if (kit?.referenceVisual) {
+    const record = rebindReferenceVisualRecord(kit.referenceVisual, kit, packedKit);
+    if (record) packedKit.referenceVisual = record;
+    else delete packedKit.referenceVisual;
+  }
+  return stripRuntime(packedKit);
 }
 
 /**
@@ -981,11 +988,24 @@ async function hydrateStyleKitFromCloud(styleKit, assetCache, localStyleKit) {
       if (dataUrl) kit.logo = { ...kit.logo, dataUrl, imageId: null };
     }
     try { kit = await migrateProjectReferences(kit); } catch { /* */ }
-    return {
+    const hydratedKit = {
       ...kit,
       refImages: refs,
       ...(logoAssetId ? { logo: { ...styleKit.logo, ...kit.logo, assetId: logoAssetId } } : {}),
     };
+    if (styleKit?.referenceVisual) {
+      const contentIds = await Promise.all(refs.map(async ref => {
+        let dataUrl = ref?.dataUrl;
+        if (!dataUrl && ref?.imageId) {
+          try { dataUrl = await imagemComoDataUrl(ref.imageId); } catch { /* conserva a identidade remota quando a mídia está ausente */ }
+        }
+        return dataUrl ? originalImageAssetId(dataUrl) : ref?.assetId;
+      }));
+      const record = rebindReferenceVisualRecord(styleKit.referenceVisual, styleKit, hydratedKit, { contentIds });
+      if (record) hydratedKit.referenceVisual = record;
+      else delete hydratedKit.referenceVisual;
+    }
+    return hydratedKit;
   } catch {
     return { ...(styleKit || {}) };
   }
