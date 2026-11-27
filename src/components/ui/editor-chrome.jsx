@@ -9,7 +9,8 @@ import { APP_MODE_UI, DEPTH_LAYERS_HINT } from '../../utils/ui-depth-labels.js';
 const FORMAT_RATIO_LABEL = { carrossel: '4:5', quadrado: '1:1', stories: '9:16', apresentacao: '16:9' };
 
 /** Proporção de exportação — uma linha no desktop; grelha largura total no mobile (evita barra apertada). */
-function EditorFormatSelector({ fmt, setFmt, layout }) {
+/** `touch`: celular deitado, onde a linha do topo tem altura para alvos de 44 px. */
+function EditorFormatSelector({ fmt, setFmt, layout, touch = false }) {
   // Mobile: segmented pill compacto (38px) em vez de grid 3-cards 80px+.
   // Liberta espaço vertical pro user ver os cards no preview enquanto
   // o drawer está aberto (drawer já é 55dvh).
@@ -79,7 +80,8 @@ function EditorFormatSelector({ fmt, setFmt, layout }) {
                     // 3 botões dividirem largura igualmente; no desktop
                     // fica padding natural (auto-width pill clássico).
                     flex: layout === 'mobile' ? '1 1 0' : 'initial',
-                    minHeight: layout === 'mobile' ? 36 : 32,
+                    minHeight: layout === 'mobile' ? (touch ? 44 : 36) : 32,
+                    minWidth: touch ? 44 : undefined,
                     padding: layout === 'mobile' ? '6px 10px' : '6px 14px',
                     borderRadius: 9999,
                     fontSize: layout === 'mobile' ? 12 : 13,

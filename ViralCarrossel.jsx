@@ -589,6 +589,8 @@ const MOBILE_BOARD_SIDE = 12;
 const MOBILE_BOARD_TOP = 8;
 const MOBILE_CARD_ACTIONS = 56;
 const MOBILE_BOARD_BOTTOM = 84;
+const LANDSCAPE_BOARD_PAD_Y = 12;
+const LANDSCAPE_CARD_ACTIONS = 56;
 const PROJECTS_V2 = import.meta.env.VITE_PROJECTS_V2 === 'true';
 
 function accountBrandsContentSnapshot(brands) {
@@ -4051,6 +4053,7 @@ export default function App() {
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState({ current:0, total:0 });
   const [vw, setVw] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const [vh, setVh] = useState(typeof window !== 'undefined' ? window.innerHeight : 768);
   const fileInputRef = useRef(null);
   const batchPhotoInputRef = useRef(null);
   const photoZoneInputRef = useRef(null);
@@ -4221,7 +4224,7 @@ export default function App() {
   }, [brand, brandRoster]);
 
   useEffect(() => {
-    const onResize = () => setVw(window.innerWidth);
+    const onResize = () => { setVw(window.innerWidth); setVh(window.innerHeight); };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
@@ -4253,15 +4256,23 @@ export default function App() {
   }, []);
 
   const isMobile = vw < 768;
+  /* Celular deitado (iPhone em paisagem: 844×390, 932×430): largura de
+     desktop e altura de ~400 px. Cabeçalho em duas linhas, faixa de
+     contexto, abas, miniaturas e zoom somavam a altura inteira e o card não
+     aparecia. Aqui as barras secundárias ficam recolhidas atrás do botão
+     "Ferramentas"; o topo vira uma linha com Gerar, Desfazer e formato. */
+  const shortLandscape = !isMobile && vh <= 500 && vw > vh;
+  const [landscapeBarsOpen, setLandscapeBarsOpen] = useState(false);
+  const landscapeCompact = shortLandscape && !landscapeBarsOpen;
   /* A assinatura tem proporção natural: as ferramentas descem antes de
      comprimir a marca ou sobrepor Salvar e Projetos. */
-  const headerTight = !isMobile && vw < 1536;
+  const headerTight = !isMobile && vw < 1536 && !landscapeCompact;
   /* <1000px: some o atalho "Projetos" do header (o rodapé já tem um igual). */
   const headerVeryTight = !isMobile && vw < 1000;
   const f = FORMATS[fmt] || FORMATS.carrossel;
   const [mobileBoardHeight, setMobileBoardHeight] = useState(0);
   useLayoutEffect(() => {
-    if (!isMobile) return undefined;
+    if (!isMobile && !shortLandscape) return undefined;
     const root = boardScrollRef.current;
     if (!root) return undefined;
     const measure = () => setMobileBoardHeight(root.clientHeight);
@@ -4269,7 +4280,7 @@ export default function App() {
     const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
     observer?.observe(root);
     return () => observer?.disconnect();
-  }, [isMobile, shellView, accountLibraryReady, activeDocId]);
+  }, [isMobile, shortLandscape, landscapeBarsOpen, shellView, accountLibraryReady, activeDocId]);
   const { zoom: canvasZoom, changeZoom } = useCanvasZoom(boardScrollRef, `${activeDocId}:${fmt}:${shellView}:${isMobile}:${accountLibraryReady}`);
   const previewBaseScale = useMemo(() => {
     if (isMobile) {
@@ -4289,9 +4300,14 @@ export default function App() {
     const targetWidth = fmt === 'apresentacao'
       ? Math.min(920, Math.max(320, (vw - 272 - 96) * 0.9))
       : 360;
-    const base = Math.min(targetWidth / f.w, fmt === 'apresentacao' ? 0.5 : 0.44);
+    let base = Math.min(targetWidth / f.w, fmt === 'apresentacao' ? 0.5 : 0.44);
+    // Celular deitado: o card cabe inteiro na altura livre do quadro (acima
+    // da fila de ações do card).
+    if (shortLandscape && mobileBoardHeight > 0) {
+      base = Math.min(base, Math.max(120, mobileBoardHeight - LANDSCAPE_BOARD_PAD_Y * 2 - LANDSCAPE_CARD_ACTIONS) / f.h);
+    }
     return thumbQaMode ? Math.min(base * 0.7, 0.28) : base;
-  }, [isMobile, vw, f, fmt, thumbQaMode, mobileBoardHeight]);
+  }, [isMobile, vw, f, fmt, thumbQaMode, mobileBoardHeight, shortLandscape]);
   const previewScale = previewBaseScale * canvasZoom;
 
   const slide = slides[activeIdx] ?? slides[0] ?? mkSlide(1, brand);
@@ -4378,6 +4394,28 @@ export default function App() {
     </nav>
   );
 
+  /* Celular deitado: mostra ou recolhe cabeçalho completo, contexto, abas e
+     miniaturas. Recolhido, o card ocupa a altura. */
+  const landscapeBarsToggle = (
+    <button
+      type="button"
+      onClick={() => setLandscapeBarsOpen(open => !open)}
+      aria-expanded={landscapeBarsOpen}
+      aria-label={landscapeBarsOpen ? 'Recolher ferramentas' : 'Mostrar ferramentas'}
+      title={landscapeBarsOpen ? 'Recolher ferramentas e mostrar o card' : 'Mostrar abas, miniaturas, contexto e Exportar'}
+      style={{
+        minWidth: 44, height: 44, padding: '0 12px', borderRadius: 9999, flexShrink: 0,
+        border: `1px solid ${landscapeBarsOpen ? 'var(--accent)' : 'var(--glass-border-strong, var(--border))'}`,
+        background: landscapeBarsOpen ? 'var(--accent-surface)' : 'var(--bg-card)',
+        color: 'var(--text-primary)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
+        fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600,
+      }}
+    >
+      <SlidersHorizontal size={15} aria-hidden="true" />
+      {landscapeBarsOpen ? 'Recolher' : 'Ferramentas'}
+    </button>
+  );
+
   const editorGenerateBtn = (
     <button
       type="button"
@@ -4423,7 +4461,7 @@ export default function App() {
       onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
     >
       <Sparkles size={14} color={appMode === 'criador' ? 'var(--accent)' : undefined} />
-      {isMobile ? 'Gerar' : (appMode === 'criador' ? 'Assistente IA' : 'Gerar com IA')}
+      {isMobile || landscapeCompact ? 'Gerar' : (appMode === 'criador' ? 'Assistente IA' : 'Gerar com IA')}
     </button>
   );
 
@@ -8718,7 +8756,11 @@ Retorne APENAS JSON: ${refineAllWantsBody
              "Gerar com IA" (28px a 1440px, 87px a 1100px). */
           gridTemplateColumns: 'minmax(0, 1fr) auto auto',
           alignItems: 'center',
-          ...(headerTight ? {
+          ...(landscapeCompact ? {
+            padding: 'env(safe-area-inset-top, 0) max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px))',
+            height: `calc(56px + env(safe-area-inset-top, 0))`,
+            gap: 8,
+          } : headerTight ? {
             /* 2 linhas: histórico + formato descem, em vez de sobrepor o CTA. */
             padding: 'env(safe-area-inset-top, 0) 14px 8px',
             rowGap: 8,
@@ -8810,7 +8852,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                 >
                   {activeEntry.name || 'Sem título'}
                 </button>
-                {!headerTight && (
+                {!headerTight && !landscapeCompact && (
                   <>{remoteProjectNotice ? <SavedIndicator savedAt={lastSavedAt} notice={remoteProjectNotice} onUpdate={() => { setRemoteProjectNotice(null); syncProjectLibrary('sync'); }} /> : saveIndicator}</>
                 )}
                 <button
@@ -8835,7 +8877,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
               </div>
             )}
           </div>
-          {!headerTight && editorPillBtn(() => goAccount('projects'), 'Projetos', Home)}
+          {!headerTight && !landscapeCompact && editorPillBtn(() => goAccount('projects'), 'Projetos', Home)}
         </div>
 
         {/* Centro — Gerar com IA */}
@@ -8844,9 +8886,19 @@ Retorne APENAS JSON: ${refineAllWantsBody
         </div>
 
         {/* Direita — ferramentas + Perfil (extremo direito) */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, minWidth: 0 }}>
-          {!headerTight && historyFormatGroup}
-          {editorHeaderActions}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: landscapeCompact ? 6 : 8, minWidth: 0 }}>
+          {landscapeCompact ? (
+            <>
+              <HistoryButtons onUndo={history.undo} onRedo={history.redo} canUndo={history.canUndo} canRedo={history.canRedo} />
+              <EditorFormatSelector fmt={fmt} setFmt={setFmt} layout="mobile" touch />
+            </>
+          ) : (
+            <>
+              {!headerTight && historyFormatGroup}
+              {editorHeaderActions}
+            </>
+          )}
+          {shortLandscape && landscapeBarsToggle}
           {editorAccountNav}
         </div>
 
@@ -8866,7 +8918,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         </div>
       )}
 
-      {!(isMobile && drawerOpen) && <ProjectContextBanner
+      {!(isMobile && drawerOpen) && !landscapeCompact && <ProjectContextBanner
         styleKit={styleKit}
         projectName={activeEntry?.name}
         compact={isMobile}
@@ -8876,7 +8928,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
       <div className="vc-editor-shell" style={{ flex:1, display:'flex', overflow:'hidden' }}>
 
         {/* Desktop sidebar — glass dark panel premium (Narrative OS) */}
-        {!isMobile && (
+        {!isMobile && !landscapeCompact && (
           <aside style={{
             width:272,
             borderRight:'1px solid var(--glass-border)',
@@ -8918,7 +8970,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
 
           {/* ── THUMBNAIL STRIP ── Mobile: colapsa junto com header quando
               drawer aberto. Desktop: sempre visível. */}
-          <div
+          {!landscapeCompact && <div
             data-vc-tour="thumbnails"
             style={{
             background:'var(--bg-sidebar)', borderBottom:'1px solid var(--border)',
@@ -8994,7 +9046,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
             </div>
             {isMobile && mobileHistoryGroup}
             </div>
-          </div>
+          </div>}
 
           {/* ── MAIN CANVAS AREA ── */}
           {!empty && isMobile && Math.round(canvasZoom * 100) !== 100 && (
@@ -9589,7 +9641,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
               </div>
             ) : (
               // Desktop: all slides row
-              <div style={{ padding:'28px 48px', display:'flex', gap:20, alignItems:'flex-start', minHeight:'100%', flexWrap:'wrap' }}>
+              <div style={{ padding: shortLandscape ? `${LANDSCAPE_BOARD_PAD_Y}px 24px` : '28px 48px', display:'flex', gap:20, alignItems:'flex-start', minHeight:'100%', flexWrap:'wrap' }}>
                 {imageGenerationAvailability.reason === 'plan_without_images' && (
                   <p role="status" style={{ flex: '1 0 100%', margin: 0, fontSize: 14, lineHeight: 1.45, color: 'var(--text-primary)' }}>
                     Seu plano não inclui imagens. Os cards saem com um padrão visual de texto. Faça upgrade ou use sua chave em Configurar IA.
@@ -9620,6 +9672,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       onClick={()=>setActiveIdx(i)}
                       style={{
                         position:'relative',
+                        // Celular deitado: Stories fica mais estreito que a
+                        // fila de ações; o contorno acompanha o card.
+                        ...(shortLandscape ? { width:'fit-content' } : {}),
                         cursor:'pointer', borderRadius:10, overflow:'hidden',
                         transition:'all 0.15s var(--ease-smooth)',
                         boxShadow: i===activeIdx

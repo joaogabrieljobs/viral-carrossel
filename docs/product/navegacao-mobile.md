@@ -13,11 +13,12 @@
 | Painel de edição aberto | card cortado pelo painel | miniatura do card inteiro acima do painel |
 
 - Topo em duas linhas finas: projetos · nome e gravação · Gerar · perfil; depois modo, biblioteca, IA e formato (só a proporção: 4:5, 1:1, 9:16, 16:9). Saíram a logo e "Sem cliente definido".
-- Faixa "Contexto ON" em uma linha, com desfazer só no ícone.
-- Desfazer e refazer ficam à direita da fila de miniaturas dos cards (23/11/2026). As duas linhas do topo não têm folga a 360 px; com o painel aberto a fila some e o aviso da ação traz o próprio botão "Desfazer".
+- Faixa "Contexto ON" em uma linha, só informativa (27/11/2026: o desfazer dela saiu; era o mesmo histórico do botão da fila).
+- Desfazer e refazer ficam à direita da fila de miniaturas dos cards (23/11/2026). Desde 27/11 o desfazer é um botão só, escrito "Desfazer", com 44 px e estado desabilitado tracejado ("Nada para desfazer"); o Refazer fica ao lado, em ícone de 44 px. O mesmo componente (`HistoryButtons`) é o do topo no desktop. As duas linhas do topo não têm folga a 360 px; com o painel aberto a fila some e o aviso da ação traz o próprio botão "Desfazer", que usa o mesmo histórico.
 - Barra de zoom e "Card 1/5" saíram do celular: troca de card pela fila e pelo deslize, zoom pela pinça; o indicador "Ajustar · N%" aparece só fora de 100%.
 - O card ocupa a largura e, em formato alto, cabe na altura livre.
 - Com o painel aberto, a área acima dele mostra o card em miniatura, que acompanha a edição; tocar nela fecha o painel.
+- Celular deitado (27/11/2026; altura até 500 px e largura maior que a altura, ex.: 844×390 e 932×430): o topo vira uma linha com Gerar, Desfazer, Refazer, formato e "Ferramentas"; faixa de contexto, abas, miniaturas e Exportar ficam atrás de "Ferramentas" (abre e recolhe). O card cabe inteiro na altura livre. Teste: `tests/e2e/celular-deitado.spec.js`.
 - Testes: `tests/e2e/navegacao-mobile.spec.js`. Capturas: `docs/mobile-nav/depois/` e `docs/mobile-nav/antes-depois-*.png` (agora com o app real, não a maquete).
 **Data:** 2026-11-18 · **Base:** `main` em `4257738`
 **Pedido:** "vamos melhorar a navegação mobile, tá muito cheio de coisas e confuso, difícil de usar."
