@@ -119,7 +119,7 @@ function artVisualDirection(slide, styleKit) {
 export function composeDeckArtImageDirection({ slides = [], styleKit = null, baseReferenceCount = 0, fmt = null, formatViews = null, referenceVisualAnalysis = null } = {}) {
   const first = deckArtSlides(slides)[0] || (Array.isArray(slides) ? slides[0] : null) || {};
   const socialFree = isSocialFreeSlide(first);
-  const referenceAnalysis = !socialFree ? normalizeReferenceVisualAnalysis(referenceVisualAnalysis) : null;
+  const referenceAnalysis = normalizeReferenceVisualAnalysis(referenceVisualAnalysis);
   const referenceBackground = referenceAnalysis?.direction.background;
   // A análise substitui a estética inferida do plano, não as proibições
   // globais validadas do briefing. O avoid local pertence à cena da página

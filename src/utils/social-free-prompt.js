@@ -5,6 +5,7 @@ import { slideForFormatDisplay } from './format-view.js';
 import { photoTextBounds, textOverPhoto } from './image-composition.js';
 import { reservedAreaColour, visualHex } from './visual-direction.js';
 import { wcagContrast } from './wcag.js';
+import { buildReferenceVisualAnalysisContext } from './reference-visual-analysis.js';
 
 export const SOCIAL_FREE_FORMATS = Object.freeze({
   carrossel: Object.freeze({ w: 1080, h: 1350, ratio: '4:5', top: 8.5, bottom: 8.5 }),
@@ -23,13 +24,19 @@ export function isSocialFreeSlide(slide) {
 const text = value => typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
 const trim = (value, max) => text(value).slice(0, max);
 
-export function buildSocialFreePrompt({ formato = 'carrossel', brand = {}, styleKit = {}, referenceColors = [], signature = '' } = {}) {
+export function buildSocialFreePrompt({ formato = 'carrossel', brand = {}, styleKit = {}, referenceColors = [], signature = '', referenceVisualAnalysis = null } = {}) {
   const fmt = normalizeSocialFreeFormat(formato);
   const frame = SOCIAL_FREE_FORMATS[fmt];
   const explicit = Object.fromEntries(['bg', 'accent', 'titleColor', 'subtitleColor', 'textColor', 'titleFont', 'bodyFont']
     .filter(key => typeof brand?.[key] === 'string' && brand[key]).map(key => [key, brand[key]]));
   const reference = (Array.isArray(referenceColors) ? referenceColors : []).map(item => typeof item === 'string'
     ? { hex: visualHex(item) } : { hex: visualHex(item?.hex), ...(Number.isFinite(item?.weight) ? { weight: item.weight } : {}) }).filter(item => item.hex);
+  // Apoteose 8 no carrossel: só uma leitura multimodal validada entra. Sem
+  // ela, o contrato social continua idêntico ao anterior.
+  const referenceContext = buildReferenceVisualAnalysisContext(referenceVisualAnalysis);
+  const referenceBlock = referenceContext ? `${referenceContext}
+Instruções escritas explícitas prevalecem sobre a referência. Não invente "no grain" nem "no people" como exclusões para preencher lacunas. Grafismos ficam secundários ao sujeito quando o briefing pede fotografia; intervenções tipográficas pertencem às camadas editáveis. Leve a direção derivada a visualDirection e às cenas; a observação da referência não é fato sobre o projeto, o público ou um local.
+` : '';
   return `MODO LIVRE SOCIAL — CONTRATO FINAL DA MESMA REDAÇÃO:
 Mantenha o briefing, o idioma, o modo narrativo, a quantidade e os limites editoriais acima. Este contrato amplia e substitui apenas o formato JSON anterior: escreva texto e direção visual no mesmo objeto JSON, sem etapa ou pedido de planejamento separado, sem HTML, CSS ou coordenadas.
 Formato deste projeto: ${frame.w} × ${frame.h}, ${frame.ratio} (${fmt}). Proteja ${frame.top}% no alto e ${frame.bottom}% embaixo; no Stories, o CTA e o rodapé ficam acima da área de interface. O código calculará as zonas reais e manterá pelo menos 28 px de leitura, contraste 4,5:1, reserva para logo e nunca três layouts iguais seguidos.
@@ -40,7 +47,7 @@ Identidade única: deckDesign.palette contém bg, surface, ink, muted, accent, a
 Kit escrito (direção, não fonte de novos fatos): ${trim([styleKit?.stylePrompt, styleKit?.contextMd].filter(Boolean).join('\n'), 1800)}
 visualDirection contém palette (3–6 objetos {role,hex}, roles base/subject_light/shadow/graphic/accent), finish, atmosphere, graphics e avoid. O acabamento e os grafismos são os da identidade; graphics pode ser "none". Respeite exclusões, inclusive ausência de grão ou de decoração. Não imponha recortes orgânicos, serigrafia ou luz saturada.
 Por card, inclua scene, avoid, design e eyebrow além dos campos editoriais pedidos. scene é um briefing em inglês: {subject,wardrobe,action,expression,setting,light,graphics,shot}; preserve sujeitos e âncoras de identidade existentes. Varie ação, lugar e enquadramento entre fotos. Casting é criação visual, nunca evidência factual sobre o público. A referência de estilo fornece só meio, cores, luz e textura, nunca a pessoa ou a composição.
-DECISÕES VISÍVEIS DA CENA:
+${referenceBlock}DECISÕES VISÍVEIS DA CENA:
 Para cada imagem, escolha uma decisão visual distintiva coerente com a função editorial do card e com o briefing. Adjetivos de qualidade não substituem decisões observáveis. Use os oito campos existentes; campos sem aplicação ficam "". Mantenha scene null quando uma foto não contribuir.
 - subject: descreva o assunto e um traço relevante; objetos e ambientes também podem conduzir a cena, com pessoas só quando fizerem parte da ideia.
 - wardrobe: descreva material, textura ou detalhe do figurino ou objeto quando relevante para a cena; não acrescente adornos só para preencher o campo.

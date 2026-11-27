@@ -197,7 +197,9 @@ export function composeImageDirection({
   const livreSocial = !apresentacao && !exitedFreeHere && (socialFree === true || isSocialFreeSlide(card));
   const livreApresentacao = apresentacao && card.presentationPresetId === 'presentation_free';
   const directed = livreSocial || livreApresentacao;
-  const referenceAnalysis = livreApresentacao ? normalizeReferenceVisualAnalysis(referenceVisualAnalysis) : null;
+  // A leitura visual vale para os dois modos Livre; estilos fixos e uma vista
+  // que saiu do Livre continuam sem ela.
+  const referenceAnalysis = directed ? normalizeReferenceVisualAnalysis(referenceVisualAnalysis) : null;
   // Direção de arte (partes 1 a 3): direção visual do deck (roteiro, modo
   // livre e kit), cena como briefing e o espaço do texto no quadro.
   const visual = apresentacao ? resolveSlideVisualDirection({ slide: card, styleKit })

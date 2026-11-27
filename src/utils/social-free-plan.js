@@ -10,6 +10,7 @@ import { normalizePresentationBlocks } from './presentation-quality.js';
 import { deriveFreeEyebrow, personalityComparison } from './free-draft.js';
 import { normalizePresentationEyebrow } from './presentation-eyebrow.js';
 import { contentLabelLanguage } from './content-label-language.js';
+import { normalizeReferenceVisualAnalysis } from './reference-visual-analysis.js';
 
 const object = value => value && typeof value === 'object' && !Array.isArray(value);
 const clean = value => typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
@@ -48,7 +49,7 @@ function blockFromText(slide, design) {
 }
 
 /** Identidade explícita da marca e paleta extraída prevalecem sobre a proposta. */
-export function normalizeSocialFreePlan(draft, { formato = 'carrossel', brand = {}, styleKit = null, referenceColors = [], signature = '', source = '' } = {}) {
+export function normalizeSocialFreePlan(draft, { formato = 'carrossel', brand = {}, styleKit = null, referenceColors = [], signature = '', source = '', referenceVisualAnalysis = null } = {}) {
   const slides = Array.isArray(draft?.slides) ? draft.slides : [];
   const kitColors = kitVisualColors(styleKit);
   const effectiveBrand = { ...explicitBrandColorsFromKit(styleKit || {}), ...(object(brand) ? brand : {}) };
@@ -80,6 +81,10 @@ export function normalizeSocialFreePlan(draft, { formato = 'carrossel', brand = 
     version: 1, kind: 'social_free', formato: normalizeSocialFreeFormat(formato), deckDesign, visualDirection,
     signature: supportedSignature(signature || draft?.signature, slides, source), cards,
   };
+  // A leitura da referência pertence ao plano do projeto, não a cada card:
+  // regenerar uma foto depois reutiliza esta cópia, conferida com o kit.
+  const referenceAnalysis = normalizeReferenceVisualAnalysis(referenceVisualAnalysis);
+  if (referenceAnalysis) plan.referenceVisualAnalysis = referenceAnalysis;
   const enriched = slides.map((slide, index) => {
     const card = cards[index];
     const content = blockFromText(slide, card.design);
