@@ -4,6 +4,7 @@ import { coercePresentationPlanShape, auditPresentationPlanScenes, snapPlanColor
 } from './presentation-plan.js';
 import { isGenerationCancelled, throwIfGenerationCancelled } from './generation-control.js';
 import { quoteCandidatesBlock, summarizePlanIssues } from './presentation-plan-repair.js';
+import { normalizeReferenceVisualAnalysis } from './reference-visual-analysis.js';
 
 /** A private response must not end up in the general JSON parser's console
  * previews. Accept the requested JSON (and a harmless surrounding code fence),
@@ -59,18 +60,22 @@ ${sceneRepairLine(issues)}${quoteCandidatesBlock(previous, issues, sources)}Copi
  * Only a validated plan can reach onPlan or the writing stage. Diagnostics
  * intentionally contain no generated values, evidence IDs, source text or
  * provider error messages. The caller controls how to display/store them. */
-export async function generatePresentationPlan({ brief = '', userInstructions = '', sources = [], count = 12, presentationPath = 'auto', freeDesign = false, kitColors = [], kitReferenceWithoutText = false, referenceColors = [], aiOptions = {}, onStage, onPlan }, callAI) {
+export async function generatePresentationPlan({ brief = '', userInstructions = '', sources = [], count = 12, presentationPath = 'auto', freeDesign = false, kitColors = [], kitReferenceWithoutText = false, referenceColors = [], referenceVisualAnalysis = null, aiOptions = {}, onStage, onPlan }, callAI) {
   if (!Number.isInteger(Number(count)) || Number(count) < 1 || Number(count) > 72) {
     throw Object.assign(new Error('Escolha uma quantidade válida de slides antes de gerar.'), { code: 'presentation_input_invalid' });
   }
   const diagnostics = [];
+  // A análise vem da chamada multimodal anterior. A resposta do planejador
+  // não pode fabricá-la nem substituí-la; persiste uma vez no topo do plano.
+  const referenceAnalysis = freeDesign === true ? normalizeReferenceVisualAnalysis(referenceVisualAnalysis) : null;
   let previous;
   let issues = [];
   // Roteiro válido cuja cena pediu reparo: fica como reserva se o reparo falhar.
   let fallback = null;
   const accept = (validPlan, attempt) => {
     // Teste 6, item 1: cores fora da referência extraída viram a mais próxima.
-    const plan = snapPlanColorsToReference(validPlan, { referenceColors, kitColors });
+    const snapped = snapPlanColorsToReference(validPlan, { referenceColors, kitColors });
+    const plan = referenceAnalysis ? { ...snapped, referenceVisualAnalysis: referenceAnalysis } : snapped;
     const metadata = { attempts: attempt, diagnostics };
     onPlan?.(plan, metadata);
     throwIfGenerationCancelled(aiOptions.signal);
@@ -80,7 +85,7 @@ export async function generatePresentationPlan({ brief = '', userInstructions = 
     throwIfGenerationCancelled(aiOptions.signal);
     onStage?.(attempt === 1 ? 'planning' : 'planning_repair', { attempt, diagnostics });
     throwIfGenerationCancelled(aiOptions.signal);
-    const prompt = buildPresentationPlanPrompt({ brief, userInstructions, sources, count, presentationPath, compactRepair: attempt > 1, freeDesign: freeDesign === true, kitColors, kitReferenceWithoutText, referenceColors })
+    const prompt = buildPresentationPlanPrompt({ brief, userInstructions, sources, count, presentationPath, compactRepair: attempt > 1, freeDesign: freeDesign === true, kitColors, kitReferenceWithoutText, referenceColors, referenceVisualAnalysis: referenceAnalysis })
       + (attempt > 1 ? repairBlock(previous, issues, sources) : '');
     let raw;
     let response;

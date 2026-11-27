@@ -23,6 +23,7 @@ import {
 import { composeImgExtraPrompt, normalizeStyleKit } from './style-kit.js';
 import { wcagContrast } from './wcag.js';
 import { composeSocialFreeArtComposition, isSocialFreeSlide, normalizeSocialFreeFormat } from './social-free-prompt.js';
+import { normalizeReferenceVisualAnalysis } from './reference-visual-analysis.js';
 
 /** Pedido de cena da arte (o mesmo texto vai em `sceneBrief.query`). */
 export const DECK_ART_SCENE = 'Abstract identity background for this presentation deck, no people.';
@@ -115,9 +116,16 @@ function artVisualDirection(slide, styleKit) {
  * concentrado na borda direita e as restrições de sempre. A referência do kit,
  * quando enviada, vale só pelo visual.
  */
-export function composeDeckArtImageDirection({ slides = [], styleKit = null, baseReferenceCount = 0, fmt = null, formatViews = null } = {}) {
+export function composeDeckArtImageDirection({ slides = [], styleKit = null, baseReferenceCount = 0, fmt = null, formatViews = null, referenceVisualAnalysis = null } = {}) {
   const first = deckArtSlides(slides)[0] || (Array.isArray(slides) ? slides[0] : null) || {};
   const socialFree = isSocialFreeSlide(first);
+  const referenceAnalysis = !socialFree ? normalizeReferenceVisualAnalysis(referenceVisualAnalysis) : null;
+  const referenceBackground = referenceAnalysis?.direction.background;
+  // A análise substitui a estética inferida do plano, não as proibições
+  // globais validadas do briefing. O avoid local pertence à cena da página
+  // e não se transfere para este asset abstrato compartilhado.
+  const imageRules = referenceBackground && Array.isArray(first.presentationPlan?.imageRules)
+    ? first.presentationPlan.imageRules.filter(rule => typeof rule === 'string' && rule.trim()) : [];
   const socialFormat = normalizeSocialFreeFormat(fmt || first.socialPlan?.formato);
   const resolved = artVisualDirection(first, styleKit);
   const deck = (socialFree ? first.socialDeckDesign : first.presentationDeckDesign)?.palette || {};
@@ -125,7 +133,10 @@ export function composeDeckArtImageDirection({ slides = [], styleKit = null, bas
   // Mesmo sem roteiro, o pedido é de arte abstrata: uma direção mínima
   // impede o montador comum de reintroduzir a fotografia/grão padrão.
   // Só compõe texto; não cria nem grava uma paleta de roteiro fictícia.
-  const vd = resolved || { palette: [{ role: 'base', hex: base }], finish: 'Clean, uniform colour field.', graphics: 'none' };
+  const vd = referenceBackground
+    ? { ...resolved, palette: resolved?.palette || [{ role: 'base', hex: base }],
+      finish: referenceBackground.finish || resolved?.finish || '', graphics: referenceBackground.graphics || resolved?.graphics || 'none' }
+    : resolved || { palette: [{ role: 'base', hex: base }], finish: 'Clean, uniform colour field.', graphics: 'none' };
   const hasGraphics = Boolean(vd.graphics && vd.graphics !== 'none');
   const ink = visualHex(first.titleColor) || (isLightInk(base) ? '#111111' : '#FFFFFF');
   const tone = isLightInk(ink) ? 'dark' : 'light';
@@ -144,6 +155,10 @@ export function composeDeckArtImageDirection({ slides = [], styleKit = null, bas
     ...(socialFree ? { socialFree: true } : {}),
     directedPrompt: {
       version: 2, kind: socialFree ? 'social_free' : 'presentation_free', visual: vd,
+      // Um fundo usa textura e grafismos da referência; o sujeito fotográfico
+      // observado não deve contaminar este asset deliberadamente abstrato.
+      ...(referenceBackground ? { referenceDirection: `Surface finish: ${vd.finish} Graphic language: ${vd.graphics}`,
+        referenceRestrictions: referenceAnalysis.direction.restrictions, assetRole: 'background' } : {}),
       scene: {
         subject: subject.replace(/^SUBJECT AND CASTING: /, ''),
         light: 'Apply the palette light and shadow roles to this abstract background, without a photographic subject.',
@@ -162,7 +177,7 @@ export function composeDeckArtImageDirection({ slides = [], styleKit = null, bas
     subjects: '',
     styleBody: [composeImgExtraPrompt(kit, '')].filter(Boolean),
     familyEnglish: '',
-    avoid: [vd.avoid, 'people, faces, hands, bodies or silhouettes', 'photographs of places or objects', 'unrequested decorative motifs'].filter(Boolean),
+    avoid: [...imageRules, !referenceBackground && vd.avoid, 'people, faces, hands, bodies or silhouettes', 'photographs of places or objects', 'unrequested decorative motifs'].filter(Boolean),
     composition,
     visualDirection: composeVisualDirectionBlock(vd, { referenceLook: refs > 0 }),
     sceneBrief: { query: socialFree ? SOCIAL_DECK_ART_SCENE : DECK_ART_SCENE, subject, action: '', light: graphics },

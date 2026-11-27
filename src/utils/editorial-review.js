@@ -386,7 +386,15 @@ export function validateCarouselDraft(rawDraft, { count, presetId, densityId, pr
         // editable notes, including any original source/condition lines.
         if (String(s.bodyAfterImage || '').trim()) slide.speakerNotes = [slide.speakerNotes, String(s.bodyAfterImage).trim()].filter(Boolean).join('\n\n');
         slide.bodyAfterImage = '';
-        slide.imageQuery = '';
+        // No Livre, um bloco pode compartilhar a página com a foto decidida
+        // pelo roteiro. A query já veio da cena em attachPresentationPlan;
+        // apagá-la aqui fazia o diretor seguinte suprimir essa foto. Sem essa
+        // intenção explícita, vale a supressão dos estilos fixos.
+        const plannedPhoto = freeDesign === true
+          && ['small', 'half', 'full'].includes(slide.presentationPlan?.design?.photo)
+          && typeof slide.presentationPlan?.scene?.subject === 'string'
+          && slide.presentationPlan.scene.subject.trim();
+        if (!plannedPhoto) slide.imageQuery = '';
       }
       if (slide.speakerNotes.length > 6000) throw Object.assign(new Error('As notas ultrapassaram o limite desta apresentação.'), { code: 'presentation_notes_too_long', field: 'speakerNotes', slideIndex: index });
     }
@@ -1734,6 +1742,7 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
     kitColors: Array.isArray(planning.kitColors) ? planning.kitColors : [], kitReferenceWithoutText: planning.kitReferenceWithoutText === true,
     // Teste 6, item 1: cores extraídas da imagem de referência do kit.
     referenceColors: Array.isArray(planning.referenceColors) ? planning.referenceColors : [],
+    ...(config.freeDesign === true ? { referenceVisualAnalysis: planning.referenceVisualAnalysis } : {}),
     aiOptions: textOptions, onStage, onPlan,
   }, callAI);
   let writingDiagnostics = [];

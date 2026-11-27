@@ -29,7 +29,15 @@ describe.each(builders)('novo planejamento com decisões visíveis: %s', (_name,
   it('pede materiais relevantes sem transformar toda cena em retrato humano', () => {
     const prompt = build();
     expect(prompt).toMatch(/wardrobe:[^\n]*material[^\n]*quando relevante/i);
-    expect(prompt).toMatch(/subject:[^\n]*objetos[^\n]*pessoas só quando/i);
+    if (_name === 'apresentação Livre') {
+      // A experiência pode ser o próprio assunto visual. A regra nova não
+      // restringe fotografia a mera ilustração, nem impõe pessoas a outros temas.
+      expect(prompt).toMatch(/briefing[^\n]*experiência[^\n]*pessoas[^\n]*comportamento[^\n]*gestos[^\n]*interações/i);
+      expect(prompt).toMatch(/subject:[^\n]*dados, arquitetura ou produto[^\n]*não acrescente pessoas por padrão/i);
+      expect(prompt).toMatch(/"no people"[^\n]*só por restrição explícita ou necessidade da cena/i);
+    } else {
+      expect(prompt).toMatch(/subject:[^\n]*objetos[^\n]*pessoas só quando/i);
+    }
     expect(prompt).toMatch(/campos sem aplicação[^\n]*""/i);
   });
 

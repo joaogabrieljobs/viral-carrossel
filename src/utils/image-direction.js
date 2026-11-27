@@ -18,6 +18,7 @@ import { presentationSceneQuery } from './presentation-plan.js';
 import { composeVisualDirectionBlock, resolveSlideVisualDirection, resolveSocialFreeVisualDirection } from './visual-direction.js';
 import { composeCompositionBlock } from './image-composition.js';
 import { composeSocialFreeComposition, isSocialFreeSlide, socialFreeImageSlide } from './social-free-prompt.js';
+import { normalizeReferenceVisualAnalysis } from './reference-visual-analysis.js';
 
 const SLIDE_DIRECTION_MAX = 1200;
 
@@ -176,6 +177,7 @@ export function composeImageDirection({
   styleKit = null, slide = null, fmt = 'carrossel', visualBible = null, slideDirection,
   anchorPlan = null, baseReferenceCount, presentationPanel = false, presentationFamily,
   deckSlides = null, slideIndex = -1, socialFree = false, formatViews = null,
+  referenceVisualAnalysis = null,
 } = {}) {
   const apresentacao = fmt === 'apresentacao';
   const source = slide || {};
@@ -195,6 +197,7 @@ export function composeImageDirection({
   const livreSocial = !apresentacao && !exitedFreeHere && (socialFree === true || isSocialFreeSlide(card));
   const livreApresentacao = apresentacao && card.presentationPresetId === 'presentation_free';
   const directed = livreSocial || livreApresentacao;
+  const referenceAnalysis = livreApresentacao ? normalizeReferenceVisualAnalysis(referenceVisualAnalysis) : null;
   // Direção de arte (partes 1 a 3): direção visual do deck (roteiro, modo
   // livre e kit), cena como briefing e o espaço do texto no quadro.
   const visual = apresentacao ? resolveSlideVisualDirection({ slide: card, styleKit })
@@ -221,6 +224,8 @@ export function composeImageDirection({
     ...(directed ? { directedPrompt: {
       version: 2, kind: livreSocial ? 'social_free' : 'presentation_free',
       visual, scene: plannedScene ? { ...plannedScene } : null,
+      ...(referenceAnalysis ? { referenceDirection: referenceAnalysis.synthesis,
+        referenceRestrictions: referenceAnalysis.direction.restrictions } : {}),
       variation: directedSceneVariation(deckSlides, slideIndex, livreSocial),
       references, manualDirection: direcao,
     } } : {}),

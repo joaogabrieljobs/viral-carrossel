@@ -18,6 +18,8 @@ const PALETTE_ROLES = Object.freeze({
 });
 const REFERENCE_ROLES = new Set(['moodboard', 'subject', 'identity']);
 const LOOK_POLICY = 'Use moodboard images only for the look (medium, palette, light, contrast, texture), never for people, objects, framing or composition.';
+const ANALYZED_LOOK_POLICY = 'Moodboards supply visual language, not the identity of the depicted person or an exact scene to copy. Explicit written direction overrides their medium and look; otherwise preserve medium, detail and photo/graphics hierarchy. The current scene and COMPOSITION govern the new image.';
+const BACKGROUND_LOOK_POLICY = 'For this abstract background, moodboards supply only transferable surface finish and graphic language. Do not reproduce their photographed people or objects. Follow the derived background direction and COMPOSITION.';
 const RULES = 'HARD RULES: No lettering, captions, logos or watermarks. Keep text, charts and interfaces in editable layers; do not fabricate screenshots, testimonials or before-and-after evidence. Depict only the requested subjects, with coherent anatomy and materials. Deliver only the image.';
 const MAP_TAIL = 'Use each named reference only for its assigned role. The scene direction below refers to these labels.';
 const VARIATION_HEADER = 'OTHER SLIDES (avoid repeating their action, setting or shot; keep shared identity):';
@@ -58,14 +60,15 @@ function styleSegments(value, manual) {
     .filter(hasText);
 }
 
-function visualBlock(visual) {
+function visualBlock(visual, referenceDirection = '') {
   const palette = (Array.isArray(visual.palette) ? visual.palette : [])
     .filter(item => hasText(item?.hex))
     .map(item => `${PALETTE_ROLES[item.role] || text(item.role) || 'colour'} ${text(item.hex)}`);
   const lines = [
+    referenceDirection ? `Reference-derived visual direction: ${referenceDirection}` : '',
     palette.length ? `Palette: ${palette.join('; ')}.` : '',
-    hasText(visual.finish) ? `Finish: ${text(visual.finish)}` : '',
-    hasText(visual.atmosphere) ? `Atmosphere: ${text(visual.atmosphere)}` : '',
+    !referenceDirection && hasText(visual.finish) ? `Finish: ${text(visual.finish)}` : '',
+    !referenceDirection && hasText(visual.atmosphere) ? `Atmosphere: ${text(visual.atmosphere)}` : '',
   ].filter(Boolean);
   return lines.length ? `VISUAL DIRECTION:\n${lines.join('\n')}` : '';
 }
@@ -84,7 +87,8 @@ function referenceBlock(parts, contract, count) {
   if (!count) return '';
   const references = (Array.isArray(contract.references) ? contract.references : []).slice(0, count);
   const policies = [];
-  if (parts.styleMoodboard === true || references.some(ref => ref?.role === 'moodboard')) policies.push(LOOK_POLICY);
+  if (parts.styleMoodboard === true || references.some(ref => ref?.role === 'moodboard')) policies.push(hasText(contract.referenceDirection)
+    ? contract.assetRole === 'background' ? BACKGROUND_LOOK_POLICY : ANALYZED_LOOK_POLICY : LOOK_POLICY);
   if (references.some(ref => ref?.role === 'subject')) policies.push('Subject references govern only their assigned subject.');
   if (references.some(ref => ref?.role === 'identity') && !hasText(parts.identityAnchor)) policies.push('Identity references govern identity only.');
   const roles = references.map((ref, index) => REFERENCE_ROLES.has(ref?.role)
@@ -124,11 +128,12 @@ export function buildDirectedImagePrompt(parts = {}, { limit = 4000 } = {}) {
     && normalizedQuery(parts.sceneBrief.query) === normalizedQuery(parts.scene);
   const scene = matchesScene && contract.scene && typeof contract.scene === 'object' ? contract.scene : null;
   const manual = text(contract.manualDirection);
+  const referenceDirection = text(contract.referenceDirection);
   const count = Math.max(0, Number(parts.referenceCount) || 0);
   const sections = [];
   const add = (key, value) => { if (hasText(value)) sections.push({ key, text: text(value) }); };
 
-  add('visualDirection', visualBlock(visual));
+  add('visualDirection', visualBlock(visual, referenceDirection));
   if (scene) {
     const subject = [text(scene.subject), hasText(scene.wardrobe) ? `Wardrobe: ${text(scene.wardrobe)}` : '', hasText(scene.setting) ? `Setting: ${text(scene.setting)}` : ''].filter(Boolean).join('. ');
     const action = [text(scene.action), hasText(scene.expression) ? `Expression: ${text(scene.expression)}` : ''].filter(Boolean).join('; ');
@@ -143,11 +148,11 @@ export function buildDirectedImagePrompt(parts = {}, { limit = 4000 } = {}) {
   if (hasText(parts.composition)) add('compositionPriority', 'COMPOSITION governs subject placement and clear areas, ahead of SHOT.');
   else add('framing', parts.framing);
   add('sceneLight', hasText(scene?.light) ? `LIGHT: ${text(scene.light)}` : '');
-  const graphics = effectiveGraphics(visual, scene);
+  const graphics = effectiveGraphics(referenceDirection ? { ...visual, graphics: '' } : visual, scene);
   add('graphics', graphics ? `GRAPHICS: ${graphics}` : '');
   add('subjects', compactKnownSubjectsHeader(parts.subjects));
   if (count) add('identityAnchor', parts.identityAnchor);
-  add('manualDirection', manual ? `MANUAL DIRECTION (explicit user instruction):\n${manual}` : '');
+  add('manualDirection', manual ? `${referenceDirection ? 'MANUAL DIRECTION (explicit user instruction; overrides the shared visual direction)' : 'MANUAL DIRECTION (explicit user instruction)'}:\n${manual}` : '');
   add('slideAction', withoutDuplicateManual(parts.slideAction, manual));
   add('referenceRoles', referenceBlock(parts, contract, count));
   if (count) add('referenceMap', withoutDuplicateManual(parts.referenceMap, manual, { map: true }));
@@ -159,7 +164,11 @@ export function buildDirectedImagePrompt(parts = {}, { limit = 4000 } = {}) {
   const requiredRows = ordered.slice(0, 2);
   const extraRows = ordered.slice(2);
   add('variation', requiredRows.length ? `${VARIATION_HEADER}\n${requiredRows.map(row => row.text).join('\n')}` : '');
-  add('avoid', avoidBlock(visual.avoid, parts.avoid));
+  const referenceRestrictions = referenceDirection && Array.isArray(contract.referenceRestrictions)
+    ? contract.referenceRestrictions : null;
+  add('avoid', referenceRestrictions
+    ? avoidBlock('', [...referenceRestrictions, ...(Array.isArray(parts.avoid) ? parts.avoid : [parts.avoid])])
+    : avoidBlock(visual.avoid, parts.avoid));
   const aspect = text(parts.outputAspectRatio);
   add('output', /^\d+(?:\.\d+)?:\d+(?:\.\d+)?$/.test(aspect)
     ? `OUTPUT: ${aspect}${hasText(parts.composition) ? '; final card and crop follow COMPOSITION' : ''}.` : '');
