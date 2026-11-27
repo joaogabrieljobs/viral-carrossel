@@ -61,7 +61,11 @@ export function applyVisualPresetToCard(doc, index, preset, presets) {
     if (exitFree) {
       const shown = doc.slides.map(item => slideForFormatDisplay(item, doc.fmt, doc.formatViews, doc.creativePreset));
       shown[index] = { ...slide, visualPresetId: preset.id };
-      patch = restyleSocialSlides(shown, { preset, brand, formato: doc.fmt, overrides: patch, narrative: doc.quickNarrativeMode || 'editorial' })[index];
+      // O card desenha a marca do projeto com os tokens visuais do estilo por
+      // cima (selo, barra e cabeçalho continuam os do projeto). A composição
+      // reserva espaço para essa mesma assinatura, não para a do estilo.
+      const drawn = { ...brandForFormatDisplay(doc.brand, doc.fmt, doc.formatViews, doc.creativePreset), ...sanitizeCustomVisualPresetBrand(brand) };
+      patch = restyleSocialSlides(shown, { preset, brand: drawn, formato: doc.fmt, overrides: patch, narrative: doc.quickNarrativeMode || 'editorial' })[index];
     }
   }
   // Keep the author's content and photos, including auxiliary copy and CTAs.
