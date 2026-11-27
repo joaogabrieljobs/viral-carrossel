@@ -162,3 +162,13 @@ Se os dados essenciais não couberem no limite da rota, a montagem devolve um di
 ### Prova exigida
 
 Testes devem falhar antes da correção e depois passar. Além das unidades do contrato, o assistente executa a geração completa com IA simulada e verifica o corpo HTTP real: luz, exclusões, diversidade, ficha, anexo, geometria e orçamento. As baterias obrigatórias e os catálogos legados continuam exigidos. A comparação estética com o PDF depende de geração real autorizada; integridade do prompt não comprova, por si só, qualidade visual equivalente.
+
+## Adendo — Apoteose 8: ler o anexo antes de escrever a direção
+
+O Teste 8 e os novos exemplos enviados pelo João mostraram que conservar o texto do pedido não basta quando o próprio roteiro inventa uma direção que não observou. A paleta já era medida, mas o planejador não via o flyer. No caso salvo, ele pediu acabamento sem grão e cenas abstratas ou sem pessoas; uma foto planejada também se perdeu numa validação posterior.
+
+Em nova geração de apresentação Livre com referência, uma leitura multimodal passa a anteceder o roteiro. O contrato separa evidência visual, interpretação, relação com o briefing, invariantes, variáveis, restrições e síntese operacional. A fotografia recebe essa síntese mais a cena e a composição da página. O fundo separado recebe uma derivação específica de superfície e grafismos; o montador não copia para ele a síntese fotográfica nem as observações de personagens. Instruções escritas explícitas prevalecem, inclusive quando mudam o meio ou o acabamento observado.
+
+Essa etapa acrescenta uma chamada de visão com `glm-4.6v`, sujeita à cota de texto existente, e reutiliza o resultado válido enquanto briefing e referências corresponderem. Atualiza, portanto, a decisão anterior de montar a direção sem chamada extra. **GPT Image 2 permanece como gerador das imagens.** Regenerar uma foto de um projeto com análise válida reutiliza o registro salvo. Nenhuma geração paga integra a bateria de testes.
+
+A leitura não é ativada nos carrosséis nem nos estilos fixos por este adendo. Abrir documentos antigos não altera suas páginas ou suas imagens. O diagnóstico, os limites e os resultados da validação estão em [Apoteose 8: referência visual](../engineering/apoteose8-referencia-visual.md).

@@ -106,3 +106,15 @@ Os testes unitários da Frente A foram executados em 26/11: 449 arquivos, 9.353 
 O teste de geração completa deve abrir o assistente, receber respostas cruas de roteiro e redação da fixture do Teste 7, percorrer o caminho real de montagem, gerar fotos e arte com respostas locais e simular uma falha de foto. Deve conferir o documento final local e remoto, o DOM e as capturas das dez páginas; reabrir o projeto sem alterações; e recuperar a foto pela ação do aviso. Nenhum slide final previamente composto deve ser injetado. A inspeção visual deve confirmar o índigo da identidade, os rótulos editoriais, os sete pares legíveis, a ausência de `CENA`, a arte visível e o slide de falha sem um painel vazio.
 
 **Situação desta revisão:** a geração completa passou nos três cenários do Teste 7 e nos fluxos de persistência legados e V2. A bateria geral terminou com 361 aprovados e 24 ignorados por configuração; a bateria V2, com os cinco arquivos obrigatórios mais o Teste 7, passou nos 60 cenários. As verificações estáticas e o build passaram. As 31 capturas de antes, depois e recuperação foram abertas no tamanho nativo de 1920 × 1080; fotos e arte são ativos de teste. A comparação com o PDF-alvo registra diferenças de tipografia, escala e distribuição que ainda permanecem. Não houve geração paga nem publicação em produção; enviar para a main continua dependendo da aprovação explícita do João.
+
+## Adendo — Apoteose 8: escala, conteúdo e intenção fotográfica
+
+A variedade do deck deve respeitar a função e a escala da foto planejada. Uma imagem protagonista não vira detalhe para cumprir variedade. A heurística de texto longo só reduz a foto quando a leitura realmente não cabe na geometria, considerando a fonte do projeto.
+
+No Livre, um bloco nativo pode compartilhar a página com uma foto explicitamente planejada e uma cena válida. Isso exige preservação da consulta de imagem durante a validação editorial e uma geometria compatível. O Modular passa a acomodar ícones e foto em áreas separadas. Sem foto planejada, sem cena ou em estilo fixo, vale a supressão anterior.
+
+A tabela de sete pares compartilha suas métricas com o renderer. Quando necessário, a composição aumenta sua reserva dentro da área segura, sem reduzir a fonte de 28px, apagar pares ou encobrir o título. O bloqueio de exportação continua ativo para um conteúdo que realmente não caiba. O apoio pode crescer até 40px quando o espaço medido permitir; esse crescimento acontece na composição explícita do Livre e não recompõe documentos ao abrir.
+
+A nova leitura visual solicitada para a referência está descrita no [adendo de direção de arte](direcao-de-arte-imagens.md#adendo--apoteose-8-ler-o-anexo-antes-de-escrever-a-direção). Ela acrescenta uma chamada de visão para a apresentação Livre com anexo e mantém GPT Image 2 para gerar imagens. O registro acompanha o plano salvo e o rascunho recuperado, sujeito à correspondência do kit.
+
+O teste de geração completa do Teste 8 e as evidências do diagnóstico estão em [Apoteose 8: referência visual](../engineering/apoteose8-referencia-visual.md).
