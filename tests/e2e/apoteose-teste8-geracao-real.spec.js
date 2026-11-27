@@ -473,3 +473,72 @@ test('Teste 8: cancelar após primeiro lote, abrir rascunho e reabrir conserva a
   }
   expect.soft(runtimeErrors).toEqual([]);
 });
+
+// Vídeo do João (27/11): arrastar a foto da capa empurrava a moldura inteira
+// e abria faixa vazia. O arrasto reenquadra a imagem; a moldura fica no lugar.
+test('Teste 8: arrastar a foto da capa reenquadra a imagem sem mover a moldura (' + (V2 ? 'V2' : 'legado') + ')', async ({ page }, testInfo) => {
+  test.setTimeout(180_000);
+  const { routes } = socialFreeCloud({ brand, session, useV2: V2 });
+  let art = '';
+  await page.context().route('**/*', route => {
+    const url = new URL(route.request().url());
+    return ['localhost', '127.0.0.1'].includes(url.hostname) || !/^https?:$/.test(url.protocol)
+      ? route.continue() : route.abort('blockedbyclient');
+  });
+  await mockApi(page, { session, extra: {
+    ...routes,
+    '/api/ai/compatible': route => {
+      const body = route.request().postDataJSON();
+      const content = body.payload.messages.find(message => message.role === 'user')?.content;
+      const prompt = Array.isArray(content) ? content.filter(part => part.type === 'text').map(part => part.text).join('\n') : String(content || '');
+      if (body.purpose === 'reference_visual_analysis') return route.fulfill({ json: completion(referenceVisualAnalysisReply()) });
+      const value = prompt.startsWith('PLANEJAMENTO ESTRUTURADO') ? structuredClone(teste8Plan)
+        : /^(REVISÃO|REPARO)/.test(prompt) ? { edits: [] }
+          : { slides: presentationBatch(prompt, structuredClone(teste8Draft)), caption: teste8Plan.signature };
+      return route.fulfill({ json: completion(value) });
+    },
+    '/api/ai/sjinn-image': route => {
+      const body = route.request().postDataJSON();
+      const isArt = body.usageContext?.cardId === 'deck-art';
+      return route.fulfill({ json: { b64_json: isArt ? art : photo, mime: isArt ? 'image/png' : 'image/webp' } });
+    },
+  } });
+  await mockOutfitFont(page);
+  await openTeste8Account(page);
+  art = (await localSocialAssets(page)).art;
+  const wizard = await startTeste8Generation(page);
+  await expect(wizard).toHaveCount(0, { timeout: 70_000 });
+  await expect(page.getByRole('region', { name: 'Geração em andamento' })).toHaveCount(0);
+  await expect.poll(async () => (await readEntry(page))?.doc?.slides?.length).toBe(10);
+  const card = page.locator('main [data-vc-card-surface]').first();
+  const zone = card.locator('[data-vc-photo-zone]');
+  await expect(zone).toHaveCount(1);
+  await zone.scrollIntoViewIfNeeded();
+  const before = await zone.evaluate(node => {
+    const box = node.getBoundingClientRect();
+    const img = [...node.querySelectorAll('div')].find(el => getComputedStyle(el).backgroundImage.startsWith('url('));
+    return { x: box.x, y: box.y, w: box.width, h: box.height, transform: getComputedStyle(node).transform, pos: img && getComputedStyle(img).backgroundPosition };
+  });
+  const box = await zone.boundingBox();
+  const start = { x: box.x + box.width * 0.5, y: box.y + box.height * 0.35 };
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  for (let step = 1; step <= 8; step += 1) await page.mouse.move(start.x - step * 12, start.y);
+  await page.mouse.up();
+  await expect.poll(() => zone.evaluate(node => {
+    const img = [...node.querySelectorAll('div')].find(el => getComputedStyle(el).backgroundImage.startsWith('url('));
+    return img && getComputedStyle(img).backgroundPosition;
+  })).not.toBe(before.pos);
+  const after = await zone.evaluate(node => {
+    const box = node.getBoundingClientRect();
+    const img = [...node.querySelectorAll('div')].find(el => getComputedStyle(el).backgroundImage.startsWith('url('));
+    return { x: box.x, y: box.y, w: box.width, h: box.height, transform: getComputedStyle(node).transform, pos: img && getComputedStyle(img).backgroundPosition };
+  });
+  const shot = await card.screenshot();
+  await testInfo.attach('foto-arrastada', { body: shot, contentType: 'image/png' });
+  if (process.env.QA_FOTO_ARRASTO_DIR) fs.writeFileSync(path.join(process.env.QA_FOTO_ARRASTO_DIR, 'capa-depois-do-arrasto.png'), shot);
+  expect(after.transform).toBe(before.transform);
+  expect(Math.abs(after.x - before.x)).toBeLessThan(1);
+  expect(Math.abs(after.w - before.w)).toBeLessThan(1);
+  expect(after.pos).not.toBe(before.pos);
+});

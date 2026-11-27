@@ -928,9 +928,9 @@ const ClassicCanvasInner = React.forwardRef(({
   const nativeEvidence = showSupportingText && normalizePresentationBlocks(slide.presentationBlocks).length > 0;
   const photoZoneInteractive = !!(onPhotoZoneClick && (showCanvasChrome || pendingPhotoZone || photoFailed));
   const photoZoneNativeHit = !!(photoZoneInteractive && onPhotoZoneFileChange);
-  const photoOffset = getElementOffset(slide, 'photo');
+  // A moldura da foto não se desloca (o arrasto reenquadra a imagem).
   const placeholderRect = photoPlaceholderRect(
-    { ...pr, x: pr.x + photoOffset.x, y: pr.y + photoOffset.y },
+    pr,
     [[tr, 'title', slide.title], [sr, 'subtitle', slide.subtitle || supportingText || nativeEvidence]]
       .filter(([, , content]) => !!content)
       .map(([rect, key]) => {
@@ -1014,8 +1014,8 @@ const ClassicCanvasInner = React.forwardRef(({
         {placeholderRect && (showCanvasChrome || pendingPhotoZone || photoFailed) && (!slide.bgImage || imgErr) && !imgLoading && !generateImageBusy && !forExport && (
           <div data-vc-photo-placeholder="1" style={{
             position:'absolute',
-            left:`${(placeholderRect.x - pr.x - photoOffset.x) / pr.w * 100}%`,
-            top:`${(placeholderRect.y - pr.y - photoOffset.y) / pr.h * 100}%`,
+            left:`${(placeholderRect.x - pr.x) / pr.w * 100}%`,
+            top:`${(placeholderRect.y - pr.y) / pr.h * 100}%`,
             width:`${placeholderRect.w / pr.w * 100}%`, height:`${placeholderRect.h / pr.h * 100}%`,
             display:'flex', alignItems:'center', justifyContent:'center',
             background:'rgba(0,0,0,0.45)',
@@ -2134,6 +2134,27 @@ const SlideCardInner = React.forwardRef(({
     if (!drag) return { onClick, 'data-vc-movable': chave, style: estiloBase };
     return { ...drag, onClick, 'data-vc-movable': chave, style: { ...estiloBase, ...drag.style } };
   }, [bindDrag, onElementSelect]);
+  /**
+   * Canvas clássico (apresentação): arrastar a foto reenquadra a imagem dentro
+   * da moldura (o deslocamento entra no background-position) e não empurra a
+   * moldura. Empurrar levava junto a máscara escura e abria faixa vazia na
+   * borda (vídeo do João, 27/11, capa da Apoteose).
+   */
+  const movPhotoReframe = React.useCallback((chave, estiloBase) => {
+    if (chave !== 'photo') return mov(chave, estiloBase);
+    const hidden = Array.isArray(slide.hiddenElements) && slide.hiddenElements.includes(chave);
+    const props = movArrasto(chave, estiloBase);
+    const style = { ...(props.style || {}) };
+    if (hidden) Object.assign(style, { display: 'none', pointerEvents: 'none' });
+    if (selectedElement === chave) {
+      style.outline = '2px solid var(--accent)';
+      style.outlineOffset = 4;
+    }
+    return { ...props, 'data-vc-selected': selectedElement === chave ? 'true' : undefined, style };
+  }, [mov, movArrasto, slide, selectedElement]);
+  const movOffsetOnlyPhotoFixed = React.useCallback((chave, estiloBase) => (
+    chave === 'photo' ? (estiloBase ? { style: estiloBase } : null) : movOffsetOnly(chave, estiloBase)
+  ), [movOffsetOnly]);
   const elementsUnlocked = slide.elementsUnlocked === true;
   /** Cultura/sanduíche nasce como composição automática. Depois de desbloquear,
    *  cada parte recebe o próprio arrasto sem mudar a geometria do layout. */
@@ -3510,7 +3531,7 @@ const SlideCardInner = React.forwardRef(({
         swapSlideIdx={enableZoneSwapDrag && showCanvasChrome ? slideIdx : null}
         swapZoneKeys={undefined}
         interactionScale={scale}
-        mov={showCanvasChrome ? movOffsetOnly : mov}
+        mov={showCanvasChrome ? movOffsetOnlyPhotoFixed : movPhotoReframe}
         onInlineTextChange={commitInlineText}
         presentationMode={presentationMode}
         showSupportingText={presentationMode || slide.canvas?.source === 'social-preset'}
