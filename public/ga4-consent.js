@@ -61,15 +61,18 @@
       ad_user_data: 'denied',
       ad_personalization: 'denied',
     });
+    // A tag do Google envia um page_view por conta própria, antes de ler o
+    // `config`. O `set` precisa vir antes do `js` para esse envio (e todos os
+    // eventos) levar o endereço limpo; por isso também não há page_view manual.
+    var enderecos = { page_location: urlLimpa(window.location.href) };
+    enderecos.page_referrer = document.referrer ? urlLimpa(document.referrer) : '';
+    gtag('set', enderecos);
     gtag('js', new Date());
-    var config = { send_page_view: false, page_location: urlLimpa(window.location.href) };
-    if (document.referrer) config.page_referrer = urlLimpa(document.referrer);
-    gtag('config', id, config);
+    gtag('config', id, { send_page_view: false });
     var script = document.createElement('script');
     script.async = true;
     script.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(id);
     document.head.appendChild(script);
-    gtag('event', 'page_view', { page_location: config.page_location, page_title: document.title });
   }
 
   // Só o nome: propriedades nunca saem daqui.
