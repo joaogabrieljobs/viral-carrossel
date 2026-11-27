@@ -9,6 +9,7 @@ import CardThumbnail from './src/components/card/CardThumbnail.jsx';
 import { cloudSyncFailureMessage, freePlanSaveFeedback, isModuleLoadError } from './src/utils/cloud-sync-feedback.js';
 import { CanvasNavigator, MobileScrollRail, useCanvasZoom } from './src/components/CanvasNavigator.jsx';
 import { ProjectContextBanner } from './src/components/ProjectContextBanner.jsx';
+import { HistoryButtons } from './src/components/ui/HistoryButtons.jsx';
 import { startAIJob, runAIJob, cancelAllAIGeneration, getAIGenerationCount, throwIfGenerationCancelled, isGenerationCancelled } from './src/utils/generation-control.js';
 import { buildRemixBlock, mergeRemixedSlides, validateRemixCardCount } from './src/utils/carousel-remix.js';
 import { GenerationStatus } from './src/components/GenerationStatus.jsx';
@@ -4430,70 +4431,14 @@ export default function App() {
      linhas do topo não têm folga a 360 px). Vários avisos mandam "usar
      Desfazer" e no telefone não existe atalho de teclado. */
   const mobileHistoryGroup = (
-    <div style={{ display:'flex', alignItems:'center', gap:2, flexShrink:0 }}>
-      {[
-        { label:'Desfazer', run: history.undo, enabled: history.canUndo, path: <><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7L3 9"/></> },
-        { label:'Refazer', run: history.redo, enabled: history.canRedo, path: <><path d="M21 7v6h-6"/><path d="M21 13a9 9 0 1 1-3-7l3 3"/></> },
-      ].map(({ label, run, enabled, path }) => (
-        <button
-          key={label}
-          type="button"
-          onClick={() => run()}
-          disabled={!enabled}
-          title={label}
-          aria-label={label}
-          style={{
-            width: 40, height: 40, borderRadius: 9999, border: '1px solid var(--border)', background: 'var(--bg-card)',
-            color: 'var(--text-muted)', cursor: enabled ? 'pointer' : 'not-allowed',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-            opacity: enabled ? 1 : 0.35,
-          }}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{path}</svg>
-        </button>
-      ))}
-    </div>
+    <HistoryButtons onUndo={history.undo} onRedo={history.redo} canUndo={history.canUndo} canRedo={history.canRedo} />
   );
 
   /* Histórico (desfazer/refazer) + formato de exportação. No desktop largo
      vive à direita; abaixo de 1200px desce para a 2ª linha do header. */
   const historyFormatGroup = (
     <>
-        <div style={{
-          display: 'flex', alignItems: 'center', background: 'var(--bg-card)',
-          borderRadius: 9999, padding: 3, gap: 0, border: '1px solid var(--border)', flexShrink: 0,
-        }}>
-          <button
-            type="button"
-            onClick={history.undo}
-            disabled={!history.canUndo}
-            title="Desfazer (⌘Z)"
-            aria-label="Desfazer"
-            style={{
-              width: 32, height: 30, borderRadius: 9999, border: 'none', background: 'transparent',
-              color: 'var(--text-muted)', cursor: history.canUndo ? 'pointer' : 'not-allowed',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              opacity: history.canUndo ? 1 : 0.35,
-            }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7L3 9"/></svg>
-          </button>
-          <button
-            type="button"
-            onClick={history.redo}
-            disabled={!history.canRedo}
-            title="Refazer (⌘⇧Z)"
-            aria-label="Refazer"
-            style={{
-              width: 32, height: 30, borderRadius: 9999, border: 'none', background: 'transparent',
-              color: 'var(--text-muted)', cursor: history.canRedo ? 'pointer' : 'not-allowed',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              opacity: history.canRedo ? 1 : 0.35,
-            }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7v6h-6"/><path d="M21 13a9 9 0 1 1-3-7l3 3"/></svg>
-          </button>
-        </div>
+        <HistoryButtons onUndo={history.undo} onRedo={history.redo} canUndo={history.canUndo} canRedo={history.canRedo} />
         <EditorFormatSelector fmt={fmt} setFmt={setFmt} layout="desktop" />
     </>
   );
@@ -8924,8 +8869,6 @@ Retorne APENAS JSON: ${refineAllWantsBody
       {!(isMobile && drawerOpen) && <ProjectContextBanner
         styleKit={styleKit}
         projectName={activeEntry?.name}
-        onUndo={history.undo}
-        canUndo={history.canUndo}
         compact={isMobile}
       />}
 
