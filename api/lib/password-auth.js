@@ -190,7 +190,7 @@ export async function setAuthRecord(email, record) {
     let customerId = record.customerId;
     if (!customerId) {
       const created = await stripe.customers.create({
-        email: clean, metadata: { product: 'viral-carrossel' },
+        email: clean, preferred_locales: ['pt-BR'], metadata: { product: 'viral-carrossel' },
       });
       customerId = created.id;
     }
@@ -215,6 +215,8 @@ export async function setAuthRecord(email, record) {
   if (!customer || customer.deleted) {
     customer = await stripe.customers.create({
       email: clean,
+      // Idioma dos e-mails da Stripe (recibo, fatura, cobrança falha).
+      preferred_locales: ['pt-BR'],
       metadata: {
         product: 'viral-carrossel',
         vc_pw_salt: record.salt,

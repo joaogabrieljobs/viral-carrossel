@@ -1,8 +1,10 @@
+import { erroDoServidor } from './auth-error-message.js';
+
 async function post(path, body) {
   const response = await fetch(path, { method: 'POST', credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw Object.assign(new Error(data.error || 'Não foi possível concluir. Tente novamente.'), { code: data.code });
+  if (!response.ok) throw erroDoServidor(data.error || 'Não foi possível concluir. Tente novamente.', { code: data.code });
   return data;
 }
 

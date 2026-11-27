@@ -6,6 +6,7 @@ import GoogleSignInButton from './GoogleSignInButton.jsx';
 import { loginWithPassword, registerWithPassword } from '../lib/billing.js';
 import { dismissOnboardingLanding } from '../utils/landing-gate.js';
 import { useModalDialog } from '../hooks/useModalDialog.js';
+import { mensagemErroAuth } from '../lib/auth-error-message.js';
 
 /**
  * Login / criar conta — e-mail+senha + Google opcional.
@@ -90,7 +91,7 @@ export default function LoginModal({
       }
       setError('Resposta inesperada do servidor.');
     } catch (err) {
-      setError(err?.message || 'Não foi possível autenticar.');
+      setError(mensagemErroAuth(err, 'Não foi possível autenticar. Tente novamente.'));
     } finally {
       setLoading(false);
     }

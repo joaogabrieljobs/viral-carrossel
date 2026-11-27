@@ -118,6 +118,8 @@ export default async function handler(req, res) {
         // Google convergirem no mesmo customer.
         customer = await stripe.customers.create({
           email: profile.email,
+          // Idioma dos e-mails da Stripe (recibo, fatura, cobrança falha).
+          preferred_locales: ['pt-BR'],
           metadata: { product: 'viral-carrossel' },
         }, {
           idempotencyKey: `moont-google-signup-${crypto.createHash('sha256').update(String(profile.sub), 'utf8').digest('hex')}`,

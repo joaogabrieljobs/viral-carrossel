@@ -274,7 +274,7 @@ describe('GET /api/auth/google/callback (RF-05)', () => {
     expect(res.redirectUrl).not.toContain('email=');
     expect(cookieValue(res, 'vc_login_hint')).toBe('semplano@teste.exemplo');
     expect(stripeMock.customers.create).toHaveBeenCalledWith(
-      { email: 'semplano@teste.exemplo', metadata: { product: 'viral-carrossel' } },
+      { email: 'semplano@teste.exemplo', preferred_locales: ['pt-BR'], metadata: { product: 'viral-carrossel' } },
       expect.objectContaining({ idempotencyKey: expect.stringMatching(/^moont-google-signup-[a-f0-9]{64}$/) }),
     );
     expect(created.metadata.vc_google_sub).toBe('google-sub-owner');

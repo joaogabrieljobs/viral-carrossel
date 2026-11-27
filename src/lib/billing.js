@@ -2,6 +2,7 @@
  * Client helpers — assinatura Stripe / acesso ao studio.
  */
 import { trackEvent } from '../utils/telemetry.js';
+import { erroDoServidor } from './auth-error-message.js';
 
 const PENDING_CHECKOUT_KEY = 'vc_pending_checkout';
 export const ACCESS_SESSION_TIMEOUT_MS = 10_000;
@@ -194,7 +195,7 @@ export async function loginWithPassword(email, password) {
     body: JSON.stringify({ email, password }),
   });
   const data = await r.json().catch(() => ({}));
-  if (!r.ok && !data.needCheckout) throw new Error(data.error || 'Não foi possível entrar');
+  if (!r.ok && !data.needCheckout) throw erroDoServidor(data.error || 'Não foi possível entrar');
   return data;
 }
 
@@ -206,7 +207,7 @@ export async function registerWithPassword(email, password) {
     body: JSON.stringify({ email, password }),
   });
   const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.error || 'Não foi possível criar a conta');
+  if (!r.ok) throw erroDoServidor(data.error || 'Não foi possível criar a conta');
   trackEvent('sign_up');
   return data;
 }

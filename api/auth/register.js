@@ -99,6 +99,8 @@ export default async function handler(req, res) {
     // A senha é ligada no passo seguinte com CAS/idempotência própria.
     const customer = await stripe.customers.create({
       email: cleanEmail,
+      // Idioma dos e-mails da Stripe (recibo, fatura, cobrança falha).
+      preferred_locales: ['pt-BR'],
       metadata: { product: 'viral-carrossel' },
     }, { idempotencyKey: registrationIdempotencyKey(cleanEmail, 'customer') });
     const identity = dbIdentity

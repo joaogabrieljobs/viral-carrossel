@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { emailContaExistente, emailRecuperacaoSenha, emailSenhaAlterada } from './email-layout.js';
 import { getStripe } from './stripe.js';
 import { getPasswordRecoveryRecord, hashPassword, normalizeEmail } from './password-auth.js';
 import {
@@ -65,11 +66,11 @@ export function passwordResetUrl(token) {
   return url.href;
 }
 
-async function sendMail({ to, subject, text, idempotencyKey, allowDuplicate = false }) {
+async function sendMail({ to, subject, html, text, idempotencyKey, allowDuplicate = false }) {
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST', signal: AbortSignal.timeout(10_000),
     headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
-    body: JSON.stringify({ from: process.env.AUTH_EMAIL_FROM, to: [to], subject, text }),
+    body: JSON.stringify({ from: process.env.AUTH_EMAIL_FROM, to: [to], subject, html, text }),
   });
   // Pedidos repetidos para o mesmo e-mail/janela não disparam novas mensagens.
   if (allowDuplicate && response.status === 409) return 'duplicate';
@@ -82,8 +83,8 @@ export async function sendPasswordReset(email) {
   if (!record) return 'no_account';
   const token = createPasswordResetToken(record);
   return sendMail({
-    to: record.email, subject: 'Redefina sua senha — Moont',
-    text: `Recebemos um pedido para redefinir sua senha na Moont.\n\nAbra o link abaixo para criar uma nova senha. Ele vale por 30 minutos e só pode ser usado uma vez:\n\n${passwordResetUrl(token)}\n\nSe você não fez este pedido, ignore este e-mail. Sua senha continua a mesma.`,
+    to: record.email,
+    ...emailRecuperacaoSenha({ link: passwordResetUrl(token), minutos: RESET_TTL_MS / 60_000 }),
     idempotencyKey: `reset-mail-${digest(record.email)}-${Math.floor(Date.now() / MAIL_WINDOW_MS)}`,
     allowDuplicate: true,
   });
@@ -98,8 +99,8 @@ export async function sendExistingAccountNotice(email) {
   const to = normalizeEmail(email);
   const app = new URL('/?app=1', process.env.APP_URL || 'https://moont.ai').href;
   return sendMail({
-    to, subject: 'Você já tem conta na Moont',
-    text: `Recebemos um pedido para criar uma conta na Moont com este e-mail, mas ele já tem uma conta.\n\nPara entrar, abra ${app} e use sua senha ou o Google. Se não lembra a senha, toque em "Esqueci minha senha" na tela de entrada.\n\nSe você não fez este pedido, ignore este e-mail. Nada mudou na sua conta.`,
+    to,
+    ...emailContaExistente({ linkEntrar: app }),
     idempotencyKey: `account-exists-mail-${digest(to)}-${Math.floor(Date.now() / MAIL_WINDOW_MS)}`,
     allowDuplicate: true,
   });
@@ -160,8 +161,9 @@ export async function resetPassword(token, password) {
 }
 
 export function sendPasswordChanged({ email, notificationKey }) {
-  return sendMail({ to: email, subject: 'Sua senha foi alterada — Moont',
-    text: `Sua senha da Moont foi alterada. As sessões anteriores foram encerradas.\n\nSe não foi você, solicite uma nova recuperação de senha em ${new URL('/redefinir-senha', process.env.APP_URL || 'https://moont.ai').href}.`,
+  return sendMail({
+    to: email,
+    ...emailSenhaAlterada({ linkRecuperacao: new URL('/redefinir-senha', process.env.APP_URL || 'https://moont.ai').href }),
     idempotencyKey: notificationKey,
   });
 }

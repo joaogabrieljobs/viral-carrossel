@@ -27,6 +27,7 @@ import { getStripe, findActiveSubscription, isSubscriptionActive } from './lib/s
 import { resolveTierFromSubscription, periodBoundsFromSubscription, getStripePriceIdForTier } from './lib/plans.js';
 import { PLAN_TIERS, PLAN_ORDER } from '../shared/plans.js';
 import { createAdminStore, adminFail, cleanText, ADMIN_TIERS, CHALLENGE_TTL_MS } from './lib/admin-store.js';
+import { emailCodigoAdmin } from './lib/email-layout.js';
 
 export const config = { maxDuration: 30 };
 
@@ -133,14 +134,11 @@ async function defaultSendCode({ to, code, intent }) {
   if (!process.env.RESEND_API_KEY?.trim() || !process.env.AUTH_EMAIL_FROM?.trim()) {
     throw adminFail('admin_email_unavailable', 'Envio de e-mail não configurado. Nenhuma ação foi feita.', 503);
   }
-  const what = intent === 'grant' ? 'conceder uma isenção' : 'revogar uma isenção';
+  const mail = emailCodigoAdmin({ codigo: code, intent, minutos: CHALLENGE_TTL_MS / 60_000 });
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST', signal: AbortSignal.timeout(10_000),
     headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: process.env.AUTH_EMAIL_FROM, to: [to], subject: `Código do console admin: ${code}`,
-      text: `Seu código para ${what} no console admin da Moont é ${code}.\n\nEle vale por ${CHALLENGE_TTL_MS / 60_000} minutos e só serve para essa ação.\n\nSe não foi você, ignore este e-mail e avise o time.`,
-    }),
+    body: JSON.stringify({ from: process.env.AUTH_EMAIL_FROM, to: [to], ...mail }),
   });
   if (!response.ok) throw adminFail('admin_email_failed', 'Não foi possível enviar o código. Nenhuma ação foi feita.', 503);
 }

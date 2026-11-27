@@ -3,6 +3,7 @@ import { GLOBAL_STYLE } from './styles/global-style.js';
 import PasswordField from './components/PasswordField.jsx';
 import LoginModal from './components/LoginModal.jsx';
 import { requestPasswordReset, submitPasswordReset } from './lib/password-recovery.js';
+import { mensagemErroAuth } from './lib/auth-error-message.js';
 
 // Consumido antes de montar React: StrictMode não deve apagar o token do segundo render.
 const incomingToken = new URLSearchParams(window.location.hash.slice(1)).get('token') || '';
@@ -33,7 +34,7 @@ export default function PasswordRecoveryPage() {
         setNotice(response.message);
       }
     } catch (e) {
-      setError(e.message);
+      setError(mensagemErroAuth(e, 'Não foi possível concluir. Tente novamente.'));
       setInvalid(e.code === 'invalid_reset_link');
     } finally { setLoading(false); }
   }

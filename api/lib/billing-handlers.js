@@ -277,6 +277,8 @@ export async function handleCheckout(req, res) {
       }
       customer = await stripe.customers.create({
         email: cleanEmail,
+        // Idioma dos e-mails da Stripe (recibo, fatura, cobrança falha).
+        preferred_locales: ['pt-BR'],
         metadata: { product: 'viral-carrossel' },
       }, {
         // Duas lambdas podem observar a mesma lista vazia. O Stripe resolve a
