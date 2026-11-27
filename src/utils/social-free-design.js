@@ -289,6 +289,10 @@ function resolvedChrome(raw, fit, F, inks, slide, deck) {
   const textZones = [fit.title, fit.subtitle, fit.evidence, eyebrow && { ...eyebrow, h: 28 * 1.3 / F.h * 100 }].filter(Boolean);
   const colors = { ink: inks.ink, body: inks.ink, muted: inks.muted, accent: inks.accent, accent2: deck.palette.accent2, bg: inks.bg, ground: inks.bg, surface: inks.bg, rule: inks.muted };
   const chrome = freeNeutralChrome(raw || []).flatMap(d => {
+    // Grade das famílias de apresentação vai de cima a baixo. No social ela
+    // fica só nas margens, como a grade dos estilos fixos: nunca atrás do
+    // título, da tabela, do cabeçalho ou do selo.
+    if (d.t === 'grid') return [{ ...d, color: colors[d.color] || inks.muted, bands: [[0, Math.max(1.5, F.t - 3)], [100 - Math.max(1.5, F.b - 3), 100]] }];
     if (d.t === 'text' && /kicker|eyebrow|subtitle|title/.test(d.text || '')) return [];
     const size = Math.max(28, Number(d.size) || 28);
     const h = d.t === 'text' ? size * 1.3 / F.h * 100 : d.h || (d.d ? d.d * F.w / F.h : 0);
