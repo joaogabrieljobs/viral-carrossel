@@ -93,6 +93,11 @@ for (const caso of casos) {
     const alvo = { x: tb2.x + tb2.width / 2, y: Math.max(tb2.y, cb2.y) + 6 };
     const tocado = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[data-vc-movable]')?.getAttribute('data-vc-movable'), alvo);
     expect(tocado, 'o segundo toque cai no mesmo texto').toBe('subtitle');
+    // No CI o toque chegava menos de 0,3 s depois do gesto anterior e o Chrome
+    // segurava o clique como possível toque duplo: pointerdown, pointerup e
+    // touchend vinham, o click não (registro do PR de diagnóstico #10, 28/11).
+    // Uma pessoa não toca tão rápido; esperar a janela do toque duplo.
+    await page.waitForTimeout(500);
     await page.touchscreen.tap(alvo.x, alvo.y);
     await expect(page.getByText('Tipografia do card')).toBeVisible();
     await context.close();
