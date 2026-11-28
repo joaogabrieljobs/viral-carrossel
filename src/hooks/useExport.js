@@ -310,6 +310,22 @@ export function overflowExportMessage(numbers = [], { itemLabel = 'slide' } = {}
   return `${where}: o texto passa da área segura e seria cortado no arquivo. Abra ${numbers.length === 1 ? 'o slide' : 'cada slide'} e reduza o texto na aba Texto, ou aumente a caixa arrastando a borda.`;
 }
 
+/**
+ * Roda as conferências de qualidade sem deixar nenhuma barrar o download
+ * (pedido do João, 28/11). Devolve as mensagens achadas; erro que não é da
+ * conferência (fonte, imagem, captura) continua subindo.
+ */
+export function collectExportQualityWarnings(...checks) {
+  const avisos = [];
+  for (const check of checks) {
+    try { check(); } catch (error) {
+      if (error?.code !== 'export_quality') throw error;
+      avisos.push(error.message);
+    }
+  }
+  return avisos;
+}
+
 /** Legacy decks keep their existing export behavior. The new planning pipeline
  * opts into measured quality gates; native evidence blocks always opt in. */
 export function assertPresentationExportQuality(scope) {
@@ -359,11 +375,16 @@ export function useExport({
         || root?.closest?.('[data-vc-card-surface]')?.getAttribute?.('data-vc-card-surface') === slide.id)]).length
         ? slides.indexOf(slide) + 1 : null))
       .filter(Boolean);
-    resolveOverflowExport({
-      numbers: overflowSlides, hasOverflow: overflowSlides.length > 0 || presentationOverflowAtFloor(roots).length > 0,
-      itemLabel, ask: (message) => window.confirm(message),
-    });
-    if (isPresentation) assertPresentationExportQuality(scope);
+    // João (28/11): a conferência acusava defeito onde não havia e recusava o
+    // download. Ela segue rodando, mas só registra; o arquivo sai sempre.
+    const avisos = collectExportQualityWarnings(
+      () => resolveOverflowExport({
+        numbers: overflowSlides, hasOverflow: overflowSlides.length > 0 || presentationOverflowAtFloor(roots).length > 0,
+        itemLabel,
+      }),
+      () => { if (isPresentation) assertPresentationExportQuality(scope); },
+    );
+    if (avisos.length) console.warn('[exportar] conferência (não bloqueia):', avisos);
   };
 
   const beginExport = () => {

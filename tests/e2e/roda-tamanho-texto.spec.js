@@ -87,7 +87,13 @@ for (const caso of casos) {
     // Segundo toque no mesmo texto abre o painel para editar.
     const paragrafo = card.getByText('A Apoteose pretende', { exact: false }).first();
     const tb2 = await paragrafo.boundingBox();
-    await page.touchscreen.tap(tb2.x + tb2.width / 2, tb2.y + tb2.height / 2);
+    // Toque na primeira linha: com a letra maior, o meio do parágrafo pode cair
+    // sobre o texto de baixo ("Uma festa…"), que é outro elemento (CI, 28/11).
+    const cb2 = await card.boundingBox();
+    const alvo = { x: tb2.x + tb2.width / 2, y: Math.max(tb2.y, cb2.y) + 6 };
+    const tocado = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[data-vc-movable]')?.getAttribute('data-vc-movable'), alvo);
+    expect(tocado, 'o segundo toque cai no mesmo texto').toBe('subtitle');
+    await page.touchscreen.tap(alvo.x, alvo.y);
     await expect(page.getByText('Tipografia do card')).toBeVisible();
     await context.close();
   });
