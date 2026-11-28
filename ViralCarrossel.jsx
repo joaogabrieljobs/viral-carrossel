@@ -6,6 +6,8 @@ import { joinSlideCaptions } from './src/utils/import-text.js';
 import { applyVisualPresetToCard, clearOwnVisualsBeforePresetOnAll, editCardVisualBrand, preserveVisualPresetContent } from './src/utils/visual-scope.js';
 import { ProjectSaveStatus } from './src/components/ProjectSaveStatus.jsx';
 import CardThumbnail from './src/components/card/CardThumbnail.jsx';
+import FontSizeWheel from './src/components/card/FontSizeWheel.jsx';
+import { textSizeTarget } from './src/utils/text-size-wheel.js';
 import { cloudSyncFailureMessage, freePlanSaveFeedback, isModuleLoadError } from './src/utils/cloud-sync-feedback.js';
 import { CanvasNavigator, MobileScrollRail, useCanvasZoom } from './src/components/CanvasNavigator.jsx';
 import { ProjectContextBanner } from './src/components/ProjectContextBanner.jsx';
@@ -4602,6 +4604,16 @@ export default function App() {
       };
     });
   }, [history, activeIdx]);
+
+  // Roda de tamanho da letra no celular (João, 28/11): com uma caixa de texto
+  // selecionada, girar muda o tamanho e o card fica à vista.
+  // Sem seleção ou sem card no índice (logo depois de desfazer um card novo), não há roda.
+  const mobileTextWheel = isMobile && !canvasEditMode && selectedCardElement?.key && slides[activeIdx]
+    && selectedCardElement.slideId === slides[activeIdx].id
+    ? textSizeTarget(panelSlide, selectedCardElement.key)
+    : null;
+  const setMobileTextSize = (value) => { if (mobileTextWheel) updateSlide(mobileTextWheel.patch(value)); };
+  const closeMobileTextWheel = () => setSelectedCardElement(null);
 
   const updateSlideAt = useCallback((idx, patch) => {
     history.set((d) => reconcileFreeImageDocument(d, applyFormatEdit(d, idx, patch)));
@@ -9456,10 +9468,26 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     onOverlayEditEnd={finishTextAreaEdit}
                     // No celular, tocar na foto só seleciona: o painel aberto encolhia o
                     // card e não dava para mover, redimensionar nem recortar com o dedo.
-                    onElementSelect={(key) => openCardElement(slide.id, key, { navigate: !(isMobile && key === 'photo') })}
+                    // Texto: o primeiro toque seleciona e mostra a roda de tamanho;
+                    // tocar de novo no mesmo texto abre o painel para editar.
+                    onElementSelect={(key) => {
+                      const again = selectedCardElement?.slideId === slide.id && selectedCardElement.key === key;
+                      const wheel = !!textSizeTarget(panelSlide, key);
+                      openCardElement(slide.id, key, { navigate: !(isMobile && (key === 'photo' || (wheel && !again))) });
+                    }}
                     selectedElement={selectedCardElement?.slideId === slide.id ? selectedCardElement.key : null}
                     onPhotoFrameChange={patchPhotoFrameAt}
                   />
+                  {mobileTextWheel && mobileArrowsBeside ? (
+                    <FontSizeWheel
+                      {...mobileTextWheel}
+                      orientation="vertical"
+                      length={Math.round(Math.min(280, Math.max(200, f.h * previewScale / 2 - 30)))}
+                      onChange={setMobileTextSize}
+                      onClose={closeMobileTextWheel}
+                      style={{ position:'absolute', left:-(MOBILE_ARROW_SIZE + 6), top:`calc(50% + ${MOBILE_ARROW_SIZE / 2 + 10}px)` }}
+                    />
+                  ) : null}
                   {showPreviewAlignGrid ? (
                     <div
                       aria-hidden
@@ -9527,6 +9555,19 @@ Retorne APENAS JSON: ${refineAllWantsBody
                 {/* Ações rápidas do card atual — pill flutuante com tela cheia,
                     baixar, grade. Acima dos dots pra ficar visível mesmo quando
                     o drawer está aberto (área do card é metade superior). */}
+                {/* Sem margem ao lado do card, a roda fica deitada numa linha
+                    própria; a barra de ações continua visível embaixo. */}
+                {mobileTextWheel && !mobileArrowsBeside ? (
+                  <div style={{ display:'flex', justifyContent:'center', marginTop:8 }}>
+                    <FontSizeWheel
+                      {...mobileTextWheel}
+                      orientation="horizontal"
+                      length={Math.round(Math.min(320, vw - 2 * MOBILE_BOARD_SIDE - 16))}
+                      onChange={setMobileTextSize}
+                      onClose={closeMobileTextWheel}
+                    />
+                  </div>
+                ) : null}
                 <div style={{ display:'flex', justifyContent:'center', alignItems:'center', gap:8, marginTop:8 }}>
                   {!mobileArrowsBeside && (activeIdx > 0 ? renderMobileSlideArrow('prev') : <span aria-hidden style={{ width:MOBILE_ARROW_SIZE, flexShrink:0 }}/>)}
                   <div style={{

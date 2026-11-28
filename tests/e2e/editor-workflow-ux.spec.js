@@ -77,6 +77,8 @@ test('mobile identifica projeto, tem Ajustes, exporta conjunto e rola por uma al
   expect(await page.getByRole('menuitem').first().innerText()).toContain('Todos os 6 cards');
   await expect(page.getByRole('menuitem', { name:'Copiar legenda', exact:true })).toBeVisible();
   await page.keyboard.press('Escape');
+  // 28/11: primeiro toque mostra a roda de tamanho; o segundo abre o painel.
+  await page.locator('main [data-vc-card-surface="ux-0"] [data-vc-movable="title"]').click();
   await page.locator('main [data-vc-card-surface="ux-0"] [data-vc-movable="title"]').click();
   await expect(page.getByRole('tab', { name:'Ajustes', exact:true })).toHaveAttribute('aria-selected', 'true');
   // Focus lands on the editable title, not on the actions above it.

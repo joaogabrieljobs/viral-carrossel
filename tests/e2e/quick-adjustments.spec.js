@@ -176,6 +176,8 @@ test('mobile mostra Início e Ajustes; tocar texto abre edição e preserva quan
   await countInput.press('Enter');
   await expect.poll(async () => (await savedDoc(page)).quickCardCount).toBe(13);
   await page.getByRole('button', { name: 'Fechar editor', exact: true }).click();
+  // 28/11: primeiro toque mostra a roda de tamanho; o segundo abre o painel.
+  await page.locator('main [data-vc-card-surface="quick-1"] [data-vc-movable="title"]').click();
   await page.locator('main [data-vc-card-surface="quick-1"] [data-vc-movable="title"]').click();
   await expect(page.getByRole('tab', { name: 'Ajustes', exact: true })).toHaveAttribute('aria-selected', 'true');
   const title = page.getByLabel('Título deste card', { exact: true });
@@ -184,6 +186,7 @@ test('mobile mostra Início e Ajustes; tocar texto abre edição e preserva quan
   await title.fill('Uma ideia clara no celular');
   await expect.poll(async () => (await savedDoc(page)).slides[0].title).toBe('Uma ideia clara no celular');
   await page.getByRole('button', { name: 'Fechar editor', exact: true }).click();
+  await page.locator('main [data-vc-card-surface="quick-1"] [data-vc-movable="subtitle"]').click();
   await page.locator('main [data-vc-card-surface="quick-1"] [data-vc-movable="subtitle"]').click();
   const support = page.getByLabel('Texto de apoio deste card', { exact: true });
   await expect(support).toBeFocused();

@@ -69,7 +69,12 @@ test.describe('Navegação no celular', () => {
 
   test('painel de texto aberto mostra a miniatura do card, que acompanha a edição', async ({ page }) => {
     await abrir(page);
-    await page.locator('main [data-vc-card-surface="nav-1"] [data-vc-movable="title"]').click();
+    // 28/11: o primeiro toque seleciona e mostra a roda de tamanho; o segundo
+    // toque no mesmo texto abre o painel.
+    const tituloNav = page.locator('main [data-vc-card-surface="nav-1"] [data-vc-movable="title"]');
+    await tituloNav.click();
+    await expect(page.locator('[data-vc-font-wheel]')).toBeVisible();
+    await tituloNav.click();
     const mini = page.locator('[data-vc-drawer-preview-card]');
     await expect(mini).toBeVisible();
     const box = await caixa(mini);
