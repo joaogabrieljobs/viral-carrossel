@@ -11,6 +11,7 @@ import { accentInkOnSurface } from '../utils/brand-visuals.js';
 import { wcagContrast } from '../utils/wcag.js';
 import { PRESENTATION_ICON_NAMES } from '../utils/presentation-icons.js';
 import { COMPARISON_PAIRS_TYPE } from '../utils/comparison-pairs-layout.js';
+import { useTouchTapToEdit } from './useTouchTapToEdit.js';
 
 /** Bloco de ícones (fase 3): a lista fechada de 26 nomes, desenhados como SVG inline. */
 const ICON_COMPONENTS = Object.freeze({
@@ -25,6 +26,7 @@ function EditableCell({ as: Tag = 'span', value, label, onCommit, style = {}, at
   const [invalid, setInvalid] = useState(false);
   const ref = useRef(null);
   useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
+  const tapToEdit = useTouchTapToEdit(ref, { enabled: !!onCommit, editing, setEditing });
   const commit = () => {
     const text = readTypedText(ref.current).trim();
     if (text !== value && onCommit?.(text) === false) {
@@ -43,9 +45,10 @@ function EditableCell({ as: Tag = 'span', value, label, onCommit, style = {}, at
     tabIndex={onCommit ? 0 : undefined}
     aria-label={onCommit ? `Editar ${label}` : undefined}
     aria-invalid={invalid || undefined}
-    title={invalid ? 'O texto excedeu o limite do quadro. Divida a informação em outro slide e tente novamente.' : onCommit ? 'Duplo clique ou Enter para editar; clique fora para salvar' : undefined}
+    title={invalid ? 'O texto excedeu o limite do quadro. Divida a informação em outro slide e tente novamente.' : onCommit ? 'Duplo clique (no celular, um toque) ou Enter para editar; clique fora para salvar' : undefined}
     onDoubleClick={onCommit ? (event) => { event.stopPropagation(); setEditing(true); } : undefined}
-    onPointerDown={editing ? (event) => event.stopPropagation() : undefined}
+    onPointerDown={tapToEdit.onPointerDown}
+    onClick={tapToEdit.onClick}
     onBlur={editing ? commit : undefined}
     onPaste={editing ? (event) => {
       event.preventDefault();

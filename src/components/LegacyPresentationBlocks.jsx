@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { normalizePresentationBlocks } from '../utils/presentation-quality.js';
+import { useTouchTapToEdit } from './useTouchTapToEdit.js';
 
 function EditableCell({ as: Tag = 'span', value, label, onCommit, style = {} }) {
   const [editing, setEditing] = useState(false);
   const [invalid, setInvalid] = useState(false);
   const ref = useRef(null);
   useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
+  const tapToEdit = useTouchTapToEdit(ref, { enabled: !!onCommit, editing, setEditing });
   const commit = () => {
     const text = String(ref.current?.innerText ?? ref.current?.textContent ?? '').trim();
     if (text !== value && onCommit?.(text) === false) {
@@ -23,9 +25,10 @@ function EditableCell({ as: Tag = 'span', value, label, onCommit, style = {} }) 
     tabIndex={onCommit ? 0 : undefined}
     aria-label={onCommit ? `Editar ${label}` : undefined}
     aria-invalid={invalid || undefined}
-    title={invalid ? 'O texto excedeu o limite do quadro. Divida a informação em outro slide e tente novamente.' : onCommit ? 'Duplo clique ou Enter para editar; clique fora para salvar' : undefined}
+    title={invalid ? 'O texto excedeu o limite do quadro. Divida a informação em outro slide e tente novamente.' : onCommit ? 'Duplo clique (no celular, um toque) ou Enter para editar; clique fora para salvar' : undefined}
     onDoubleClick={onCommit ? (event) => { event.stopPropagation(); setEditing(true); } : undefined}
-    onPointerDown={editing ? (event) => event.stopPropagation() : undefined}
+    onPointerDown={tapToEdit.onPointerDown}
+    onClick={tapToEdit.onClick}
     onBlur={editing ? commit : undefined}
     onPaste={editing ? (event) => {
       event.preventDefault();
