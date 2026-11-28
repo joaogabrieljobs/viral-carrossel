@@ -4640,6 +4640,29 @@ export default function App() {
     });
   }, [history, displaySlides]);
 
+  /**
+   * Moldura e recorte da foto direto no card (PhotoFrameEditor). `{ zone }`
+   * grava a zona da foto na proporção aberta, mesmo sem a composição ligada;
+   * o resto (bgX, bgY, bgZoom, bgFit) é o recorte. Cada gesto vira um passo
+   * de desfazer (o histórico junta os movimentos próximos).
+   */
+  const patchPhotoFrameAt = useCallback((idx, patch) => {
+    if (!patch || typeof patch !== 'object') return;
+    history.set((d) => {
+      const sl = d.slides?.[idx];
+      if (!sl) return d;
+      const { zone, ...rest } = patch;
+      let next = d;
+      if (zone && typeof zone === 'object') {
+        const canvas = slideForFormatDisplay(sl, d.fmt, d.formatViews, d.creativePreset).canvas;
+        if (canvas?.zones) {
+          next = applyFormatEdit(next, idx, { canvas: { ...canvas, zones: { ...canvas.zones, photo: clampRect(zone) }, userEdited: true } });
+        }
+      }
+      return Object.keys(rest).length ? applyFormatEdit(next, idx, rest) : next;
+    });
+  }, [history]);
+
   const patchCanvasZonesAt = useCallback((idx, zonePatch) => {
     history.set((d) => {
       const sl = d.slides?.[idx];
@@ -9410,8 +9433,11 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     onCreateText={(position) => createTextAreaAt(activeIdx, position)}
                     autoEditOverlayId={editingTextArea?.slideId === slide.id ? editingTextArea.overlayId : null}
                     onOverlayEditEnd={finishTextAreaEdit}
-                    onElementSelect={(key) => openCardElement(slide.id, key, { navigate: true })}
+                    // No celular, tocar na foto só seleciona: o painel aberto encolhia o
+                    // card e não dava para mover, redimensionar nem recortar com o dedo.
+                    onElementSelect={(key) => openCardElement(slide.id, key, { navigate: !(isMobile && key === 'photo') })}
                     selectedElement={selectedCardElement?.slideId === slide.id ? selectedCardElement.key : null}
+                    onPhotoFrameChange={patchPhotoFrameAt}
                   />
                   {showPreviewAlignGrid ? (
                     <div
@@ -9732,8 +9758,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
                         onCreateText={(position) => createTextAreaAt(i, position)}
                         autoEditOverlayId={editingTextArea?.slideId === s.id ? editingTextArea.overlayId : null}
                         onOverlayEditEnd={finishTextAreaEdit}
-                        onElementSelect={(key) => openCardElement(s.id, key, { navigate: true })}
+                        onElementSelect={(key) => openCardElement(s.id, key, { navigate: !(isMobile && key === 'photo') })}
                         selectedElement={selectedCardElement?.slideId === s.id ? selectedCardElement.key : null}
+                        onPhotoFrameChange={patchPhotoFrameAt}
                       />
                       {showPreviewAlignGrid ? (
                         <div

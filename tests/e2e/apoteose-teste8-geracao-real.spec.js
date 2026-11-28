@@ -476,7 +476,9 @@ test('Teste 8: cancelar após primeiro lote, abrir rascunho e reabrir conserva a
 
 // Vídeo do João (27/11): arrastar a foto da capa empurrava a moldura inteira
 // e abria faixa vazia. O arrasto reenquadra a imagem; a moldura fica no lugar.
-test('Teste 8: arrastar a foto da capa reenquadra a imagem sem mover a moldura (' + (V2 ? 'V2' : 'legado') + ')', async ({ page }, testInfo) => {
+// 27/11: arrastar a foto selecionada move a moldura; o reenquadramento fica no
+// recorte (duplo clique), onde a moldura não se mexe.
+test('Teste 8: recortar a foto da capa (duplo clique) reenquadra a imagem sem mover a moldura (' + (V2 ? 'V2' : 'legado') + ')', async ({ page }, testInfo) => {
   test.setTimeout(180_000);
   const { routes } = socialFreeCloud({ brand, session, useV2: V2 });
   let art = '';
@@ -521,6 +523,14 @@ test('Teste 8: arrastar a foto da capa reenquadra a imagem sem mover a moldura (
   });
   const box = await zone.boundingBox();
   const start = { x: box.x + box.width * 0.5, y: box.y + box.height * 0.35 };
+  await page.mouse.click(start.x, start.y);
+  const editor = card.locator('[data-vc-photo-frame-editor]');
+  await expect(editor).toHaveAttribute('data-vc-photo-frame-editor', 'frame');
+  await page.mouse.dblclick(start.x, start.y);
+  await expect(editor).toHaveAttribute('data-vc-photo-frame-editor', 'crop');
+  // Zoom antes do arrasto: a capa em tela cheia não tem sobra lateral sem ele.
+  await editor.getByRole('button', { name: 'Aumentar o zoom da foto' }).click();
+  await editor.getByRole('button', { name: 'Aumentar o zoom da foto' }).click();
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   for (let step = 1; step <= 8; step += 1) await page.mouse.move(start.x - step * 12, start.y);

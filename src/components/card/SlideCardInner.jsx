@@ -6,6 +6,7 @@ import { Layout, Minus, Plus, Video, User } from 'lucide-react';
 import { getVideoUrl } from '../../utils/video-store.js';
 import AutoFitText from '../AutoFitText.jsx';
 import PresentationBlocks from '../PresentationBlocks.jsx';
+import PhotoFrameEditor from './PhotoFrameEditor.jsx';
 import PresentationArtChrome from './PresentationArtChrome.jsx';
 import SocialArtChrome from './SocialArtChrome.jsx';
 import { readableInk, socialScrimAlphas } from '../../utils/social-chrome.js';
@@ -844,6 +845,8 @@ const ClassicCanvasInner = React.forwardRef(({
    *  esta ligado — aí quem posiciona e o overlay de zonas. */
   mov = null,
   fallbackLogo = '',
+  /** Foto selecionada e editável: `{ onPatch, scale }` liga moldura e recorte. */
+  photoFrameEditor = null,
 }, ref) => {
   void imgModeNorm;
   const logoFallback = fallbackLogo && fallbackLogo !== brand?.logo ? fallbackLogo : '';
@@ -953,6 +956,7 @@ const ClassicCanvasInner = React.forwardRef(({
       ? { borderRadius: Math.min(64, Number(slide.presentationPhotoRadius)) * f.w / (f.h > f.w ? 1080 : 1920) } : {}),
     ...vcPresentationEvidenceGlassStyle(slide, f),
   };
+  const photoMovProps = movOu('photo', photoZoneBoxStyle);
   const photoZoneChildren = (
     <>
         {slide.bgImage && imgReady && !imgErr && (
@@ -1045,10 +1049,12 @@ const ClassicCanvasInner = React.forwardRef(({
         paletteOverrides={slidePaletteOverrides(slide, slide.presentationChrome?.family || slide.presentationDesignFamily, brand)} />
       <SocialArtChrome slide={slide} brand={brand} frame={f} titleFont={titleFF} bodyFont={bodyFF} index={num - 1} total={total} titleInsetPx={padTitleXp} />
       {!slide.presentationSuppressPhoto && <div
-        {...movOu('photo', photoZoneBoxStyle)}
+        {...photoMovProps}
         data-vc-photo-zone="1"
         data-vc-presentation-glass={evidenceGlassActive ? 'evidence' : undefined}
-        onClick={photoZoneInteractive && !photoZoneNativeHit ? (e) => { e.stopPropagation(); onPhotoZoneClick(); } : undefined}
+        // Importar tem prioridade; sem ele, o clique seleciona a foto (antes o
+        // `onClick` daqui apagava o da seleção, que vinha do `mov`).
+        onClick={photoZoneInteractive && !photoZoneNativeHit ? (e) => { e.stopPropagation(); onPhotoZoneClick(); } : photoMovProps?.onClick}
         role={photoZoneInteractive && !photoZoneNativeHit ? 'button' : undefined}
       >
         {photoZoneChildren}
@@ -1064,6 +1070,14 @@ const ClassicCanvasInner = React.forwardRef(({
           />
         ) : null}
       </div>}
+      {photoFrameEditor && !slide.presentationSuppressPhoto && slide.bgImage ? <PhotoFrameEditor
+        rect={pr}
+        frame={f}
+        slide={slide}
+        imageSrc={slide.bgImage}
+        onPatch={photoFrameEditor.onPatch}
+        interactionScale={photoFrameEditor.scale}
+      /> : null}
 
       <OverflowScaler
         containerProps={{ ...movOu('title'), 'data-vc-zone': 'title', 'data-vc-quality-zone': showSupportingText ? 'title' : undefined }}
@@ -1985,6 +1999,8 @@ const SlideCardInner = React.forwardRef(({
   onTextBlockWidthChange = null,
   /** Mostra o botão Expandir neste card (o card ativo do quadro). */
   showTextResize = false,
+  /** `(slideIdx, patch) => void` — moldura (`{ zone }`) ou recorte (bgX/bgY/bgZoom) da foto. */
+  onPhotoFrameChange = null,
 }, ref) => {
   // Textos de preset trazem tokens ({handle}, {marca}, {ano}) em vez de nomes
   // de marca de terceiros. Resolve UMA vez aqui — assim o card acompanha o
@@ -2145,10 +2161,15 @@ const SlideCardInner = React.forwardRef(({
    * moldura. Empurrar levava junto a máscara escura e abria faixa vazia na
    * borda (vídeo do João, 27/11, capa da Apoteose).
    */
+  const photoFrameEnabled = !!(onPhotoFrameChange && movableElements && !forExport);
   const movPhotoReframe = React.useCallback((chave, estiloBase) => {
     if (chave !== 'photo') return mov(chave, estiloBase);
     const hidden = Array.isArray(slide.hiddenElements) && slide.hiddenElements.includes(chave);
-    const props = movArrasto(chave, estiloBase);
+    // Com a edição da moldura ligada, tocar seleciona; mover, redimensionar e
+    // recortar acontecem na moldura que aparece por cima (PhotoFrameEditor).
+    const props = photoFrameEnabled
+      ? { onClick: (event) => { event.stopPropagation(); onElementSelect?.(chave); }, 'data-vc-movable': chave, style: estiloBase }
+      : movArrasto(chave, estiloBase);
     const style = { ...(props.style || {}) };
     if (hidden) Object.assign(style, { display: 'none', pointerEvents: 'none' });
     if (selectedElement === chave) {
@@ -2156,7 +2177,13 @@ const SlideCardInner = React.forwardRef(({
       style.outlineOffset = 4;
     }
     return { ...props, 'data-vc-selected': selectedElement === chave ? 'true' : undefined, style };
-  }, [mov, movArrasto, slide, selectedElement]);
+  }, [mov, movArrasto, slide, selectedElement, photoFrameEnabled, onElementSelect]);
+  const photoFrameRef = React.useRef(onPhotoFrameChange);
+  photoFrameRef.current = onPhotoFrameChange;
+  const photoFramePatch = React.useCallback((patch) => photoFrameRef.current?.(slideIdx, patch), [slideIdx]);
+  const photoFrameEditor = React.useMemo(() => (
+    photoFrameEnabled && selectedElement === 'photo' ? { onPatch: photoFramePatch, scale } : null
+  ), [photoFrameEnabled, selectedElement, photoFramePatch, scale]);
   const movOffsetOnlyPhotoFixed = React.useCallback((chave, estiloBase) => (
     chave === 'photo' ? (estiloBase ? { style: estiloBase } : null) : movOffsetOnly(chave, estiloBase)
   ), [movOffsetOnly]);
@@ -3537,6 +3564,7 @@ const SlideCardInner = React.forwardRef(({
         swapZoneKeys={undefined}
         interactionScale={scale}
         mov={showCanvasChrome ? movOffsetOnlyPhotoFixed : movPhotoReframe}
+        photoFrameEditor={showCanvasChrome ? null : photoFrameEditor}
         onInlineTextChange={commitInlineText}
         presentationMode={presentationMode}
         showSupportingText={presentationMode || slide.canvas?.source === 'social-preset'}
