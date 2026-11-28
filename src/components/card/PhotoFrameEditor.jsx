@@ -55,8 +55,19 @@ export default function PhotoFrameEditor({ rect, frame, slide, imageSrc, onPatch
   }, [imageSrc]);
 
   const cardBox = () => rootRef.current?.parentElement?.getBoundingClientRect?.() || null;
+  // Tamanho real da imagem para medir a sobra. Se o carregamento assíncrono
+  // ainda não respondeu, a imagem já está no cache do card: ler na hora evita
+  // o primeiro arrasto sem efeito (sobra zero).
+  const knownImageSize = () => {
+    if (live.current.imageSize) return live.current.imageSize;
+    if (!imageSrc || typeof window === 'undefined' || !window.Image) return null;
+    const img = new window.Image();
+    img.src = imageSrc;
+    return img.complete && img.naturalWidth ? { w: img.naturalWidth, h: img.naturalHeight } : null;
+  };
   const frameGeometry = () => {
-    const { rect: r, imageSize: size } = live.current;
+    const { rect: r } = live.current;
+    const size = knownImageSize();
     return {
       frameW: (r.w / 100) * frame.w,
       frameH: (r.h / 100) * frame.h,
@@ -95,13 +106,27 @@ export default function PhotoFrameEditor({ rect, frame, slide, imageSrc, onPatch
     return () => el.removeEventListener('wheel', onWheel);
   }, [mode]);
 
+  const cancelFrameGesture = () => {
+    const g = gesture.current;
+    gesture.current = null;
+    if (g?.moved && (g.kind === 'move' || g.kind === 'resize')) live.current.onPatch?.({ zone: g.rect });
+  };
+
   // O deslize do carrossel e a pinça do zoom da tela escutam toque direto no
   // DOM (fora do React). Parar aqui, no próprio elemento, impede que mexer na
   // foto troque de card ou amplie a tela inteira.
   React.useEffect(() => {
     const el = rootRef.current;
     if (!el) return undefined;
-    const stop = (event) => event.stopPropagation();
+    const stop = (event) => {
+      // Fora do recorte, dois dedos são o zoom da tela: o gesto da moldura é
+      // desfeito e o toque segue para o zoom.
+      if (live.current.mode !== 'crop' && (event.touches?.length || 0) >= 2) {
+        cancelFrameGesture();
+        return;
+      }
+      event.stopPropagation();
+    };
     const kinds = ['touchstart', 'touchmove', 'touchend', 'touchcancel'];
     kinds.forEach((kind) => el.addEventListener(kind, stop, { passive: true }));
     return () => kinds.forEach((kind) => el.removeEventListener(kind, stop));
@@ -114,6 +139,7 @@ export default function PhotoFrameEditor({ rect, frame, slide, imageSrc, onPatch
     try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* sem captura */ }
     const box = cardBox();
     if (!box?.width) return;
+    if (pointers.current.size >= 2 && live.current.mode !== 'crop') { cancelFrameGesture(); return; }
     if (pointers.current.size === 2 && live.current.mode === 'crop') {
       const [a, b] = [...pointers.current.values()];
       gesture.current = { kind: 'pinch', distance: Math.hypot(a.x - b.x, a.y - b.y) || 1, state: photoCropState(live.current.slide), box };

@@ -1,5 +1,9 @@
 import { readFileSync } from 'node:fs';
-import { test, expect } from '@playwright/test';
+import { test, expect as baseExpect } from '@playwright/test';
+
+// O que o card grava chega ao armazenamento local com atraso (debounce); sob
+// carga da suíte inteira, 5 s não bastavam.
+const expect = baseExpect.configure({ timeout: 15_000 });
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 import { enterEditorFromHome } from './helpers/project-entry.js';
 

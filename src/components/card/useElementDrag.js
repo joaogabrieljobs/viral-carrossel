@@ -47,6 +47,41 @@ export function isolarToqueDoElemento(ev) {
   ev?.stopPropagation?.();
 }
 
+/**
+ * Pinça no celular (27/11): o primeiro dedo pousa num texto e começa a
+ * arrastá-lo; quando o segundo chega, o gesto é zoom da tela. Quem está
+ * arrastando se inscreve aqui e é cancelado — e volta à posição do início do
+ * gesto — assim que há dois dedos na tela. O zoom escuta toque no próprio DOM,
+ * então a escuta aqui também é no `window`, em captura.
+ */
+const aoSegundoDedo = new Set();
+/** Dedos na tela, pelos eventos de ponteiro (chegam antes do `touchstart`). */
+const dedos = new Set();
+let escutandoDedos = false;
+function cancelarArrastos() {
+  [...aoSegundoDedo].forEach((cancelar) => cancelar());
+}
+function escutarSegundoDedo() {
+  if (escutandoDedos || typeof window === 'undefined') return;
+  escutandoDedos = true;
+  window.addEventListener('pointerdown', (ev) => {
+    if (ev.pointerType !== 'touch') return;
+    dedos.add(ev.pointerId);
+    if (dedos.size >= 2) cancelarArrastos();
+  }, { capture: true, passive: true });
+  const solta = (ev) => { dedos.delete(ev.pointerId); };
+  window.addEventListener('pointerup', solta, { capture: true, passive: true });
+  window.addEventListener('pointercancel', solta, { capture: true, passive: true });
+  window.addEventListener('touchstart', (ev) => {
+    if ((ev.touches?.length || 0) >= 2) cancelarArrastos();
+  }, { capture: true, passive: true });
+  window.addEventListener('touchend', (ev) => {
+    if (!(ev.touches?.length)) dedos.clear();
+  }, { capture: true, passive: true });
+}
+/** Escuta desde o carregamento: o primeiro dedo também precisa ser contado. */
+if (typeof window !== 'undefined') escutarSegundoDedo();
+
 function resumoAcessivel(slide, chave) {
   const campo = chave === 'title'
     ? slide?.title
@@ -87,6 +122,7 @@ export function useElementDrag({ f, slide, onOffsetChange, enabled, interactionS
     const d = arrasto.current;
     arrasto.current = null;
     if (!d) return;
+    if (d.cancelar) aoSegundoDedo.delete(d.cancelar);
     ev?.stopPropagation?.();
     try { ev?.currentTarget?.releasePointerCapture?.(d.pointerId); } catch { /* ignore */ }
     // Passou do limiar: engole o clique que o browser dispara a seguir, senão
@@ -136,14 +172,27 @@ export function useElementDrag({ f, slide, onOffsetChange, enabled, interactionS
     return {
       onPointerDown: (ev) => {
         if (ev.button != null && ev.button !== 0) return;
+        // Segundo dedo de uma pinça: é zoom da tela, não arrasto.
+        if (ev.pointerType === 'touch' && dedos.size >= 2) return;
         ev.stopPropagation();
         const base = getElementOffset(slideRef.current, chave);
-        arrasto.current = {
+        const gesto = {
           chave, pointerId: ev.pointerId,
           startX: ev.clientX, startY: ev.clientY,
           baseX: base.x, baseY: base.y,
           totalX: 0, totalY: 0, moveu: false,
         };
+        if (ev.pointerType === 'touch') {
+          escutarSegundoDedo();
+          gesto.cancelar = () => {
+            aoSegundoDedo.delete(gesto.cancelar);
+            if (arrasto.current !== gesto) return;
+            arrasto.current = null;
+            if (gesto.moveu) onChangeRef.current?.(chave, { x: base.x, y: base.y });
+          };
+          aoSegundoDedo.add(gesto.cancelar);
+        }
+        arrasto.current = gesto;
         try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch { /* ignore */ }
       },
       onPointerMove: move,
