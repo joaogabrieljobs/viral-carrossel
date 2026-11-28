@@ -276,10 +276,49 @@ function vcFixHtml2CanvasTextClip(clonedDoc, clonedSlideRoot) {
   });
 }
 
+/**
+ * Texto movido no card sumia ou saía cortado no arquivo exportado no iPhone
+ * (João, 28/11, Apoteose 10). A caixa movida leva `transform: translate` e
+ * `overflow: hidden`; no Safari do iOS o html2canvas recorta a caixa no lugar
+ * original e desenha o texto no lugar deslocado. Na cópia que vira arquivo, o
+ * deslocamento puro (sem escala nem giro) vira left/top, que ele desenha certo.
+ */
+function vcFlattenTranslateTransforms(clonedDoc, clonedSlideRoot) {
+  const view = clonedDoc?.defaultView;
+  if (!clonedSlideRoot?.querySelectorAll || !view?.getComputedStyle) return;
+  const px = (value) => `${Math.round(value * 100) / 100}px`;
+  const num = (value) => (Number.isFinite(parseFloat(value)) ? parseFloat(value) : null);
+  for (const el of Array.from(clonedSlideRoot.querySelectorAll('*'))) {
+    const cs = view.getComputedStyle(el);
+    const m = String(cs?.transform || '').match(/^matrix\(\s*([^)]+)\)$/);
+    if (!m) continue;
+    const [a, b, c, d, tx, ty] = m[1].split(',').map((v) => Number(v.trim()));
+    if (![a, b, c, d, tx, ty].every(Number.isFinite)) continue;
+    if (Math.abs(a - 1) > 1e-6 || Math.abs(d - 1) > 1e-6 || Math.abs(b) > 1e-6 || Math.abs(c) > 1e-6) continue;
+    if (Math.abs(tx) < 0.01 && Math.abs(ty) < 0.01) continue;
+    if (cs.position === 'fixed' || cs.position === 'sticky') continue;
+    if (cs.position === 'absolute') {
+      if (num(cs.left) != null) el.style.left = px(num(cs.left) + tx);
+      else if (num(cs.right) != null) el.style.right = px(num(cs.right) - tx);
+      else continue;
+      if (num(cs.top) != null) el.style.top = px(num(cs.top) + ty);
+      else if (num(cs.bottom) != null) el.style.bottom = px(num(cs.bottom) - ty);
+      else continue;
+    } else {
+      if (cs.position !== 'relative') el.style.position = 'relative';
+      el.style.left = px((cs.position === 'relative' ? num(cs.left) || 0 : 0) + tx);
+      el.style.top = px((cs.position === 'relative' ? num(cs.top) || 0 : 0) + ty);
+    }
+    el.style.transform = 'none';
+  }
+}
+
 async function vcPrepareHtml2CanvasClone(clonedDoc, clonedSlideRoot) {
   await vcFixHtml2CanvasImages(clonedDoc, clonedSlideRoot);
   await vcFixHtml2CanvasBackgroundImages(clonedDoc, clonedSlideRoot);
   vcFixHtml2CanvasTextClip(clonedDoc, clonedSlideRoot);
+  // Por último: o ajuste do título acima zera `top` do h1 e leria o valor novo.
+  vcFlattenTranslateTransforms(clonedDoc, clonedSlideRoot);
 }
 
 /** Telemóveis / Safari: após awaits o gesto já não abre âncoras — Web Share API (ficheiro) costuma funcionar. */
@@ -423,6 +462,7 @@ export {
   vcFixHtml2CanvasImages,
   vcFixHtml2CanvasBackgroundImages,
   vcFixHtml2CanvasTextClip,
+  vcFlattenTranslateTransforms,
   vcPrepareHtml2CanvasClone,
   vcPreferFileShareForDownloads,
   saveFileTapLabels,
