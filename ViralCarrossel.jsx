@@ -588,6 +588,8 @@ import CloudPhotoProgress from './src/components/CloudPhotoProgress.jsx';
 // prontos no mesmo deploy. O fluxo anterior permanece intacto sem a flag.
 /* Quadro do celular: margens do card e reservas abaixo dele (ações do card e barra inferior fixa). */
 const MOBILE_BOARD_SIDE = 12;
+// Setas de passar card no celular (alvo de 44 px).
+const MOBILE_ARROW_SIZE = 44;
 const MOBILE_BOARD_TOP = 8;
 const MOBILE_CARD_ACTIONS = 56;
 const MOBILE_BOARD_BOTTOM = 84;
@@ -4323,6 +4325,25 @@ export default function App() {
     return thumbQaMode ? Math.min(base * 0.7, 0.28) : base;
   }, [isMobile, vw, f, fmt, thumbQaMode, mobileBoardHeight, shortLandscape]);
   const previewScale = previewBaseScale * canvasZoom;
+  // Setas do celular fora do card: ao lado dele quando sobra espaço (Stories),
+  // senão na linha de ações abaixo (João, 28/11: sobre a foto não apareciam).
+  const mobileArrowsBeside = (vw - f.w * previewScale) / 2 >= MOBILE_ARROW_SIZE + 10;
+  const renderMobileSlideArrow = (dir, position = {}) => (
+    <button
+      type="button"
+      onClick={() => setActiveIdx(dir === 'prev' ? activeIdx - 1 : activeIdx + 1)}
+      aria-label={dir === 'prev' ? 'Slide anterior' : 'Próximo slide'}
+      data-vc-slide-arrow={dir}
+      style={{
+        ...position,
+        width:MOBILE_ARROW_SIZE, height:MOBILE_ARROW_SIZE, borderRadius:'50%', flexShrink:0, zIndex:6,
+        background:'var(--bg-card)', border:'1px solid var(--border)',
+        color:'var(--text-primary)', cursor:'pointer',
+        display:'flex', alignItems:'center', justifyContent:'center',
+        boxShadow:'0 4px 12px rgba(0,0,0,0.35)',
+      }}
+    >{dir === 'prev' ? <ChevronLeft size={20}/> : <ChevronRight size={20}/>}</button>
+  );
 
   const slide = slides[activeIdx] ?? slides[0] ?? mkSlide(1, brand);
   const formatSlides = useMemo(
@@ -9496,41 +9517,18 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     </div>
                   ) : null}
 
-                  {/* Setas flutuantes */}
-                  {activeIdx > 0 && (
-                    <button
-                      onClick={()=>setActiveIdx(activeIdx-1)}
-                      aria-label="Slide anterior"
-                      style={{
-                        position:'absolute', left:-6, top:'50%', transform:'translateY(-50%)',
-                        width:40, height:40, borderRadius:'50%',
-                        background:'rgba(0,0,0,0.55)', border:'1px solid rgba(255,255,255,0.18)',
-                        color:'#fff', cursor:'pointer', backdropFilter:'blur(6px)',
-                        display:'flex', alignItems:'center', justifyContent:'center',
-                        boxShadow:'0 4px 12px rgba(0,0,0,0.35)',
-                      }}
-                    ><ChevronLeft size={18}/></button>
-                  )}
-                  {activeIdx < slides.length-1 && (
-                    <button
-                      onClick={()=>setActiveIdx(activeIdx+1)}
-                      aria-label="Próximo slide"
-                      style={{
-                        position:'absolute', right:-6, top:'50%', transform:'translateY(-50%)',
-                        width:40, height:40, borderRadius:'50%',
-                        background:'rgba(0,0,0,0.55)', border:'1px solid rgba(255,255,255,0.18)',
-                        color:'#fff', cursor:'pointer', backdropFilter:'blur(6px)',
-                        display:'flex', alignItems:'center', justifyContent:'center',
-                        boxShadow:'0 4px 12px rgba(0,0,0,0.35)',
-                      }}
-                    ><ChevronRight size={18}/></button>
-                  )}
+                  {/* Setas fora do card (João, 28/11: por cima da foto sumiam).
+                      Com folga dos lados (Stories), ficam ao lado do card; sem
+                      folga (4:5, 1:1, 16:9), vão para a linha de ações abaixo. */}
+                  {mobileArrowsBeside && activeIdx > 0 && renderMobileSlideArrow('prev', { position:'absolute', left:-(MOBILE_ARROW_SIZE + 6), top:'50%', transform:'translateY(-50%)' })}
+                  {mobileArrowsBeside && activeIdx < slides.length-1 && renderMobileSlideArrow('next', { position:'absolute', right:-(MOBILE_ARROW_SIZE + 6), top:'50%', transform:'translateY(-50%)' })}
                 </div>
 
                 {/* Ações rápidas do card atual — pill flutuante com tela cheia,
                     baixar, grade. Acima dos dots pra ficar visível mesmo quando
                     o drawer está aberto (área do card é metade superior). */}
-                <div style={{ display:'flex', justifyContent:'center', marginTop:8 }}>
+                <div style={{ display:'flex', justifyContent:'center', alignItems:'center', gap:8, marginTop:8 }}>
+                  {!mobileArrowsBeside && (activeIdx > 0 ? renderMobileSlideArrow('prev') : <span aria-hidden style={{ width:MOBILE_ARROW_SIZE, flexShrink:0 }}/>)}
                   <div style={{
                     display:'inline-flex', alignItems:'center', gap:2,
                     padding:4, borderRadius:9999,
@@ -9645,6 +9643,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       Aa
                     </button>
                   </div>
+                  {!mobileArrowsBeside && (activeIdx < slides.length-1 ? renderMobileSlideArrow('next') : <span aria-hidden style={{ width:MOBILE_ARROW_SIZE, flexShrink:0 }}/>)}
                 </div>
 
                 {/* Dots + contador */}

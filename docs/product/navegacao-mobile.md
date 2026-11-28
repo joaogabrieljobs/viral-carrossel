@@ -22,6 +22,7 @@
 - Com o painel aberto, a área acima dele mostra o card em miniatura, que acompanha a edição; tocar nela fecha o painel.
 - Tabela, métricas e passos do slide (28/11/2026): no celular um toque na célula entra na edição e abre o teclado; com mouse continua o duplo clique. O duplo toque do iPhone não chega como duplo clique. Teste: `tests/e2e/tabela-toque-edita.spec.js`.
 - Card no iPhone e no iPad (28/11/2026): reduzido com `transform`, não com `zoom`. Com `zoom` o iOS aumentava sozinho a letra do texto corrido (subtítulo e tabela saíam maiores e cortados na tela, diferentes do arquivo, e a célula em edição crescia mais). Regra em `src/utils/preview-scale.js`; conferido no Safari do Simulador iOS.
+- Setas de passar card (28/11/2026): fora da imagem, com alvo de 44 px. Ao lado do card quando sobra espaço (Stories); na linha de ações abaixo dele quando o card ocupa a largura. Teste: `tests/e2e/setas-fora-do-card.spec.js`.
 - Celular deitado (27/11/2026; altura até 500 px e largura maior que a altura, ex.: 844×390 e 932×430): o topo vira uma linha com Gerar, Desfazer, Refazer, formato e "Ferramentas"; faixa de contexto, abas, miniaturas e Exportar ficam atrás de "Ferramentas" (abre e recolhe). O card cabe inteiro na altura livre. Teste: `tests/e2e/celular-deitado.spec.js`.
 - Testes: `tests/e2e/navegacao-mobile.spec.js`. Capturas: `docs/mobile-nav/depois/` e `docs/mobile-nav/antes-depois-*.png` (agora com o app real, não a maquete).
 **Data:** 2026-11-18 · **Base:** `main` em `4257738`
