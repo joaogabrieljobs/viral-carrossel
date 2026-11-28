@@ -6,6 +6,7 @@ import { hasPresentationDesign, presentationForSocialFormat } from './presentati
 import { restorePresentationPhotoComposition } from './presentation-composition.js';
 import { socialFormatPatch } from './social-visual-composition.js';
 import { isFreeSocialSlide } from './social-free-design.js';
+import { changedTypographyFields, slideTypographyPatch } from './brand-typography.js';
 
 /** Ajustes visuais que podem ser diferentes em cada proporção. Texto e foto continuam no slide. */
 const VIEW_KEYS = [
@@ -175,7 +176,39 @@ export function slideForFormatDisplay(slide, fmt, formatViews, creativePreset) {
     next.elementOffsets = { ...(base.elementOffsets || {}), ...entry.elementOffsets };
   }
   if (entry.overlays) next.overlays = mergeOverlayContent(slide.overlays, entry.overlays);
-  return next;
+  return withPresentationTypeSizes(next, entry);
+}
+
+/**
+ * Slide de apresentação desenha o tamanho do token tipográfico da composição
+ * (`sizePercent`), não `titleSize`/`subSize`. O tamanho gravado na proporção
+ * aberta (régua da aba Texto, ajuste do card) vence o token; sem ele, o campo
+ * passa a mostrar o tamanho desenhado, para a próxima régua partir dele.
+ * Antes as duas réguas não mudavam nenhum slide de apresentação (27/11).
+ */
+function withPresentationTypeSizes(next, entry) {
+  const composition = String(next?.presentationComposition || '').trim();
+  const tokens = composition && next.presentationTypographyByComposition?.[composition];
+  if (!tokens || typeof tokens !== 'object') return next;
+  let changed = false;
+  const own = { ...tokens };
+  const out = { ...next };
+  for (const [key, field] of [['title', 'titleSize'], ['subtitle', 'subSize']]) {
+    const token = tokens[key];
+    const drawn = Number(token?.sizePercent);
+    if (!token || typeof token !== 'object' || !(drawn > 0)) continue;
+    const chosen = Number(entry?.[field]);
+    if (Number.isFinite(chosen) && chosen > 0) {
+      if (chosen !== drawn) { own[key] = { ...token, sizePercent: chosen }; changed = true; }
+      out[field] = chosen;
+    } else {
+      out[field] = drawn;
+    }
+  }
+  if (changed) {
+    out.presentationTypographyByComposition = { ...next.presentationTypographyByComposition, [composition]: own };
+  }
+  return out;
 }
 
 /** Ajuste da marca numa vista derivada fica só nessa proporção. */
@@ -336,6 +369,27 @@ export function applyFormatEdit(doc, index, patch) {
     };
   }
   return isPhotoSwap(slide, patch) ? settlePhotoSwap(next, index, patch) : next;
+}
+
+/**
+ * Régua de tipografia da marca → slides, pelo mesmo caminho do ajuste card a
+ * card. A proporção é calculada sobre o tamanho que o card MOSTRA na
+ * proporção aberta; numa vista derivada (Stories, Quadrado, apresentação) o
+ * valor fica na vista. Gravar só no slide base não mudava o card que tinha
+ * tamanho próprio na vista (Apoteose 10, slide 9, 27/11).
+ */
+export function applyBrandTypographyEdit(doc, prevBrand, nextBrand) {
+  if (!doc || !Array.isArray(doc.slides) || !doc.slides.length) return doc;
+  const mudancas = changedTypographyFields(prevBrand, nextBrand);
+  if (!mudancas.length) return doc;
+  const fmt = FORMATS[doc.fmt] ? doc.fmt : 'carrossel';
+  return doc.slides.reduce((next, slide, index) => {
+    if (!slide) return next;
+    const derived = isDerivedView(next, slide);
+    const shown = derived ? slideForFormatDisplay(slide, fmt, next.formatViews, next.creativePreset) : slide;
+    const patch = slideTypographyPatch(shown, mudancas);
+    return patch ? applyFormatEdit(next, index, patch) : next;
+  }, doc);
 }
 
 function isDerivedView(doc, slide) {

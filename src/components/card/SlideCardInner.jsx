@@ -926,6 +926,11 @@ const ClassicCanvasInner = React.forwardRef(({
   const photoFailed = slide.bgImageFailed === true || (!!slide.bgImage && imgReady && imgErr);
   const supportingText = showSupportingText ? String(slide.bodyAfterImage || '').trim() : '';
   const nativeEvidence = showSupportingText && normalizePresentationBlocks(slide.presentationBlocks).length > 0;
+  // Texto acima do quadro de evidência (zIndex 5). Se a pessoa (ou a troca de
+  // proporção) põe o subtítulo dentro da tabela, ele continua visível e
+  // clicável para ser movido; antes sumia sob o fundo opaco do quadro e
+  // travava a exportação sem que se achasse o porquê (Apoteose 10, 27/11).
+  const textZoneZ = nativeEvidence ? 6 : 4;
   const photoZoneInteractive = !!(onPhotoZoneClick && (showCanvasChrome || pendingPhotoZone || photoFailed));
   const photoZoneNativeHit = !!(photoZoneInteractive && onPhotoZoneFileChange);
   // A moldura da foto não se desloca (o arrasto reenquadra a imagem).
@@ -1065,7 +1070,7 @@ const ClassicCanvasInner = React.forwardRef(({
         containerStyle={{
           ...pctBox(tr, f),
           ...VC_TEXT_ZONE_STYLE,
-          zIndex: 4,
+          zIndex: textZoneZ,
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
@@ -1167,7 +1172,7 @@ const ClassicCanvasInner = React.forwardRef(({
         containerStyle={{
           ...pctBox(sr, f),
           ...VC_TEXT_ZONE_STYLE,
-          zIndex: 4,
+          zIndex: textZoneZ,
           overflow: 'hidden',
           background: 'transparent',
           padding: `${padYZn}px ${padSubtitleXp}px`,

@@ -149,7 +149,7 @@ import * as accountLibraryMeta from './src/utils/account-library-meta.js';
 import { FORMATS } from './src/utils/formats.js';
 import { usePhotoFraming } from './src/hooks/usePhotoFraming.js';
 import { automaticPhotoFramingPatch } from './src/utils/photo-framing.js';
-import { applyBrandEdit, applyFormatEdit, applyPhotoSwapSlides, brandForFormatDisplay, duplicateSlideInDoc, slideForFormatDisplay, transformFormatVisuals } from './src/utils/format-view.js';
+import { applyBrandEdit, applyBrandTypographyEdit, applyFormatEdit, applyPhotoSwapSlides, brandForFormatDisplay, duplicateSlideInDoc, slideForFormatDisplay, transformFormatVisuals } from './src/utils/format-view.js';
 import { PALETTES, TITLE_FONTS, TEMPLATES } from './src/utils/design-data.js';
 import { getServerStatus } from './src/utils/server-status.js';
 import {
@@ -1341,9 +1341,7 @@ export default function App() {
           d.fmt, d.formatViews, d.creativePreset,
         ));
         const brandNext = hydrateBrandTextColors(typeof next === 'function' ? next(cur) : { ...cur, ...next });
-        const edited = applyBrandEdit(d, brandNext);
-        const slidesNext = propagateBrandTypography(edited.slides, cur, brandNext);
-        return slidesNext === edited.slides ? edited : { ...edited, slides: slidesNext };
+        return applyBrandTypographyEdit(applyBrandEdit(d, brandNext), cur, brandNext);
       }),
     [history],
   );
