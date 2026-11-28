@@ -7,6 +7,7 @@ import { getVideoUrl } from '../../utils/video-store.js';
 import AutoFitText from '../AutoFitText.jsx';
 import PresentationBlocks from '../PresentationBlocks.jsx';
 import PhotoFrameEditor from './PhotoFrameEditor.jsx';
+import { currentPreviewScaleUsesZoom } from '../../utils/preview-scale.js';
 import PresentationArtChrome from './PresentationArtChrome.jsx';
 import SocialArtChrome from './SocialArtChrome.jsx';
 import { readableInk, socialScrimAlphas } from '../../utils/social-chrome.js';
@@ -4177,11 +4178,9 @@ const SlideCardInner = React.forwardRef(({
     && getComposition(slide.composition)?.showSwipeCue !== false;
   const showEdgePeek = !!(slide.edgePeek || getComposition(slide.composition)?.edgePeek);
 
-  // `zoom` (Chromium/WebKit) mantém logos/PNG nítidos na miniatura; `transform:
-  // scale` reamostra bitmaps e deixava a marca borrosa. Firefox cai no fallback.
-  const previewUsesZoom = typeof CSS !== 'undefined'
-    && typeof CSS.supports === 'function'
-    && CSS.supports('zoom', '1');
+  // `zoom` mantém logos/PNG nítidos na miniatura; no iPhone/iPad e no Firefox o
+  // card usa `transform` (ver `src/utils/preview-scale.js`).
+  const previewUsesZoom = currentPreviewScaleUsesZoom();
 
   return (
     <div
